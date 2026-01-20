@@ -186,6 +186,36 @@ export const api = {
       throw error;
     }
   },
+
+  // ============ МЕТАДАННЫЕ ============
+
+  // Получить уникальные годы из задач
+  async getUniqueYears() {
+    try {
+      const records = await pb.collection('tasks').getFullList({
+        fields: 'year',
+      });
+      const years = [...new Set(records.map(r => r.year).filter(Boolean))];
+      return years.sort((a, b) => b - a); // Сортируем по убыванию
+    } catch (error) {
+      console.error('Error fetching years:', error);
+      return [];
+    }
+  },
+
+  // Получить уникальные источники из задач
+  async getUniqueSources() {
+    try {
+      const records = await pb.collection('tasks').getFullList({
+        fields: 'source',
+      });
+      const sources = [...new Set(records.map(r => r.source).filter(Boolean))];
+      return sources.sort();
+    } catch (error) {
+      console.error('Error fetching sources:', error);
+      return [];
+    }
+  },
 };
 
 export default pb;

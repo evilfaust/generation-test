@@ -6,7 +6,7 @@ import MathRenderer from './MathRenderer';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const TaskEditModal = ({ task, visible, onClose, onSave }) => {
+const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSources = [], allYears = [] }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [previewStatement, setPreviewStatement] = useState('');
@@ -19,6 +19,9 @@ const TaskEditModal = ({ task, visible, onClose, onSave }) => {
         answer: task.answer || '',
         statement_md: task.statement_md || '',
         solution_md: task.solution_md || '',
+        source: task.source || '',
+        year: task.year || undefined,
+        tags: task.tags || [],
       });
       setPreviewStatement(task.statement_md || '');
       setPreviewAnswer(task.answer || '');
@@ -92,6 +95,60 @@ const TaskEditModal = ({ task, visible, onClose, onSave }) => {
             <Option value="3">3 - Повышенный</Option>
             <Option value="4">4 - Высокий</Option>
             <Option value="5">5 - Олимпиадный</Option>
+          </Select>
+        </Form.Item>
+
+        {/* Источник */}
+        <Form.Item
+          name="source"
+          label="Источник"
+        >
+          <Select
+            placeholder="Выберите или введите источник"
+            allowClear
+            showSearch
+            mode="tags"
+            maxTagCount={1}
+          >
+            {allSources.map(s => (
+              <Option key={s} value={s}>{s}</Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        {/* Год */}
+        <Form.Item
+          name="year"
+          label="Год"
+        >
+          <Select
+            placeholder="Выберите год"
+            allowClear
+            showSearch
+          >
+            {allYears.map(y => (
+              <Option key={y} value={y}>{y}</Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        {/* Теги */}
+        <Form.Item
+          name="tags"
+          label="Теги"
+        >
+          <Select
+            mode="multiple"
+            placeholder="Выберите теги"
+            allowClear
+            showSearch
+            optionFilterProp="children"
+          >
+            {allTags.map(tag => (
+              <Option key={tag.id} value={tag.id}>
+                {tag.title}
+              </Option>
+            ))}
           </Select>
         </Form.Item>
 

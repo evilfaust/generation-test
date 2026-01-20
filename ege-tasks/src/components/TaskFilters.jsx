@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Card, Form, Select, Button, Space, Row, Col, Radio, Statistic, Badge } from 'antd';
-import { FilterOutlined, ClearOutlined } from '@ant-design/icons';
+import { useState, useEffect, useCallback } from 'react';
+import { Card, Form, Select, Button, Space, Row, Col, Radio, Statistic, Badge, Input, Tag } from 'antd';
+import { FilterOutlined, ClearOutlined, SearchOutlined, CloseCircleOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
-const TaskFilters = ({ topics, tags, onFilterChange, totalCount }) => {
+const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, totalCount }) => {
   const [form] = Form.useForm();
   const [filters, setFilters] = useState({});
 
@@ -19,10 +19,11 @@ const TaskFilters = ({ topics, tags, onFilterChange, totalCount }) => {
     return colors[difficulty] || '#d9d9d9';
   };
 
-  const handleApplyFilters = () => {
-    const values = form.getFieldsValue();
+  // Автоматическое применение фильтров при изменении
+  const applyFilters = useCallback((values) => {
     const newFilters = {};
 
+    if (values.search) newFilters.search = values.search;
     if (values.topic) newFilters.topic = values.topic;
     if (values.difficulty) newFilters.difficulty = values.difficulty;
     if (values.source) newFilters.source = values.source;
@@ -32,6 +33,12 @@ const TaskFilters = ({ topics, tags, onFilterChange, totalCount }) => {
 
     setFilters(newFilters);
     onFilterChange(newFilters);
+  }, [onFilterChange]);
+
+  // Обработчик изменения любого поля
+  const handleFieldChange = () => {
+    const values = form.getFieldsValue();
+    applyFilters(values);
   };
 
   const handleResetFilters = () => {
@@ -40,8 +47,17 @@ const TaskFilters = ({ topics, tags, onFilterChange, totalCount }) => {
     onFilterChange({});
   };
 
-  const sources = [...new Set(topics.map(t => t.section))].filter(Boolean);
-  const years = [2024, 2025, 2026];
+  const removeFilter = (filterKey) => {
+    form.setFieldValue(filterKey, undefined);
+    const values = form.getFieldsValue();
+    values[filterKey] = undefined;
+    applyFilters(values);
+  };
+
+  const getActiveFiltersCount = () => {
+    return Object.keys(filters).length;
+  };
+
   const difficulties = [
     { value: '1', label: 'Базовый' },
     { value: '2', label: 'Средний' },
@@ -70,8 +86,20 @@ const TaskFilters = ({ topics, tags, onFilterChange, totalCount }) => {
       <Form
         form={form}
         layout="vertical"
-        onFinish={handleApplyFilters}
+        onValuesChange={handleFieldChange}
       >
+        <Row gutter={16}>
+          <Col xs={24}>
+            <Form.Item name="search" label="Поиск по коду или тексту">
+              <Input
+                placeholder="Введите код задачи или текст..."
+                prefix={<SearchOutlined />}
+                allowClear
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
         <Row gutter={16}>
           <Col xs={24} sm={12} md={6}>
             <Form.Item name="topic" label="Тема">
@@ -148,15 +176,81 @@ const TaskFilters = ({ topics, tags, onFilterChange, totalCount }) => {
           </Col>
         </Row>
 
+        {getActiveFiltersCount() > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Space wrap>
+              <span style={{ color: '#666', fontWeight: 500 }}>Активные фильтры:</span>
+              {filters.search && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('search')}
+                  color="blue"
+                >
+                  Поиск: {filters.search}
+                </Tag>
+              )}
+              {filters.topic && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('topic')}
+                  color="blue"
+                >
+                  Тема: {topics.find(t => t.id === filters.topic)?.title}
+                </Tag>
+              )}
+              {filters.difficulty && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('difficulty')}
+                  color="blue"
+                >
+                  Сложность: {filters.difficulty}
+                </Tag>
+              )}
+              {filters.source && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('source')}
+                  color="blue"
+                >
+                  Источник: {filters.source}
+                </Tag>
+              )}
+              {filters.year && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('year')}
+                  color="blue"
+                >
+                  Год: {filters.year}
+                </Tag>
+              )}
+              {filters.hasAnswer !== undefined && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('hasAnswer')}
+                  color="green"
+                >
+                  {filters.hasAnswer ? 'С ответом' : 'Без ответа'}
+                </Tag>
+              )}
+              {filters.hasSolution !== undefined && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('hasSolution')}
+                  color="green"
+                >
+                  {filters.hasSolution ? 'С решением' : 'Без решения'}
+                </Tag>
+              )}
+            </Space>
+          </div>
+        )}
+
         <Form.Item>
-          <Space>
-            <Button type="primary" htmlType="submit" icon={<FilterOutlined />}>
-              Применить фильтры
-            </Button>
-            <Button onClick={handleResetFilters} icon={<ClearOutlined />}>
-              Сбросить
-            </Button>
-          </Space>
+          <Button onClick={handleResetFilters} icon={<ClearOutlined />}>
+            Сбросить все фильтры
+          </Button>
         </Form.Item>
       </Form>
     </Card>

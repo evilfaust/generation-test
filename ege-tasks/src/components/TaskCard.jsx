@@ -14,7 +14,7 @@ import { api } from '../services/pocketbase';
 const { Text, Paragraph } = Typography;
 const { Option } = Select;
 
-const TaskCard = ({ task, onUpdate }) => {
+const TaskCard = ({ task, allTags, allSources, allYears, onUpdate }) => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [changingDifficulty, setChangingDifficulty] = useState(false);
 
@@ -231,6 +231,9 @@ const TaskCard = ({ task, onUpdate }) => {
         visible={editModalVisible}
         onClose={() => setEditModalVisible(false)}
         onSave={handleSave}
+        allTags={allTags || []}
+        allSources={allSources || []}
+        allYears={allYears || []}
       />
     </>
   );
