@@ -180,8 +180,215 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  
+
   .task-answer {
     background: #f0f9ff !important;
+  }
+}
+
+/* ============ НОВЫЕ СТИЛИ ============ */
+
+/* Разрыв страницы */
+.page-break {
+  page-break-after: always;
+  break-after: always;
+}
+
+@media screen {
+  .page-break {
+    height: 30px;
+    border-bottom: 2px dashed #ccc;
+    margin: 20px 0;
+    position: relative;
+  }
+
+  .page-break::after {
+    content: "Разрыв страницы";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 0 10px;
+    color: #999;
+    font-size: 12px;
+  }
+}
+
+/* Титульный лист */
+.title-page {
+  min-height: 297mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.title-page-content h1 {
+  font-size: 2.5em;
+  margin-bottom: 20px;
+  color: #1890ff;
+}
+
+.title-page-content .work-date {
+  font-size: 1.3em;
+  color: #666;
+  margin: 10px 0;
+}
+
+.title-page-content .work-class {
+  font-size: 1.2em;
+  color: #666;
+  margin: 10px 0;
+}
+
+@media print {
+  .title-page {
+    page-break-after: always;
+  }
+}
+
+/* Контейнер варианта */
+.variant-container {
+  margin-bottom: 30px;
+}
+
+/* Заголовок варианта */
+.variant-header {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #1890ff;
+}
+
+.variant-header h2 {
+  font-size: 1.8em;
+  color: #1890ff;
+  margin: 0 0 15px 0;
+}
+
+/* Информация о студенте */
+.student-info {
+  display: flex;
+  gap: 30px;
+  margin-top: 15px;
+}
+
+.student-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.student-field span {
+  font-weight: 600;
+  color: #666;
+  white-space: nowrap;
+}
+
+.student-line {
+  border-bottom: 1px solid #333;
+  min-width: 200px;
+}
+
+@media print {
+  .variant-header {
+    page-break-after: avoid;
+  }
+}
+
+/* Контент с задачами */
+.tasks-content {
+  margin-top: 20px;
+}
+
+/* Места для решения - разные размеры */
+.answer-space-none {
+  display: none;
+}
+
+.answer-space-small {
+  min-height: 30px;
+  margin-top: 10px;
+}
+
+.answer-space-medium {
+  min-height: 60px;
+  margin-top: 10px;
+}
+
+.answer-space-large {
+  min-height: 100px;
+  margin-top: 10px;
+}
+
+.answer-space-small,
+.answer-space-medium,
+.answer-space-large {
+  border-top: 1px dashed #ccc;
+  padding-top: 8px;
+  color: #999;
+  font-style: italic;
+}
+
+/* Страница с ответами */
+.answers-page {
+  padding: 20px;
+  page-break-before: always;
+}
+
+.answers-page h2 {
+  font-size: 2em;
+  color: #1890ff;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.variant-answers {
+  margin-bottom: 30px;
+  page-break-inside: avoid;
+}
+
+.variant-answers h3 {
+  font-size: 1.5em;
+  color: #333;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #e8e8e8;
+  padding-bottom: 8px;
+}
+
+.answers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.answer-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.answer-number {
+  font-weight: 600;
+  color: #1890ff;
+  min-width: 30px;
+}
+
+.answer-value {
+  flex: 1;
+  color: #333;
+}
+
+@media print {
+  .answers-page {
+    page-break-before: always;
+  }
+
+  .answer-item {
+    background: #f5f5f5 !important;
   }
 }

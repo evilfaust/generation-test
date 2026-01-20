@@ -82,9 +82,11 @@ function App() {
         );
       case 'worksheet':
         return (
-          <TaskWorksheet 
-            topics={topics} 
+          <TaskWorksheet
+            topics={topics}
             tags={tags}
+            years={years}
+            sources={sources}
           />
         );
       default:
