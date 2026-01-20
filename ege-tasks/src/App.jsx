@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Menu, ConfigProvider, theme } from 'antd';
+import { Layout, Menu, ConfigProvider, theme, message } from 'antd';
 import { FileTextOutlined, PrinterOutlined, FileSearchOutlined } from '@ant-design/icons';
 import TaskList from './components/TaskList';
 import WorksheetGenerator from './components/WorksheetGenerator';
@@ -14,6 +14,8 @@ function App() {
   const [currentView, setCurrentView] = useState('tasks');
   const [topics, setTopics] = useState([]);
   const [tags, setTags] = useState([]);
+  const [years, setYears] = useState([]);
+  const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tasksKey, setTasksKey] = useState(0);
 
@@ -24,14 +26,19 @@ function App() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [topicsData, tagsData] = await Promise.all([
+      const [topicsData, tagsData, yearsData, sourcesData] = await Promise.all([
         api.getTopics(),
         api.getTags(),
+        api.getUniqueYears(),
+        api.getUniqueSources(),
       ]);
       setTopics(topicsData);
       setTags(tagsData);
+      setYears(yearsData);
+      setSources(sourcesData);
     } catch (error) {
       console.error('Error loading data:', error);
+      message.error('Ошибка при загрузке данных');
     } finally {
       setLoading(false);
     }
@@ -63,10 +70,12 @@ function App() {
     switch (currentView) {
       case 'tasks':
         return (
-          <TaskList 
+          <TaskList
             key={tasksKey}
-            topics={topics} 
-            tags={tags} 
+            topics={topics}
+            tags={tags}
+            years={years}
+            sources={sources}
             loading={loading}
             onUpdate={handleTaskUpdate}
           />

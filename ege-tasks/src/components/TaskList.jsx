@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Row, Col, Spin, Empty, Pagination } from 'antd';
+import { Row, Col, Spin, Empty, Pagination, message, Skeleton, Card } from 'antd';
 import TaskFilters from './TaskFilters';
 import TaskCard from './TaskCard';
 import { api } from '../services/pocketbase';
 
-const TaskList = ({ topics, tags, loading: initialLoading, onUpdate }) => {
+const TaskList = ({ topics, tags, years, sources, loading: initialLoading, onUpdate }) => {
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -17,17 +17,37 @@ const TaskList = ({ topics, tags, loading: initialLoading, onUpdate }) => {
     loadTasks();
   }, []);
 
-  const loadTasks = async (newFilters = {}) => {
+  // Применяем клиентский поиск
+  useEffect(() => {
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      const filtered = tasks.filter(task => {
+        return (
+          task.code?.toLowerCase().includes(searchLower) ||
+          task.statement_md?.toLowerCase().includes(searchLower)
+        );
+      });
+      setFilteredTasks(filtered);
+      setCurrentPage(1); // Сбрасываем на первую страницу при поиске
+    } else {
+      setFilteredTasks(tasks);
+    }
+  }, [filters.search, tasks]);
+
+  const loadTasks = async (newFilters = {}, resetPage = false) => {
     setLoading(true);
     try {
       const data = await api.getTasks(newFilters);
       setTasks(data);
       setFilteredTasks(data);
-      setCurrentPage(1);
+      if (resetPage) {
+        setCurrentPage(1);
+      }
       // Сохраняем фильтры в ref
       filtersRef.current = newFilters;
     } catch (error) {
       console.error('Error loading tasks:', error);
+      message.error('Ошибка при загрузке задач');
     } finally {
       setLoading(false);
     }
@@ -35,7 +55,12 @@ const TaskList = ({ topics, tags, loading: initialLoading, onUpdate }) => {
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    loadTasks(newFilters);
+
+    // Разделяем поиск от остальных фильтров
+    const { search, ...serverFilters } = newFilters;
+
+    // Загружаем задачи с серверными фильтрами и сбрасываем страницу
+    loadTasks(serverFilters, true);
   };
 
   const handlePageChange = (page, size) => {
@@ -61,6 +86,7 @@ const TaskList = ({ topics, tags, loading: initialLoading, onUpdate }) => {
       // НЕ сбрасываем currentPage и фильтры!
     } catch (error) {
       console.error('Error loading tasks:', error);
+      message.error('Ошибка при загрузке задач');
     } finally {
       setLoading(false);
     }
@@ -81,17 +107,25 @@ const TaskList = ({ topics, tags, loading: initialLoading, onUpdate }) => {
 
   return (
     <div>
-      <TaskFilters 
+      <TaskFilters
         topics={topics}
         tags={tags}
+        years={years}
+        sources={sources}
         onFilterChange={handleFilterChange}
         totalCount={filteredTasks.length}
       />
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '50px 0' }}>
-          <Spin size="large" />
-        </div>
+        <Row gutter={[16, 16]}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Col xs={24} sm={24} md={12} lg={8} key={i}>
+              <Card>
+                <Skeleton active paragraph={{ rows: 4 }} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
       ) : filteredTasks.length === 0 ? (
         <Empty 
           description="Задачи не найдены"
@@ -102,8 +136,11 @@ const TaskList = ({ topics, tags, loading: initialLoading, onUpdate }) => {
           <Row gutter={[16, 16]}>
             {paginatedTasks.map((task) => (
               <Col xs={24} sm={24} md={12} lg={8} key={task.id}>
-                <TaskCard 
+                <TaskCard
                   task={task}
+                  allTags={tags}
+                  allSources={sources}
+                  allYears={years}
                   onUpdate={handleTaskUpdate}
                 />
               </Col>
