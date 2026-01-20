@@ -17,7 +17,6 @@ function App() {
   const [years, setYears] = useState([]);
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tasksKey, setTasksKey] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -44,10 +43,6 @@ function App() {
     }
   };
 
-  const handleTaskUpdate = () => {
-    setTasksKey(prev => prev + 1);
-  };
-
   const menuItems = [
     {
       key: 'tasks',
@@ -71,13 +66,11 @@ function App() {
       case 'tasks':
         return (
           <TaskList
-            key={tasksKey}
             topics={topics}
             tags={tags}
             years={years}
             sources={sources}
             loading={loading}
-            onUpdate={handleTaskUpdate}
           />
         );
       case 'generator':
