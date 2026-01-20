@@ -4,7 +4,7 @@ import TaskFilters from './TaskFilters';
 import TaskCard from './TaskCard';
 import { api } from '../services/pocketbase';
 
-const TaskList = ({ topics, tags, years, sources, loading: initialLoading, onUpdate }) => {
+const TaskList = ({ topics, tags, years, sources, loading: initialLoading }) => {
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -70,11 +70,8 @@ const TaskList = ({ topics, tags, years, sources, loading: initialLoading, onUpd
 
   const handleTaskUpdate = () => {
     // Перезагружаем задачи с СОХРАНЁННЫМИ фильтрами из ref
+    // Фильтры и страница НЕ сбрасываются!
     loadTasksWithoutReset(filtersRef.current);
-    // Вызываем родительский callback если есть
-    if (onUpdate) {
-      onUpdate();
-    }
   };
 
   const loadTasksWithoutReset = async (currentFilters = {}) => {
@@ -82,8 +79,9 @@ const TaskList = ({ topics, tags, years, sources, loading: initialLoading, onUpd
     try {
       const data = await api.getTasks(currentFilters);
       setTasks(data);
-      setFilteredTasks(data);
+      // filteredTasks обновится через useEffect с клиентским поиском
       // НЕ сбрасываем currentPage и фильтры!
+      filtersRef.current = currentFilters; // Обновляем ref
     } catch (error) {
       console.error('Error loading tasks:', error);
       message.error('Ошибка при загрузке задач');
