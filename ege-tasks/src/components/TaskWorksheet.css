@@ -23,7 +23,7 @@
 /* Печатный лист */
 .printable-worksheet {
   background: white;
-  padding: 15mm;
+  padding: 20px;
   margin: 20px auto;
   max-width: 210mm;
   min-height: 297mm;
@@ -34,12 +34,12 @@
 @media print {
   .printable-worksheet {
     margin: 0;
-    padding: 15mm;
+    padding: 12mm 15mm;
     box-shadow: none;
     max-width: 100%;
     page-break-after: always;
   }
-  
+
   @page {
     size: A4;
     margin: 0;
@@ -50,9 +50,9 @@
 .task-item {
   break-inside: avoid;
   page-break-inside: avoid;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e8e8e8;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .task-item:last-child {
@@ -62,57 +62,69 @@
 /* Заголовок задачи */
 .task-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 6px;
   font-weight: 600;
 }
 
 .task-number {
-  font-size: 1.1em;
+  font-size: 1.15em;
   color: #1890ff;
+  font-weight: 700;
+  min-width: 28px;
 }
 
 .task-code {
-  font-size: 0.85em;
+  font-size: 0.8em;
   color: #999;
-  font-family: monospace;
+  font-family: 'Courier New', monospace;
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+@media print {
+  .task-code {
+    background: #f5f5f5 !important;
+  }
 }
 
 /* Содержимое задачи */
 .task-content {
-  line-height: 1.6;
-  margin-bottom: 8px;
+  line-height: 1.55;
+  margin-bottom: 6px;
+  text-align: justify;
 }
 
 /* Изображение в задаче */
 .task-image {
-  margin: 10px 0;
+  margin: 8px 0;
   text-align: center;
 }
 
 .task-image img {
   max-width: 100%;
-  max-height: 200px;
+  max-height: 180px;
   height: auto;
-  border-radius: 4px;
-  border: 1px solid #e8e8e8;
+  border-radius: 3px;
+  border: 1px solid #ddd;
 }
 
 @media print {
   .task-image img {
-    max-height: 150px;
+    max-height: 140px;
   }
 }
 
 /* Ответ */
 .task-answer {
-  margin-top: 8px;
-  padding: 6px 10px;
+  margin-top: 6px;
+  padding: 5px 10px;
   background: #f0f9ff;
   border-left: 3px solid #1890ff;
-  border-radius: 3px;
-  font-size: 0.95em;
+  border-radius: 2px;
+  font-size: 0.92em;
 }
 
 .task-answer strong {
@@ -121,12 +133,12 @@
 
 /* Место для ответа */
 .answer-space {
-  margin-top: 8px;
-  padding: 6px 0;
-  font-size: 0.95em;
-  color: #666;
-  border-top: 1px dashed #ddd;
-  padding-top: 8px;
+  margin-top: 6px;
+  padding: 5px 0;
+  font-size: 0.9em;
+  color: #777;
+  border-top: 1px dashed #ccc;
+  padding-top: 6px;
 }
 
 /* Стили для математических формул */
@@ -250,49 +262,56 @@
 
 /* Контейнер варианта */
 .variant-container {
-  margin-bottom: 30px;
+  margin-bottom: 25px;
 }
 
 /* Заголовок варианта */
 .variant-header {
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #1890ff;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2.5px solid #1890ff;
+  background: linear-gradient(to right, #f0f9ff 0%, transparent 100%);
+  padding: 10px 12px;
+  border-radius: 4px 4px 0 0;
 }
 
 .variant-header h2 {
-  font-size: 1.8em;
+  font-size: 1.6em;
   color: #1890ff;
-  margin: 0 0 15px 0;
+  margin: 0 0 12px 0;
+  font-weight: 700;
 }
 
 /* Информация о студенте */
 .student-info {
   display: flex;
-  gap: 30px;
-  margin-top: 15px;
+  gap: 25px;
+  margin-top: 10px;
+  flex-wrap: wrap;
 }
 
 .student-field {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .student-field span {
   font-weight: 600;
-  color: #666;
+  color: #555;
   white-space: nowrap;
+  font-size: 0.95em;
 }
 
 .student-line {
-  border-bottom: 1px solid #333;
+  border-bottom: 1.5px solid #333;
   min-width: 200px;
 }
 
 @media print {
   .variant-header {
     page-break-after: avoid;
+    background: #f0f9ff !important;
   }
 }
 
@@ -332,55 +351,62 @@
 
 /* Страница с ответами */
 .answers-page {
-  padding: 20px;
+  padding: 15px;
   page-break-before: always;
 }
 
 .answers-page h2 {
-  font-size: 2em;
+  font-size: 1.9em;
   color: #1890ff;
-  margin-bottom: 30px;
+  margin-bottom: 25px;
   text-align: center;
+  font-weight: 700;
+  border-bottom: 3px solid #1890ff;
+  padding-bottom: 10px;
 }
 
 .variant-answers {
-  margin-bottom: 30px;
+  margin-bottom: 25px;
   page-break-inside: avoid;
 }
 
 .variant-answers h3 {
-  font-size: 1.5em;
+  font-size: 1.35em;
   color: #333;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   border-bottom: 2px solid #e8e8e8;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
+  font-weight: 600;
 }
 
 .answers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  padding: 10px 0;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 8px 0;
 }
 
 .answer-item {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  padding: 8px;
+  gap: 8px;
+  padding: 6px 10px;
   background: #f5f5f5;
-  border-radius: 4px;
+  border-radius: 3px;
+  border-left: 3px solid #1890ff;
 }
 
 .answer-number {
-  font-weight: 600;
+  font-weight: 700;
   color: #1890ff;
-  min-width: 30px;
+  min-width: 28px;
+  font-size: 0.95em;
 }
 
 .answer-value {
   flex: 1;
   color: #333;
+  font-size: 0.95em;
 }
 
 @media print {

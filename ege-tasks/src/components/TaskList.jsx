@@ -17,22 +17,55 @@ const TaskList = ({ topics, tags, years, sources, loading: initialLoading }) => 
     loadTasks();
   }, []);
 
-  // Применяем клиентский поиск
+  // Применяем клиентский поиск и сортировку
   useEffect(() => {
+    let result = [...tasks];
+
+    // Применяем поиск
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      const filtered = tasks.filter(task => {
+      result = result.filter(task => {
         return (
           task.code?.toLowerCase().includes(searchLower) ||
           task.statement_md?.toLowerCase().includes(searchLower)
         );
       });
-      setFilteredTasks(filtered);
-      setCurrentPage(1); // Сбрасываем на первую страницу при поиске
-    } else {
-      setFilteredTasks(tasks);
     }
-  }, [filters.search, tasks]);
+
+    // Применяем сортировку
+    if (filters.sortBy) {
+      switch (filters.sortBy) {
+        case 'code':
+          result.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+          break;
+        case 'difficulty':
+          result.sort((a, b) => {
+            const diffA = parseInt(a.difficulty || '1');
+            const diffB = parseInt(b.difficulty || '1');
+            return diffA - diffB;
+          });
+          break;
+        case 'created':
+          result.sort((a, b) => new Date(b.created) - new Date(a.created));
+          break;
+        case 'updated':
+          result.sort((a, b) => new Date(b.updated) - new Date(a.updated));
+          break;
+        default:
+          result.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+      }
+    } else {
+      // Сортировка по умолчанию - по коду
+      result.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+    }
+
+    setFilteredTasks(result);
+
+    // Сбрасываем на первую страницу при изменении поиска
+    if (filters.search) {
+      setCurrentPage(1);
+    }
+  }, [filters.search, filters.sortBy, tasks]);
 
   const loadTasks = async (newFilters = {}, resetPage = false) => {
     setLoading(true);
