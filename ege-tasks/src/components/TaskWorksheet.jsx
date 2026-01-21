@@ -63,6 +63,11 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [savingWork, setSavingWork] = useState(false);
 
+  // Состояния для загрузки работы
+  const [loadModalVisible, setLoadModalVisible] = useState(false);
+  const [savedWorks, setSavedWorks] = useState([]);
+  const [loadingWorks, setLoadingWorks] = useState(false);
+
   const handleGenerate = async (values) => {
     setLoading(true);
     try {
@@ -272,6 +277,99 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
       message.error('Ошибка при сохранении работы');
     } finally {
       setSavingWork(false);
+    }
+  };
+
+  const handleOpenLoadModal = async () => {
+    setLoadModalVisible(true);
+    setLoadingWorks(true);
+    try {
+      const works = await api.getWorks();
+      setSavedWorks(works);
+    } catch (error) {
+      console.error('Error loading works:', error);
+      message.error('Ошибка при загрузке работ');
+    } finally {
+      setLoadingWorks(false);
+    }
+  };
+
+  const handleLoadWork = async (workId) => {
+    setLoadingWorks(true);
+    try {
+      // Загружаем работу и её варианты
+      const work = await api.getWork(workId);
+      const variantsData = await api.getVariantsByWork(workId);
+
+      // Формируем варианты в нужном формате
+      const loadedVariants = [];
+      for (const variantData of variantsData) {
+        // Получаем задачи варианта в правильном порядке
+        const tasksIds = variantData.tasks || [];
+        const order = variantData.order || [];
+
+        // Загружаем полные данные задач
+        const tasks = [];
+        for (const taskId of tasksIds) {
+          const task = await api.getTask(taskId);
+          if (task) {
+            tasks.push(task);
+          }
+        }
+
+        // Сортируем задачи по порядку из order
+        if (order.length > 0) {
+          tasks.sort((a, b) => {
+            const posA = order.find(o => o.taskId === a.id)?.position ?? 999;
+            const posB = order.find(o => o.taskId === b.id)?.position ?? 999;
+            return posA - posB;
+          });
+        }
+
+        loadedVariants.push({
+          number: variantData.number,
+          tasks: tasks,
+        });
+      }
+
+      // Устанавливаем загруженные варианты
+      setVariants(loadedVariants);
+
+      // Заполняем форму данными работы
+      form.setFieldsValue({
+        workTitle: work.title,
+        workClass: work.class?.toString(),
+        topic: work.topic,
+      });
+
+      setLoadModalVisible(false);
+      message.success(`Работа "${work.title}" успешно загружена`);
+    } catch (error) {
+      console.error('Error loading work:', error);
+      message.error('Ошибка при загрузке работы');
+    } finally {
+      setLoadingWorks(false);
+    }
+  };
+
+  const handleDeleteWork = async (workId, workTitle) => {
+    try {
+      // Сначала удаляем все варианты работы
+      const variantsData = await api.getVariantsByWork(workId);
+      for (const variant of variantsData) {
+        await api.deleteVariant(variant.id);
+      }
+
+      // Затем удаляем саму работу
+      await api.deleteWork(workId);
+
+      // Обновляем список работ
+      setSavedWorks(savedWorks.filter(w => w.id !== workId));
+
+      message.success(`Работа "${workTitle}" удалена`);
+    } catch (error) {
+      console.error('Error deleting work:', error);
+      message.error('Ошибка при удалении работы');
     }
   };
 
@@ -713,6 +811,14 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
               >
                 Сформировать лист
               </Button>
+              <Button
+                type="default"
+                icon={<FolderOpenOutlined />}
+                onClick={handleOpenLoadModal}
+                size="large"
+              >
+                Открыть сохраненную
+              </Button>
               {variants.length > 0 && (
                 <>
                   <Button
@@ -968,6 +1074,80 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Модальное окно для загрузки сохраненной работы */}
+      <Modal
+        title={
+          <Space>
+            <FolderOpenOutlined />
+            <span>Сохраненные работы</span>
+          </Space>
+        }
+        open={loadModalVisible}
+        onCancel={() => setLoadModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        {loadingWorks ? (
+          <div style={{ textAlign: 'center', padding: 30 }}>
+            <Spin tip="Загружаем работы..." />
+          </div>
+        ) : savedWorks.length === 0 ? (
+          <Empty description="Нет сохраненных работ" style={{ padding: 30 }} />
+        ) : (
+          <List
+            dataSource={savedWorks}
+            renderItem={(work) => (
+              <List.Item
+                actions={[
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<FolderOpenOutlined />}
+                    onClick={() => handleLoadWork(work.id)}
+                  >
+                    Открыть
+                  </Button>,
+                  <Button
+                    danger
+                    size="small"
+                    onClick={() => {
+                      Modal.confirm({
+                        title: 'Удалить работу?',
+                        content: `Вы уверены, что хотите удалить работу "${work.title}"? Это действие нельзя отменить.`,
+                        okText: 'Удалить',
+                        okType: 'danger',
+                        cancelText: 'Отмена',
+                        onOk: () => handleDeleteWork(work.id, work.title),
+                      });
+                    }}
+                  >
+                    Удалить
+                  </Button>
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <Space>
+                      <span style={{ fontWeight: 600, fontSize: 16 }}>{work.title}</span>
+                      {work.class && <Tag color="blue">Класс: {work.class}</Tag>}
+                      {work.time_limit && <Tag color="green">{work.time_limit} мин</Tag>}
+                      {work.expand?.topic && (
+                        <Tag color="purple">№{work.expand.topic.ege_number} - {work.expand.topic.title}</Tag>
+                      )}
+                    </Space>
+                  }
+                  description={
+                    <Space style={{ color: '#666', fontSize: 12 }}>
+                      <span>Создана: {new Date(work.created).toLocaleDateString('ru-RU')}</span>
+                    </Space>
+                  }
+                />
+              </List.Item>
+            )}
+          />
+        )}
       </Modal>
     </div>
   );
