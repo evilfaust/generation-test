@@ -179,32 +179,30 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
     setLoadingReplacements(true);
 
     try {
-      // Загружаем похожие задачи (та же тема, близкая сложность)
+      // Загружаем все задачи из той же темы
       const filters = {};
       if (task.topic) filters.topic = task.topic;
 
-      const similarTasks = await api.getTasks(filters);
+      const allTopicTasks = await api.getTasks(filters);
 
-      // Фильтруем: убираем текущую задачу и задачи, уже используемые в вариантах
+      // Фильтруем: убираем только текущую задачу и задачи, уже используемые в вариантах
       const usedTaskIds = new Set();
       variants.forEach(variant => {
         variant.tasks.forEach(t => usedTaskIds.add(t.id));
       });
 
-      const filtered = similarTasks.filter(t =>
+      const filtered = allTopicTasks.filter(t =>
         t.id !== task.id &&
-        !usedTaskIds.has(t.id) &&
-        // Близкая сложность (±1)
-        Math.abs(parseInt(t.difficulty || '1') - parseInt(task.difficulty || '1')) <= 1
+        !usedTaskIds.has(t.id)
       );
 
-      // Сортируем по сложности
-      filtered.sort((a, b) => (a.difficulty || '1').localeCompare(b.difficulty || '1'));
+      // Сортируем по коду для удобства
+      filtered.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
 
       setReplacementTasks(filtered);
     } catch (error) {
       console.error('Error loading replacement tasks:', error);
-      message.error('Ошибка при загрузке похожих задач');
+      message.error('Ошибка при загрузке задач для замены');
     } finally {
       setLoadingReplacements(false);
     }
@@ -766,15 +764,15 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
               </div>
             </div>
 
-            <Divider>Похожие задачи</Divider>
+            <Divider>Задачи для замены</Divider>
 
             {loadingReplacements ? (
               <div style={{ textAlign: 'center', padding: 30 }}>
-                <Spin tip="Загружаем похожие задачи..." />
+                <Spin tip="Загружаем задачи из темы..." />
               </div>
             ) : replacementTasks.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 30, color: '#999' }}>
-                Похожие задачи не найдены
+                Задачи для замены не найдены
               </div>
             ) : (
               <List
