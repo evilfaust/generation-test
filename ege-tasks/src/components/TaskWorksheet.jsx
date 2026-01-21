@@ -83,15 +83,11 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
       if (values.hasAnswer !== undefined) filters.hasAnswer = values.hasAnswer === 'yes';
       if (values.hasSolution !== undefined) filters.hasSolution = values.hasSolution === 'yes';
 
-      const tasksData = await api.getTasks(filters);
+      // Проверяем, есть ли хотя бы один фильтр (кроме тегов и поиска)
+      const hasServerFilters = Object.keys(filters).length > 0;
 
-      if (tasksData.length === 0) {
-        message.warning('Задачи по заданным фильтрам не найдены');
-        setAllTasks([]);
-        setVariants([]);
-        setLoading(false);
-        return;
-      }
+      // Если есть только теги или поиск, загружаем все задачи
+      const tasksData = await api.getTasks(hasServerFilters ? filters : {});
 
       // Клиентская фильтрация по тегам
       let filteredTasks = tasksData;
@@ -112,7 +108,7 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
       }
 
       if (filteredTasks.length === 0) {
-        message.warning('Задачи не найдены по поисковому запросу');
+        message.warning('Задачи не найдены по заданным фильтрам');
         setAllTasks([]);
         setVariants([]);
         setLoading(false);
