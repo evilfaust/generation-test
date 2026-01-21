@@ -56,7 +56,7 @@ const TaskCard = ({ task, allTags, allSources, allYears, allSubtopics, allTopics
     }
   };
 
-  const handleSave = async (taskId, values) => {
+  const handleSave = async (taskId, values, options = {}) => {
     try {
       // Handle subtopic from mode="tags" (it returns an array)
       let subtopicValue = values.subtopic;
@@ -67,8 +67,15 @@ const TaskCard = ({ task, allTags, allSources, allYears, allSubtopics, allTopics
       // Update the task
       await api.updateTask(taskId, values);
 
-      // If subtopic changed, also update the topic's subtopic field
-      if (subtopicValue && values.topic) {
+      // If subtopic update is requested via options
+      if (options.updateTopic && options.topicId) {
+        try {
+          await api.updateTopic(options.topicId, { subtopic: options.subtopic || '' });
+        } catch (error) {
+          console.warn('Could not update topic subtopic:', error);
+        }
+      } else if (subtopicValue && values.topic) {
+        // Legacy: If subtopic changed, also update the topic's subtopic field
         try {
           await api.updateTopic(values.topic, { subtopic: subtopicValue });
         } catch (error) {

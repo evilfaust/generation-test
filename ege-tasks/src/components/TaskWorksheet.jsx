@@ -29,6 +29,7 @@ import {
   SaveOutlined,
   SearchOutlined,
   SwapOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import { api } from '../services/pocketbase';
@@ -57,6 +58,10 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
   const [taskToReplace, setTaskToReplace] = useState(null); // { variantIndex, taskIndex, task }
   const [replacementTasks, setReplacementTasks] = useState([]);
   const [loadingReplacements, setLoadingReplacements] = useState(false);
+
+  // Состояния для сохранения работы
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [savingWork, setSavingWork] = useState(false);
 
   const handleGenerate = async (values) => {
     setLoading(true);
@@ -232,6 +237,42 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
     setReplaceModalVisible(false);
     setTaskToReplace(null);
     setReplacementTasks([]);
+  };
+
+  const handleSaveWork = async (values) => {
+    setSavingWork(true);
+    try {
+      // Создаем работу
+      const workData = {
+        title: values.workTitle || 'Контрольная работа',
+        class: values.workClass ? parseInt(values.workClass) : null,
+        topic: form.getFieldValue('topic') || null,
+        time_limit: values.timeLimit ? parseInt(values.timeLimit) : null,
+      };
+
+      const work = await api.createWork(workData);
+
+      // Создаем варианты для этой работы
+      for (const variant of variants) {
+        const taskIds = variant.tasks.map(t => t.id);
+        const order = variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx }));
+
+        await api.createVariant({
+          work: work.id,
+          number: variant.number,
+          tasks: taskIds,
+          order: order,
+        });
+      }
+
+      message.success(`Работа "${workData.title}" успешно сохранена с ${variants.length} вариантами`);
+      setSaveModalVisible(false);
+    } catch (error) {
+      console.error('Error saving work:', error);
+      message.error('Ошибка при сохранении работы');
+    } finally {
+      setSavingWork(false);
+    }
   };
 
   const renderTitlePage = (workTitle, workDate, workClass) => {
@@ -676,6 +717,14 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
                 <>
                   <Button
                     type="default"
+                    icon={<SaveOutlined />}
+                    onClick={() => setSaveModalVisible(true)}
+                    size="large"
+                  >
+                    Сохранить работу
+                  </Button>
+                  <Button
+                    type="default"
                     icon={<PrinterOutlined />}
                     onClick={handlePrint}
                     size="large"
@@ -844,6 +893,81 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Модальное окно для сохранения работы */}
+      <Modal
+        title={
+          <Space>
+            <SaveOutlined />
+            <span>Сохранить работу</span>
+          </Space>
+        }
+        open={saveModalVisible}
+        onCancel={() => setSaveModalVisible(false)}
+        footer={null}
+        width={500}
+      >
+        <Form
+          layout="vertical"
+          onFinish={handleSaveWork}
+          initialValues={{
+            workTitle: form.getFieldValue('workTitle') || 'Контрольная работа',
+            workClass: form.getFieldValue('workClass'),
+            timeLimit: null,
+          }}
+        >
+          <Alert
+            message="Информация"
+            description={`Будет сохранено ${variants.length} вариант(ов) с общим количеством ${variants.reduce((sum, v) => sum + v.tasks.length, 0)} задач.`}
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form.Item
+            name="workTitle"
+            label="Название работы"
+            rules={[{ required: true, message: 'Введите название работы' }]}
+          >
+            <Input placeholder="Например: Контрольная работа №1" />
+          </Form.Item>
+
+          <Form.Item
+            name="workClass"
+            label="Класс"
+          >
+            <Input placeholder="Например: 10" />
+          </Form.Item>
+
+          <Form.Item
+            name="timeLimit"
+            label="Время на выполнение (минут)"
+          >
+            <InputNumber
+              min={1}
+              max={300}
+              style={{ width: '100%' }}
+              placeholder="Например: 45"
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+            <Space>
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<SaveOutlined />}
+                loading={savingWork}
+              >
+                Сохранить
+              </Button>
+              <Button onClick={() => setSaveModalVisible(false)}>
+                Отмена
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );
