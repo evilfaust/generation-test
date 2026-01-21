@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Modal, Form, Select, Input, message, Button, Space } from 'antd';
-import { EditOutlined, SaveOutlined } from '@ant-design/icons';
+import { Modal, Form, Select, Input, message, Button, Space, Alert } from 'antd';
+import { EditOutlined, SaveOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 
 const { Option } = Select;
@@ -11,9 +11,13 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
   const [loading, setLoading] = useState(false);
   const [previewStatement, setPreviewStatement] = useState('');
   const [previewAnswer, setPreviewAnswer] = useState('');
+  const [selectedTopic, setSelectedTopic] = useState(null);
 
   useEffect(() => {
     if (task && visible) {
+      const topicData = allTopics.find(t => t.id === task.topic);
+      setSelectedTopic(topicData);
+
       form.setFieldsValue({
         topic: task.topic || undefined,
         subtopic: task.expand?.topic?.subtopic || '',
@@ -28,15 +32,51 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
       setPreviewStatement(task.statement_md || '');
       setPreviewAnswer(task.answer || '');
     }
-  }, [task, visible, form]);
+  }, [task, visible, form, allTopics]);
+
+  const handleTopicChange = (topicId) => {
+    const topicData = allTopics.find(t => t.id === topicId);
+    setSelectedTopic(topicData);
+
+    // Автоматически заполняем подтему текущей темы
+    if (topicData?.subtopic) {
+      form.setFieldValue('subtopic', topicData.subtopic);
+    }
+  };
 
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
       setLoading(true);
-      
-      await onSave(task.id, values);
-      
+
+      // Данные для обновления задачи
+      const taskData = {
+        topic: values.topic,
+        difficulty: values.difficulty,
+        answer: values.answer || '',
+        statement_md: values.statement_md || '',
+        solution_md: values.solution_md || '',
+        source: values.source || '',
+        year: values.year || null,
+        tags: values.tags || [],
+      };
+
+      // Если подтема изменилась, нужно обновить тему
+      const newSubtopic = values.subtopic || '';
+      const currentSubtopic = selectedTopic?.subtopic || '';
+
+      if (newSubtopic !== currentSubtopic && values.topic) {
+        // Обновляем подтему в теме
+        await onSave(task.id, taskData, {
+          updateTopic: true,
+          topicId: values.topic,
+          subtopic: newSubtopic,
+        });
+      } else {
+        // Просто обновляем задачу
+        await onSave(task.id, taskData);
+      }
+
       message.success('Задача успешно обновлена');
       onClose();
     } catch (error) {
@@ -110,10 +150,12 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
             placeholder="Выберите тему"
             showSearch
             optionFilterProp="children"
+            onChange={handleTopicChange}
           >
             {allTopics.map(topic => (
               <Option key={topic.id} value={topic.id}>
                 №{topic.ege_number} - {topic.title}
+                {topic.subtopic && <span style={{ color: '#999', marginLeft: 8 }}>({topic.subtopic})</span>}
               </Option>
             ))}
           </Select>
@@ -122,7 +164,8 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
         {/* Подтема */}
         <Form.Item
           name="subtopic"
-          label="Подтема"
+          label="Подтема темы"
+          tooltip="Подтема привязана к теме. При изменении подтема обновится у выбранной темы."
         >
           <Select
             placeholder="Выберите или введите подтему"
@@ -130,12 +173,24 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
             showSearch
             mode="tags"
             maxTagCount={1}
+            disabled={!form.getFieldValue('topic')}
           >
             {allSubtopics.map(st => (
               <Option key={st} value={st}>{st}</Option>
             ))}
           </Select>
         </Form.Item>
+
+        {selectedTopic && form.getFieldValue('subtopic') !== selectedTopic.subtopic && (
+          <Alert
+            message="Изменение подтемы"
+            description={`Подтема будет изменена для темы "${selectedTopic.title}" с "${selectedTopic.subtopic || 'не указана'}" на "${form.getFieldValue('subtopic') || 'не указана'}". Это повлияет на все задачи этой темы.`}
+            type="warning"
+            icon={<InfoCircleOutlined />}
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
 
         {/* Источник */}
         <Form.Item

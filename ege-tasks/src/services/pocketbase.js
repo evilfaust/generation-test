@@ -61,8 +61,21 @@ export const api = {
         filterArr.push(`topic = "${filters.topic}"`);
       }
 
-      if (filters.subtopic) {
-        filterArr.push(`topic.subtopic = "${filters.subtopic}"`);
+      // Фильтрация по подтеме - сначала получаем темы с нужной подтемой
+      if (filters.subtopic && !filters.topic) {
+        // Если не выбрана конкретная тема, найдем все темы с этой подтемой
+        const topicsWithSubtopic = await pb.collection('topics').getFullList({
+          filter: `subtopic = "${filters.subtopic}"`,
+          fields: 'id',
+        });
+
+        if (topicsWithSubtopic.length > 0) {
+          const topicIds = topicsWithSubtopic.map(t => `"${t.id}"`).join(',');
+          filterArr.push(`topic IN (${topicIds})`);
+        } else {
+          // Если тем с такой подтемой нет, вернем пустой массив
+          return [];
+        }
       }
 
       if (filters.difficulty) {
@@ -92,6 +105,13 @@ export const api = {
         expand: 'topic,tags',
         sort: filters.sort || 'code',
       });
+
+      // Если выбрана и тема и подтема, фильтруем на клиенте
+      if (filters.topic && filters.subtopic) {
+        return records.filter(task =>
+          task.expand?.topic?.subtopic === filters.subtopic
+        );
+      }
 
       return records;
     } catch (error) {
@@ -242,6 +262,123 @@ export const api = {
     } catch (error) {
       console.error('Error fetching subtopics:', error);
       return [];
+    }
+  },
+
+  // ============ РАБОТЫ (WORKS) ============
+
+  // Создать работу
+  async createWork(data) {
+    try {
+      return await pb.collection('works').create(data);
+    } catch (error) {
+      console.error('Error creating work:', error);
+      throw error;
+    }
+  },
+
+  // Получить все работы
+  async getWorks() {
+    try {
+      const records = await pb.collection('works').getFullList({
+        sort: '-created',
+        expand: 'topic',
+      });
+      return records;
+    } catch (error) {
+      console.error('Error fetching works:', error);
+      return [];
+    }
+  },
+
+  // Получить работу по ID
+  async getWork(id) {
+    try {
+      return await pb.collection('works').getOne(id, {
+        expand: 'topic',
+      });
+    } catch (error) {
+      console.error('Error fetching work:', error);
+      return null;
+    }
+  },
+
+  // Удалить работу
+  async deleteWork(id) {
+    try {
+      return await pb.collection('works').delete(id);
+    } catch (error) {
+      console.error('Error deleting work:', error);
+      throw error;
+    }
+  },
+
+  // Обновить работу
+  async updateWork(id, data) {
+    try {
+      return await pb.collection('works').update(id, data);
+    } catch (error) {
+      console.error('Error updating work:', error);
+      throw error;
+    }
+  },
+
+  // ============ ВАРИАНТЫ (VARIANTS) ============
+
+  // Создать вариант
+  async createVariant(data) {
+    try {
+      return await pb.collection('variants').create(data);
+    } catch (error) {
+      console.error('Error creating variant:', error);
+      throw error;
+    }
+  },
+
+  // Получить все варианты работы
+  async getVariantsByWork(workId) {
+    try {
+      const records = await pb.collection('variants').getFullList({
+        filter: `work = "${workId}"`,
+        sort: 'number',
+        expand: 'tasks,tasks.topic',
+      });
+      return records;
+    } catch (error) {
+      console.error('Error fetching variants:', error);
+      return [];
+    }
+  },
+
+  // Получить вариант по ID
+  async getVariant(id) {
+    try {
+      return await pb.collection('variants').getOne(id, {
+        expand: 'work,tasks,tasks.topic',
+      });
+    } catch (error) {
+      console.error('Error fetching variant:', error);
+      return null;
+    }
+  },
+
+  // Удалить вариант
+  async deleteVariant(id) {
+    try {
+      return await pb.collection('variants').delete(id);
+    } catch (error) {
+      console.error('Error deleting variant:', error);
+      throw error;
+    }
+  },
+
+  // Обновить вариант
+  async updateVariant(id, data) {
+    try {
+      return await pb.collection('variants').update(id, data);
+    } catch (error) {
+      console.error('Error updating variant:', error);
+      throw error;
     }
   },
 };

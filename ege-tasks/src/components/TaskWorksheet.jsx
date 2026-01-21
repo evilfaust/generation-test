@@ -29,6 +29,7 @@ import {
   SaveOutlined,
   SearchOutlined,
   SwapOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import { api } from '../services/pocketbase';
@@ -57,6 +58,15 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
   const [taskToReplace, setTaskToReplace] = useState(null); // { variantIndex, taskIndex, task }
   const [replacementTasks, setReplacementTasks] = useState([]);
   const [loadingReplacements, setLoadingReplacements] = useState(false);
+
+  // Состояния для сохранения работы
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [savingWork, setSavingWork] = useState(false);
+
+  // Состояния для загрузки работы
+  const [loadModalVisible, setLoadModalVisible] = useState(false);
+  const [savedWorks, setSavedWorks] = useState([]);
+  const [loadingWorks, setLoadingWorks] = useState(false);
 
   const handleGenerate = async (values) => {
     setLoading(true);
@@ -232,6 +242,135 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
     setReplaceModalVisible(false);
     setTaskToReplace(null);
     setReplacementTasks([]);
+  };
+
+  const handleSaveWork = async (values) => {
+    setSavingWork(true);
+    try {
+      // Создаем работу
+      const workData = {
+        title: values.workTitle || 'Контрольная работа',
+        class: values.workClass ? parseInt(values.workClass) : null,
+        topic: form.getFieldValue('topic') || null,
+        time_limit: values.timeLimit ? parseInt(values.timeLimit) : null,
+      };
+
+      const work = await api.createWork(workData);
+
+      // Создаем варианты для этой работы
+      for (const variant of variants) {
+        const taskIds = variant.tasks.map(t => t.id);
+        const order = variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx }));
+
+        await api.createVariant({
+          work: work.id,
+          number: variant.number,
+          tasks: taskIds,
+          order: order,
+        });
+      }
+
+      message.success(`Работа "${workData.title}" успешно сохранена с ${variants.length} вариантами`);
+      setSaveModalVisible(false);
+    } catch (error) {
+      console.error('Error saving work:', error);
+      message.error('Ошибка при сохранении работы');
+    } finally {
+      setSavingWork(false);
+    }
+  };
+
+  const handleOpenLoadModal = async () => {
+    setLoadModalVisible(true);
+    setLoadingWorks(true);
+    try {
+      const works = await api.getWorks();
+      setSavedWorks(works);
+    } catch (error) {
+      console.error('Error loading works:', error);
+      message.error('Ошибка при загрузке работ');
+    } finally {
+      setLoadingWorks(false);
+    }
+  };
+
+  const handleLoadWork = async (workId) => {
+    setLoadingWorks(true);
+    try {
+      // Загружаем работу и её варианты
+      const work = await api.getWork(workId);
+      const variantsData = await api.getVariantsByWork(workId);
+
+      // Формируем варианты в нужном формате
+      const loadedVariants = [];
+      for (const variantData of variantsData) {
+        // Получаем задачи варианта в правильном порядке
+        const tasksIds = variantData.tasks || [];
+        const order = variantData.order || [];
+
+        // Загружаем полные данные задач
+        const tasks = [];
+        for (const taskId of tasksIds) {
+          const task = await api.getTask(taskId);
+          if (task) {
+            tasks.push(task);
+          }
+        }
+
+        // Сортируем задачи по порядку из order
+        if (order.length > 0) {
+          tasks.sort((a, b) => {
+            const posA = order.find(o => o.taskId === a.id)?.position ?? 999;
+            const posB = order.find(o => o.taskId === b.id)?.position ?? 999;
+            return posA - posB;
+          });
+        }
+
+        loadedVariants.push({
+          number: variantData.number,
+          tasks: tasks,
+        });
+      }
+
+      // Устанавливаем загруженные варианты
+      setVariants(loadedVariants);
+
+      // Заполняем форму данными работы
+      form.setFieldsValue({
+        workTitle: work.title,
+        workClass: work.class?.toString(),
+        topic: work.topic,
+      });
+
+      setLoadModalVisible(false);
+      message.success(`Работа "${work.title}" успешно загружена`);
+    } catch (error) {
+      console.error('Error loading work:', error);
+      message.error('Ошибка при загрузке работы');
+    } finally {
+      setLoadingWorks(false);
+    }
+  };
+
+  const handleDeleteWork = async (workId, workTitle) => {
+    try {
+      // Сначала удаляем все варианты работы
+      const variantsData = await api.getVariantsByWork(workId);
+      for (const variant of variantsData) {
+        await api.deleteVariant(variant.id);
+      }
+
+      // Затем удаляем саму работу
+      await api.deleteWork(workId);
+
+      // Обновляем список работ
+      setSavedWorks(savedWorks.filter(w => w.id !== workId));
+
+      message.success(`Работа "${workTitle}" удалена`);
+    } catch (error) {
+      console.error('Error deleting work:', error);
+      message.error('Ошибка при удалении работы');
+    }
   };
 
   const renderTitlePage = (workTitle, workDate, workClass) => {
@@ -672,8 +811,24 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
               >
                 Сформировать лист
               </Button>
+              <Button
+                type="default"
+                icon={<FolderOpenOutlined />}
+                onClick={handleOpenLoadModal}
+                size="large"
+              >
+                Открыть сохраненную
+              </Button>
               {variants.length > 0 && (
                 <>
+                  <Button
+                    type="default"
+                    icon={<SaveOutlined />}
+                    onClick={() => setSaveModalVisible(true)}
+                    size="large"
+                  >
+                    Сохранить работу
+                  </Button>
                   <Button
                     type="default"
                     icon={<PrinterOutlined />}
@@ -843,6 +998,155 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
               />
             )}
           </div>
+        )}
+      </Modal>
+
+      {/* Модальное окно для сохранения работы */}
+      <Modal
+        title={
+          <Space>
+            <SaveOutlined />
+            <span>Сохранить работу</span>
+          </Space>
+        }
+        open={saveModalVisible}
+        onCancel={() => setSaveModalVisible(false)}
+        footer={null}
+        width={500}
+      >
+        <Form
+          layout="vertical"
+          onFinish={handleSaveWork}
+          initialValues={{
+            workTitle: form.getFieldValue('workTitle') || 'Контрольная работа',
+            workClass: form.getFieldValue('workClass'),
+            timeLimit: null,
+          }}
+        >
+          <Alert
+            message="Информация"
+            description={`Будет сохранено ${variants.length} вариант(ов) с общим количеством ${variants.reduce((sum, v) => sum + v.tasks.length, 0)} задач.`}
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form.Item
+            name="workTitle"
+            label="Название работы"
+            rules={[{ required: true, message: 'Введите название работы' }]}
+          >
+            <Input placeholder="Например: Контрольная работа №1" />
+          </Form.Item>
+
+          <Form.Item
+            name="workClass"
+            label="Класс"
+          >
+            <Input placeholder="Например: 10" />
+          </Form.Item>
+
+          <Form.Item
+            name="timeLimit"
+            label="Время на выполнение (минут)"
+          >
+            <InputNumber
+              min={1}
+              max={300}
+              style={{ width: '100%' }}
+              placeholder="Например: 45"
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+            <Space>
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<SaveOutlined />}
+                loading={savingWork}
+              >
+                Сохранить
+              </Button>
+              <Button onClick={() => setSaveModalVisible(false)}>
+                Отмена
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Модальное окно для загрузки сохраненной работы */}
+      <Modal
+        title={
+          <Space>
+            <FolderOpenOutlined />
+            <span>Сохраненные работы</span>
+          </Space>
+        }
+        open={loadModalVisible}
+        onCancel={() => setLoadModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        {loadingWorks ? (
+          <div style={{ textAlign: 'center', padding: 30 }}>
+            <Spin tip="Загружаем работы..." />
+          </div>
+        ) : savedWorks.length === 0 ? (
+          <Empty description="Нет сохраненных работ" style={{ padding: 30 }} />
+        ) : (
+          <List
+            dataSource={savedWorks}
+            renderItem={(work) => (
+              <List.Item
+                actions={[
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<FolderOpenOutlined />}
+                    onClick={() => handleLoadWork(work.id)}
+                  >
+                    Открыть
+                  </Button>,
+                  <Button
+                    danger
+                    size="small"
+                    onClick={() => {
+                      Modal.confirm({
+                        title: 'Удалить работу?',
+                        content: `Вы уверены, что хотите удалить работу "${work.title}"? Это действие нельзя отменить.`,
+                        okText: 'Удалить',
+                        okType: 'danger',
+                        cancelText: 'Отмена',
+                        onOk: () => handleDeleteWork(work.id, work.title),
+                      });
+                    }}
+                  >
+                    Удалить
+                  </Button>
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <Space>
+                      <span style={{ fontWeight: 600, fontSize: 16 }}>{work.title}</span>
+                      {work.class && <Tag color="blue">Класс: {work.class}</Tag>}
+                      {work.time_limit && <Tag color="green">{work.time_limit} мин</Tag>}
+                      {work.expand?.topic && (
+                        <Tag color="purple">№{work.expand.topic.ege_number} - {work.expand.topic.title}</Tag>
+                      )}
+                    </Space>
+                  }
+                  description={
+                    <Space style={{ color: '#666', fontSize: 12 }}>
+                      <span>Создана: {new Date(work.created).toLocaleDateString('ru-RU')}</span>
+                    </Space>
+                  }
+                />
+              </List.Item>
+            )}
+          />
         )}
       </Modal>
     </div>
