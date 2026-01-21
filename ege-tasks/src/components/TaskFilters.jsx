@@ -28,6 +28,7 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
     if (values.difficulty) newFilters.difficulty = values.difficulty;
     if (values.source) newFilters.source = values.source;
     if (values.year) newFilters.year = values.year;
+    if (values.tags && values.tags.length > 0) newFilters.tags = values.tags;
     if (values.hasAnswer !== undefined) newFilters.hasAnswer = values.hasAnswer === 'yes';
     if (values.hasSolution !== undefined) newFilters.hasSolution = values.hasSolution === 'yes';
     if (values.sortBy) newFilters.sortBy = values.sortBy;
@@ -170,6 +171,26 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
         </Row>
 
         <Row gutter={16}>
+          <Col xs={24}>
+            <Form.Item name="tags" label="Теги">
+              <Select
+                mode="multiple"
+                placeholder="Выберите теги"
+                allowClear
+                showSearch
+                optionFilterProp="children"
+              >
+                {tags.map(tag => (
+                  <Option key={tag.id} value={tag.id}>
+                    {tag.title}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
           <Col xs={24} sm={12}>
             <Form.Item name="hasAnswer" label="Наличие ответа">
               <Radio.Group>
@@ -238,6 +259,18 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
                   color="blue"
                 >
                   Год: {filters.year}
+                </Tag>
+              )}
+              {filters.tags && filters.tags.length > 0 && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('tags')}
+                  color="cyan"
+                >
+                  Теги: {filters.tags.map(tagId => {
+                    const tag = tags.find(t => t.id === tagId);
+                    return tag ? tag.title : tagId;
+                  }).join(', ')}
                 </Tag>
               )}
               {filters.hasAnswer !== undefined && (
