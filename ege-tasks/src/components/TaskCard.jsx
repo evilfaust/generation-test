@@ -14,7 +14,7 @@ import { api } from '../services/pocketbase';
 const { Text, Paragraph } = Typography;
 const { Option } = Select;
 
-const TaskCard = ({ task, allTags, allSources, allYears, onUpdate }) => {
+const TaskCard = ({ task, allTags, allSources, allYears, allSubtopics, allTopics, onUpdate }) => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [changingDifficulty, setChangingDifficulty] = useState(false);
 
@@ -58,7 +58,24 @@ const TaskCard = ({ task, allTags, allSources, allYears, onUpdate }) => {
 
   const handleSave = async (taskId, values) => {
     try {
+      // Handle subtopic from mode="tags" (it returns an array)
+      let subtopicValue = values.subtopic;
+      if (Array.isArray(subtopicValue) && subtopicValue.length > 0) {
+        subtopicValue = subtopicValue[0];
+      }
+
+      // Update the task
       await api.updateTask(taskId, values);
+
+      // If subtopic changed, also update the topic's subtopic field
+      if (subtopicValue && values.topic) {
+        try {
+          await api.updateTopic(values.topic, { subtopic: subtopicValue });
+        } catch (error) {
+          console.warn('Could not update topic subtopic:', error);
+        }
+      }
+
       if (onUpdate) {
         onUpdate();
       }
@@ -234,6 +251,8 @@ const TaskCard = ({ task, allTags, allSources, allYears, onUpdate }) => {
         allTags={allTags || []}
         allSources={allSources || []}
         allYears={allYears || []}
+        allSubtopics={allSubtopics || []}
+        allTopics={allTopics || []}
       />
     </>
   );

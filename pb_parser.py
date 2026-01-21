@@ -275,12 +275,19 @@ for key, value in metadata.items():
 
 # Извлекаем поля из YAML
 topic_name = metadata.get("topic")
-subtopic = metadata.get("subtopic", "")
-paragraph = metadata.get("paragraph", "")
+subtopic_name = metadata.get("subtopic")  # Парсим подтему из YAML
 difficulty = str(metadata.get("difficulty", "1"))
 source = metadata.get("source", "Не указан")
 year = metadata.get("year", 2026)
 global_tags_str = metadata.get("tags", "")
+
+# Если subtopic не указана в YAML, пытаемся определить из имени файла
+# Например: 16-1.md -> subtopic = "1", 16-2.md -> subtopic = "2"
+if not subtopic_name:
+    filename_match = re.match(r"(\d+)-(\d+)\.md$", filename)
+    if filename_match:
+        subtopic_name = filename_match.group(2)
+        print(f"ℹ️  Подтема определена из имени файла: {subtopic_name}")
 
 # Проверяем обязательные поля
 if not topic_name:
@@ -297,6 +304,21 @@ else:
 
 # Интерактивный поиск темы
 TOPIC_ID = search_topic_interactive(topic_name)
+
+# Обновляем subtopic в topics если она указана
+if subtopic_name:
+    try:
+        update_resp = requests.patch(
+            f"{PB_URL}/api/collections/topics/records/{TOPIC_ID}",
+            headers=HEADERS,
+            json={"subtopic": subtopic_name}
+        )
+        if update_resp.status_code == 200:
+            print(f"✓ Подтема '{subtopic_name}' установлена для темы")
+        else:
+            print(f"⚠️ Не удалось обновить подтему: {update_resp.text}")
+    except Exception as e:
+        print(f"⚠️ Ошибка при обновлении подтемы: {e}")
 
 # --------------------------
 # 6. ПАРСИНГ ЗАДАНИЙ

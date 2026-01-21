@@ -29,6 +29,16 @@ export const api = {
     }
   },
 
+  // Обновить тему
+  async updateTopic(id, data) {
+    try {
+      return await pb.collection('topics').update(id, data);
+    } catch (error) {
+      console.error('Error updating topic:', error);
+      throw error;
+    }
+  },
+
   // Получить все теги
   async getTags() {
     try {

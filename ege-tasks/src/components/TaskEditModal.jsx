@@ -6,7 +6,7 @@ import MathRenderer from './MathRenderer';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSources = [], allYears = [] }) => {
+const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSources = [], allYears = [], allSubtopics = [], allTopics = [] }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [previewStatement, setPreviewStatement] = useState('');
@@ -15,6 +15,8 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
   useEffect(() => {
     if (task && visible) {
       form.setFieldsValue({
+        topic: task.topic || undefined,
+        subtopic: task.expand?.topic?.subtopic || '',
         difficulty: task.difficulty,
         answer: task.answer || '',
         statement_md: task.statement_md || '',
@@ -95,6 +97,43 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
             <Option value="3">3 - Повышенный</Option>
             <Option value="4">4 - Высокий</Option>
             <Option value="5">5 - Олимпиадный</Option>
+          </Select>
+        </Form.Item>
+
+        {/* Тема */}
+        <Form.Item
+          name="topic"
+          label="Тема"
+          rules={[{ required: true, message: 'Выберите тему' }]}
+        >
+          <Select
+            placeholder="Выберите тему"
+            showSearch
+            optionFilterProp="children"
+          >
+            {allTopics.map(topic => (
+              <Option key={topic.id} value={topic.id}>
+                №{topic.ege_number} - {topic.title}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+
+        {/* Подтема */}
+        <Form.Item
+          name="subtopic"
+          label="Подтема"
+        >
+          <Select
+            placeholder="Выберите или введите подтему"
+            allowClear
+            showSearch
+            mode="tags"
+            maxTagCount={1}
+          >
+            {allSubtopics.map(st => (
+              <Option key={st} value={st}>{st}</Option>
+            ))}
           </Select>
         </Form.Item>
 
