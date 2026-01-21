@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Form, Select, Button, Space, Row, Col, Radio, Statistic, Badge, Input, Tag } from 'antd';
-import { FilterOutlined, ClearOutlined, SearchOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { FilterOutlined, ClearOutlined, SearchOutlined, CloseCircleOutlined, SortAscendingOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -30,6 +30,7 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
     if (values.year) newFilters.year = values.year;
     if (values.hasAnswer !== undefined) newFilters.hasAnswer = values.hasAnswer === 'yes';
     if (values.hasSolution !== undefined) newFilters.hasSolution = values.hasSolution === 'yes';
+    if (values.sortBy) newFilters.sortBy = values.sortBy;
 
     setFilters(newFilters);
     onFilterChange(newFilters);
@@ -89,13 +90,27 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
         onValuesChange={handleFieldChange}
       >
         <Row gutter={16}>
-          <Col xs={24}>
+          <Col xs={24} sm={18} md={18}>
             <Form.Item name="search" label="Поиск по коду или тексту">
               <Input
                 placeholder="Введите код задачи или текст..."
                 prefix={<SearchOutlined />}
                 allowClear
               />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={6} md={6}>
+            <Form.Item name="sortBy" label="Сортировка">
+              <Select
+                placeholder="Выберите сортировку"
+                defaultValue="code"
+                suffixIcon={<SortAscendingOutlined />}
+              >
+                <Option value="code">По коду</Option>
+                <Option value="difficulty">По сложности</Option>
+                <Option value="created">Новые первые</Option>
+                <Option value="updated">Обновленные первые</Option>
+              </Select>
             </Form.Item>
           </Col>
         </Row>
@@ -241,6 +256,20 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
                   color="green"
                 >
                   {filters.hasSolution ? 'С решением' : 'Без решения'}
+                </Tag>
+              )}
+              {filters.sortBy && filters.sortBy !== 'code' && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('sortBy')}
+                  color="purple"
+                >
+                  Сортировка: {
+                    filters.sortBy === 'difficulty' ? 'По сложности' :
+                    filters.sortBy === 'created' ? 'Новые первые' :
+                    filters.sortBy === 'updated' ? 'Обновленные первые' :
+                    'По коду'
+                  }
                 </Tag>
               )}
             </Space>
