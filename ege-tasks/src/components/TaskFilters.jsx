@@ -4,7 +4,7 @@ import { FilterOutlined, ClearOutlined, SearchOutlined, CloseCircleOutlined, Sor
 
 const { Option } = Select;
 
-const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, totalCount }) => {
+const TaskFilters = ({ topics, tags, years = [], sources = [], subtopics = [], onFilterChange, totalCount }) => {
   const [form] = Form.useForm();
   const [filters, setFilters] = useState({});
 
@@ -25,6 +25,7 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
 
     if (values.search) newFilters.search = values.search;
     if (values.topic) newFilters.topic = values.topic;
+    if (values.subtopic) newFilters.subtopic = values.subtopic;
     if (values.difficulty) newFilters.difficulty = values.difficulty;
     if (values.source) newFilters.source = values.source;
     if (values.year) newFilters.year = values.year;
@@ -135,6 +136,23 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
           </Col>
 
           <Col xs={24} sm={12} md={6}>
+            <Form.Item name="subtopic" label="Подтема">
+              <Select
+                placeholder="Выберите подтему"
+                allowClear
+                showSearch
+                optionFilterProp="children"
+              >
+                {subtopics.map(subtopic => (
+                  <Option key={subtopic} value={subtopic}>
+                    {subtopic}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
             <Form.Item name="difficulty" label="Сложность">
               <Select placeholder="Выберите сложность" allowClear>
                 {difficulties.map(d => (
@@ -232,6 +250,15 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], onFilterChange, t
                   color="blue"
                 >
                   Тема: {topics.find(t => t.id === filters.topic)?.title}
+                </Tag>
+              )}
+              {filters.subtopic && (
+                <Tag
+                  closable
+                  onClose={() => removeFilter('subtopic')}
+                  color="purple"
+                >
+                  Подтема: {filters.subtopic}
                 </Tag>
               )}
               {filters.difficulty && (
