@@ -38,7 +38,7 @@ const { Option } = Select;
 const { Panel } = Collapse;
 const { TabPane } = Tabs;
 
-const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
+const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [allTasks, setAllTasks] = useState([]); // Все загруженные задачи
@@ -61,10 +61,10 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
   const handleGenerate = async (values) => {
     setLoading(true);
     try {
-      // Собираем фильтры
+      // Собираем фильтры (теги не передаем в API, будем фильтровать на клиенте)
       const filters = {};
       if (values.topic) filters.topic = values.topic;
-      if (values.tags && values.tags.length > 0) filters.tags = values.tags;
+      if (values.subtopic) filters.subtopic = values.subtopic;
       if (values.difficulty) filters.difficulty = values.difficulty;
       if (values.source) filters.source = values.source;
       if (values.year) filters.year = values.year;
@@ -81,11 +81,19 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
         return;
       }
 
-      // Клиентский поиск если есть
+      // Клиентская фильтрация по тегам
       let filteredTasks = tasksData;
+      if (values.tags && values.tags.length > 0) {
+        filteredTasks = tasksData.filter(task => {
+          if (!task.tags || task.tags.length === 0) return false;
+          return values.tags.some(tagId => task.tags.includes(tagId));
+        });
+      }
+
+      // Клиентский поиск если есть
       if (values.search) {
         const searchLower = values.search.toLowerCase();
-        filteredTasks = tasksData.filter(task =>
+        filteredTasks = filteredTasks.filter(task =>
           task.code?.toLowerCase().includes(searchLower) ||
           task.statement_md?.toLowerCase().includes(searchLower)
         );
@@ -389,7 +397,7 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
               </Row>
 
               <Row gutter={16}>
-                <Col xs={24} md={8}>
+                <Col xs={24} md={6}>
                   <Form.Item name="topic" label="Тема">
                     <Select
                       placeholder="Выберите тему"
@@ -406,7 +414,24 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
                   </Form.Item>
                 </Col>
 
-                <Col xs={24} md={8}>
+                <Col xs={24} md={6}>
+                  <Form.Item name="subtopic" label="Подтема">
+                    <Select
+                      placeholder="Выберите подтему"
+                      showSearch
+                      optionFilterProp="children"
+                      allowClear
+                    >
+                      {subtopics.map(subtopic => (
+                        <Option key={subtopic} value={subtopic}>
+                          {subtopic}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={6}>
                   <Form.Item name="difficulty" label="Сложность">
                     <Select placeholder="Любая" allowClear>
                       <Option value="1">1 - Базовый</Option>
@@ -418,7 +443,7 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [] }) => {
                   </Form.Item>
                 </Col>
 
-                <Col xs={24} md={8}>
+                <Col xs={24} md={6}>
                   <Form.Item name="tags" label="Теги">
                     <Select
                       mode="multiple"

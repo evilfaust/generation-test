@@ -16,6 +16,7 @@ function App() {
   const [tags, setTags] = useState([]);
   const [years, setYears] = useState([]);
   const [sources, setSources] = useState([]);
+  const [subtopics, setSubtopics] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,16 +26,18 @@ function App() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [topicsData, tagsData, yearsData, sourcesData] = await Promise.all([
+      const [topicsData, tagsData, yearsData, sourcesData, subtopicsData] = await Promise.all([
         api.getTopics(),
         api.getTags(),
         api.getUniqueYears(),
         api.getUniqueSources(),
+        api.getUniqueSubtopics(),
       ]);
       setTopics(topicsData);
       setTags(tagsData);
       setYears(yearsData);
       setSources(sourcesData);
+      setSubtopics(subtopicsData);
     } catch (error) {
       console.error('Error loading data:', error);
       message.error('Ошибка при загрузке данных');
@@ -70,14 +73,16 @@ function App() {
             tags={tags}
             years={years}
             sources={sources}
+            subtopics={subtopics}
             loading={loading}
           />
         );
       case 'generator':
         return (
-          <WorksheetGenerator 
-            topics={topics} 
+          <WorksheetGenerator
+            topics={topics}
             tags={tags}
+            subtopics={subtopics}
           />
         );
       case 'worksheet':
@@ -87,6 +92,7 @@ function App() {
             tags={tags}
             years={years}
             sources={sources}
+            subtopics={subtopics}
           />
         );
       default:

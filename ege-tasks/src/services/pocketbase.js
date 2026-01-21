@@ -51,6 +51,10 @@ export const api = {
         filterArr.push(`topic = "${filters.topic}"`);
       }
 
+      if (filters.subtopic) {
+        filterArr.push(`topic.subtopic = "${filters.subtopic}"`);
+      }
+
       if (filters.difficulty) {
         filterArr.push(`difficulty = "${filters.difficulty}"`);
       }
@@ -213,6 +217,20 @@ export const api = {
       return sources.sort();
     } catch (error) {
       console.error('Error fetching sources:', error);
+      return [];
+    }
+  },
+
+  // Получить уникальные подтемы из topics
+  async getUniqueSubtopics() {
+    try {
+      const records = await pb.collection('topics').getFullList({
+        fields: 'subtopic',
+      });
+      const subtopics = [...new Set(records.map(r => r.subtopic).filter(Boolean))];
+      return subtopics.sort();
+    } catch (error) {
+      console.error('Error fetching subtopics:', error);
       return [];
     }
   },
