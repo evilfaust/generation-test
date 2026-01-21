@@ -4,7 +4,7 @@ import TaskFilters from './TaskFilters';
 import TaskCard from './TaskCard';
 import { api } from '../services/pocketbase';
 
-const TaskList = ({ topics, tags, years, sources, loading: initialLoading }) => {
+const TaskList = ({ topics, tags, years, sources, subtopics, loading: initialLoading }) => {
   const [tasks, setTasks] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -152,6 +152,7 @@ const TaskList = ({ topics, tags, years, sources, loading: initialLoading }) => 
         tags={tags}
         years={years}
         sources={sources}
+        subtopics={subtopics}
         onFilterChange={handleFilterChange}
         totalCount={filteredTasks.length}
       />
@@ -181,6 +182,8 @@ const TaskList = ({ topics, tags, years, sources, loading: initialLoading }) => 
                   allTags={tags}
                   allSources={sources}
                   allYears={years}
+                  allSubtopics={subtopics}
+                  allTopics={topics}
                   onUpdate={handleTaskUpdate}
                 />
               </Col>
