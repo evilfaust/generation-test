@@ -498,6 +498,7 @@ const PrintableWorksheet = ({ cards: initialCards, title, showAnswers, showSolut
         topics={topics}
         subtopics={subtopics}
         tags={tags}
+        currentVariantTasks={taskToReplace ? cards[taskToReplace.cardIndex] || [] : []}
       />
     </div>
   );

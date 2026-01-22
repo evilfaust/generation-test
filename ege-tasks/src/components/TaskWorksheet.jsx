@@ -883,6 +883,7 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
         topics={topics}
         subtopics={subtopics}
         tags={tags}
+        currentVariantTasks={taskToReplace ? variants[taskToReplace.variantIndex]?.tasks || [] : []}
       />
 
       {/* Модальное окно для сохранения работы */}

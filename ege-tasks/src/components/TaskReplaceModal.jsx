@@ -13,7 +13,8 @@ const TaskReplaceModal = ({
   onCancel,
   topics = [],
   subtopics = [],
-  tags = []
+  tags = [],
+  currentVariantTasks = [] // Задачи текущего варианта/карточки
 }) => {
   const [form] = Form.useForm();
   const [replacementTasks, setReplacementTasks] = useState([]);
@@ -46,8 +47,15 @@ const TaskReplaceModal = ({
 
       const allTasks = await api.getTasks(filterObj);
 
-      // Исключаем текущую задачу
-      const filtered = allTasks.filter(t => t.id !== task.id);
+      // Создаем Set с ID задач текущего варианта/карточки
+      const usedTaskIds = new Set(currentVariantTasks.map(t => t.id));
+
+      // Исключаем:
+      // 1. Текущую задачу
+      // 2. Задачи, которые уже используются в текущем варианте/карточке
+      const filtered = allTasks.filter(t =>
+        t.id !== task.id && !usedTaskIds.has(t.id)
+      );
 
       setReplacementTasks(filtered);
       setFilteredReplacementTasks(filtered);
