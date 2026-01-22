@@ -560,8 +560,8 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
                       allowClear
                     >
                       {subtopics.map(subtopic => (
-                        <Option key={subtopic} value={subtopic}>
-                          {subtopic}
+                        <Option key={subtopic.id} value={subtopic.id}>
+                          {subtopic.name}
                         </Option>
                       ))}
                     </Select>

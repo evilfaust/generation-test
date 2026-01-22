@@ -31,7 +31,7 @@ function App() {
         api.getTags(),
         api.getUniqueYears(),
         api.getUniqueSources(),
-        api.getUniqueSubtopics(),
+        api.getSubtopics(),
       ]);
       setTopics(topicsData);
       setTags(tagsData);

@@ -12,15 +12,22 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
   const [previewStatement, setPreviewStatement] = useState('');
   const [previewAnswer, setPreviewAnswer] = useState('');
   const [selectedTopic, setSelectedTopic] = useState(null);
+  const [filteredSubtopics, setFilteredSubtopics] = useState([]);
 
   useEffect(() => {
     if (task && visible) {
       const topicData = allTopics.find(t => t.id === task.topic);
       setSelectedTopic(topicData);
 
+      // Фильтруем подтемы по выбранной теме
+      if (task.topic) {
+        const subtopicsForTopic = allSubtopics.filter(st => st.topic === task.topic);
+        setFilteredSubtopics(subtopicsForTopic);
+      }
+
       form.setFieldsValue({
         topic: task.topic || undefined,
-        subtopic: task.expand?.topic?.subtopic || '',
+        subtopic: task.subtopic || undefined,
         difficulty: task.difficulty,
         answer: task.answer || '',
         statement_md: task.statement_md || '',
@@ -32,16 +39,18 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
       setPreviewStatement(task.statement_md || '');
       setPreviewAnswer(task.answer || '');
     }
-  }, [task, visible, form, allTopics]);
+  }, [task, visible, form, allTopics, allSubtopics]);
 
   const handleTopicChange = (topicId) => {
     const topicData = allTopics.find(t => t.id === topicId);
     setSelectedTopic(topicData);
 
-    // Автоматически заполняем подтему текущей темы
-    if (topicData?.subtopic) {
-      form.setFieldValue('subtopic', topicData.subtopic);
-    }
+    // Фильтруем подтемы по выбранной теме
+    const subtopicsForTopic = allSubtopics.filter(st => st.topic === topicId);
+    setFilteredSubtopics(subtopicsForTopic);
+
+    // Сбрасываем подтему при смене темы
+    form.setFieldValue('subtopic', undefined);
   };
 
   const handleSave = async () => {
@@ -52,6 +61,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
       // Данные для обновления задачи
       const taskData = {
         topic: values.topic,
+        subtopic: values.subtopic || null,
         difficulty: values.difficulty,
         answer: values.answer || '',
         statement_md: values.statement_md || '',
@@ -61,21 +71,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
         tags: values.tags || [],
       };
 
-      // Если подтема изменилась, нужно обновить тему
-      const newSubtopic = values.subtopic || '';
-      const currentSubtopic = selectedTopic?.subtopic || '';
-
-      if (newSubtopic !== currentSubtopic && values.topic) {
-        // Обновляем подтему в теме
-        await onSave(task.id, taskData, {
-          updateTopic: true,
-          topicId: values.topic,
-          subtopic: newSubtopic,
-        });
-      } else {
-        // Просто обновляем задачу
-        await onSave(task.id, taskData);
-      }
+      await onSave(task.id, taskData);
 
       message.success('Задача успешно обновлена');
       onClose();
@@ -155,7 +151,6 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
             {allTopics.map(topic => (
               <Option key={topic.id} value={topic.id}>
                 №{topic.ege_number} - {topic.title}
-                {topic.subtopic && <span style={{ color: '#999', marginLeft: 8 }}>({topic.subtopic})</span>}
               </Option>
             ))}
           </Select>
@@ -164,33 +159,20 @@ const TaskEditModal = ({ task, visible, onClose, onSave, allTags = [], allSource
         {/* Подтема */}
         <Form.Item
           name="subtopic"
-          label="Подтема темы"
-          tooltip="Подтема привязана к теме. При изменении подтема обновится у выбранной темы."
+          label="Подтема"
         >
           <Select
-            placeholder="Выберите или введите подтему"
+            placeholder="Выберите подтему"
             allowClear
             showSearch
-            mode="tags"
-            maxTagCount={1}
+            optionFilterProp="children"
             disabled={!form.getFieldValue('topic')}
           >
-            {allSubtopics.map(st => (
-              <Option key={st} value={st}>{st}</Option>
+            {filteredSubtopics.map(st => (
+              <Option key={st.id} value={st.id}>{st.name}</Option>
             ))}
           </Select>
         </Form.Item>
-
-        {selectedTopic && form.getFieldValue('subtopic') !== selectedTopic.subtopic && (
-          <Alert
-            message="Изменение подтемы"
-            description={`Подтема будет изменена для темы "${selectedTopic.title}" с "${selectedTopic.subtopic || 'не указана'}" на "${form.getFieldValue('subtopic') || 'не указана'}". Это повлияет на все задачи этой темы.`}
-            type="warning"
-            icon={<InfoCircleOutlined />}
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-        )}
 
         {/* Источник */}
         <Form.Item

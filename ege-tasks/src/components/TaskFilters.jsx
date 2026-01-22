@@ -144,8 +144,8 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], subtopics = [], o
                 optionFilterProp="children"
               >
                 {subtopics.map(subtopic => (
-                  <Option key={subtopic} value={subtopic}>
-                    {subtopic}
+                  <Option key={subtopic.id} value={subtopic.id}>
+                    {subtopic.name}
                   </Option>
                 ))}
               </Select>
@@ -258,7 +258,7 @@ const TaskFilters = ({ topics, tags, years = [], sources = [], subtopics = [], o
                   onClose={() => removeFilter('subtopic')}
                   color="purple"
                 >
-                  Подтема: {filters.subtopic}
+                  Подтема: {subtopics.find(s => s.id === filters.subtopic)?.name || filters.subtopic}
                 </Tag>
               )}
               {filters.difficulty && (
