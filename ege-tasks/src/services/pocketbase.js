@@ -61,9 +61,10 @@ export const api = {
         filterArr.push(`topic = "${filters.topic}"`);
       }
 
-      // Фильтрация по подтеме - теперь это relation поле
+      // Фильтрация по подтеме - это Multiple relation (массив)
+      // Используем оператор ~ для проверки наличия ID в массиве
       if (filters.subtopic) {
-        filterArr.push(`subtopic = "${filters.subtopic}"`);
+        filterArr.push(`subtopic ~ "${filters.subtopic}"`);
       }
 
       if (filters.difficulty) {
