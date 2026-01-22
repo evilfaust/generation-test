@@ -31,7 +31,7 @@ import { api } from '../services/pocketbase';
 const { Option } = Select;
 const { TextArea } = Input;
 
-const WorksheetGenerator = ({ topics }) => {
+const WorksheetGenerator = ({ topics, tags = [], subtopics = [] }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [worksheet, setWorksheet] = useState(null);
@@ -543,7 +543,7 @@ const WorksheetGenerator = ({ topics }) => {
             </div>
           </Card>
 
-          <PrintableWorksheet {...worksheet} />
+          <PrintableWorksheet {...worksheet} topics={topics} tags={tags} subtopics={subtopics} />
         </>
       )}
     </div>

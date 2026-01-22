@@ -1,18 +1,17 @@
 import { useState } from 'react';
-import { Card, Typography, Image, Modal, List, Button, Spin, Badge, Tag, Divider, Space, Tooltip, message } from 'antd';
+import { Card, Typography, Image, Tooltip, message } from 'antd';
 import { SwapOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
+import TaskReplaceModal from './TaskReplaceModal';
 import { api } from '../services/pocketbase';
 
 const { Text, Title } = Typography;
 
-const PrintableWorksheet = ({ cards: initialCards, title, showAnswers, showSolutions, format, cardsCount, tasksPerCard, topicName }) => {
+const PrintableWorksheet = ({ cards: initialCards, title, showAnswers, showSolutions, format, cardsCount, tasksPerCard, topicName, topics = [], tags = [], subtopics = [] }) => {
   // Состояния для карточек и замены задач
   const [cards, setCards] = useState(initialCards || []);
   const [replaceModalVisible, setReplaceModalVisible] = useState(false);
   const [taskToReplace, setTaskToReplace] = useState(null); // { cardIndex, taskIndex, task }
-  const [replacementTasks, setReplacementTasks] = useState([]);
-  const [loadingReplacements, setLoadingReplacements] = useState(false);
 
   // Определяем размеры карточек в зависимости от формата
   const getCardStyle = () => {
@@ -55,39 +54,9 @@ const PrintableWorksheet = ({ cards: initialCards, title, showAnswers, showSolut
   const cardStyle = getCardStyle();
 
   // Функции для замены задач
-  const handleReplaceTask = async (cardIndex, taskIndex, task) => {
+  const handleReplaceTask = (cardIndex, taskIndex, task) => {
     setTaskToReplace({ cardIndex, taskIndex, task });
     setReplaceModalVisible(true);
-    setLoadingReplacements(true);
-
-    try {
-      // Загружаем все задачи из той же темы
-      const filters = {};
-      if (task.topic) filters.topic = task.topic;
-
-      const allTopicTasks = await api.getTasks(filters);
-
-      // Фильтруем: убираем только текущую задачу и задачи, уже используемые в карточках
-      const usedTaskIds = new Set();
-      cards.forEach(cardTasks => {
-        cardTasks.forEach(t => usedTaskIds.add(t.id));
-      });
-
-      const filtered = allTopicTasks.filter(t =>
-        t.id !== task.id &&
-        !usedTaskIds.has(t.id)
-      );
-
-      // Сортируем по коду для удобства
-      filtered.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
-
-      setReplacementTasks(filtered);
-    } catch (error) {
-      console.error('Error loading replacement tasks:', error);
-      message.error('Ошибка при загрузке задач для замены');
-    } finally {
-      setLoadingReplacements(false);
-    }
   };
 
   const handleConfirmReplace = (newTask) => {
@@ -106,7 +75,6 @@ const PrintableWorksheet = ({ cards: initialCards, title, showAnswers, showSolut
   const handleCancelReplace = () => {
     setReplaceModalVisible(false);
     setTaskToReplace(null);
-    setReplacementTasks([]);
   };
 
   return (
@@ -522,97 +490,15 @@ const PrintableWorksheet = ({ cards: initialCards, title, showAnswers, showSolut
       );})}
 
       {/* Модальное окно для замены задачи */}
-      <Modal
-        title={
-          <Space>
-            <SwapOutlined />
-            <span>Заменить задачу</span>
-          </Space>
-        }
-        open={replaceModalVisible}
+      <TaskReplaceModal
+        visible={replaceModalVisible}
+        taskToReplace={taskToReplace}
+        onConfirm={handleConfirmReplace}
         onCancel={handleCancelReplace}
-        footer={null}
-        width={800}
-        style={{ top: 20 }}
-      >
-        {taskToReplace && (
-          <div>
-            <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-              <strong>Текущая задача:</strong>
-              <div style={{ marginTop: 8 }}>
-                <Badge color="blue" text={`Код: ${taskToReplace.task.code}`} />
-                <Divider type="vertical" />
-                <Badge
-                  color={
-                    taskToReplace.task.difficulty === '1' ? 'green' :
-                    taskToReplace.task.difficulty === '2' ? 'blue' :
-                    taskToReplace.task.difficulty === '3' ? 'orange' :
-                    taskToReplace.task.difficulty === '4' ? 'red' : 'purple'
-                  }
-                  text={`Сложность: ${taskToReplace.task.difficulty || '1'}`}
-                />
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <MathRenderer text={taskToReplace.task.statement_md} />
-              </div>
-            </div>
-
-            <Divider>Задачи для замены</Divider>
-
-            {loadingReplacements ? (
-              <div style={{ textAlign: 'center', padding: 30 }}>
-                <Spin tip="Загружаем задачи из темы..." />
-              </div>
-            ) : replacementTasks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: '#999' }}>
-                Задачи для замены не найдены
-              </div>
-            ) : (
-              <List
-                dataSource={replacementTasks}
-                renderItem={(task) => (
-                  <List.Item
-                    actions={[
-                      <Button
-                        type="primary"
-                        size="small"
-                        onClick={() => handleConfirmReplace(task)}
-                      >
-                        Заменить
-                      </Button>
-                    ]}
-                  >
-                    <List.Item.Meta
-                      title={
-                        <Space>
-                          <Badge color="blue" text={task.code} />
-                          <Badge
-                            color={
-                              task.difficulty === '1' ? 'green' :
-                              task.difficulty === '2' ? 'blue' :
-                              task.difficulty === '3' ? 'orange' :
-                              task.difficulty === '4' ? 'red' : 'purple'
-                            }
-                            text={`Сложность: ${task.difficulty || '1'}`}
-                          />
-                          {task.answer && <Tag color="green">С ответом</Tag>}
-                          {task.solution && <Tag color="blue">С решением</Tag>}
-                        </Space>
-                      }
-                      description={
-                        <div style={{ maxHeight: 100, overflow: 'hidden' }}>
-                          <MathRenderer text={task.statement_md} />
-                        </div>
-                      }
-                    />
-                  </List.Item>
-                )}
-                style={{ maxHeight: 500, overflowY: 'auto' }}
-              />
-            )}
-          </div>
-        )}
-      </Modal>
+        topics={topics}
+        subtopics={subtopics}
+        tags={tags}
+      />
     </div>
   );
 };

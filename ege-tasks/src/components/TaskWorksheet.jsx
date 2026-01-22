@@ -34,6 +34,7 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
+import TaskReplaceModal from './TaskReplaceModal';
 import { api } from '../services/pocketbase';
 import './TaskWorksheet.css';
 
@@ -58,8 +59,6 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
   // Состояния для замены задачи
   const [replaceModalVisible, setReplaceModalVisible] = useState(false);
   const [taskToReplace, setTaskToReplace] = useState(null); // { variantIndex, taskIndex, task }
-  const [replacementTasks, setReplacementTasks] = useState([]);
-  const [loadingReplacements, setLoadingReplacements] = useState(false);
 
   // Состояния для сохранения работы
   const [saveModalVisible, setSaveModalVisible] = useState(false);
@@ -189,39 +188,9 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
     form.resetFields();
   };
 
-  const handleReplaceTask = async (variantIndex, taskIndex, task) => {
+  const handleReplaceTask = (variantIndex, taskIndex, task) => {
     setTaskToReplace({ variantIndex, taskIndex, task });
     setReplaceModalVisible(true);
-    setLoadingReplacements(true);
-
-    try {
-      // Загружаем все задачи из той же темы
-      const filters = {};
-      if (task.topic) filters.topic = task.topic;
-
-      const allTopicTasks = await api.getTasks(filters);
-
-      // Фильтруем: убираем только текущую задачу и задачи, уже используемые в вариантах
-      const usedTaskIds = new Set();
-      variants.forEach(variant => {
-        variant.tasks.forEach(t => usedTaskIds.add(t.id));
-      });
-
-      const filtered = allTopicTasks.filter(t =>
-        t.id !== task.id &&
-        !usedTaskIds.has(t.id)
-      );
-
-      // Сортируем по коду для удобства
-      filtered.sort((a, b) => (a.code || '').localeCompare(b.code || ''));
-
-      setReplacementTasks(filtered);
-    } catch (error) {
-      console.error('Error loading replacement tasks:', error);
-      message.error('Ошибка при загрузке задач для замены');
-    } finally {
-      setLoadingReplacements(false);
-    }
   };
 
   const handleConfirmReplace = (newTask) => {
@@ -239,7 +208,6 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
   const handleCancelReplace = () => {
     setReplaceModalVisible(false);
     setTaskToReplace(null);
-    setReplacementTasks([]);
   };
 
   const handleSaveWork = async (values) => {
@@ -907,97 +875,15 @@ const TaskWorksheet = ({ topics, tags, years = [], sources = [], subtopics = [] 
       )}
 
       {/* Модальное окно для замены задачи */}
-      <Modal
-        title={
-          <Space>
-            <SwapOutlined />
-            <span>Заменить задачу</span>
-          </Space>
-        }
-        open={replaceModalVisible}
+      <TaskReplaceModal
+        visible={replaceModalVisible}
+        taskToReplace={taskToReplace}
+        onConfirm={handleConfirmReplace}
         onCancel={handleCancelReplace}
-        footer={null}
-        width={800}
-        style={{ top: 20 }}
-      >
-        {taskToReplace && (
-          <div>
-            <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
-              <strong>Текущая задача:</strong>
-              <div style={{ marginTop: 8 }}>
-                <Badge color="blue" text={`Код: ${taskToReplace.task.code}`} />
-                <Divider type="vertical" />
-                <Badge
-                  color={
-                    taskToReplace.task.difficulty === '1' ? 'green' :
-                    taskToReplace.task.difficulty === '2' ? 'blue' :
-                    taskToReplace.task.difficulty === '3' ? 'orange' :
-                    taskToReplace.task.difficulty === '4' ? 'red' : 'purple'
-                  }
-                  text={`Сложность: ${taskToReplace.task.difficulty || '1'}`}
-                />
-              </div>
-              <div style={{ marginTop: 8 }}>
-                <MathRenderer text={taskToReplace.task.statement_md} />
-              </div>
-            </div>
-
-            <Divider>Задачи для замены</Divider>
-
-            {loadingReplacements ? (
-              <div style={{ textAlign: 'center', padding: 30 }}>
-                <Spin tip="Загружаем задачи из темы..." />
-              </div>
-            ) : replacementTasks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 30, color: '#999' }}>
-                Задачи для замены не найдены
-              </div>
-            ) : (
-              <List
-                dataSource={replacementTasks}
-                renderItem={(task) => (
-                  <List.Item
-                    actions={[
-                      <Button
-                        type="primary"
-                        size="small"
-                        onClick={() => handleConfirmReplace(task)}
-                      >
-                        Заменить
-                      </Button>
-                    ]}
-                  >
-                    <List.Item.Meta
-                      title={
-                        <Space>
-                          <Badge color="blue" text={task.code} />
-                          <Badge
-                            color={
-                              task.difficulty === '1' ? 'green' :
-                              task.difficulty === '2' ? 'blue' :
-                              task.difficulty === '3' ? 'orange' :
-                              task.difficulty === '4' ? 'red' : 'purple'
-                            }
-                            text={`Сложность: ${task.difficulty || '1'}`}
-                          />
-                          {task.answer && <Tag color="green">С ответом</Tag>}
-                          {task.solution && <Tag color="blue">С решением</Tag>}
-                        </Space>
-                      }
-                      description={
-                        <div style={{ maxHeight: 100, overflow: 'hidden' }}>
-                          <MathRenderer text={task.statement_md} />
-                        </div>
-                      }
-                    />
-                  </List.Item>
-                )}
-                style={{ maxHeight: 500, overflowY: 'auto' }}
-              />
-            )}
-          </div>
-        )}
-      </Modal>
+        topics={topics}
+        subtopics={subtopics}
+        tags={tags}
+      />
 
       {/* Модальное окно для сохранения работы */}
       <Modal
