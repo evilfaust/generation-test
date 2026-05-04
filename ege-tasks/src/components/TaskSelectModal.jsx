@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Card, Button, Spin, Empty, Form, Select, Row, Col, Input, Space, Tag } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
@@ -32,42 +32,114 @@ const TaskSelectModal = ({
   const [filters, setFilters] = useState({});
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    if (!visible) return;
-    loadTasks();
-  }, [visible, filters]);
+  const PER_PAGE = 60;
 
-  const loadTasks = async () => {
-    const hasFilters = !!(
-      filters.exam_type ||
-      filters.topic ||
-      filters.subtopic ||
-      (filters.tags && filters.tags.length) ||
-      filters.difficulty
-    );
-    if (!hasFilters) {
+  // AbortController для отмены незавершённых запросов
+  const abortRef = useRef(null);
+  // Кеш: { key, tasks, totalItems, loadedPages }
+  const cacheRef = useRef(null);
+
+  const [totalItems, setTotalItems] = useState(0);
+  const [loadedPages, setLoadedPages] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const buildFilterObj = (f) => {
+    const obj = {};
+    if (f.exam_type)               obj.exam_type  = f.exam_type;
+    if (f.topic)                   obj.topic      = f.topic;
+    if (f.subtopic)                obj.subtopic   = f.subtopic;
+    if (f.tags && f.tags.length)   obj.tags       = f.tags;
+    if (f.difficulty)              obj.difficulty = f.difficulty;
+    return obj;
+  };
+
+  const hasFilters = (f) => !!(
+    f.exam_type || f.topic || f.subtopic ||
+    (f.tags && f.tags.length) || f.difficulty
+  );
+
+  const loadTasks = useCallback(async (currentFilters) => {
+    if (!hasFilters(currentFilters)) {
       setTasks([]);
+      setTotalItems(0);
+      setLoadedPages(0);
+      cacheRef.current = null;
       return;
     }
 
-    setLoading(true);
-    try {
-      const filterObj = {};
-      if (filters.exam_type)                      filterObj.exam_type = filters.exam_type;
-      if (filters.topic)                          filterObj.topic = filters.topic;
-      if (filters.subtopic)                       filterObj.subtopic = filters.subtopic;
-      if (filters.tags && filters.tags.length > 0) filterObj.tags = filters.tags;
-      if (filters.difficulty)                     filterObj.difficulty = filters.difficulty;
+    const cacheKey = JSON.stringify(currentFilters);
 
-      const allTasks = await api.getTasks(filterObj);
+    // Попадание в кеш — мгновенный ответ, без запроса
+    if (cacheRef.current?.key === cacheKey) {
       const excluded = new Set(excludeIds);
-      setTasks(allTasks.filter(t => !excluded.has(t.id)));
+      setTasks(cacheRef.current.tasks.filter(t => !excluded.has(t.id)));
+      setTotalItems(cacheRef.current.totalItems);
+      setLoadedPages(cacheRef.current.loadedPages);
+      return;
+    }
+
+    // Отменяем предыдущий незавершённый запрос
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setLoading(true);
+    setTasks([]);
+    setTotalItems(0);
+    setLoadedPages(0);
+    try {
+      const result = await api.getTasksPage({ page: 1, perPage: PER_PAGE, filters: buildFilterObj(currentFilters) });
+      if (controller.signal.aborted) return;
+
+      cacheRef.current = { key: cacheKey, tasks: result.items, totalItems: result.totalItems, loadedPages: 1 };
+      const excluded = new Set(excludeIds);
+      setTasks(result.items.filter(t => !excluded.has(t.id)));
+      setTotalItems(result.totalItems);
+      setLoadedPages(1);
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error('Error loading tasks for selection:', error);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  };
+  }, [excludeIds]);
+
+  const loadMore = useCallback(async () => {
+    if (!cacheRef.current) return;
+    const nextPage = cacheRef.current.loadedPages + 1;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setLoadingMore(true);
+    try {
+      const result = await api.getTasksPage({ page: nextPage, perPage: PER_PAGE, filters: buildFilterObj(filters) });
+      if (controller.signal.aborted) return;
+
+      const merged = [...cacheRef.current.tasks, ...result.items];
+      cacheRef.current = { ...cacheRef.current, tasks: merged, loadedPages: nextPage };
+
+      const excluded = new Set(excludeIds);
+      setTasks(merged.filter(t => !excluded.has(t.id)));
+      setLoadedPages(nextPage);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      console.error('Error loading more tasks:', error);
+    } finally {
+      if (!controller.signal.aborted) setLoadingMore(false);
+    }
+  }, [filters, excludeIds]);
+
+  useEffect(() => {
+    if (!visible) {
+      abortRef.current?.abort();
+      return;
+    }
+    // Дебаунс 300 мс: при cascade exam_type→topic→subtopic отправляем 1 запрос, не 3
+    const timer = setTimeout(() => loadTasks(filters), 300);
+    return () => clearTimeout(timer);
+  }, [visible, filters, loadTasks]);
 
   const filteredTopics = useMemo(() => {
     if (!filters.exam_type) return allTopics;
@@ -93,6 +165,9 @@ const TaskSelectModal = ({
     form.resetFields();
     setFilters({});
     setSearch('');
+    setTotalItems(0);
+    setLoadedPages(0);
+    cacheRef.current = null;
   };
 
   const handleClose = () => {
@@ -234,30 +309,43 @@ const TaskSelectModal = ({
       ) : visibleTasks.length === 0 ? (
         <Empty description="Нет задач по заданным условиям" />
       ) : (
-        <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-          {visibleTasks.map(task => (
-            <Card key={task.id} size="small" style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                    {task.code || 'Без кода'}
-                  </div>
-                  <MathRenderer text={task.statement_md} />
-                  {task.answer && (
-                    <div style={{ marginTop: 6 }}>
-                      <Tag color="green">Ответ: {task.answer}</Tag>
+        <>
+          <div style={{ marginBottom: 8, color: '#888', fontSize: 13 }}>
+            Показано {tasks.length} из {totalItems} задач
+            {search && ` (фильтр: ${visibleTasks.length})`}
+          </div>
+          <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+            {visibleTasks.map(task => (
+              <Card key={task.id} size="small" style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                      {task.code || 'Без кода'}
                     </div>
-                  )}
+                    <MathRenderer text={task.statement_md} />
+                    {task.answer && (
+                      <div style={{ marginTop: 6 }}>
+                        <Tag color="green">Ответ: {task.answer}</Tag>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Button type="primary" onClick={() => onSelect(task)}>
+                      Добавить
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <Button type="primary" onClick={() => onSelect(task)}>
-                    Добавить
-                  </Button>
-                </div>
+              </Card>
+            ))}
+            {tasks.length < totalItems && (
+              <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                <Button onClick={loadMore} loading={loadingMore}>
+                  Загрузить ещё (осталось {totalItems - tasks.length})
+                </Button>
               </div>
-            </Card>
-          ))}
-        </div>
+            )}
+          </div>
+        </>
       )}
     </Modal>
   );

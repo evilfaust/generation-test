@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip } from 'antd';
-import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
@@ -17,6 +17,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [copyingToGeo, setCopyingToGeo] = useState(false);
   const [previewStatement, setPreviewStatement] = useState('');
   const [previewAnswer, setPreviewAnswer] = useState('');
   const [previewSolution, setPreviewSolution] = useState('');
@@ -310,6 +311,59 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
     }
   };
 
+  const handleCopyToGeometry = async () => {
+    setCopyingToGeo(true);
+    try {
+      const values = form.getFieldsValue();
+      const statement = values.statement_md || task.statement_md || '';
+      const solution = values.solution_md || task.solution_md || '';
+      const solutionWithRef = [`*Аналогична задаче ${task.code}.*`, solution].filter(Boolean).join('\n\n');
+
+      const sourceVal = values.source;
+      const source = Array.isArray(sourceVal) ? (sourceVal[0] || '') : (sourceVal || task.source || '');
+
+      const titleRaw = statement.replace(/\$\$[\s\S]*?\$\$/g, '…').replace(/\$[^$]*\$/g, '…').replace(/[*_#]/g, '').trim();
+      const title = titleRaw.slice(0, 80) || task.code;
+
+      const geoTasks = await api.getGeometryTasks();
+      const n = String(geoTasks.length + 1).padStart(3, '0');
+      const code = `GEO-${n}`;
+
+      const payload = {
+        code,
+        title,
+        difficulty: values.difficulty || task.difficulty,
+        statement_md: statement,
+        answer: values.answer || task.answer || '',
+        solution_md: solutionWithRef,
+        source,
+        year: values.year || task.year || null,
+      };
+
+      // Копируем изображение из задачи, если оно есть
+      const imageUrl = api.getTaskImageUrl(task);
+      if (imageUrl) {
+        try {
+          const resp = await fetch(imageUrl);
+          const blob = await resp.blob();
+          const ext = blob.type.includes('png') ? 'png' : 'jpg';
+          payload.geogebra_image_base64 = new File([blob], `${code}.${ext}`, { type: blob.type });
+          payload.drawing_view = 'image';
+        } catch {
+          message.warning('Не удалось скопировать изображение — задача создана без чертежа');
+        }
+      }
+
+      const created = await api.createGeometryTask(payload);
+      message.success(`Задача скопирована в геометрию как ${created.code}`);
+    } catch (error) {
+      console.error('Error copying to geometry:', error);
+      message.error('Ошибка при копировании в геометрию');
+    } finally {
+      setCopyingToGeo(false);
+    }
+  };
+
   const handleCropped = (croppedDataUrl) => {
     img.setUploadPreviewUrl(croppedDataUrl);
     img.setUploadedFile(dataUrlToFile(croppedDataUrl, img.uploadedFile?.name || 'image.png'));
@@ -336,17 +390,24 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {!isCreateMode ? (
-            <Popconfirm
-              title="Удаление задачи"
-              description={`Вы уверены, что хотите удалить задачу ${task?.code}?`}
-              onConfirm={handleDelete}
-              okText="Удалить"
-              cancelText="Отмена"
-              okButtonProps={{ danger: true }}
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
-            >
-              <Button danger icon={<DeleteOutlined />} loading={deleting}>Удалить</Button>
-            </Popconfirm>
+            <Space>
+              <Popconfirm
+                title="Удаление задачи"
+                description={`Вы уверены, что хотите удалить задачу ${task?.code}?`}
+                onConfirm={handleDelete}
+                okText="Удалить"
+                cancelText="Отмена"
+                okButtonProps={{ danger: true }}
+                icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={deleting}>Удалить</Button>
+              </Popconfirm>
+              <Tooltip title="Скопировать задачу в базу геометрических задач">
+                <Button icon={<ExportOutlined />} loading={copyingToGeo} onClick={handleCopyToGeometry}>
+                  В геометрию
+                </Button>
+              </Tooltip>
+            </Space>
           ) : <div />}
           <Space>
             <Button onClick={onClose}>Отмена</Button>
