@@ -622,13 +622,20 @@ function AppLayout() {
               style={{ flexShrink: 0, width: 40, height: 40 }}
             />
           )}
-          <span style={{
-            fontSize: isDesktop ? 20 : 16,
-            fontWeight: 500, flex: 1,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {title}
-          </span>
+          {breadcrumbItems ? (
+            <Breadcrumb
+              items={breadcrumbItems}
+              style={{ flex: 1, fontSize: isDesktop ? 15 : 13 }}
+            />
+          ) : (
+            <span style={{
+              fontSize: isDesktop ? 20 : 16,
+              fontWeight: 500, flex: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {title}
+            </span>
+          )}
         </Header>
 
         <Content style={{
@@ -642,9 +649,6 @@ function AppLayout() {
             background: '#fff',
             borderRadius: noMargin ? 0 : 8,
           }}>
-            {!noMargin && breadcrumbItems && (
-              <Breadcrumb items={breadcrumbItems} style={{ marginBottom: 16 }} />
-            )}
             <Outlet />
           </div>
         </Content>

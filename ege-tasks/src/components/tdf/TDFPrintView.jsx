@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Button, Checkbox, Space, Typography, Segmented } from 'antd';
+import { Button, Space, Typography, Segmented } from 'antd';
 import { ArrowLeftOutlined, PrinterOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { api } from '../../services/pocketbase';
 import MathRenderer from '../../shared/components/MathRenderer';
@@ -17,17 +17,15 @@ const TYPE_LABELS = {
  * Печатный вид ТДФ.
  *
  * mode="etalon" — полный конспект (все поля заполнены)
- * mode="blank"  — пустой вариант (только название/вопрос, остальное — пустое место)
+ * mode="blank"  — пустой вариант (только название, остальное — пустое место)
  */
 export default function TDFPrintView({ tdfSet, items, mode, variantNumber, variantTitle, onBack }) {
   const printRef = useRef(null);
   const { exportToPDF, exporting } = usePuppeteerPDF();
-  const [hideQuestionColumn, setHideQuestionColumn] = useState(false);
   const [portrait, setPortrait] = useState(false);
 
   const isBlank = mode === 'blank';
   const today = new Date().toLocaleDateString('ru-RU');
-  const showQuestionColumn = !hideQuestionColumn || isBlank;
 
   const handlePrint = () => {
     const style = document.createElement('style');
@@ -52,7 +50,7 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
       if (item.is_section_header) {
         return (
           <tr key={item.id} className="tdf-section-header-row">
-            <td colSpan={showQuestionColumn ? 5 : 4} className="tdf-section-header-cell">
+            <td colSpan={4} className="tdf-section-header-cell">
               {item.section_title}
             </td>
           </tr>
@@ -79,28 +77,6 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
               </div>
             )}
           </td>
-          {showQuestionColumn && (
-            <td className="tdf-cell tdf-cell-question">
-              {isBlank ? (
-                <div className="tdf-blank-lines">
-                  <div className="tdf-question-text">
-                    {item.question_md && <MathRenderer content={item.question_md} />}
-                  </div>
-                  <div className="tdf-write-lines">
-                    <div className="tdf-line" />
-                    <div className="tdf-line" />
-                    <div className="tdf-line" />
-                  </div>
-                </div>
-              ) : (
-                <div className="tdf-math-content">
-                  {item.question_md
-                    ? <MathRenderer content={item.question_md} />
-                    : <span className="tdf-empty">—</span>}
-                </div>
-              )}
-            </td>
-          )}
           <td className="tdf-cell tdf-cell-drawing">
             {isBlank ? (
               <div className="tdf-blank-area" />
@@ -144,11 +120,6 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
           <Button icon={<FilePdfOutlined />} onClick={handleExportPDF} loading={exporting}>
             Скачать PDF
           </Button>
-          {!isBlank && (
-            <Checkbox checked={hideQuestionColumn} onChange={(e) => setHideQuestionColumn(e.target.checked)}>
-              Скрыть "Вопрос / задание"
-            </Checkbox>
-          )}
         </Space>
         <Text type="secondary" style={{ marginLeft: 16 }}>
           {isBlank ? `Вариант ${variantNumber}${variantTitle ? ' — ' + variantTitle : ''}` : 'Эталонный конспект'}
@@ -176,16 +147,14 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
         <table className="tdf-table">
           <colgroup>
             <col style={{ width: '4%' }} />
-            <col style={{ width: showQuestionColumn ? '28%' : '36%' }} />
-            {showQuestionColumn && <col style={{ width: '18%' }} />}
-            <col style={{ width: showQuestionColumn ? '28%' : '34%' }} />
-            <col style={{ width: showQuestionColumn ? '22%' : '26%' }} />
+            <col style={{ width: '42%' }} />
+            <col style={{ width: '30%' }} />
+            <col style={{ width: '24%' }} />
           </colgroup>
           <thead>
             <tr className="tdf-thead-row">
               <th className="tdf-th">№</th>
               <th className="tdf-th">Тема / Формулировка</th>
-              {showQuestionColumn && <th className="tdf-th">Вопрос / задание</th>}
               <th className="tdf-th">Чертёж</th>
               <th className="tdf-th">Краткая запись</th>
             </tr>

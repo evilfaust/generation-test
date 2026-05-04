@@ -49,7 +49,6 @@ export default function TDFItemModal({ open, item, setId, onClose, onSaved, next
         section_title: item.section_title || '',
         type: item.type || undefined,
         name: item.name || '',
-        question_md: item.question_md || '',
         formulation_md: item.formulation_md || '',
         short_notation_md: item.short_notation_md || '',
       });
@@ -141,7 +140,6 @@ export default function TDFItemModal({ open, item, setId, onClose, onSaved, next
       } else {
         fields.type = values.type || '';
         fields.name = values.name || '';
-        fields.question_md = values.question_md || '';
         fields.formulation_md = values.formulation_md || '';
         fields.short_notation_md = values.short_notation_md || '';
       }
@@ -206,12 +204,6 @@ export default function TDFItemModal({ open, item, setId, onClose, onSaved, next
               </Form.Item>
               <Form.Item name="name" label="Название / тема">
                 <Input placeholder="Например: Признак 1 (накрест лежащие углы)" />
-              </Form.Item>
-              <Form.Item name="question_md" label="Вопрос / задание">
-                <TextArea
-                  rows={2}
-                  placeholder="Например: Сформулируйте признак параллельности прямых через накрест лежащие углы."
-                />
               </Form.Item>
               <Form.Item name="formulation_md" label="Формулировка">
                 <TextArea
@@ -299,7 +291,7 @@ export default function TDFItemModal({ open, item, setId, onClose, onSaved, next
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#fafafa' }}>
-                {['Вопрос / задание', 'Формулировка', 'Чертёж', 'Краткая запись'].map(h => (
+                {['Формулировка', 'Чертёж', 'Краткая запись'].map(h => (
                   <th key={h} style={{ border: '1px solid #d9d9d9', padding: '6px 10px', fontWeight: 600 }}>
                     {h}
                   </th>
@@ -308,9 +300,6 @@ export default function TDFItemModal({ open, item, setId, onClose, onSaved, next
             </thead>
             <tbody>
               <tr>
-                <td style={{ border: '1px solid #d9d9d9', padding: '8px 10px', verticalAlign: 'top' }}>
-                  <MathRenderer content={form.getFieldValue('question_md') || ''} />
-                </td>
                 <td style={{ border: '1px solid #d9d9d9', padding: '8px 10px', verticalAlign: 'top' }}>
                   <MathRenderer content={formulationPreview} />
                 </td>

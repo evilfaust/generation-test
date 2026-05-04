@@ -45,7 +45,6 @@
 }
 
 .tdf-print-page--portrait .tdf-cell-name-formulation,
-.tdf-print-page--portrait .tdf-cell-question,
 .tdf-print-page--portrait .tdf-cell-drawing,
 .tdf-print-page--portrait .tdf-cell-notation {
   font-size: 9pt;
@@ -184,7 +183,6 @@
   border-top: 1px dashed #ccc;
 }
 
-.tdf-cell-question,
 .tdf-cell-drawing,
 .tdf-cell-notation {
   font-size: 10.5pt;
@@ -204,32 +202,6 @@
 
 .tdf-empty {
   color: #aaa;
-}
-
-/* Пустые строки для бланка */
-.tdf-blank-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 52px;
-}
-
-.tdf-question-text {
-  font-size: 10pt;
-  color: #333;
-  margin-bottom: 2px;
-}
-
-.tdf-write-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.tdf-line {
-  border-bottom: 1px solid #aaa;
-  height: 12px;
 }
 
 .tdf-blank-area {

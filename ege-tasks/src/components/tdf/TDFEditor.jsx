@@ -260,14 +260,9 @@ export default function TDFEditor({ setId, onBack }) {
                     )}
                   </div>
 
-                  {/* Название + вопрос */}
+                  {/* Название */}
                   <div>
                     <Text strong style={{ fontSize: 13 }}>{item.name || '—'}</Text>
-                    {item.question_md && (
-                      <div style={{ marginTop: 2, fontSize: 12, color: '#666' }}>
-                        <MathRenderer content={item.question_md} />
-                      </div>
-                    )}
                   </div>
 
                   {/* Формулировка */}
