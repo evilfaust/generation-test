@@ -47,6 +47,28 @@ export default function TeamPixelArtPrintLayout({
     return Math.min(10, availW / cols, availH / rows);
   };
 
+  // ── Единый размер клетки для всех плиток (ориентир — самая «тесная») ───────
+  // В режиме twoSheets сетка на отдельном листе без задач — там всегда одинаково.
+  // В режиме per_tile + одна страница: у кого больше задач — меньше места → берём min.
+  const unifiedCellMm = (() => {
+    const sizes = Array.from({ length: totalTiles }, (_, i) => {
+      const grid = tileGrids?.[i];
+      if (!grid?.length) return null;
+      return calcCellMm(grid, getTasksForTile(i), twoSheets, twoColumns);
+    }).filter(v => v !== null);
+    return sizes.length > 0 ? Math.min(...sizes) : 6;
+  })();
+
+  const unifiedGridCellMm = (() => {
+    // Для страниц с только сеткой (twoSheets=true) задачи не влияют, но всё равно унифицируем
+    const sizes = Array.from({ length: totalTiles }, (_, i) => {
+      const grid = tileGrids?.[i];
+      if (!grid?.length) return null;
+      return calcCellMm(grid, [], true, twoColumns);
+    }).filter(v => v !== null);
+    return sizes.length > 0 ? Math.min(...sizes) : 6;
+  })();
+
   // ── Рендер сетки плитки ───────────────────────────────────────────────────
   const renderTileGrid = (grid, cellMm, highlightAnswers = false) => {
     if (!grid?.length) return null;
@@ -373,7 +395,6 @@ export default function TeamPixelArtPrintLayout({
         const grid  = tileGrids?.[i];
         const tasks = getTasksForTile(i);
         if (!grid) return null;
-        const cellMm = calcCellMm(grid, tasks, twoSheets, twoColumns);
 
         return (
           <div
@@ -388,7 +409,7 @@ export default function TeamPixelArtPrintLayout({
             {!twoSheets && (
               <div style={{ pageBreakInside: 'avoid' }}>
                 {gridCaption}
-                {renderTileGrid(grid, cellMm, false)}
+                {renderTileGrid(grid, unifiedCellMm, false)}
               </div>
             )}
 
@@ -401,7 +422,6 @@ export default function TeamPixelArtPrintLayout({
       {twoSheets && Array.from({ length: totalTiles }, (_, i) => {
         const grid  = tileGrids?.[i];
         if (!grid) return null;
-        const cellMm = calcCellMm(grid, [], true, twoColumns);
         return (
           <div key={`grid-${i}`} className="team-pixel-art-grid-page" style={{ pageBreakBefore: 'always' }}>
             <div style={{
@@ -411,7 +431,7 @@ export default function TeamPixelArtPrintLayout({
               {title} — Таблица
             </div>
             {gridCaption}
-            {renderTileGrid(grid, cellMm, false)}
+            {renderTileGrid(grid, unifiedGridCellMm, false)}
             {footer}
           </div>
         );
