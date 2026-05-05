@@ -140,10 +140,16 @@
 .cwg-theme-btn:hover  { transform: scale(1.04); }
 .cwg-theme-btn.active { border-color: #1677ff; }
 
-/* ── Print styles ───────────────────────────────────────────────────────── */
+/* ── Скрываем печатный блок на экране ──────────────────────────────────── */
+.cw-print-root {
+  display: none;
+}
+
+/* ── Print styles (по паттерну QRWorksheetGenerator) ───────────────────── */
 @media print {
   body:has(.cw-print-root) { visibility: hidden; }
   .cw-print-root {
+    display: block !important;
     visibility: visible !important;
     position: absolute !important;
     top: 0 !important;

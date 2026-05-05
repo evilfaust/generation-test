@@ -330,17 +330,15 @@ export default function CrosswordGenerator() {
         </div>
       </div>
 
-      {/* Печатный layout — всегда в DOM, вне экрана, показывается только при печати */}
-      <div style={{ position:'absolute', left:'-9999px', top:0, overflow:'hidden' }}>
-        <CrosswordPrintLayout
-          className="cw-print-root"
-          words={words}
-          layout={layout}
-          theme={theme}
-          title={title}
-          showAnswers={showAnswers}
-        />
-      </div>
+      {/* Печатный layout — всегда в DOM, как в QRWorksheetGenerator */}
+      <CrosswordPrintLayout
+        className="cw-print-root"
+        words={words}
+        layout={layout}
+        theme={theme}
+        title={title}
+        showAnswers={showAnswers}
+      />
     </div>
   );
 }
