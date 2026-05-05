@@ -142,7 +142,12 @@
 
 /* ── Print styles ───────────────────────────────────────────────────────── */
 @media print {
-  body > * { display: none !important; }
-  .cw-print-only { display: block !important; }
-  .cw-print-root { page-break-inside: avoid; }
+  body:has(.cw-print-root) { visibility: hidden; }
+  .cw-print-root {
+    visibility: visible !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+  }
+  .cw-print-root * { visibility: visible !important; }
 }

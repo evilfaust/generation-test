@@ -105,7 +105,7 @@ function buildDecorPositions(symbols, rng) {
 }
 
 const CrosswordPrintLayout = forwardRef(function CrosswordPrintLayout(
-  { words, layout, theme, title, showAnswers },
+  { words, layout, theme, title, showAnswers, className = '' },
   ref
 ) {
   const t = THEMES[theme] ?? THEMES.ocean;
@@ -125,6 +125,7 @@ const CrosswordPrintLayout = forwardRef(function CrosswordPrintLayout(
   return (
     <div
       ref={ref}
+      className={className}
       style={{
         width: PAGE_W,
         height: PAGE_H,

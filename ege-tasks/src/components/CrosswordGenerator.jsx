@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useCallback } from 'react';
 import {
   Button, Input, InputNumber, Typography, Space, Tooltip,
   Popconfirm, Alert, Divider,
@@ -74,25 +74,17 @@ async function resizeImage(file) {
   });
 }
 
-// ── Safe CSS-inject print (no window.open → no crash) ─────────────────────
-function doPrint(el) {
-  const clone = el.cloneNode(true);
-  clone.id = '__cw_print__';
-  clone.style.cssText = 'position:fixed;top:0;left:0;z-index:2147483647;';
-  document.body.appendChild(clone);
+// ── Паттерн печати как в QRWorksheetGenerator ─────────────────────────────
+function doPrint() {
   const style = document.createElement('style');
-  style.id = '__cw_print_style__';
-  style.textContent = `
-    @media print {
-      @page { size: A4 portrait; margin: 0; }
-      body > *:not(#__cw_print__) { display: none !important; }
-      #__cw_print__ { display: block !important; position: fixed !important; top: 0; left: 0; }
-    }
-  `;
+  style.id = 'cw-print-page-style';
+  style.textContent = '@page { size: A4 portrait; margin: 0; }';
   document.head.appendChild(style);
   window.print();
-  document.body.removeChild(clone);
-  document.head.removeChild(style);
+  setTimeout(() => {
+    const s = document.getElementById('cw-print-page-style');
+    if (s) document.head.removeChild(s);
+  }, 1000);
 }
 
 // ── Word card ──────────────────────────────────────────────────────────────
@@ -224,12 +216,9 @@ export default function CrosswordGenerator() {
     addWord, updateWord, removeWord, clearAll,
   } = useCrossword();
 
-  const printRef = useRef();
   const unplacedSet = new Set(unplacedWords);
 
-  const handlePrint = () => {
-    if (printRef.current) doPrint(printRef.current);
-  };
+  const handlePrint = () => doPrint();
 
   return (
     <div style={{ padding: '16px 20px' }}>
@@ -319,7 +308,7 @@ export default function CrosswordGenerator() {
           )}
         </div>
 
-        {/* ── Preview ── */}
+        {/* ── Preview (scaled, screen only) ── */}
         <div className="cwg-preview-col">
           <Text type="secondary" style={{ alignSelf:'flex-start', marginBottom:4 }}>
             Предпросмотр ({Math.round(SCALE * 100)}%)
@@ -330,7 +319,6 @@ export default function CrosswordGenerator() {
           >
             <div style={{ transform:`scale(${SCALE})`, transformOrigin:'top left' }}>
               <CrosswordPrintLayout
-                ref={printRef}
                 words={words}
                 layout={layout}
                 theme={theme}
@@ -340,6 +328,18 @@ export default function CrosswordGenerator() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Печатный layout — всегда в DOM, вне экрана, показывается только при печати */}
+      <div style={{ position:'absolute', left:'-9999px', top:0, overflow:'hidden' }}>
+        <CrosswordPrintLayout
+          className="cw-print-root"
+          words={words}
+          layout={layout}
+          theme={theme}
+          title={title}
+          showAnswers={showAnswers}
+        />
       </div>
     </div>
   );
