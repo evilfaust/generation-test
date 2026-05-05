@@ -1,8 +1,39 @@
 /* ТДФ — Печатный вид */
 
+@page { size: A4 landscape; margin: 0; }
+
 .tdf-print-wrapper {
   background: #f5f5f5;
   min-height: 100vh;
+}
+
+/* ── Фаза 1: скрытый блок для замера высот строк ── */
+.tdf-measure-root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+  width: 297mm;
+  padding: 8mm 5mm 5mm;
+  box-sizing: border-box;
+  font-family: 'Times New Roman', serif;
+  font-size: 11pt;
+  z-index: -1;
+}
+
+.tdf-measure-root--portrait {
+  width: 210mm;
+  font-size: 9pt;
+}
+
+/* ── Контейнер всех страниц ── */
+.tdf-print-book {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
 }
 
 .tdf-print-controls {
@@ -20,7 +51,7 @@
 .tdf-print-page {
   background: #fff;
   margin: 16px auto;
-  padding: 7mm 8mm 6mm;
+  padding: 8mm 5mm 5mm;
   width: 297mm;
   min-height: 210mm;
   box-shadow: 0 2px 12px rgba(0,0,0,0.12);
@@ -71,7 +102,21 @@
   font-size: 11pt;
 }
 
-/* Шапка */
+/* Шапка документа внутри thead (повторяется на каждой странице) */
+.tdf-doc-header-cell {
+  border: none !important;
+  padding: 4px 0 6px 0;
+  border-bottom: 1.5px solid #333 !important;
+}
+
+.tdf-doc-header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+/* Шапка (старый div, оставлен для совместимости, не используется) */
 .tdf-header {
   margin-bottom: 8px;
   border-bottom: 1.5px solid #333;
@@ -226,10 +271,33 @@
     background: transparent;
   }
 
+  .tdf-measure-root {
+    display: none !important;
+  }
+
+  .tdf-print-book {
+    padding: 0;
+  }
+
   .tdf-print-page {
     margin: 0;
-    padding: 0;
-    width: 100%;
+    padding: 8mm 5mm 5mm;
+    width: 297mm;
+    height: 210mm;
     box-shadow: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .tdf-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .tdf-print-page--portrait {
+    width: 210mm;
+    height: 297mm;
   }
 }
