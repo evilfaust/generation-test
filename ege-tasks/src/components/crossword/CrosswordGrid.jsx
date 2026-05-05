@@ -1,14 +1,19 @@
-export default function CrosswordGrid({ layout, showAnswers, cellSize = 28 }) {
+export default function CrosswordGrid({
+  layout,
+  showAnswers,
+  cellSize = 28,
+  cellBorder = '#222',
+  cellBg = 'rgba(255,255,255,0.92)',
+  numColor = '#1a1a1a',
+}) {
   if (!layout) return null;
 
   const { grid, placed, width, height } = layout;
 
-  // Map "row,col" → word number for cells that start a word
   const startNumbers = {};
   for (const pw of placed) {
     if (!pw.unplaced) {
       const k = `${pw.row},${pw.col}`;
-      // If multiple words start at same cell (rare), show smallest number
       if (!startNumbers[k] || pw.number < startNumbers[k]) {
         startNumbers[k] = pw.number;
       }
@@ -31,8 +36,8 @@ export default function CrosswordGrid({ layout, showAnswers, cellSize = 28 }) {
                 style={{
                   width: cellSize,
                   height: cellSize,
-                  border: cell ? '1.5px solid #222' : 'none',
-                  background: cell ? '#fff' : 'transparent',
+                  border: cell ? `2px solid ${cellBorder}` : 'none',
+                  background: cell ? cellBg : 'transparent',
                   position: 'relative',
                   boxSizing: 'border-box',
                   flexShrink: 0,
@@ -43,11 +48,11 @@ export default function CrosswordGrid({ layout, showAnswers, cellSize = 28 }) {
                     style={{
                       position: 'absolute',
                       top: 1,
-                      left: 1,
+                      left: 2,
                       fontSize: numSize,
                       lineHeight: 1,
-                      fontWeight: 700,
-                      color: '#1a1a1a',
+                      fontWeight: 800,
+                      color: numColor,
                       fontFamily: 'Arial, sans-serif',
                     }}
                   >
@@ -65,7 +70,7 @@ export default function CrosswordGrid({ layout, showAnswers, cellSize = 28 }) {
                       paddingTop: startNum != null ? numSize : 0,
                       fontSize: letterSize,
                       fontWeight: 700,
-                      color: '#1677ff',
+                      color: numColor,
                       fontFamily: 'Arial, sans-serif',
                     }}
                   >

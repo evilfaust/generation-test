@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react';
 import {
   Button, Input, InputNumber, Typography, Space, Tooltip,
-  Popconfirm, Alert, Switch, Divider,
+  Popconfirm, Alert, Divider,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, PrinterOutlined,
@@ -14,20 +14,17 @@ import './CrosswordGenerator.css';
 
 const { Text, Title } = Typography;
 
-// ── Background removal via canvas flood-fill from corners ──────────────────
+// ── Background removal (flood-fill from corners) ───────────────────────────
 async function removeBackground(dataUrl, tolerance = 35) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = img.width; canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
       const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const { data, width, height } = id;
-
-      // Sample bg color from all 4 corners, average them
       const corners = [[0,0],[width-1,0],[0,height-1],[width-1,height-1]];
       let bgR=0, bgG=0, bgB=0;
       for (const [cx,cy] of corners) {
@@ -35,7 +32,6 @@ async function removeBackground(dataUrl, tolerance = 35) {
         bgR+=data[i]; bgG+=data[i+1]; bgB+=data[i+2];
       }
       bgR=bgR/4|0; bgG=bgG/4|0; bgB=bgB/4|0;
-
       const visited = new Uint8Array(width * height);
       const stack = [...corners];
       while (stack.length) {
@@ -58,13 +54,12 @@ async function removeBackground(dataUrl, tolerance = 35) {
   });
 }
 
-// Resize image to max 160×160 for compact storage
 async function resizeImage(file) {
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 160;
+      const MAX = 200;
       const scale = Math.min(1, MAX / img.width, MAX / img.height);
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
@@ -79,7 +74,28 @@ async function resizeImage(file) {
   });
 }
 
-// ── Word card ───────────────────────────────────────────────────────────────
+// ── Safe CSS-inject print (no window.open → no crash) ─────────────────────
+function doPrint(el) {
+  const clone = el.cloneNode(true);
+  clone.id = '__cw_print__';
+  clone.style.cssText = 'position:fixed;top:0;left:0;z-index:2147483647;';
+  document.body.appendChild(clone);
+  const style = document.createElement('style');
+  style.id = '__cw_print_style__';
+  style.textContent = `
+    @media print {
+      @page { size: A4 portrait; margin: 0; }
+      body > *:not(#__cw_print__) { display: none !important; }
+      #__cw_print__ { display: block !important; position: fixed !important; top: 0; left: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+  window.print();
+  document.body.removeChild(clone);
+  document.head.removeChild(style);
+}
+
+// ── Word card ──────────────────────────────────────────────────────────────
 function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
   const fileRef = useRef();
 
@@ -99,13 +115,11 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
 
   return (
     <div className="cwg-word-card" style={isUnplaced ? { borderColor: '#ff4d4f' } : {}}>
-      {/* Number badge */}
       <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, paddingTop:2 }}>
         <span className="cwg-num-badge">{word.number}</span>
         <Text style={{ fontSize:10, color:'#aaa' }}>×{word.number}</Text>
       </div>
 
-      {/* Image upload box */}
       <div
         className="cwg-word-img-box"
         onClick={() => fileRef.current?.click()}
@@ -115,9 +129,7 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
           ? <img src={word.imageDataUrl} alt="word" />
           : <UploadOutlined style={{ fontSize:22, color:'#bbb' }} />
         }
-        <div className="cwg-word-img-overlay">
-          <UploadOutlined />
-        </div>
+        <div className="cwg-word-img-overlay"><UploadOutlined /></div>
         <input
           ref={fileRef}
           type="file"
@@ -127,17 +139,16 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
         />
       </div>
 
-      {/* Fields */}
       <div className="cwg-word-fields">
         <Input
           value={word.text}
           onChange={e => onUpdate({ text: e.target.value.toUpperCase().replace(/[^A-Z]/g,'') })}
           placeholder="WORD"
-          style={{ fontWeight:700, letterSpacing:2, textTransform:'uppercase' }}
+          style={{ fontWeight:700, letterSpacing:2 }}
           maxLength={20}
         />
         <div className="cwg-word-row">
-          <Text style={{ fontSize:12, color:'#888' }}>Число картинок:</Text>
+          <Text style={{ fontSize:12, color:'#888' }}>Картинок:</Text>
           <InputNumber
             min={1} max={20}
             value={word.number}
@@ -146,7 +157,7 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
             style={{ width:60 }}
           />
           {word.imageDataUrl && (
-            <Tooltip title="Убрать фон">
+            <Tooltip title="Убрать однотонный фон">
               <Button size="small" onClick={handleRemoveBg} style={{ fontSize:11 }}>
                 Убрать фон
               </Button>
@@ -154,13 +165,12 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
           )}
         </div>
         {isUnplaced && (
-          <Text className="cwg-unplaced-tag">
-            ⚠ Не удалось разместить — нет общих букв
+          <Text style={{ fontSize:11, color:'#ff4d4f' }}>
+            ⚠ Нет общих букв с другими словами
           </Text>
         )}
       </div>
 
-      {/* Remove */}
       <Popconfirm title="Удалить слово?" onConfirm={onRemove} okText="Да" cancelText="Нет">
         <Button type="text" icon={<DeleteOutlined />} danger size="small" />
       </Popconfirm>
@@ -168,16 +178,31 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
   );
 }
 
-// ── Theme selector ──────────────────────────────────────────────────────────
+// ── Theme selector ─────────────────────────────────────────────────────────
 function ThemeSelector({ value, onChange }) {
   return (
-    <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
       {Object.entries(THEMES).map(([key, t]) => (
         <button
           key={key}
-          className={`cwg-theme-btn${value === key ? ' active' : ''}`}
-          style={{ background: t.bg, borderColor: value===key ? t.border : 'transparent' }}
           onClick={() => onChange(key)}
+          style={{
+            background: t.bg,
+            border: value === key ? '3px solid #fff' : '3px solid transparent',
+            outline: value === key ? '2px solid #1677ff' : 'none',
+            outlineOffset: 1,
+            borderRadius: 10,
+            padding: '7px 14px',
+            cursor: 'pointer',
+            fontSize: 13,
+            fontWeight: 700,
+            color: '#fff',
+            textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+            boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+            transition: 'transform 0.12s, box-shadow 0.12s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform='scale(1.06)'; e.currentTarget.style.boxShadow='0 5px 16px rgba(0,0,0,0.3)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.2)'; }}
         >
           {t.symbol} {t.name}
         </button>
@@ -186,27 +211,12 @@ function ThemeSelector({ value, onChange }) {
   );
 }
 
-// ── Print helper ────────────────────────────────────────────────────────────
-function printElement(el) {
-  const w = window.open('', '_blank');
-  w.document.write(`
-    <html><head><style>
-      @page { size: A4 portrait; margin: 0; }
-      body { margin: 0; padding: 0; }
-    </style></head>
-    <body>${el.outerHTML}</body></html>
-  `);
-  w.document.close();
-  w.focus();
-  setTimeout(() => { w.print(); w.close(); }, 400);
-}
+// ── Scale preview to fit sidebar ───────────────────────────────────────────
+const PREVIEW_W = 430;
+const PRINT_W   = 794;
+const SCALE     = PREVIEW_W / PRINT_W;
 
-// ── Preview scale to fit screen ─────────────────────────────────────────────
-const PREVIEW_WIDTH = 440;
-const PRINT_WIDTH   = 794;
-const PREVIEW_SCALE = PREVIEW_WIDTH / PRINT_WIDTH;
-
-// ── Main component ──────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────
 export default function CrosswordGenerator() {
   const {
     words, theme, title, showAnswers, layout, unplacedWords,
@@ -215,27 +225,23 @@ export default function CrosswordGenerator() {
   } = useCrossword();
 
   const printRef = useRef();
+  const unplacedSet = new Set(unplacedWords);
 
   const handlePrint = () => {
-    if (printRef.current) printElement(printRef.current);
+    if (printRef.current) doPrint(printRef.current);
   };
-
-  const unplacedSet = new Set(unplacedWords);
 
   return (
     <div style={{ padding: '16px 20px' }}>
-      {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
         <Title level={4} style={{ margin:0 }}>Генератор кроссвордов</Title>
         <Space>
-          <Tooltip title={showAnswers ? 'Скрыть ответы' : 'Показать ответы'}>
-            <Button
-              icon={showAnswers ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-              onClick={() => setShowAnswers(v => !v)}
-            >
-              {showAnswers ? 'Скрыть ответы' : 'Показать ответы'}
-            </Button>
-          </Tooltip>
+          <Button
+            icon={showAnswers ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+            onClick={() => setShowAnswers(v => !v)}
+          >
+            {showAnswers ? 'Скрыть ответы' : 'Показать ответы'}
+          </Button>
           <Button
             type="primary"
             icon={<PrinterOutlined />}
@@ -248,12 +254,10 @@ export default function CrosswordGenerator() {
       </div>
 
       <div className="cwg-root">
-        {/* ── Left panel: editor ── */}
+        {/* ── Editor panel ── */}
         <div className="cwg-panel">
-
-          {/* Title */}
           <div>
-            <Text strong style={{ display:'block', marginBottom:4 }}>Заголовок</Text>
+            <Text strong style={{ display:'block', marginBottom:4 }}>Заголовок листа</Text>
             <Input
               value={title}
               onChange={e => setTitle(e.target.value)}
@@ -262,20 +266,18 @@ export default function CrosswordGenerator() {
             />
           </div>
 
-          {/* Theme */}
           <div>
-            <Text strong style={{ display:'block', marginBottom:6 }}>Тема оформления</Text>
+            <Text strong style={{ display:'block', marginBottom:8 }}>Тема оформления</Text>
             <ThemeSelector value={theme} onChange={setTheme} />
           </div>
 
           <Divider style={{ margin:'4px 0' }} />
 
-          {/* Words */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <Text strong>Слова ({words.length})</Text>
             <Space size={4}>
               <Button size="small" icon={<PlusOutlined />} onClick={addWord} type="primary">
-                Добавить слово
+                Добавить
               </Button>
               {words.length > 0 && (
                 <Popconfirm title="Очистить все слова?" onConfirm={clearAll} okText="Да" cancelText="Нет">
@@ -289,18 +291,18 @@ export default function CrosswordGenerator() {
             <Alert
               type="info"
               showIcon
-              message="Добавьте слова на английском языке"
-              description="Для каждого слова загрузите картинку. Число на значке = сколько раз картинка встретится на листе — это подсказка ученику."
+              message="Как это работает"
+              description="Добавьте слова на английском + картинку для каждого. Число = сколько раз картинка будет разбросана по листу. Ученик считает и вписывает слово."
               style={{ fontSize:12 }}
             />
           )}
 
-          <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'60vh', overflowY:'auto' }}>
-            {words.map((w) => (
+          <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'58vh', overflowY:'auto' }}>
+            {words.map(w => (
               <WordCard
                 key={w.id}
                 word={w}
-                onUpdate={(changes) => updateWord(w.id, changes)}
+                onUpdate={ch => updateWord(w.id, ch)}
                 onRemove={() => removeWord(w.id)}
                 isUnplaced={unplacedSet.has(w.text.toUpperCase())}
               />
@@ -312,35 +314,21 @@ export default function CrosswordGenerator() {
               type="warning"
               showIcon
               message={`${unplacedWords.length} слов не размещено`}
-              description="У этих слов нет общих букв с другими. Попробуйте изменить слова или порядок."
-            />
-          )}
-
-          {/* Hint about numbering */}
-          {words.length > 0 && (
-            <Alert
-              type="info"
-              showIcon
-              message="Как читать кроссворд"
-              description="Цифра в клетке = сколько раз эта картинка на листе. Ученик считает картинки и пишет слово."
-              style={{ fontSize:11 }}
+              description="Нет общих букв с другими словами. Измените написание или добавьте слово с общей буквой."
             />
           )}
         </div>
 
-        {/* ── Right: preview ── */}
+        {/* ── Preview ── */}
         <div className="cwg-preview-col">
-          <Text type="secondary" style={{ alignSelf:'flex-start' }}>
-            Предпросмотр (масштаб {Math.round(PREVIEW_SCALE * 100)}%)
+          <Text type="secondary" style={{ alignSelf:'flex-start', marginBottom:4 }}>
+            Предпросмотр ({Math.round(SCALE * 100)}%)
           </Text>
           <div
             className="cwg-print-wrapper"
-            style={{
-              width: PREVIEW_WIDTH,
-              height: Math.round(1123 * PREVIEW_SCALE),
-            }}
+            style={{ width: PREVIEW_W, height: Math.round(1123 * SCALE) }}
           >
-            <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin:'top left' }}>
+            <div style={{ transform:`scale(${SCALE})`, transformOrigin:'top left' }}>
               <CrosswordPrintLayout
                 ref={printRef}
                 words={words}

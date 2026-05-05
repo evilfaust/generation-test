@@ -2,13 +2,20 @@ import { useMemo, forwardRef } from 'react';
 import CrosswordGrid from './CrosswordGrid';
 import { THEMES } from '../../hooks/useCrossword';
 
-// A4 at 96 dpi
-const PAGE_W = 794;
-const PAGE_H = 1123;
-const IMG_SIZE = 66;
-const CELL_SIZE = 24;
+const PAGE_W   = 794;
+const PAGE_H   = 1123;
+const IMG_SIZE = 82;
+const CELL_SIZE = 26;
+const HEADER_H  = 72;
+const FRAME_PAD = 14;   // inner padding from frame border
+const BORDER_W  = 10;   // frame border thickness
 
-// Simple seeded RNG (LCG)
+// Safe image area (keep images inside the frame)
+const SAFE_X1 = FRAME_PAD + BORDER_W;
+const SAFE_X2 = PAGE_W - FRAME_PAD - BORDER_W - IMG_SIZE;
+const SAFE_Y1 = HEADER_H + 4;
+const SAFE_Y2 = PAGE_H - FRAME_PAD - BORDER_W - IMG_SIZE;
+
 function makeRng(seed) {
   let s = Math.abs(seed | 0) || 1;
   return () => {
@@ -22,6 +29,8 @@ function strHash(str) {
   for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
   return h;
 }
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 function buildImageInstances(words) {
   const instances = [];
@@ -44,122 +53,117 @@ function shuffleWithRng(arr, rng) {
 }
 
 function computeImagePositions(cwW, cwH, rng) {
-  const HEADER_H = 60;
-  const cwLeft  = (PAGE_W - cwW) / 2;
-  const cwTop   = HEADER_H + (PAGE_H - HEADER_H - cwH) / 2;
-  const PAD = 10;
+  const cwLeft = (PAGE_W - cwW) / 2;
+  const cwTop  = HEADER_H + (PAGE_H - HEADER_H - cwH) / 2;
+  const CW_PAD = 12;
 
+  const STEP = IMG_SIZE + 4;
+  const cols = Math.ceil(PAGE_W / STEP);
+  const rows = Math.ceil(PAGE_H / STEP);
   const positions = [];
-  const cols = Math.floor(PAGE_W / IMG_SIZE);
-  const rows = Math.floor(PAGE_H / IMG_SIZE);
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const jx = (rng() - 0.5) * (IMG_SIZE * 0.3);
-      const jy = (rng() - 0.5) * (IMG_SIZE * 0.3);
-      const x = c * IMG_SIZE + IMG_SIZE / 2 - IMG_SIZE / 2 + jx;
-      const y = r * IMG_SIZE + IMG_SIZE / 2 - IMG_SIZE / 2 + jy;
+      const jx = (rng() - 0.5) * 20;
+      const jy = (rng() - 0.5) * 20;
+      const rawX = c * STEP + jx;
+      const rawY = r * STEP + jy;
+      const x = clamp(rawX, SAFE_X1, SAFE_X2);
+      const y = clamp(rawY, SAFE_Y1, SAFE_Y2);
 
-      // Skip cells that would obscure the crossword center (with padding)
+      // Skip if it would cover the crossword grid
       if (
-        x + IMG_SIZE > cwLeft - PAD &&
-        x < cwLeft + cwW + PAD &&
-        y + IMG_SIZE > cwTop - PAD &&
-        y < cwTop + cwH + PAD
+        x + IMG_SIZE > cwLeft - CW_PAD &&
+        x            < cwLeft + cwW + CW_PAD &&
+        y + IMG_SIZE > cwTop  - CW_PAD &&
+        y            < cwTop  + cwH + CW_PAD
       ) continue;
 
-      const rotation = (rng() - 0.5) * 24;
+      const rotation = (rng() - 0.5) * 28;
       positions.push({ x, y, rotation });
     }
   }
 
-  // Shuffle positions so images are distributed evenly, not row by row
   return shuffleWithRng(positions, rng);
 }
 
-// Decorative symbols scattered around border
-const DECOR_COUNT = 28;
-function buildDecorPositions(rng) {
-  const positions = [];
-  for (let i = 0; i < DECOR_COUNT; i++) {
-    const side = Math.floor(rng() * 4);
+function buildDecorPositions(symbols, rng) {
+  const COUNT = 32;
+  const result = [];
+  for (let i = 0; i < COUNT; i++) {
+    // Distribute across the whole page edge region
+    const edge = rng();
     let x, y;
-    if (side === 0) { x = rng() * PAGE_W; y = rng() * 40; }
-    else if (side === 1) { x = rng() * PAGE_W; y = PAGE_H - rng() * 40; }
-    else if (side === 2) { x = rng() * 40; y = rng() * PAGE_H; }
-    else { x = PAGE_W - rng() * 40; y = rng() * PAGE_H; }
-    positions.push({ x, y, size: 10 + rng() * 10 });
+    if (edge < 0.25)      { x = rng() * PAGE_W;        y = FRAME_PAD + rng() * 40; }
+    else if (edge < 0.5)  { x = rng() * PAGE_W;        y = PAGE_H - FRAME_PAD - 40 + rng() * 40; }
+    else if (edge < 0.75) { x = FRAME_PAD + rng() * 40; y = rng() * PAGE_H; }
+    else                   { x = PAGE_W - FRAME_PAD - 40 + rng() * 40; y = rng() * PAGE_H; }
+    const sym = symbols[Math.floor(rng() * symbols.length)];
+    result.push({ x, y, size: 13 + rng() * 12, sym });
   }
-  return positions;
+  return result;
 }
 
 const CrosswordPrintLayout = forwardRef(function CrosswordPrintLayout(
   { words, layout, theme, title, showAnswers },
   ref
 ) {
-  const themeObj = THEMES[theme] ?? THEMES.winter;
+  const t = THEMES[theme] ?? THEMES.ocean;
 
   const cwW = layout ? layout.width  * CELL_SIZE : 0;
   const cwH = layout ? layout.height * CELL_SIZE : 0;
-  const HEADER_H = 60;
   const cwLeft = (PAGE_W - cwW) / 2;
   const cwTop  = HEADER_H + (PAGE_H - HEADER_H - cwH) / 2;
 
-  const seed = strHash((words.map(w => w.text).join('') || '') + title);
+  const seed = strHash((words.map(w => w.text).join('') || '') + title + theme);
 
   const instances = useMemo(() => buildImageInstances(words), [words]);
   const positions = useMemo(() => computeImagePositions(cwW, cwH, makeRng(seed)), [cwW, cwH, seed]);
-  const decorPos  = useMemo(() => buildDecorPositions(makeRng(seed + 1)), [seed]);
-
-  const shuffledInstances = useMemo(
-    () => shuffleWithRng(instances, makeRng(seed + 2)),
-    [instances, seed]
-  );
+  const decorPos  = useMemo(() => buildDecorPositions(t.decorSymbols, makeRng(seed + 1)), [t.decorSymbols, seed]);
+  const shuffledInstances = useMemo(() => shuffleWithRng(instances, makeRng(seed + 2)), [instances, seed]);
 
   return (
     <div
       ref={ref}
-      className="cw-print-root"
       style={{
         width: PAGE_W,
         height: PAGE_H,
         position: 'relative',
         overflow: 'hidden',
-        background: themeObj.bg,
+        background: t.bg,
         boxSizing: 'border-box',
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: '"Arial Rounded MT Bold", Arial, sans-serif',
       }}
     >
-      {/* Border frame */}
+      {/* Outer frame */}
       <div style={{
         position: 'absolute',
-        inset: 6,
-        border: `3px solid ${themeObj.border}`,
-        borderRadius: 6,
+        inset: 8,
+        border: `${BORDER_W}px solid ${t.frameColor}`,
+        borderRadius: 16,
         pointerEvents: 'none',
-        zIndex: 10,
+        zIndex: 30,
+        boxSizing: 'border-box',
       }} />
 
-      {/* Decorative theme symbols */}
+      {/* Edge decorative symbols */}
       {decorPos.map((d, i) => (
-        <span
-          key={i}
-          style={{
-            position: 'absolute',
-            left: d.x,
-            top: d.y,
-            fontSize: d.size,
-            opacity: 0.35,
-            userSelect: 'none',
-            pointerEvents: 'none',
-            lineHeight: 1,
-          }}
-        >
-          {themeObj.symbol}
+        <span key={i} style={{
+          position: 'absolute',
+          left: d.x,
+          top: d.y,
+          fontSize: d.size,
+          opacity: 0.55,
+          userSelect: 'none',
+          pointerEvents: 'none',
+          lineHeight: 1,
+          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))',
+        }}>
+          {d.sym}
         </span>
       ))}
 
-      {/* Scattered images */}
+      {/* Scattered word images */}
       {shuffledInstances.map((inst, idx) => {
         if (idx >= positions.length) return null;
         const pos = positions[idx];
@@ -176,8 +180,7 @@ const CrosswordPrintLayout = forwardRef(function CrosswordPrintLayout(
               height: IMG_SIZE,
               objectFit: 'contain',
               transform: `rotate(${pos.rotation}deg)`,
-              opacity: 0.9,
-              imageRendering: 'auto',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))',
             }}
           />
         );
@@ -186,54 +189,54 @@ const CrosswordPrintLayout = forwardRef(function CrosswordPrintLayout(
       {/* Header */}
       <div style={{
         position: 'absolute',
-        top: 14,
+        top: 20,
         left: 0,
         width: PAGE_W,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 28px',
+        padding: '0 32px',
         boxSizing: 'border-box',
         zIndex: 20,
       }}>
         <div style={{
-          fontSize: 22,
+          fontSize: 28,
           fontWeight: 900,
-          color: themeObj.border,
-          letterSpacing: 1,
+          color: t.titleColor,
+          letterSpacing: 3,
           textTransform: 'uppercase',
+          textShadow: '0 2px 8px rgba(0,0,0,0.3)',
         }}>
-          {title || 'Crossword'}
+          {t.symbol} {title || 'Crossword'}
         </div>
         <div style={{
-          fontSize: 13,
-          color: '#444',
           display: 'flex',
-          gap: 20,
+          flexDirection: 'column',
+          gap: 4,
+          fontSize: 12,
+          color: t.nameColor,
+          textShadow: '0 1px 4px rgba(0,0,0,0.3)',
         }}>
-          <span>Name: ____________________</span>
-          <span>Class: _______</span>
+          <span>Name: ________________________________</span>
+          <span>Class: _____________ Date: __________</span>
         </div>
       </div>
 
-      {/* Crossword grid — centered, on top of images */}
+      {/* Crossword — floating directly on background, no white panel */}
       {layout && (
-        <div
-          style={{
-            position: 'absolute',
-            left: cwLeft,
-            top: cwTop,
-            background: 'rgba(255,255,255,0.92)',
-            padding: 8,
-            borderRadius: 4,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
-            zIndex: 15,
-          }}
-        >
+        <div style={{
+          position: 'absolute',
+          left: cwLeft,
+          top: cwTop,
+          zIndex: 15,
+        }}>
           <CrosswordGrid
             layout={layout}
             showAnswers={showAnswers}
             cellSize={CELL_SIZE}
+            cellBorder={t.cellBorder}
+            cellBg={t.cellBg}
+            numColor={t.numColor}
           />
         </div>
       )}
@@ -241,14 +244,16 @@ const CrosswordPrintLayout = forwardRef(function CrosswordPrintLayout(
       {!layout && (
         <div style={{
           position: 'absolute',
-          top: '50%',
-          left: '50%',
+          top: '50%', left: '50%',
           transform: 'translate(-50%,-50%)',
-          color: '#999',
-          fontSize: 14,
+          color: 'rgba(255,255,255,0.7)',
+          fontSize: 16,
+          fontWeight: 600,
+          textAlign: 'center',
           zIndex: 15,
+          textShadow: '0 1px 4px rgba(0,0,0,0.3)',
         }}>
-          Добавьте слова, чтобы увидеть кроссворд
+          Добавьте слова, чтобы<br />увидеть кроссворд
         </div>
       )}
     </div>
