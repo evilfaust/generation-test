@@ -1,0 +1,148 @@
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.cwg-root {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  min-height: calc(100vh - 120px);
+}
+
+.cwg-panel {
+  width: 380px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cwg-preview-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Word card ──────────────────────────────────────────────────────────── */
+.cwg-word-card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  transition: box-shadow 0.15s;
+}
+.cwg-word-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.cwg-word-img-box {
+  width: 64px;
+  height: 64px;
+  border: 1.5px dashed #d9d9d9;
+  border-radius: 6px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 0.15s;
+}
+.cwg-word-img-box:hover {
+  border-color: #1677ff;
+}
+.cwg-word-img-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cwg-word-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+}
+.cwg-word-img-box:hover .cwg-word-img-overlay {
+  display: flex;
+}
+
+.cwg-word-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cwg-word-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cwg-word-num-label {
+  font-size: 12px;
+  color: #888;
+  flex-shrink: 0;
+  min-width: 20px;
+}
+
+/* ── Number badge ───────────────────────────────────────────────────────── */
+.cwg-num-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #1677ff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Unplaced warning ───────────────────────────────────────────────────── */
+.cwg-unplaced-tag {
+  font-size: 11px;
+  color: #ff4d4f;
+}
+
+/* ── Print area ─────────────────────────────────────────────────────────── */
+.cwg-print-wrapper {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+  transform-origin: top center;
+}
+
+/* ── Theme selector ─────────────────────────────────────────────────────── */
+.cwg-theme-btn {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.cwg-theme-btn:hover  { transform: scale(1.04); }
+.cwg-theme-btn.active { border-color: #1677ff; }
+
+/* ── Print styles ───────────────────────────────────────────────────────── */
+@media print {
+  body > * { display: none !important; }
+  .cw-print-only { display: block !important; }
+  .cw-print-root { page-break-inside: avoid; }
+}

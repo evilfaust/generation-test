@@ -57,6 +57,7 @@ import AdditionFormulasGenerator from './components/AdditionFormulasGenerator';
 import TrigMixedGenerator from './components/TrigMixedGenerator';
 import DoubleAngleGenerator from './components/DoubleAngleGenerator';
 import MarathonGenerator from './components/MarathonGenerator';
+import CrosswordGenerator from './components/CrosswordGenerator';
 import EgeScoreCalculator from './components/EgeScoreCalculator';
 import MCTestGenerator from './components/MCTestGenerator';
 import { api } from './services/pocketbase';
@@ -87,6 +88,7 @@ export const R = {
   CRYPTOGRAM:          '/app/gamification/cryptogram',
   ROUTE_SHEET:         '/app/gamification/route-sheet',
   MARATHON:            '/app/gamification/marathon',
+  CROSSWORD:           '/app/gamification/crossword',
   // Работы
   WORKS:               '/app/works',
   WORK_EDITOR:         '/app/works/:workId/edit',
@@ -170,6 +172,7 @@ const ROUTE_META = [
   { re: /^\/app\/gamification\/cryptogram/, menuKey: 'cryptogram',       menuGroup: 'gamification-group', title: 'Шифровки' },
   { re: /^\/app\/gamification\/route/,     menuKey: 'route-sheet',       menuGroup: 'gamification-group', title: 'Маршрутный лист' },
   { re: /^\/app\/gamification\/marathon/,  menuKey: 'marathon',          menuGroup: 'gamification-group', title: 'Марафон — подготовка и проведение' },
+  { re: /^\/app\/gamification\/crossword/, menuKey: 'crossword',         menuGroup: 'gamification-group', title: 'Генератор кроссвордов' },
   { re: /^\/app\/works$/,                  menuKey: 'work-manager',              title: 'Мои работы' },
   { re: /^\/app\/students$/,               menuKey: 'students', menuGroup: 'students-group', title: 'Прогресс учеников' },
   { re: /^\/app\/import/,                  menuKey: 'import',                    title: 'Импорт задач' },
@@ -213,6 +216,7 @@ const MENU_KEY_PATH = {
   cryptogram:               R.CRYPTOGRAM,
   'route-sheet':            R.ROUTE_SHEET,
   marathon:                 R.MARATHON,
+  crossword:                R.CROSSWORD,
   'work-manager':           R.WORKS,
   'work-editor':            '/app/works/new/edit',
   students:                 R.STUDENTS,
@@ -501,6 +505,7 @@ function AppLayout() {
         { key: 'cryptogram',      icon: <KeyOutlined />,       label: 'Шифровки' },
         { key: 'route-sheet',     icon: <BranchesOutlined />,  label: 'Маршрутный лист' },
         { key: 'marathon',        icon: <TrophyOutlined />,    label: 'Марафон' },
+        { key: 'crossword',       icon: <AppstoreOutlined />,  label: 'Кроссворды' },
       ],
     },
     { key: 'work-manager', icon: <SolutionOutlined />, label: 'Мои работы' },
@@ -691,6 +696,7 @@ function App() {
               <Route path={R.CRYPTOGRAM}     element={<CryptogramGenerator />} />
               <Route path={R.ROUTE_SHEET}    element={<RouteSheetGenerator />} />
               <Route path={R.MARATHON}       element={<MarathonGenerator />} />
+              <Route path={R.CROSSWORD}     element={<CrosswordGenerator />} />
 
               {/* Работы */}
               <Route path={R.WORKS}       element={<WorksPage />} />
