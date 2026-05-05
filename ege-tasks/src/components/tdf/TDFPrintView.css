@@ -1,6 +1,7 @@
 /* ТДФ — Печатный вид */
 
-@page { size: A4 landscape; margin: 0; }
+/* Глобальный @page — без size (ориентация задаётся динамически в handlePrint) */
+@page { margin: 0; }
 
 .tdf-print-wrapper {
   background: #f5f5f5;
@@ -16,7 +17,7 @@
   pointer-events: none;
   overflow: hidden;
   width: 297mm;
-  padding: 8mm 5mm 5mm;
+  padding: 5mm;
   box-sizing: border-box;
   font-family: 'Times New Roman', serif;
   font-size: 11pt;
@@ -51,7 +52,7 @@
 .tdf-print-page {
   background: #fff;
   margin: 16px auto;
-  padding: 8mm 5mm 5mm;
+  padding: 5mm;
   width: 297mm;
   min-height: 210mm;
   box-shadow: 0 2px 12px rgba(0,0,0,0.12);
@@ -263,12 +264,17 @@
 
 /* Печать */
 @media print {
+  /* Перекрываем браузерные дефолтные поля для чётных/нечётных страниц */
+  @page :left { margin: 0; }
+  @page :right { margin: 0; }
+
   .no-print {
     display: none !important;
   }
 
   .tdf-print-wrapper {
     background: transparent;
+    min-height: 0;
   }
 
   .tdf-measure-root {
@@ -276,12 +282,15 @@
   }
 
   .tdf-print-book {
+    display: block;
     padding: 0;
+    margin: 0;
   }
 
   .tdf-print-page {
     margin: 0;
-    padding: 8mm 5mm 5mm;
+    /* явные 4 значения: top right bottom left */
+    padding: 5mm;
     width: 297mm;
     height: 210mm;
     box-shadow: none;
@@ -289,11 +298,12 @@
     overflow: hidden;
     break-after: page;
     page-break-after: always;
+    break-inside: avoid-page;
   }
 
   .tdf-print-page:last-child {
-    break-after: auto;
-    page-break-after: auto;
+    break-after: auto !important;
+    page-break-after: auto !important;
   }
 
   .tdf-print-page--portrait {

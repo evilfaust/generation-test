@@ -17,17 +17,18 @@ const MM_TO_PX = 3.7795;
 
 /**
  * Распределяет items по страницам на основе замеренных высот строк.
- * Возвращает массив страниц — каждая страница = массив items.
+ * firstPageAreaPx — доступная высота для страницы 1 (с заголовком).
+ * otherPageAreaPx — доступная высота для страниц 2+ (без заголовка, больше места).
  */
-function paginateByHeight(items, heights, rowAreaPx) {
+function paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx) {
   const pages = [];
   let current = [];
   let usedPx = 0;
 
   for (const item of items) {
     const h = heights[item.id] ?? 50;
-    // Если строка не влезает и страница не пустая — переходим на следующую
-    if (current.length > 0 && usedPx + h > rowAreaPx) {
+    const areaForPage = pages.length === 0 ? firstPageAreaPx : otherPageAreaPx;
+    if (current.length > 0 && usedPx + h > areaForPage) {
       pages.push(current);
       current = [];
       usedPx = 0;
@@ -51,6 +52,7 @@ function paginateByHeight(items, heights, rowAreaPx) {
 export default function TDFPrintView({ tdfSet, items, mode, variantNumber, variantTitle, onBack }) {
   const printRef = useRef(null);
   const rowRefs = useRef({});
+  const theadRef = useRef(null); // для замера реальной высоты заголовка таблицы
   const { exportToPDF, exporting } = usePuppeteerPDF();
 
   const [portrait, setPortrait] = useState(false);
@@ -77,14 +79,10 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   ].join('|');
   const needsMeasure = pagination.key !== paginationKey;
 
-  // Доступная высота для строк tbody на странице (px)
-  // A4 landscape: 210mm, portrait: 297mm
-  // padding top: 8mm, bottom: 5mm
-  // doc-header строка: ~10mm, col-header строка: ~8mm
+  // A4: landscape 210mm, portrait 297mm; padding top 8mm + bottom 5mm
   const pageHeightMm = portrait ? 297 : 210;
-  const rowAreaPx = (pageHeightMm - 8 - 5 - 10 - 8) * MM_TO_PX;
 
-  // Фаза 1 → Фаза 2: замеряем высоты сразу после рендера скрытого блока
+  // Фаза 1 → Фаза 2: замеряем высоты строк и реальную высоту thead
   useLayoutEffect(() => {
     if (!needsMeasure) return;
     const heights = {};
@@ -92,7 +90,13 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
       const el = rowRefs.current[item.id];
       if (el) heights[item.id] = el.offsetHeight;
     });
-    setPagination({ key: paginationKey, pages: paginateByHeight(items, heights, rowAreaPx) });
+    // Полная высота содержимого страницы (без padding 5mm × 2)
+    const pageContentPx = (pageHeightMm - 5 - 5) * MM_TO_PX;
+    // Реальная высота thead (doc-header + col-headers), измеренная в DOM
+    const theadH = theadRef.current ? theadRef.current.offsetHeight : 70;
+    const firstPageAreaPx = pageContentPx - theadH; // страница 1: с заголовком
+    const otherPageAreaPx = pageContentPx;           // страницы 2+: без заголовка, больше места
+    setPagination({ key: paginationKey, pages: paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx) });
   });
 
   const handlePrint = () => {
@@ -215,6 +219,34 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
         <div className={`tdf-measure-root${portrait ? ' tdf-measure-root--portrait' : ''}`}>
           <table className="tdf-table">
             {colgroup}
+            {/* thead здесь нужен для точного замера его реальной высоты */}
+            <thead ref={theadRef}>
+              <tr>
+                <td colSpan={4} className="tdf-doc-header-cell">
+                  <div className="tdf-doc-header-inner">
+                    <div className="tdf-header-title">
+                      <strong>ТДФ: {tdfSet?.title}</strong>
+                      {tdfSet?.class_number && (
+                        <span className="tdf-header-class"> — {tdfSet.class_number} класс</span>
+                      )}
+                    </div>
+                    {isBlank && (
+                      <div className="tdf-header-meta">
+                        <span>Вариант {variantNumber}{variantTitle ? ` — ${variantTitle}` : ''}</span>
+                        <span className="tdf-header-name-field">ФИО: ________________________</span>
+                        <span>Дата: {today}</span>
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+              <tr className="tdf-thead-row">
+                <th className="tdf-th">№</th>
+                <th className="tdf-th">Тема / Формулировка</th>
+                <th className="tdf-th">Чертёж</th>
+                <th className="tdf-th">Краткая запись</th>
+              </tr>
+            </thead>
             <tbody>
               {items.map(item => {
                 if (!item.is_section_header) measureNum++;
@@ -239,35 +271,36 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
           <div key={pageIdx} className={`tdf-print-page${portrait ? ' tdf-print-page--portrait' : ''}`}>
             <table className="tdf-table">
               {colgroup}
-              <thead>
-                {/* Заголовок документа — на каждой странице */}
-                <tr>
-                  <td colSpan={4} className="tdf-doc-header-cell">
-                    <div className="tdf-doc-header-inner">
-                      <div className="tdf-header-title">
-                        <strong>ТДФ: {tdfSet?.title}</strong>
-                        {tdfSet?.class_number && (
-                          <span className="tdf-header-class"> — {tdfSet.class_number} класс</span>
+              {/* Заголовок только на первой странице */}
+              {pageIdx === 0 && (
+                <thead>
+                  <tr>
+                    <td colSpan={4} className="tdf-doc-header-cell">
+                      <div className="tdf-doc-header-inner">
+                        <div className="tdf-header-title">
+                          <strong>ТДФ: {tdfSet?.title}</strong>
+                          {tdfSet?.class_number && (
+                            <span className="tdf-header-class"> — {tdfSet.class_number} класс</span>
+                          )}
+                        </div>
+                        {isBlank && (
+                          <div className="tdf-header-meta">
+                            <span>Вариант {variantNumber}{variantTitle ? ` — ${variantTitle}` : ''}</span>
+                            <span className="tdf-header-name-field">ФИО: ________________________</span>
+                            <span>Дата: {today}</span>
+                          </div>
                         )}
                       </div>
-                      {isBlank && (
-                        <div className="tdf-header-meta">
-                          <span>Вариант {variantNumber}{variantTitle ? ` — ${variantTitle}` : ''}</span>
-                          <span className="tdf-header-name-field">ФИО: ________________________</span>
-                          <span>Дата: {today}</span>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-                {/* Заголовки колонок */}
-                <tr className="tdf-thead-row">
-                  <th className="tdf-th">№</th>
-                  <th className="tdf-th">Тема / Формулировка</th>
-                  <th className="tdf-th">Чертёж</th>
-                  <th className="tdf-th">Краткая запись</th>
-                </tr>
-              </thead>
+                    </td>
+                  </tr>
+                  <tr className="tdf-thead-row">
+                    <th className="tdf-th">№</th>
+                    <th className="tdf-th">Тема / Формулировка</th>
+                    <th className="tdf-th">Чертёж</th>
+                    <th className="tdf-th">Краткая запись</th>
+                  </tr>
+                </thead>
+              )}
               <tbody>
                 {pageItems.map(item => {
                   if (!item.is_section_header) globalNum++;
