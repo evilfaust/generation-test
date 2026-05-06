@@ -7,11 +7,27 @@ import './GeometryWorksheetPrint.css';
 
 const { Text } = Typography;
 
+/**
+ * Размеры чертежей: ширина контейнера (%) и max-height (mm) для каждого
+ * сочетания drawingSize × tasksPerSheet.
+ */
+const DRAWING_SIZE_CFG = {
+  s:  { w: '26%', h: { 2: '33mm', 3: '27mm', 4: '19mm', 5: '14mm' } },
+  m:  { w: '42%', h: { 2: '55mm', 3: '45mm', 4: '32mm', 5: '25mm' } },
+  l:  { w: '56%', h: { 2: '80mm', 3: '65mm', 4: '46mm', 5: '35mm' } },
+  xl: { w: '70%', h: { 2: '110mm', 3: '88mm', 4: '61mm', 5: '46mm' } },
+};
+
 // ── Одна задача (половина листа) ─────────────────────────────────────────────
 
-function WorksheetTask({ task, index, showDrawing }) {
+function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet }) {
   const imageUrl = api.getGeometryImageUrl(task);
   const hasImage = !!imageUrl;
+
+  const dcfg = DRAWING_SIZE_CFG[drawingSize] ?? DRAWING_SIZE_CFG.m;
+  const maxH = dcfg.h[tasksPerSheet] ?? dcfg.h[2];
+  const drawingStyle = { width: dcfg.w, maxHeight: maxH };
+  const imgStyle    = { maxHeight: maxH };
 
   return (
     <div className="geo-worksheet-task">
@@ -48,9 +64,9 @@ function WorksheetTask({ task, index, showDrawing }) {
 
         {/* Чертёж — плавает поверх сетки в левом верхнем углу */}
         {showDrawing && (
-          <div className="geo-worksheet-task-drawing">
+          <div className="geo-worksheet-task-drawing" style={drawingStyle}>
             {hasImage ? (
-              <img src={imageUrl} alt={`Чертёж ${task.code || ''}`} />
+              <img src={imageUrl} alt={`Чертёж ${task.code || ''}`} style={imgStyle} />
             ) : (
               <div className="geo-worksheet-task-drawing-placeholder">нет чертежа</div>
             )}
@@ -72,6 +88,7 @@ function WorksheetSheet({
   showDrawing,
   isFirstSheet,
   tasksPerSheet,
+  drawingSize,
 }) {
   const showPrimaryHeader = isFirstSheet;
   const showCompactTitle = !isFirstSheet && topicLabel;
@@ -120,6 +137,8 @@ function WorksheetSheet({
             task={task}
             index={startIndex + i}
             showDrawing={showDrawing}
+            drawingSize={drawingSize}
+            tasksPerSheet={tasksPerSheet}
           />
         </>
       ))}
@@ -140,6 +159,7 @@ export default function GeometryWorksheetPrint({
   const [showFields, setShowFields] = useState(true);
   const [showDrawing, setShowDrawing] = useState(true);
   const [tasksPerSheet, setTasksPerSheet] = useState(2);
+  const [drawingSize, setDrawingSize] = useState('m');
 
   const handlePrint = () => {
     const size = tasksPerSheet === 2 ? 'A5 portrait' : 'A4 portrait';
@@ -220,6 +240,22 @@ export default function GeometryWorksheetPrint({
             <Switch size="small" checked={showDrawing} onChange={setShowDrawing} />
             <Text style={{ fontSize: 13 }}>Чертежи</Text>
           </Space>
+          {showDrawing && (
+            <Space size={6}>
+              <Text style={{ fontSize: 13 }}>Размер чертежа:</Text>
+              <Segmented
+                size="small"
+                value={drawingSize}
+                onChange={setDrawingSize}
+                options={[
+                  { label: 'S', value: 's' },
+                  { label: 'M', value: 'm' },
+                  { label: 'L', value: 'l' },
+                  { label: 'XL', value: 'xl' },
+                ]}
+              />
+            </Space>
+          )}
         </Space>
       </Card>
 
@@ -237,6 +273,7 @@ export default function GeometryWorksheetPrint({
             showDrawing={showDrawing}
             isFirstSheet={i === 0}
             tasksPerSheet={tasksPerSheet}
+            drawingSize={drawingSize}
           />
         ))}
       </div>
