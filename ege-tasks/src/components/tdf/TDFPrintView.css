@@ -258,6 +258,17 @@
 }
 
 /* Сетка «в клетку» для ячеек в blank-режиме */
+
+/* Название пункта — белый фон, чтобы текст не попадал на пересечения клеток */
+.tdf-cell--grid .tdf-item-name {
+  background: #fff;
+  display: inline-block;
+  padding: 0 3px 1px;
+  border-radius: 2px;
+  position: relative;
+  z-index: 1;
+}
+
 .tdf-cell--grid {
   background-image:
     linear-gradient(to right, #d0d0d0 1px, transparent 1px),
