@@ -54,35 +54,7 @@
   height: 297mm;
 }
 
-/* Чертёж уменьшен для 3 задач / A4 */
-.geo-worksheet-sheet--a4 .geo-worksheet-task-drawing {
-  max-height: 45mm;
-  width: 38%;
-}
-
-.geo-worksheet-sheet--a4 .geo-worksheet-task-drawing img {
-  max-height: 43mm;
-}
-
-/* Чертёж ещё меньше для 4 задач / A4 */
-.geo-worksheet-sheet--4 .geo-worksheet-task-drawing {
-  max-height: 32mm;
-  width: 35%;
-}
-
-.geo-worksheet-sheet--4 .geo-worksheet-task-drawing img {
-  max-height: 30mm;
-}
-
-/* Чертёж минимальный для 5 задач / A4 */
-.geo-worksheet-sheet--5 .geo-worksheet-task-drawing {
-  max-height: 25mm;
-  width: 32%;
-}
-
-.geo-worksheet-sheet--5 .geo-worksheet-task-drawing img {
-  max-height: 23mm;
-}
+/* Размеры чертежей управляются через inline-стили (DRAWING_SIZE_CFG в JSX) */
 
 /* ── Шапка листа ─────────────────────────────────── */
 
@@ -233,8 +205,7 @@
   position: absolute;
   top: 2mm;
   left: 2mm;
-  width: 42%;
-  max-height: 55mm;
+  /* width задаётся inline через maxWidth — контейнер сжимается до картинки */
   background: #fff;
   border-radius: 0.8mm;
   padding: 1mm;
@@ -242,7 +213,8 @@
 }
 
 .geo-worksheet-task-drawing img {
-  width: 100%;
+  width: auto;       /* не растягивать до ширины контейнера */
+  max-width: 100%;
   height: auto;
   max-height: 53mm;
   object-fit: contain;

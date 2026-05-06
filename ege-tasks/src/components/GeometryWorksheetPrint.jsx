@@ -26,7 +26,8 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet })
 
   const dcfg = DRAWING_SIZE_CFG[drawingSize] ?? DRAWING_SIZE_CFG.m;
   const maxH = dcfg.h[tasksPerSheet] ?? dcfg.h[2];
-  const drawingStyle = { width: dcfg.w, maxHeight: maxH };
+  // maxWidth вместо width — контейнер сжимается до реального размера картинки
+  const drawingStyle = { maxWidth: dcfg.w, maxHeight: maxH };
   const imgStyle    = { maxHeight: maxH };
 
   return (
