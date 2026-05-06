@@ -13,12 +13,11 @@ const TYPE_LABELS = {
   axiom: 'Аксиома', property: 'Свойство', criterion: 'Признак', corollary: 'Следствие',
 };
 
-const MM_TO_PX = 3.7795;
+const MM_TO_PX = 3.7795; // фолбэк, если measureRootRef не готов
 
 /**
- * Распределяет items по страницам на основе замеренных высот строк.
- * firstPageAreaPx — доступная высота для страницы 1 (с заголовком).
- * otherPageAreaPx — доступная высота для страниц 2+ (без заголовка, больше места).
+ * Жадно распределяет items по страницам.
+ * Страница 1 учитывает заголовок (firstPageAreaPx), страницы 2+ — полную высоту (otherPageAreaPx).
  */
 function paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx) {
   const pages = [];
@@ -45,20 +44,23 @@ function paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx) {
  *
  * Двухфазный рендер:
  *  1. «measure»: все строки рендерятся в скрытый блок → useLayoutEffect замеряет offsetHeight
- *  2. «render»: строки распределяются по страницам-div с фиксированным размером A4
+ *     pxPerMm берётся из measureRootRef.offsetWidth / pageWidthMm (точный замер контейнера)
+ *  2. «render»: строки распределяются по страницам с фиксированным размером A4
  *
- * @page { margin: 0 } + break-after: page — каждая страница точно соответствует листу A4.
+ * Stretch-режим (только для blank): 2 страницы, строки растянуты равномерно.
  */
 export default function TDFPrintView({ tdfSet, items, mode, variantNumber, variantTitle, onBack }) {
   const printRef = useRef(null);
   const rowRefs = useRef({});
-  const theadRef = useRef(null); // для замера реальной высоты заголовка таблицы
-  const rulerRef = useRef(null); // для точного замера px/mm на текущем экране
+  const theadRef = useRef(null);
+  const measureRootRef = useRef(null); // точный источник pxPerMm
   const { exportToPDF, exporting } = usePuppeteerPDF();
 
   const [portrait, setPortrait] = useState(false);
   const [drawingSize, setDrawingSize] = useState('m');
-  const [pagination, setPagination] = useState({ key: null, pages: null });
+  const [stretchMode, setStretchMode] = useState(false); // blank: 1 vs 2 листа
+  const [showGrid, setShowGrid] = useState(false);       // blank: сетка в ячейках
+  const [pagination, setPagination] = useState({ key: null, pages: null, stretchRowH: null });
 
   const isBlank = mode === 'blank';
   const today = new Date().toLocaleDateString('ru-RU');
@@ -71,38 +73,60 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   };
   const dcfg = DRAWING_CFG[drawingSize];
 
-  // Ключ пересчёта: меняется при изменении контента, ориентации, размера чертежей, режима
   const paginationKey = [
     items.map(i => i.id).join(','),
     drawingSize,
     portrait ? 'p' : 'l',
     isBlank ? 'blank' : 'etalon',
+    stretchMode ? 'stretch' : 'compact',
   ].join('|');
   const needsMeasure = pagination.key !== paginationKey;
 
-  // A4: landscape 210mm, portrait 297mm; padding top 8mm + bottom 5mm
+  const pageWidthMm  = portrait ? 210 : 297;
   const pageHeightMm = portrait ? 297 : 210;
 
-  // Фаза 1 → Фаза 2: замеряем высоты строк и реальную высоту thead
   useLayoutEffect(() => {
     if (!needsMeasure) return;
+
+    // Точный px/mm: берём реальную ширину контейнера-измерителя в px и делим на известную ширину в mm
+    const pxPerMm = measureRootRef.current
+      ? measureRootRef.current.offsetWidth / pageWidthMm
+      : MM_TO_PX;
+
     const heights = {};
     items.forEach(item => {
       const el = rowRefs.current[item.id];
       if (el) heights[item.id] = el.offsetHeight;
     });
-    // Реальный px/mm для текущего экрана (учитывает zoom, DPR, HiDPI)
-    // MM_TO_PX = 3.7795 — только фолбэк для 96dpi без масштабирования
-    const pxPerMm = rulerRef.current
-      ? rulerRef.current.getBoundingClientRect().height / 100
-      : MM_TO_PX;
-    // Полная высота содержимого страницы (без padding 5mm × 2)
-    const pageContentPx = (pageHeightMm - 10) * pxPerMm;
-    // Реальная высота thead (doc-header + col-headers), измеренная в DOM
+
     const theadH = theadRef.current ? theadRef.current.offsetHeight : 70;
-    const firstPageAreaPx = pageContentPx - theadH; // страница 1: с заголовком
-    const otherPageAreaPx = pageContentPx;           // страницы 2+: без заголовка, больше места
-    setPagination({ key: paginationKey, pages: paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx) });
+    const pageContentPx = (pageHeightMm - 10) * pxPerMm; // 10 = 5mm top + 5mm bottom padding
+
+    if (isBlank && stretchMode) {
+      // Stretch: ровно 2 страницы, строки заполняют лист целиком
+      const n = items.length;
+      if (n === 0) {
+        setPagination({ key: paginationKey, pages: [[]], stretchRowH: null });
+        return;
+      }
+      const n1 = Math.ceil(n / 2);
+      const n2 = n - n1;
+      const rowH1 = n1 > 0 ? Math.floor((pageContentPx - theadH) / n1) : 0;
+      const rowH2 = n2 > 0 ? Math.floor(pageContentPx / n2) : 0;
+      const pages = n2 > 0
+        ? [items.slice(0, n1), items.slice(n1)]
+        : [items.slice(0, n1)];
+      setPagination({ key: paginationKey, pages, stretchRowH: [rowH1, rowH2] });
+    } else {
+      // Compact: жадная пагинация по высоте
+      const firstPageAreaPx = pageContentPx - theadH;
+      const otherPageAreaPx = pageContentPx;
+      setPagination({
+        key: paginationKey,
+        pages: paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx),
+        stretchRowH: null,
+      });
+    }
   });
 
   const handlePrint = () => {
@@ -131,23 +155,26 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     </colgroup>
   );
 
-  const renderRow = (item, num, refCb) => {
+  const renderRow = (item, num, refCb, rowHeight) => {
+    const rowStyle = rowHeight ? { height: rowHeight } : undefined;
+    const gridCls = (showGrid && isBlank) ? ' tdf-cell--grid' : '';
+
     if (item.is_section_header) {
       return (
-        <tr key={item.id} ref={refCb} className="tdf-section-header-row">
+        <tr key={item.id} ref={refCb} style={rowStyle} className="tdf-section-header-row">
           <td colSpan={4} className="tdf-section-header-cell">{item.section_title}</td>
         </tr>
       );
     }
     return (
-      <tr key={item.id} ref={refCb} className="tdf-item-row">
+      <tr key={item.id} ref={refCb} style={rowStyle} className="tdf-item-row">
         <td className="tdf-cell tdf-cell-num">
           <div className="tdf-num-content">
             <span className="tdf-num-value">{num}</span>
             {item.type && <span className="tdf-type-vertical">{TYPE_LABELS[item.type]}</span>}
           </div>
         </td>
-        <td className="tdf-cell tdf-cell-name-formulation">
+        <td className={`tdf-cell tdf-cell-name-formulation${gridCls}`}>
           <div className="tdf-item-name">{item.name}</div>
           {isBlank ? (
             <div className="tdf-blank-area" />
@@ -159,7 +186,7 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
             </div>
           )}
         </td>
-        <td className="tdf-cell tdf-cell-drawing">
+        <td className={`tdf-cell tdf-cell-drawing${gridCls}`}>
           {isBlank ? (
             <div className="tdf-blank-area" />
           ) : (
@@ -168,7 +195,7 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
               : <span className="tdf-empty">—</span>
           )}
         </td>
-        <td className="tdf-cell tdf-cell-notation">
+        <td className={`tdf-cell tdf-cell-notation${gridCls}`}>
           {isBlank ? (
             <div className="tdf-blank-area" />
           ) : (
@@ -183,9 +210,39 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     );
   };
 
+  const docHeader = (
+    <thead ref={theadRef}>
+      <tr>
+        <td colSpan={4} className="tdf-doc-header-cell">
+          <div className="tdf-doc-header-inner">
+            <div className="tdf-header-title">
+              <strong>ТДФ: {tdfSet?.title}</strong>
+              {tdfSet?.class_number && (
+                <span className="tdf-header-class"> — {tdfSet.class_number} класс</span>
+              )}
+            </div>
+            {isBlank && (
+              <div className="tdf-header-meta">
+                <span>Вариант {variantNumber}{variantTitle ? ` — ${variantTitle}` : ''}</span>
+                <span className="tdf-header-name-field">ФИО: ________________________</span>
+                <span>Дата: {today}</span>
+              </div>
+            )}
+          </div>
+        </td>
+      </tr>
+      <tr className="tdf-thead-row">
+        <th className="tdf-th">№</th>
+        <th className="tdf-th">Тема / Формулировка</th>
+        <th className="tdf-th">Чертёж</th>
+        <th className="tdf-th">Краткая запись</th>
+      </tr>
+    </thead>
+  );
+
   const controls = (
     <div className="tdf-print-controls no-print">
-      <Space>
+      <Space wrap>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack}>Назад</Button>
         <Segmented
           value={portrait ? 'portrait' : 'landscape'}
@@ -205,6 +262,26 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
             { label: 'Чертёж XL', value: 'xl' },
           ]}
         />
+        {isBlank && (
+          <>
+            <Segmented
+              value={stretchMode ? '2' : '1'}
+              onChange={v => setStretchMode(v === '2')}
+              options={[
+                { label: '1 лист', value: '1' },
+                { label: '2 листа', value: '2' },
+              ]}
+            />
+            <Segmented
+              value={showGrid ? 'grid' : 'plain'}
+              onChange={v => setShowGrid(v === 'grid')}
+              options={[
+                { label: 'Без сетки', value: 'plain' },
+                { label: 'В клетку', value: 'grid' },
+              ]}
+            />
+          </>
+        )}
         <Button icon={<PrinterOutlined />} onClick={handlePrint}>Печать</Button>
         <Button icon={<FilePdfOutlined />} onClick={handleExportPDF} loading={exporting}>
           Скачать PDF
@@ -216,45 +293,19 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     </div>
   );
 
-  // ── Фаза 1: скрытый рендер для замера высот ────────────────────────────────
+  // ── Фаза 1: скрытый рендер для замера высот ─────────────────────────────────
   if (needsMeasure) {
     let measureNum = 0;
     return (
       <div className="tdf-print-wrapper">
         {controls}
-        {/* Линейка: 100mm в DOM → узнаём реальный px/mm для данного экрана */}
-        <div ref={rulerRef} style={{ position: 'absolute', height: '100mm', width: '1px', top: 0, left: -9999 }} />
-        <div className={`tdf-measure-root${portrait ? ' tdf-measure-root--portrait' : ''}`}>
+        <div
+          ref={measureRootRef}
+          className={`tdf-measure-root${portrait ? ' tdf-measure-root--portrait' : ''}`}
+        >
           <table className="tdf-table">
             {colgroup}
-            {/* thead здесь нужен для точного замера его реальной высоты */}
-            <thead ref={theadRef}>
-              <tr>
-                <td colSpan={4} className="tdf-doc-header-cell">
-                  <div className="tdf-doc-header-inner">
-                    <div className="tdf-header-title">
-                      <strong>ТДФ: {tdfSet?.title}</strong>
-                      {tdfSet?.class_number && (
-                        <span className="tdf-header-class"> — {tdfSet.class_number} класс</span>
-                      )}
-                    </div>
-                    {isBlank && (
-                      <div className="tdf-header-meta">
-                        <span>Вариант {variantNumber}{variantTitle ? ` — ${variantTitle}` : ''}</span>
-                        <span className="tdf-header-name-field">ФИО: ________________________</span>
-                        <span>Дата: {today}</span>
-                      </div>
-                    )}
-                  </div>
-                </td>
-              </tr>
-              <tr className="tdf-thead-row">
-                <th className="tdf-th">№</th>
-                <th className="tdf-th">Тема / Формулировка</th>
-                <th className="tdf-th">Чертёж</th>
-                <th className="tdf-th">Краткая запись</th>
-              </tr>
-            </thead>
+            {docHeader}
             <tbody>
               {items.map(item => {
                 if (!item.is_section_header) measureNum++;
@@ -267,9 +318,9 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     );
   }
 
-  // ── Фаза 2: рендер постраничного вывода ────────────────────────────────────
-  const { pages } = pagination;
-  let globalNum = 0; // сквозной номер пунктов через все страницы
+  // ── Фаза 2: рендер постраничного вывода ─────────────────────────────────────
+  const { pages, stretchRowH } = pagination;
+  let globalNum = 0;
 
   return (
     <div className="tdf-print-wrapper">
@@ -277,42 +328,14 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
       <div ref={printRef} className="tdf-print-book">
         {pages.map((pageItems, pageIdx) => (
           <div key={pageIdx} className={`tdf-print-page${portrait ? ' tdf-print-page--portrait' : ''}`}>
-            <table className="tdf-table">
+            <table className={`tdf-table${stretchRowH ? ' tdf-table--stretch' : ''}`}>
               {colgroup}
-              {/* Заголовок только на первой странице */}
-              {pageIdx === 0 && (
-                <thead>
-                  <tr>
-                    <td colSpan={4} className="tdf-doc-header-cell">
-                      <div className="tdf-doc-header-inner">
-                        <div className="tdf-header-title">
-                          <strong>ТДФ: {tdfSet?.title}</strong>
-                          {tdfSet?.class_number && (
-                            <span className="tdf-header-class"> — {tdfSet.class_number} класс</span>
-                          )}
-                        </div>
-                        {isBlank && (
-                          <div className="tdf-header-meta">
-                            <span>Вариант {variantNumber}{variantTitle ? ` — ${variantTitle}` : ''}</span>
-                            <span className="tdf-header-name-field">ФИО: ________________________</span>
-                            <span>Дата: {today}</span>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  <tr className="tdf-thead-row">
-                    <th className="tdf-th">№</th>
-                    <th className="tdf-th">Тема / Формулировка</th>
-                    <th className="tdf-th">Чертёж</th>
-                    <th className="tdf-th">Краткая запись</th>
-                  </tr>
-                </thead>
-              )}
+              {pageIdx === 0 && docHeader}
               <tbody>
                 {pageItems.map(item => {
                   if (!item.is_section_header) globalNum++;
-                  return renderRow(item, globalNum);
+                  const rowH = stretchRowH ? stretchRowH[pageIdx] : undefined;
+                  return renderRow(item, globalNum, undefined, rowH);
                 })}
               </tbody>
             </table>

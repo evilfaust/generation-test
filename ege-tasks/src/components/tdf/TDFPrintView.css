@@ -254,6 +254,21 @@
 .tdf-blank-area {
   min-height: 60px;
   width: 100%;
+  flex: 1;
+}
+
+/* Сетка «в клетку» для ячеек в blank-режиме */
+.tdf-cell--grid {
+  background-image:
+    linear-gradient(to right, #d0d0d0 1px, transparent 1px),
+    linear-gradient(to bottom, #d0d0d0 1px, transparent 1px);
+  background-size: 5mm 5mm;
+  background-position: 0 0;
+}
+
+/* Stretch-режим: таблица занимает всю доступную высоту */
+.tdf-table--stretch {
+  height: 100%;
 }
 
 /* Подвал */
