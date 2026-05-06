@@ -55,6 +55,7 @@
   padding: 5mm;
   width: 297mm;
   min-height: 210mm;
+  box-sizing: border-box;
   box-shadow: 0 2px 12px rgba(0,0,0,0.12);
   font-size: 11pt;
   font-family: 'Times New Roman', serif;

@@ -53,6 +53,7 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   const printRef = useRef(null);
   const rowRefs = useRef({});
   const theadRef = useRef(null); // для замера реальной высоты заголовка таблицы
+  const rulerRef = useRef(null); // для точного замера px/mm на текущем экране
   const { exportToPDF, exporting } = usePuppeteerPDF();
 
   const [portrait, setPortrait] = useState(false);
@@ -90,8 +91,13 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
       const el = rowRefs.current[item.id];
       if (el) heights[item.id] = el.offsetHeight;
     });
+    // Реальный px/mm для текущего экрана (учитывает zoom, DPR, HiDPI)
+    // MM_TO_PX = 3.7795 — только фолбэк для 96dpi без масштабирования
+    const pxPerMm = rulerRef.current
+      ? rulerRef.current.getBoundingClientRect().height / 100
+      : MM_TO_PX;
     // Полная высота содержимого страницы (без padding 5mm × 2)
-    const pageContentPx = (pageHeightMm - 5 - 5) * MM_TO_PX;
+    const pageContentPx = (pageHeightMm - 10) * pxPerMm;
     // Реальная высота thead (doc-header + col-headers), измеренная в DOM
     const theadH = theadRef.current ? theadRef.current.offsetHeight : 70;
     const firstPageAreaPx = pageContentPx - theadH; // страница 1: с заголовком
@@ -216,6 +222,8 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     return (
       <div className="tdf-print-wrapper">
         {controls}
+        {/* Линейка: 100mm в DOM → узнаём реальный px/mm для данного экрана */}
+        <div ref={rulerRef} style={{ position: 'absolute', height: '100mm', width: '1px', top: 0, left: -9999 }} />
         <div className={`tdf-measure-root${portrait ? ' tdf-measure-root--portrait' : ''}`}>
           <table className="tdf-table">
             {colgroup}
