@@ -102,31 +102,32 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     const theadH = theadRef.current ? theadRef.current.offsetHeight : 70;
     const pageContentPx = (pageHeightMm - 10) * pxPerMm; // 10 = 5mm top + 5mm bottom padding
 
+    const firstPageAreaPx = pageContentPx - theadH;
+    const otherPageAreaPx = pageContentPx;
+
+    // Определяем распределение items по страницам
+    let pages;
     if (isBlank && stretchMode) {
-      // Stretch: ровно 2 страницы, строки заполняют лист целиком
+      // «2 листа»: ровно 2 страницы, пополам
       const n = items.length;
-      if (n === 0) {
-        setPagination({ key: paginationKey, pages: [[]], stretchRowH: null });
-        return;
-      }
+      if (n === 0) { setPagination({ key: paginationKey, pages: [[]], stretchRowH: null }); return; }
       const n1 = Math.ceil(n / 2);
-      const n2 = n - n1;
-      const rowH1 = n1 > 0 ? Math.floor((pageContentPx - theadH) / n1) : 0;
-      const rowH2 = n2 > 0 ? Math.floor(pageContentPx / n2) : 0;
-      const pages = n2 > 0
-        ? [items.slice(0, n1), items.slice(n1)]
-        : [items.slice(0, n1)];
-      setPagination({ key: paginationKey, pages, stretchRowH: [rowH1, rowH2] });
+      pages = n > n1 ? [items.slice(0, n1), items.slice(n1)] : [items.slice(0, n1)];
     } else {
-      // Compact: жадная пагинация по высоте
-      const firstPageAreaPx = pageContentPx - theadH;
-      const otherPageAreaPx = pageContentPx;
-      setPagination({
-        key: paginationKey,
-        pages: paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx),
-        stretchRowH: null,
-      });
+      // «1 лист» / эталон: умная пагинация по высоте
+      pages = paginateByHeight(items, heights, firstPageAreaPx, otherPageAreaPx);
     }
+
+    // В blank-режиме всегда растягиваем строки до заполнения страницы
+    const stretchRowH = isBlank
+      ? pages.map((pageItems, pageIdx) => {
+          const n = Math.max(pageItems.length, 1);
+          const availH = pageIdx === 0 ? firstPageAreaPx : otherPageAreaPx;
+          return Math.floor(availH / n);
+        })
+      : null;
+
+    setPagination({ key: paginationKey, pages, stretchRowH });
   });
 
   const handlePrint = () => {
