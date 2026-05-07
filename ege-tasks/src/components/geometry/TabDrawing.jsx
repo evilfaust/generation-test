@@ -9,6 +9,52 @@ import {
 import GeoGebraApplet from '../GeoGebraApplet';
 import CropModal from '../shared/CropModal';
 
+// ── Удаление фона: flood-fill от 4 углов ─────────────────────────────────
+// tolerance=25 — консервативно для геометрических чертежей (чёткий контраст
+// белый фон vs тёмные линии). Замкнутые фигуры не «протекают» внутрь.
+async function removeWhiteBackground(dataUrl, tolerance = 25) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const { data, width, height } = id;
+
+      // Берём средний цвет фона по 4 углам
+      const corners = [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1]];
+      let bgR = 0, bgG = 0, bgB = 0;
+      for (const [cx, cy] of corners) {
+        const i = (cy * width + cx) * 4;
+        bgR += data[i]; bgG += data[i + 1]; bgB += data[i + 2];
+      }
+      bgR = bgR / 4 | 0; bgG = bgG / 4 | 0; bgB = bgB / 4 | 0;
+
+      const visited = new Uint8Array(width * height);
+      const stack = [...corners];
+      while (stack.length) {
+        const [x, y] = stack.pop();
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
+        const idx = y * width + x;
+        if (visited[idx]) continue;
+        visited[idx] = 1;
+        const pi = idx * 4;
+        const diff = Math.abs(data[pi] - bgR) + Math.abs(data[pi + 1] - bgG) + Math.abs(data[pi + 2] - bgB);
+        if (diff > tolerance * 3) continue;
+        data[pi + 3] = 0; // прозрачный
+        stack.push([x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]);
+      }
+      ctx.putImageData(id, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 const { Text } = Typography;
 
 const APPNAME_OPTIONS = [
@@ -40,6 +86,7 @@ export default function TabDrawing({
     typeof window !== 'undefined' ? window.innerHeight : 900,
   );
   const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [removingBg, setRemovingBg] = useState(false);
 
   useEffect(() => {
     const onResize = () => setViewportHeight(window.innerHeight);
@@ -108,6 +155,23 @@ export default function TabDrawing({
     setCropModalOpen(false);
   };
 
+  const handleRemoveBg = useCallback(async () => {
+    if (!imageBase64) {
+      message.warning('Сначала сохраните PNG');
+      return;
+    }
+    setRemovingBg(true);
+    try {
+      const result = await removeWhiteBackground(imageBase64);
+      onCropApplied(result);
+      message.success('Фон удалён');
+    } catch {
+      message.error('Не удалось удалить фон');
+    } finally {
+      setRemovingBg(false);
+    }
+  }, [imageBase64, onCropApplied]);
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%', padding: '16px 0' }}>
       {/* Панель управления */}
@@ -172,6 +236,14 @@ export default function TabDrawing({
           </Button>
 
           <Button
+            onClick={handleRemoveBg}
+            disabled={!imageBase64}
+            loading={removingBg}
+          >
+            Убрать фон
+          </Button>
+
+          <Button
             icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
             onClick={toggleFullscreen}
           >
@@ -203,7 +275,8 @@ export default function TabDrawing({
             Нарисуйте чертёж в поле ниже. Можно сохранить в формате GeoGebra
             кнопкой <strong>«Сохранить чертёж (GeoGebra + PNG)»</strong> или обновить только картинку
             кнопкой <strong>«Сохранить как картинку (PNG)»</strong>.
-            После этого можно обрезать лишние поля кнопкой <strong>«Обрезать PNG»</strong>.
+            После этого можно обрезать лишние поля кнопкой <strong>«Обрезать PNG»</strong>,
+            а белый фон убрать кнопкой <strong>«Убрать фон»</strong>.
           </span>
         }
       />
