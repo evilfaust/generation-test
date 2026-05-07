@@ -12,7 +12,25 @@ import CropModal from '../shared/CropModal';
 // ── Удаление фона: flood-fill от 4 углов ─────────────────────────────────
 // tolerance=25 — консервативно для геометрических чертежей (чёткий контраст
 // белый фон vs тёмные линии). Замкнутые фигуры не «протекают» внутрь.
-async function removeWhiteBackground(dataUrl, tolerance = 25) {
+//
+// Важно: если src — remote URL (PocketBase), canvas будет «tainted» и
+// getImageData() бросит SecurityError. Поэтому сначала конвертируем в data URL.
+async function toDataUrl(src) {
+  if (String(src).startsWith('data:')) return src;
+  const resp = await fetch(src);
+  const blob = await resp.blob();
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = (e) => res(e.target.result);
+    reader.onerror = rej;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function removeWhiteBackground(src, tolerance = 25) {
+  // Конвертируем в data URL чтобы canvas не стал tainted
+  const dataUrl = await toDataUrl(src);
+
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {

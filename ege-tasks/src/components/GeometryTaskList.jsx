@@ -533,7 +533,7 @@ export default function GeometryTaskList() {
     {
       title: '',
       key: 'actions',
-      width: 90,
+      width: 130,
       align: 'right',
       render: (_, record) => (
         <Space size={4}>
