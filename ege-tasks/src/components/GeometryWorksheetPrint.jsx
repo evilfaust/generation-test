@@ -63,14 +63,10 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet })
           </svg>
         </div>
 
-        {/* Чертёж — плавает поверх сетки в левом верхнем углу */}
-        {showDrawing && (
+        {/* Чертёж — плавает поверх сетки в левом верхнем углу (только если есть картинка) */}
+        {showDrawing && hasImage && (
           <div className="geo-worksheet-task-drawing" style={drawingStyle}>
-            {hasImage ? (
-              <img src={imageUrl} alt={`Чертёж ${task.code || ''}`} style={imgStyle} />
-            ) : (
-              <div className="geo-worksheet-task-drawing-placeholder">нет чертежа</div>
-            )}
+            <img src={imageUrl} alt={`Чертёж ${task.code || ''}`} style={imgStyle} />
           </div>
         )}
       </div>
