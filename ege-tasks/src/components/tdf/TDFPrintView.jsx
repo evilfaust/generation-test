@@ -119,10 +119,11 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     }
 
     // В blank-режиме всегда растягиваем строки до заполнения страницы
+    const STRETCH_SAFETY_PX = Math.ceil(2 * pxPerMm); // ~8px запас на различия экран↔печать
     const stretchRowH = isBlank
       ? pages.map((pageItems, pageIdx) => {
           const n = Math.max(pageItems.length, 1);
-          const availH = pageIdx === 0 ? firstPageAreaPx : otherPageAreaPx;
+          const availH = (pageIdx === 0 ? firstPageAreaPx : otherPageAreaPx) - STRETCH_SAFETY_PX;
           return Math.floor(availH / n);
         })
       : null;
