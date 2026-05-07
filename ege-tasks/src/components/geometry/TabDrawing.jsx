@@ -107,11 +107,11 @@ async function removeWhiteBackground(src) {
         const idx = y * width + x;
         if (visited[idx]) continue;
         visited[idx] = 1;
-        if (protect[idx]) continue;          // ← защищённый — не трогаем
         const pi = idx * 4;
         const diff = Math.abs(data[pi] - bgR) + Math.abs(data[pi + 1] - bgG) + Math.abs(data[pi + 2] - bgB);
-        if (diff > BG_TOLERANCE * 3) continue;
-        data[pi + 3] = 0;                    // прозрачный
+        if (diff > BG_TOLERANCE * 3) continue; // тёмный пиксель — стоп, не распространяться
+        // Стираем ТОЛЬКО если не в защитной зоне; но распространяемся всегда
+        if (!protect[idx]) data[pi + 3] = 0;
         stack.push([x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]);
       }
 
