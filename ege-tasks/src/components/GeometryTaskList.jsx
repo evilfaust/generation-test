@@ -19,6 +19,7 @@ import {
 } from 'antd';
 import {
   CheckCircleOutlined,
+  CopyOutlined,
   DeleteOutlined,
   EyeOutlined,
   EditOutlined,
@@ -55,6 +56,7 @@ export default function GeometryTaskList() {
   const [editingTask, setEditingTask] = useState(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorLoadingId, setEditorLoadingId] = useState(null);
+  const [duplicatingId, setDuplicatingId] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewTasks, setPreviewTasks] = useState([]);
   const [previewPrintTest, setPreviewPrintTest] = useState(null);
@@ -120,6 +122,19 @@ export default function GeometryTaskList() {
       loadTasks();
     } catch {
       message.error('Ошибка при удалении задачи');
+    }
+  };
+
+  const handleDuplicate = async (id) => {
+    setDuplicatingId(id);
+    try {
+      await api.duplicateGeometryTask(id);
+      message.success('Задача продублирована');
+      loadTasks();
+    } catch {
+      message.error('Не удалось дублировать задачу');
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -541,6 +556,16 @@ export default function GeometryTaskList() {
               onClick={() => openQuickPreview(record)}
             />
           </Tooltip>
+          <Tooltip title="Дублировать">
+            <Button
+              type="text"
+              icon={<CopyOutlined />}
+              size="small"
+              loading={duplicatingId === record.id}
+              disabled={duplicatingId !== null && duplicatingId !== record.id}
+              onClick={() => handleDuplicate(record.id)}
+            />
+          </Tooltip>
           <Popconfirm
             title="Удалить задачу?"
             description="Это действие необратимо."
@@ -722,6 +747,16 @@ export default function GeometryTaskList() {
                           size="small"
                           loading={quickPreviewLoadingId === record.id}
                           onClick={() => openQuickPreview(record)}
+                        />
+                      </Tooltip>
+                      <Tooltip title="Дублировать">
+                        <Button
+                          type="text"
+                          icon={<CopyOutlined />}
+                          size="small"
+                          loading={duplicatingId === record.id}
+                          disabled={duplicatingId !== null && duplicatingId !== record.id}
+                          onClick={() => handleDuplicate(record.id)}
                         />
                       </Tooltip>
                       <Popconfirm

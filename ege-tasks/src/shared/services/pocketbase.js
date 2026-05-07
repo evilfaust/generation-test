@@ -1713,6 +1713,52 @@ export const api = {
     }
   },
 
+  async duplicateGeometryTask(id) {
+    try {
+      // Полная запись (включая geogebra_base64 и solution_md)
+      const task = await pb.collection('geometry_tasks').getOne(id);
+
+      const formData = new FormData();
+
+      // Текстовые поля — копируем как есть
+      const TEXT_FIELDS = [
+        'title', 'topic', 'subtopic', 'difficulty', 'statement_md',
+        'answer', 'hints', 'geogebra_appname', 'drawing_view',
+        'source', 'year', 'preview_layout', 'solution_md', 'geogebra_base64',
+      ];
+      for (const field of TEXT_FIELDS) {
+        if (task[field] != null && task[field] !== '') {
+          formData.append(field, task[field]);
+        }
+      }
+
+      // Код: добавляем суффикс «-копия»
+      if (task.code) {
+        formData.append('code', task.code + '-копия');
+      }
+
+      // Файл чертежа: скачиваем из PocketBase и перезаливаем
+      const drawingFileName = task.drawing_image || task.geogebra_image_base64 || '';
+      if (drawingFileName && !String(drawingFileName).startsWith('data:image/')) {
+        const fileUrl = `${PB_BASE_URL}/api/files/geometry_tasks/${task.id}/${drawingFileName}`;
+        try {
+          const resp = await fetch(fileUrl);
+          if (resp.ok) {
+            const blob = await resp.blob();
+            formData.append('drawing_image', new File([blob], drawingFileName, { type: blob.type || 'image/png' }));
+          }
+        } catch {
+          // Не смогли скопировать файл — продолжаем без него
+        }
+      }
+
+      return await pb.collection('geometry_tasks').create(formData);
+    } catch (error) {
+      console.error('Error duplicating geometry task:', error);
+      throw error;
+    }
+  },
+
   async deleteGeometryTask(id) {
     try {
       return await pb.collection('geometry_tasks').delete(id);
