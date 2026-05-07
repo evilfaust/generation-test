@@ -63,7 +63,6 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   const [pagination, setPagination] = useState({ key: null, pages: null, stretchRowH: null });
 
   const isBlank = mode === 'blank';
-  const today = new Date().toLocaleDateString('ru-RU');
 
   const DRAWING_CFG = {
     s:  { drawingCol: '22%', contentCol: '50%', notationCol: '24%', imgH: portrait ?  50 :  60 },
@@ -227,7 +226,7 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
               <div className="tdf-header-meta">
                 <span>Вариант {variantNumber}{variantTitle ? ` — ${variantTitle}` : ''}</span>
                 <span className="tdf-header-name-field">ФИО: ________________________</span>
-                <span>Дата: {today}</span>
+                <span>Дата: ____________</span>
               </div>
             )}
           </div>
