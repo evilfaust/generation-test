@@ -10,9 +10,9 @@ import GeoGebraApplet from '../GeoGebraApplet';
 import CropModal from '../shared/CropModal';
 
 // ── Удаление фона: flood-fill от 4 углов ─────────────────────────────────
-// tolerance=8 — очень аккуратно: порог суммы отклонений по каналам = 24.
-// (255,255,255) diff=0 → удалён; (247,247,247) diff=24 → граница;
-// (240,240,240) diff=45 → сохранён. Антиалиасинг текста и линий не трогаем.
+// tolerance=3 — порог суммы отклонений = 9. Убираем только чисто белые
+// пиксели (255,255,255 и очень близко к ним). Антиалиасинг букв, линий
+// и точек (≥250 → diff≥15 > 9) не трогаем → нет ореолов, нет потерь текста.
 //
 // Важно: если src — remote URL (PocketBase), canvas будет «tainted» и
 // getImageData() бросит SecurityError. Поэтому сначала конвертируем в data URL.
@@ -28,7 +28,7 @@ async function toDataUrl(src) {
   });
 }
 
-async function removeWhiteBackground(src, tolerance = 8) {
+async function removeWhiteBackground(src, tolerance = 3) {
   // Конвертируем в data URL чтобы canvas не стал tainted
   const dataUrl = await toDataUrl(src);
 
