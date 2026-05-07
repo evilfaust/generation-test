@@ -9,13 +9,18 @@ import {
 import GeoGebraApplet from '../GeoGebraApplet';
 import CropModal from '../shared/CropModal';
 
-// ── Удаление фона: flood-fill от 4 углов ─────────────────────────────────
-// tolerance=3 — порог суммы отклонений = 9. Убираем только чисто белые
-// пиксели (255,255,255 и очень близко к ним). Антиалиасинг букв, линий
-// и точек (≥250 → diff≥15 > 9) не трогаем → нет ореолов, нет потерь текста.
+// ── Удаление фона: flood-fill от 4 углов с зоной защиты ─────────────────
 //
-// Важно: если src — remote URL (PocketBase), canvas будет «tainted» и
-// getImageData() бросит SecurityError. Поэтому сначала конвертируем в data URL.
+// Алгоритм:
+//  1. Находим все «тёмные» пиксели (линии, текст, точки).
+//  2. BFS: расширяем зону защиты на PROTECT_R пикселей вокруг каждого тёмного.
+//  3. Flood-fill от углов убирает белый фон, пропуская защищённые пиксели.
+//
+// Так даже при щедром tolerance белое внутри/рядом с рисунком не трогается.
+//
+// Важно: remote URL (PocketBase) → canvas tainted → getImageData бросит
+// SecurityError. Поэтому сначала конвертируем в data URL через fetch.
+
 async function toDataUrl(src) {
   if (String(src).startsWith('data:')) return src;
   const resp = await fetch(src);
@@ -28,8 +33,11 @@ async function toDataUrl(src) {
   });
 }
 
-async function removeWhiteBackground(src, tolerance = 3) {
-  // Конвертируем в data URL чтобы canvas не стал tainted
+async function removeWhiteBackground(src) {
+  const DARK_MIN_DIFF = 20;  // пиксель «тёмный» если хотя бы один канал отличается от 255 на ≥20
+  const PROTECT_R    = 4;    // пикселей защитной зоны вокруг тёмного контента
+  const BG_TOLERANCE = 30;   // допуск flood-fill (щедрый — зона защиты нас страхует)
+
   const dataUrl = await toDataUrl(src);
 
   return new Promise((resolve) => {
@@ -42,30 +50,71 @@ async function removeWhiteBackground(src, tolerance = 3) {
       ctx.drawImage(img, 0, 0);
       const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const { data, width, height } = id;
+      const n = width * height;
 
-      // Берём средний цвет фона по 4 углам
+      // ── Шаг 1: помечаем тёмные пиксели ─────────────────────────────────
+      const dark = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        const p = i * 4;
+        if (
+          255 - data[p]     >= DARK_MIN_DIFF ||
+          255 - data[p + 1] >= DARK_MIN_DIFF ||
+          255 - data[p + 2] >= DARK_MIN_DIFF
+        ) dark[i] = 1;
+      }
+
+      // ── Шаг 2: BFS — расширяем защитную зону на PROTECT_R пикселей ─────
+      const protect = new Uint8Array(n);
+      const dist    = new Int16Array(n).fill(-1);
+      const queue   = [];
+      for (let i = 0; i < n; i++) {
+        if (dark[i]) { protect[i] = 1; dist[i] = 0; queue.push(i); }
+      }
+      let head = 0;
+      while (head < queue.length) {
+        const idx = queue[head++];
+        const d = dist[idx];
+        if (d >= PROTECT_R) continue;
+        const x = idx % width, y = (idx / width) | 0;
+        const nb = [];
+        if (x > 0)         nb.push(idx - 1);
+        if (x < width - 1) nb.push(idx + 1);
+        if (y > 0)         nb.push(idx - width);
+        if (y < height - 1) nb.push(idx + width);
+        for (const ni of nb) {
+          if (dist[ni] === -1) {
+            dist[ni] = d + 1;
+            protect[ni] = 1;
+            queue.push(ni);
+          }
+        }
+      }
+
+      // ── Шаг 3: flood-fill от углов, пропуская защищённые пиксели ────────
       const corners = [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1]];
       let bgR = 0, bgG = 0, bgB = 0;
       for (const [cx, cy] of corners) {
-        const i = (cy * width + cx) * 4;
-        bgR += data[i]; bgG += data[i + 1]; bgB += data[i + 2];
+        const p = (cy * width + cx) * 4;
+        bgR += data[p]; bgG += data[p + 1]; bgB += data[p + 2];
       }
       bgR = bgR / 4 | 0; bgG = bgG / 4 | 0; bgB = bgB / 4 | 0;
 
-      const visited = new Uint8Array(width * height);
-      const stack = [...corners];
+      const visited = new Uint8Array(n);
+      const stack   = [...corners];
       while (stack.length) {
         const [x, y] = stack.pop();
         if (x < 0 || x >= width || y < 0 || y >= height) continue;
         const idx = y * width + x;
         if (visited[idx]) continue;
         visited[idx] = 1;
+        if (protect[idx]) continue;          // ← защищённый — не трогаем
         const pi = idx * 4;
         const diff = Math.abs(data[pi] - bgR) + Math.abs(data[pi + 1] - bgG) + Math.abs(data[pi + 2] - bgB);
-        if (diff > tolerance * 3) continue;
-        data[pi + 3] = 0; // прозрачный
+        if (diff > BG_TOLERANCE * 3) continue;
+        data[pi + 3] = 0;                    // прозрачный
         stack.push([x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]);
       }
+
       ctx.putImageData(id, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
