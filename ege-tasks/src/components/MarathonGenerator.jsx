@@ -17,6 +17,8 @@ import MarathonCardsPrint from './marathon/MarathonCardsPrint';
 import MarathonTeacherSheet from './marathon/MarathonTeacherSheet';
 import MarathonRatingPrint from './marathon/MarathonRatingPrint';
 import MarathonTracker from './marathon/MarathonTracker';
+import LessonSidebar from './marathon/LessonSidebar';
+import QueueBoard from './marathon/QueueBoard';
 import MathRenderer from '../shared/components/MathRenderer';
 import './MarathonGenerator.css';
 
@@ -63,6 +65,7 @@ export default function MarathonGenerator() {
   const [newStudentName, setNewStudentName] = useState('');
   const [printMode, setPrintMode] = useState(null); // 'cards' | 'teacher' | 'rating' | null
   const [showLogo, setShowLogo] = useState(true);
+  const [trackerMode, setTrackerMode] = useState('grid'); // 'grid' | 'queue'
 
   // Ждём рендера print-блока + загрузки картинок, потом печатаем
   useEffect(() => {
@@ -360,22 +363,20 @@ export default function MarathonGenerator() {
     </div>
   );
 
-  // Подвкладка: Карточки учеников
+  // Подвкладка: Карточки учеников (flashcard-превью)
   const cardsTab = (
     <div className="mg-print-tab">
       {tasks.length === 0 ? (
         <Empty description="Добавьте задачи в разделе «Содержимое»" />
       ) : (
         <>
-          <div className="mg-print-actions">
-            <Button
-              type="primary"
-              icon={<PrinterOutlined />}
+          <div className="cards-toolbar">
+            <button
+              className="btn is-primary"
               onClick={() => handlePrint('cards')}
-              className="marathon-print-cards-trigger"
             >
-              Печать карточек (A6, 4 на лист)
-            </Button>
+              <PrinterOutlined /> Печать карточек (A6, 4 на лист)
+            </button>
             <Space>
               <Switch size="small" checked={showLogo} onChange={setShowLogo} />
               <Text type="secondary" style={{ fontSize: 13 }}>Логотип</Text>
@@ -385,21 +386,26 @@ export default function MarathonGenerator() {
             </Text>
           </div>
 
-          <div className="mg-cards-preview">
+          <div className="cards-grid">
             {tasks.map((task, idx) => {
               const diff = task.difficulty || 1;
+              const diffClass = { 1: 'easy', 2: 'med', 3: 'hard' }[diff];
+              // Детерминированный наклон по task.id
+              const rot = ((task.id.charCodeAt(0) + task.id.charCodeAt(1)) % 7) - 3;
               return (
-                <div key={task.id} className="mg-card-preview-item">
-                  <div
-                    className="mg-card-preview__header"
-                    style={{ background: DIFFICULTY_COLOR[diff] }}
-                  >
-                    <span className="mg-card-preview__num">{idx + 1}</span>
-                    <span className="mg-card-preview__diff">{DIFFICULTY_LABEL[diff]}</span>
-                    <span className="mg-card-preview__code" style={{ opacity: 0.7, fontSize: 10 }}>{task.code}</span>
+                <div
+                  key={task.id}
+                  className="flashcard"
+                  style={{ '--rot': `${rot * 0.4}deg` }}
+                >
+                  <div className={`fc-header ${diffClass}`}>
+                    <span className="fc-num">{idx + 1}</span>
+                    <span className="fc-diff">{DIFFICULTY_LABEL[diff]}</span>
+                    <span className="fc-code">{task.code}</span>
                   </div>
-                  <div className="mg-card-preview__body">
+                  <div className="fc-body">
                     <MathRenderer content={task.statement_md || ''} />
+                    <span className="fc-watermark">LEMMA</span>
                   </div>
                 </div>
               );
@@ -558,32 +564,68 @@ export default function MarathonGenerator() {
     </div>
   );
 
-  const trackerView = (
-    <div>
-      <div className="mg-print-actions" style={{ marginBottom: 12 }}>
-        <Button
-          type="default"
-          icon={<ReloadOutlined />}
-          onClick={handleInitTracking}
-        >
-          Переинициализировать трекер
-        </Button>
-        {savedId && (
-          <Button
-            type="primary"
-            icon={<DashboardOutlined />}
-            onClick={() => {
-              const base = import.meta.env.VITE_STUDENT_URL || `${window.location.origin}/student`;
-              window.open(`${base}/marathon-live/${savedId}`, '_blank');
-            }}
-          >
-            Открыть дашборд
-          </Button>
+  const trackerContent = (
+    <div className="lesson-hud">
+      {/* Левая колонка: тулбар + грид/очередь */}
+      <div style={{ minWidth: 0 }}>
+        {/* Тулбар урока */}
+        <div className="mg-lesson-toolbar">
+          {/* Grid / Queue toggle */}
+          <div className="seg">
+            <button
+              className={trackerMode === 'grid' ? 'is-active' : ''}
+              onClick={() => setTrackerMode('grid')}
+            >
+              📊 Сетка
+            </button>
+            <button
+              className={trackerMode === 'queue' ? 'is-active' : ''}
+              onClick={() => setTrackerMode('queue')}
+            >
+              📋 По задачам
+            </button>
+          </div>
+
+          {savedId && (
+            <button
+              className="btn is-primary"
+              onClick={() => {
+                const base = import.meta.env.VITE_STUDENT_URL || `${window.location.origin}/student`;
+                window.open(`${base}/marathon-live/${savedId}`, '_blank');
+              }}
+            >
+              <DashboardOutlined /> Live-дашборд
+            </button>
+          )}
+
+          <button className="btn" onClick={handleInitTracking}>
+            <ReloadOutlined /> Сброс трекера
+          </button>
+        </div>
+
+        {trackerMode === 'grid' ? (
+          <MarathonTracker
+            tasks={tasks}
+            students={students}
+            trackingData={trackingData}
+            setTrackingData={setTrackingData}
+            onSaveTracking={savedId ? saveTracking : null}
+          />
+        ) : (
+          <QueueBoard
+            tasks={tasks}
+            students={students}
+            trackingData={trackingData}
+            setTrackingData={setTrackingData}
+            onSaveTracking={savedId ? saveTracking : null}
+          />
         )}
       </div>
-      <MarathonTracker
-        tasks={tasks}
+
+      {/* Правая колонка: сайдбар */}
+      <LessonSidebar
         students={students}
+        tasks={tasks}
         trackingData={trackingData}
         setTrackingData={setTrackingData}
         onSaveTracking={savedId ? saveTracking : null}
@@ -614,7 +656,7 @@ export default function MarathonGenerator() {
   };
 
   const currentLiveContent = {
-    tracker: trackerInitialized ? trackerView : initScreen,
+    tracker: trackerInitialized ? trackerContent : initScreen,
   };
 
   const activeTabs = phase === 'prep' ? PREP_TABS : LIVE_TABS;

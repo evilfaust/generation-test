@@ -1242,6 +1242,552 @@
 }
 
 /* ================================================
+   Lesson HUD (двухколоночный layout урока)
+   ================================================ */
+
+.marathon-generator .lesson-hud {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1280px) {
+  .marathon-generator .lesson-hud {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mg-lesson-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.mg-lesson-toolbar .seg {
+  display: inline-flex;
+  background: var(--ink-100, #eef2f8);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.mg-lesson-toolbar .seg button {
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-500, #5b6b86);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+}
+
+.mg-lesson-toolbar .seg button.is-active {
+  background: white;
+  color: var(--ink-900, #0d1424);
+  box-shadow: 0 1px 2px rgba(13,20,36,.08);
+}
+
+/* ================================================
+   KPI row (4 плитки)
+   ================================================ */
+
+.marathon-generator .kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.marathon-generator .kpi {
+  background: white;
+  border: 1px solid var(--ink-200, #d8e0ec);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-1);
+}
+
+.marathon-generator .kpi .lbl {
+  font-size: 10px;
+  color: var(--ink-400, #8294b1);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 600;
+}
+
+.marathon-generator .kpi .val {
+  font-family: var(--font-display, "Manrope", sans-serif);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink-900, #0d1424);
+  line-height: 1;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.marathon-generator .kpi .val.is-progress { color: var(--ok, #14a85a); }
+
+/* ================================================
+   Side panel / cards
+   ================================================ */
+
+.marathon-generator .side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.marathon-generator .side-card {
+  background: white;
+  border: 1px solid var(--ink-200, #d8e0ec);
+  border-radius: 12px;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.marathon-generator .side-card-head {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ink-200, #d8e0ec);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink-900, #0d1424);
+}
+
+.marathon-generator .side-card-body {
+  padding: 10px 14px;
+}
+
+/* Podium */
+.marathon-generator .podium {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 4px;
+  align-items: end;
+  padding: 12px 8px 0;
+}
+
+.marathon-generator .podium .col {
+  background: var(--ink-100, #eef2f8);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 4px 6px;
+  text-align: center;
+}
+
+.marathon-generator .podium .col.gold {
+  background: linear-gradient(180deg, #fff5c4 0%, #fde9a3 100%);
+  height: 100px;
+}
+
+.marathon-generator .podium .col.silver {
+  background: linear-gradient(180deg, #eaeef5 0%, #d6dee8 100%);
+  height: 82px;
+}
+
+.marathon-generator .podium .col.bronze {
+  background: linear-gradient(180deg, #f9dec4 0%, #e9c39a 100%);
+  height: 70px;
+}
+
+.marathon-generator .podium .medal { font-size: 18px; line-height: 1.2; }
+
+.marathon-generator .podium .pname {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--ink-900, #0d1424);
+  margin-top: 2px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.marathon-generator .podium .ppts {
+  font-family: var(--font-display, "Manrope", sans-serif);
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--ink-900, #0d1424);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rest of ranking rows */
+.side-rank-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--ink-100, #eef2f8);
+  font-size: 12px;
+}
+
+.side-rank-row:last-child { border-bottom: none; }
+
+.side-rank-pos {
+  width: 16px;
+  font-weight: 700;
+  color: var(--ink-400, #8294b1);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.side-rank-name {
+  flex: 1;
+  color: var(--ink-800, #1a2236);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side-rank-score {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-900, #0d1424);
+  width: 24px;
+  text-align: right;
+}
+
+.side-rank-bar {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ink-100, #eef2f8);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.side-rank-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--brand, #4f56e3), #8b5cf6);
+  transition: width 0.3s;
+}
+
+/* Queue to teacher */
+.marathon-generator .queue-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.marathon-generator .queue-item {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--ink-200, #d8e0ec);
+}
+
+.marathon-generator .queue-item:last-child { border-bottom: none; }
+
+.marathon-generator .qpos {
+  font-weight: 700;
+  color: var(--ink-400, #8294b1);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+.marathon-generator .qcards {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+}
+
+.marathon-generator .qcard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 26px;
+  border-radius: 4px;
+  background: white;
+  border: 1px solid var(--ink-200, #d8e0ec);
+  color: var(--ink-700, #2c3a55);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.marathon-generator .qcard.easy { border-color: #b9e9c9; color: #0e7c40; background: #e9f8ef; }
+.marathon-generator .qcard.med  { border-color: #f4d99a; color: #8c5b07; background: #fdf3df; }
+.marathon-generator .qcard.hard { border-color: #f4b9c0; color: #aa2533; background: #fde6e8; }
+
+.btn-accept {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--ok, #14a85a);
+  background: var(--easy-50, #e6f7ee);
+  color: var(--ok, #14a85a);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.btn-accept:hover { background: #d0f0e0; }
+
+.btn-enqueue {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--ink-200, #d8e0ec);
+  background: white;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-700, #2c3a55);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.btn-enqueue:hover {
+  background: var(--brand-50, #eef0ff);
+  border-color: var(--brand, #4f56e3);
+  color: var(--brand, #4f56e3);
+}
+
+/* ================================================
+   QueueBoard — очередь по задачам
+   ================================================ */
+
+.marathon-generator .queue-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.marathon-generator .qb-card {
+  background: white;
+  border: 1px solid var(--ink-200, #d8e0ec);
+  border-radius: 12px;
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.marathon-generator .qb-card-head {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-bottom: 1px solid var(--ink-100, #eef2f8);
+  background: linear-gradient(180deg, #fafbfd, white);
+}
+
+.marathon-generator .qb-card-head__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-700, #2c3a55);
+}
+
+.marathon-generator .qb-card-head__code {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: var(--ink-400, #8294b1);
+}
+
+.marathon-generator .qb-card-head__count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand, #4f56e3);
+  background: var(--brand-50, #eef0ff);
+  border-radius: 10px;
+  padding: 0 7px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.marathon-generator .qb-card-body {
+  padding: 6px 8px 10px;
+}
+
+.marathon-generator .qb-student {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 12.5px;
+}
+
+.marathon-generator .qb-student:hover { background: var(--ink-100, #eef2f8); }
+
+.marathon-generator .qb-student .att {
+  font-size: 10px;
+}
+
+.marathon-generator .qb-student .actions {
+  display: flex;
+  gap: 3px;
+}
+
+.marathon-generator .qb-student .qbtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  transition: filter 0.1s;
+}
+
+.marathon-generator .qb-student .qbtn:hover { filter: brightness(1.1); }
+.marathon-generator .qb-student .qbtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.marathon-generator .qb-student .ok { background: var(--ok, #14a85a); }
+.marathon-generator .qb-student .ng { background: var(--fail, #e23d4e); }
+
+/* task-num пиллюля для QueueBoard */
+.marathon-generator .task-num {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.marathon-generator .task-num.easy { background: var(--easy, #14a85a); }
+.marathon-generator .task-num.med  { background: var(--med, #e89a14); }
+.marathon-generator .task-num.hard { background: var(--hard, #e23d4e); }
+
+/* ================================================
+   Flashcards (карточки учеников — новый вид)
+   ================================================ */
+
+.marathon-generator .cards-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.marathon-generator .cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 20px;
+}
+
+.marathon-generator .flashcard {
+  position: relative;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px -8px rgba(35,42,82,.18), 0 2px 6px -1px rgba(35,42,82,.08);
+  overflow: hidden;
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.marathon-generator .flashcard:hover {
+  transform: translateY(-3px) rotate(var(--rot, 0deg));
+  box-shadow: 0 18px 32px -12px rgba(35,42,82,.25), 0 4px 10px rgba(35,42,82,.08);
+}
+
+.marathon-generator .flashcard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(0,0,0,0.022) 1px, transparent 1px);
+  background-size: 12px 12px;
+  pointer-events: none;
+  opacity: .35;
+}
+
+.marathon-generator .fc-header {
+  height: 42px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+}
+
+.marathon-generator .fc-header.easy {
+  background: linear-gradient(135deg, #1ab86a 0%, #14a85a 60%, #0e8b48 100%);
+}
+
+.marathon-generator .fc-header.med {
+  background: linear-gradient(135deg, #f1b440 0%, #e89a14 60%, #c97c00 100%);
+}
+
+.marathon-generator .fc-header.hard {
+  background: linear-gradient(135deg, #ee5260 0%, #e23d4e 60%, #b9263a 100%);
+}
+
+.marathon-generator .fc-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.22);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.marathon-generator .fc-diff {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.marathon-generator .fc-code {
+  margin-left: auto;
+  opacity: .7;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+}
+
+.marathon-generator .fc-body {
+  padding: 12px 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-800, #1a2236);
+  min-height: 130px;
+  position: relative;
+}
+
+.marathon-generator .fc-watermark {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-family: var(--font-display, "Manrope", sans-serif);
+  font-weight: 700;
+  font-size: 9px;
+  color: var(--ink-200, #d8e0ec);
+  letter-spacing: .12em;
+  pointer-events: none;
+}
+
+/* ================================================
    PRINT STYLES
    ================================================ */
 
