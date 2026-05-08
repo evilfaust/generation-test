@@ -2,6 +2,33 @@
    MarathonLiveBoard — Dark Tournament Dashboard
    ============================================================ */
 
+/* ---- Freeze button ---- */
+
+.mlb-freeze-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.07);
+  color: rgba(255,255,255,.7);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.mlb-freeze-btn:hover {
+  background: rgba(255,255,255,.12);
+  border-color: rgba(255,255,255,.25);
+}
+
+.mlb-freeze-btn.is-frozen {
+  background: rgba(96, 165, 250, 0.2);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #93c5fd;
+}
+
 /* ---- Keyframes ---- */
 
 @keyframes mlb-live-pulse {

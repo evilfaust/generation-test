@@ -31,6 +31,7 @@ export function useMarathon() {
   const [saving, setSaving] = useState(false);
   // 'idle' | 'dirty' | 'saving' | 'saved'
   const [saveStatus, setSaveStatus] = useState('idle');
+  const [startedAt, setStartedAt] = useState(null); // ISO datetime когда нажали «Старт»
 
   // Ref для дебаунса автосохранения
   const autosaveTimerRef = useRef(null);
@@ -138,6 +139,8 @@ export function useMarathon() {
   // --- Трекинг ---
 
   const initTracking = useCallback(() => {
+    const now = new Date().toISOString();
+    setStartedAt(now);
     setTrackingData(initTrackingData(students, tasks.length));
     triggerAutosave();
   }, [students, tasks.length, triggerAutosave]);
@@ -205,6 +208,7 @@ export function useMarathon() {
         students,
         tracking_data: trackingData,
       };
+      if (startedAt) data.started_at = startedAt;
       if (savedId) {
         await api.updateMarathon(savedId, data);
       } else {
@@ -262,6 +266,7 @@ export function useMarathon() {
     setStudents([]);
     setTrackingData({});
     setSavedId(null);
+    setStartedAt(null);
   }, []);
 
   // Подсчёт решённых задач для студента

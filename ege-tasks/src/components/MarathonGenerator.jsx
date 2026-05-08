@@ -49,7 +49,7 @@ export default function MarathonGenerator() {
     tasks, students, trackingData, setTrackingData,
     savedId, saved, loadingSaved, saving, saveStatus,
     addTasks, removeTask, moveTask,
-    addStudent, removeStudent,
+    addStudent, removeStudent, updateStudentName,
     saveMarathon, saveTracking, loadMarathon, loadSavedList, deleteMarathon, reset,
     initTracking,
   } = useMarathon();
@@ -66,6 +66,10 @@ export default function MarathonGenerator() {
   const [printMode, setPrintMode] = useState(null); // 'cards' | 'teacher' | 'rating' | null
   const [showLogo, setShowLogo] = useState(true);
   const [trackerMode, setTrackerMode] = useState('grid'); // 'grid' | 'queue'
+  const [bulkText, setBulkText] = useState('');
+  const [showBulk, setShowBulk] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null); // имя редактируемого
+  const [editingValue, setEditingValue] = useState('');
 
   // Ждём рендера print-блока + загрузки картинок, потом печатаем
   useEffect(() => {
@@ -100,6 +104,29 @@ export default function MarathonGenerator() {
     if (!newStudentName.trim()) return;
     addStudent(newStudentName.trim());
     setNewStudentName('');
+  };
+
+  const handleBulkImport = () => {
+    const names = bulkText
+      .split('\n')
+      .map(s => s.trim())
+      .filter(Boolean);
+    names.forEach(name => addStudent(name));
+    setBulkText('');
+    setShowBulk(false);
+  };
+
+  const handleStartRename = (name) => {
+    setEditingStudent(name);
+    setEditingValue(name);
+  };
+
+  const handleFinishRename = (oldName) => {
+    if (editingValue.trim() && editingValue.trim() !== oldName) {
+      updateStudentName(oldName, editingValue.trim());
+    }
+    setEditingStudent(null);
+    setEditingValue('');
   };
 
   const handleSave = async () => {
@@ -174,6 +201,53 @@ export default function MarathonGenerator() {
     }
     setPhase('live');
     setLiveTab('tracker');
+  };
+
+  // CSV экспорт результатов
+  const handleExportCSV = () => {
+    const calcScore = (data, taskCount) => {
+      let total = 0;
+      for (let i = 0; i < taskCount; i++) {
+        const d = data[String(i)];
+        if (!d || (!d.solved && !d.failed)) continue;
+        if (d.failed) continue;
+        if (d.solved) {
+          const a = d.attempts || 0;
+          total += a === 0 ? 3 : a === 1 ? 2 : 1;
+        }
+      }
+      return total;
+    };
+
+    const header = ['Ученик', ...tasks.map((_, i) => `Задача ${i + 1}`), 'Итого'];
+    const rows = students.map(name => {
+      const data = trackingData[name] || {};
+      const cells = tasks.map((_, i) => {
+        const d = data[String(i)];
+        if (!d || (!d.solved && !d.failed && !d.attempts)) return '';
+        if (d.failed) return '0';
+        if (d.solved) {
+          const a = d.attempts || 0;
+          return String(a === 0 ? 3 : a === 1 ? 2 : 1);
+        }
+        return `попыток:${d.attempts}`;
+      });
+      const total = calcScore(data, tasks.length);
+      return [name, ...cells, String(total)];
+    });
+
+    const csv = [header, ...rows]
+      .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
+
+    const bom = '﻿'; // UTF-8 BOM для Excel
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title || 'марафон'}_результаты.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // =====================================================================
@@ -327,8 +401,13 @@ export default function MarathonGenerator() {
           </Space>
         }
         className="mg-card"
+        extra={
+          <Button size="small" onClick={() => setShowBulk(v => !v)}>
+            Пакетный импорт
+          </Button>
+        }
       >
-        <Space.Compact style={{ width: '100%', marginBottom: 12 }}>
+        <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
           <Input
             placeholder="Фамилия Имя"
             value={newStudentName}
@@ -340,6 +419,29 @@ export default function MarathonGenerator() {
           </Button>
         </Space.Compact>
 
+        {showBulk && (
+          <div className="mg-bulk-import">
+            <Input.TextArea
+              placeholder={"Иванов Иван\nПетров Пётр\nСидорова Мария"}
+              value={bulkText}
+              onChange={e => setBulkText(e.target.value)}
+              rows={5}
+              style={{ marginBottom: 8 }}
+            />
+            <Space>
+              <Button type="primary" size="small" onClick={handleBulkImport}>
+                Добавить всех
+              </Button>
+              <Button size="small" onClick={() => { setShowBulk(false); setBulkText(''); }}>
+                Отмена
+              </Button>
+            </Space>
+            <Text type="secondary" style={{ display: 'block', fontSize: 11, marginTop: 4 }}>
+              По одному имени на строку. Дубликаты игнорируются.
+            </Text>
+          </div>
+        )}
+
         {students.length === 0 ? (
           <Text type="secondary">Список учеников пуст</Text>
         ) : (
@@ -347,7 +449,25 @@ export default function MarathonGenerator() {
             {students.map((name, idx) => (
               <div key={name} className="mg-student-item">
                 <span className="mg-student-idx">{idx + 1}.</span>
-                <span className="mg-student-name">{name}</span>
+                {editingStudent === name ? (
+                  <Input
+                    size="small"
+                    value={editingValue}
+                    onChange={e => setEditingValue(e.target.value)}
+                    onPressEnter={() => handleFinishRename(name)}
+                    onBlur={() => handleFinishRename(name)}
+                    autoFocus
+                    style={{ flex: 1 }}
+                  />
+                ) : (
+                  <span
+                    className="mg-student-name"
+                    onDoubleClick={() => handleStartRename(name)}
+                    title="Двойной клик — переименовать"
+                  >
+                    {name}
+                  </span>
+                )}
                 <Button
                   size="small"
                   type="text"
@@ -702,6 +822,11 @@ export default function MarathonGenerator() {
                 disabled={saving}
               >
                 <SaveOutlined /> {savedId ? 'Обновить' : 'Сохранить'}
+              </button>
+            )}
+            {phase === 'live' && students.length > 0 && tasks.length > 0 && (
+              <button className="btn" onClick={handleExportCSV} title="Экспорт результатов CSV">
+                ↓ CSV
               </button>
             )}
             <Popconfirm title="Сбросить всё?" onConfirm={reset}>

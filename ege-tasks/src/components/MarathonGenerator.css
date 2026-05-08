@@ -355,6 +355,18 @@
 .mg-student-name {
   flex: 1;
   font-size: 14px;
+  cursor: default;
+}
+
+.mg-student-name:hover {
+  text-decoration: underline dotted var(--ink-300, #b3c0d4);
+}
+
+.mg-bulk-import {
+  background: var(--ink-100, #eef2f8);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 12px;
 }
 
 /* ================================================
@@ -721,6 +733,85 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* ================================================
+   Клавиатурные шорткаты — плашка ?
+   ================================================ */
+
+.kbd-help-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ink-800, #1a2236);
+  color: rgba(255,255,255,.8);
+  font-size: 15px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(13,20,36,.25);
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.kbd-help-btn:hover { background: var(--brand, #4f56e3); }
+
+.kbd-help-panel {
+  position: fixed;
+  bottom: 64px;
+  right: 24px;
+  width: 260px;
+  background: var(--ink-900, #0d1424);
+  color: rgba(255,255,255,.9);
+  border-radius: 12px;
+  padding: 14px 16px;
+  z-index: 100;
+  box-shadow: 0 16px 40px -8px rgba(13,20,36,.45);
+}
+
+.kbd-help-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: rgba(255,255,255,.5);
+  margin-bottom: 10px;
+}
+
+.kbd-help-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.kbd-help-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.kbd-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.15);
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255,255,255,.85);
+  flex-shrink: 0;
 }
 
 @keyframes mgLivePulse {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Popconfirm } from 'antd';
 
 /* ================================================================
@@ -282,6 +282,78 @@ export default function MarathonTracker({
   const popularTasks = getPopularTasks(students, tasks, trackingData);
   const maxScore = tasks.length * 3;
 
+  /* ---- Keyboard shortcuts ---- */
+
+  // Фокус-каретка: [rowIdx, colIdx]
+  const [focus, setFocus] = useState(null); // { row, col } | null
+  const [showHelp, setShowHelp] = useState(false);
+
+  const moveFocus = useCallback((dRow, dCol) => {
+    setFocus(prev => {
+      const row = prev ? Math.max(0, Math.min(displayStudents.length - 1, prev.row + dRow)) : 0;
+      const col = prev ? Math.max(0, Math.min(tasks.length - 1, prev.col + dCol)) : 0;
+      return { row, col };
+    });
+  }, [displayStudents.length, tasks.length]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      // Игнорируем если фокус в input/textarea
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      // Игнорируем если открыт Popconfirm или модал
+      if (document.querySelector('.ant-popconfirm, .ant-modal-wrap:not(.ant-modal-wrap-hidden)')) return;
+
+      const cur = focus;
+
+      switch (e.key) {
+        case 'ArrowRight': e.preventDefault(); moveFocus(0, 1); break;
+        case 'ArrowLeft':  e.preventDefault(); moveFocus(0, -1); break;
+        case 'ArrowDown':  e.preventDefault(); moveFocus(1, 0); break;
+        case 'ArrowUp':    e.preventDefault(); moveFocus(-1, 0); break;
+        case 'j': case 'J': moveFocus(1, 0); break;
+        case 'k': case 'K': moveFocus(-1, 0); break;
+        case '?': setShowHelp(v => !v); break;
+        case 'Escape': setShowHelp(false); setFocus(null); break;
+
+        case 'Enter':
+        case '1':
+          if (cur) {
+            const name = displayStudents[cur.row];
+            if (name) handleAttempt(name, cur.col, true);
+          }
+          break;
+
+        case 'Backspace':
+        case '0':
+          if (cur) {
+            e.preventDefault();
+            const name = displayStudents[cur.row];
+            if (name) handleAttempt(name, cur.col, false);
+          }
+          break;
+
+        case 'r': case 'R':
+          if (cur) {
+            const name = displayStudents[cur.row];
+            if (name) handleReset(name, cur.col);
+          }
+          break;
+
+        case 'h': case 'H':
+          if (cur) {
+            const name = displayStudents[cur.row];
+            if (name) handleIssueNext(name);
+          }
+          break;
+
+        default: break;
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [focus, moveFocus, handleAttempt, handleReset, handleIssueNext, displayStudents]);
+
   if (!students.length || !tasks.length) {
     return (
       <div className="tg-empty">
@@ -409,15 +481,21 @@ export default function MarathonTracker({
                 {tasks.map((_, taskIdx) => {
                   const data = (trackingData[student] || {})[String(taskIdx)];
                   const isInHand = taskIdx < issuedCount && !data?.solved && !data?.failed;
+                  const isFocused = focus?.row === rowIdx && focus?.col === taskIdx;
                   return (
-                    <TgCell
+                    <div
                       key={taskIdx}
-                      data={data}
-                      isInHand={isInHand}
-                      onSuccess={() => handleAttempt(student, taskIdx, true)}
-                      onFail={() => handleAttempt(student, taskIdx, false)}
-                      onReset={() => handleReset(student, taskIdx)}
-                    />
+                      onClick={() => setFocus({ row: rowIdx, col: taskIdx })}
+                      style={isFocused ? { outline: '2px solid var(--brand, #4f56e3)', outlineOffset: -2, borderRadius: 8 } : {}}
+                    >
+                      <TgCell
+                        data={data}
+                        isInHand={isInHand}
+                        onSuccess={() => handleAttempt(student, taskIdx, true)}
+                        onFail={() => handleAttempt(student, taskIdx, false)}
+                        onReset={() => handleReset(student, taskIdx)}
+                      />
+                    </div>
                   );
                 })}
 
@@ -443,6 +521,34 @@ export default function MarathonTracker({
         <span style={{ color: '#999' }}>0 — три неудачи</span>
         <span style={{ color: 'var(--brand, #4f56e3)' }}>🃏 — карточка на руках</span>
       </div>
+
+      {/* ---- Плашка шорткатов ---- */}
+      <div className="kbd-help-btn" onClick={() => setShowHelp(v => !v)} title="Клавиатурные шорткаты">
+        ?
+      </div>
+
+      {showHelp && (
+        <div className="kbd-help-panel">
+          <div className="kbd-help-title">Шорткаты трекера</div>
+          <div className="kbd-help-list">
+            {[
+              ['←↑→↓', 'Перемещение фокуса'],
+              ['Enter / 1', 'Решено ✓'],
+              ['Backspace / 0', 'Неудача ✗'],
+              ['R', 'Сбросить ячейку'],
+              ['J / K', 'Следующий / предыдущий ученик'],
+              ['H', 'Выдать карточку текущему'],
+              ['?', 'Показать / скрыть справку'],
+              ['Esc', 'Снять фокус'],
+            ].map(([key, desc]) => (
+              <div key={key} className="kbd-help-row">
+                <span className="kbd-key">{key}</span>
+                <span>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

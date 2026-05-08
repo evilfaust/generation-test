@@ -171,6 +171,7 @@ export default function MarathonLiveBoard({ marathonId }) {
   const [confettiBursts, setConfettiBursts] = useState([]);
   const [flashingRows, setFlashingRows] = useState(new Set());
   const [popScores, setPopScores] = useState({});
+  const [isFrozen, setIsFrozen] = useState(false);
 
   // ---- Refs ----
   const prevScoresRef = useRef({});
@@ -254,6 +255,7 @@ export default function MarathonLiveBoard({ marathonId }) {
 
   const handleEvent = useCallback((event) => {
     if (event.action !== 'update') return;
+    if (isFrozen) return;
     const newTracking = event.record.tracking_data || {};
     const currentMarathon = marathonRef.current;
     if (!currentMarathon) return;
@@ -299,7 +301,7 @@ export default function MarathonLiveBoard({ marathonId }) {
 
       return newTracking;
     });
-  }, [addFloatingPlus, flashRow, popScore, triggerConfetti, recordPositions]);
+  }, [addFloatingPlus, flashRow, popScore, triggerConfetti, recordPositions, isFrozen]);
 
   // Keep ref current every render (after handleEvent is defined)
   handleEventRef.current = handleEvent;
@@ -446,6 +448,14 @@ export default function MarathonLiveBoard({ marathonId }) {
             <span className="mlb-stat-label">Решений</span>
           </div>
           <div className="mlb-stat-divider" />
+
+          <button
+            className={`mlb-freeze-btn${isFrozen ? ' is-frozen' : ''}`}
+            onClick={() => setIsFrozen(v => !v)}
+            title={isFrozen ? 'Разморозить рейтинг' : 'Заморозить рейтинг'}
+          >
+            {isFrozen ? '❄️ Заморожен' : '▶ Заморозить'}
+          </button>
 
           {connected ? (
             <div className="mlb-live-badge">
