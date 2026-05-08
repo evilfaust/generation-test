@@ -1,14 +1,10 @@
-import { useState, useCallback } from 'react';
-import { Button, Tooltip, Tag } from 'antd';
-import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useState, useCallback, useRef } from 'react';
+import { Popconfirm } from 'antd';
 
-/**
- * Очки за задачу:
- *  решена с 0 неудачных попыток  → +3
- *  решена с 1 неудачной попыткой → +2
- *  решена с 2 неудачными попытками → +1
- *  3 неудачные попытки (задача провалена) → 0
- */
+/* ================================================================
+   Score helpers
+   ================================================================ */
+
 function calcTaskScore(data) {
   if (!data || (!data.solved && !data.failed)) return 0;
   if (data.failed) return 0;
@@ -24,92 +20,152 @@ function calcTaskScore(data) {
 function calcTotalScore(name, trackingData) {
   const data = trackingData[name] || {};
   return Object.entries(data).reduce((sum, [k, v]) => {
-    if (k.startsWith('_')) return sum; // skip meta fields like _issued
+    if (k.startsWith('_')) return sum;
     return sum + calcTaskScore(v);
   }, 0);
 }
 
-// Сколько карточек выдано ученику (по умолчанию 2 — первые две)
 function getIssuedCount(studentName, trackingData) {
   return trackingData[studentName]?._issued ?? 2;
 }
 
-// Номера карточек, которые сейчас у ученика «на руках»
-// (выданы, но ещё не решены и не провалены)
 function getHandCards(studentName, taskCount, trackingData) {
   const issued = getIssuedCount(studentName, trackingData);
   const result = [];
   for (let i = 0; i < Math.min(issued, taskCount); i++) {
     const d = (trackingData[studentName] || {})[String(i)];
-    if (!d?.solved && !d?.failed) result.push(i + 1); // 1-based номер карточки
+    if (!d?.solved && !d?.failed) result.push(i + 1);
   }
   return result;
 }
 
-const SCORE_STYLE = {
-  3: { color: '#52c41a', label: '+3' },
-  2: { color: '#1890ff', label: '+2' },
-  1: { color: '#faad14', label: '+1' },
-  0: { color: '#999',    label: '0'  },
-};
+// Топ-3 задачи по количеству решений
+function getPopularTasks(students, tasks, trackingData) {
+  const counts = tasks.map((_, idx) => {
+    const solved = students.filter(s => (trackingData[s] || {})[String(idx)]?.solved).length;
+    return { idx, solved };
+  });
+  counts.sort((a, b) => b.solved - a.solved);
+  const top = new Set(counts.slice(0, 3).filter(c => c.solved > 0).map(c => c.idx));
+  return top;
+}
 
-function TaskCell({ data, onSuccess, onFail, onReset }) {
+/* ================================================================
+   Difficulty helpers
+   ================================================================ */
+
+const DIFF_CLASS = { 1: 'easy', 2: 'med', 3: 'hard' };
+const DIFF_LABEL = { 1: 'Л', 2: 'С', 3: 'Т' };
+
+/* ================================================================
+   Cell component — tg-cell
+   ================================================================ */
+
+function TgCell({ data, onSuccess, onFail, onReset, isInHand }) {
   const attempts = data?.attempts || 0;
 
+  let stateClass = 'empty';
   if (data?.solved) {
     const score = calcTaskScore(data);
-    const s = SCORE_STYLE[score] || SCORE_STYLE[0];
-    return (
-      <div className="mt-cell mt-cell--solved">
-        <span style={{ fontWeight: 700, fontSize: 13, color: s.color }}>{s.label}</span>
-        <Tooltip title="Сбросить">
-          <button className="mt-cell__reset-btn" onClick={onReset}>↺</button>
-        </Tooltip>
-      </div>
-    );
+    stateClass = `s${score}`;
+  } else if (data?.failed) {
+    stateClass = 's0';
+  } else if (attempts > 0) {
+    stateClass = 'attempting';
+  } else if (isInHand) {
+    stateClass = 'empty in-hand';
   }
 
-  if (data?.failed) {
-    return (
-      <div className="mt-cell mt-cell--failed">
-        <span style={{ fontWeight: 700, fontSize: 13, color: '#999' }}>0</span>
-        <Tooltip title="Сбросить">
-          <button className="mt-cell__reset-btn" onClick={onReset}>↺</button>
-        </Tooltip>
-      </div>
-    );
-  }
+  const innerContent = () => {
+    if (data?.solved) {
+      const score = calcTaskScore(data);
+      return (
+        <>
+          <span>+{score}</span>
+          {attempts > 0 && (
+            <div className="dots">
+              {[0, 1, 2].map(i => (
+                <span key={i} className={`d${i < attempts ? ' fail' : ''}`} />
+              ))}
+            </div>
+          )}
+        </>
+      );
+    }
+    if (data?.failed) {
+      return (
+        <>
+          <span>✕</span>
+          <div className="dots">
+            {[0, 1, 2].map(i => <span key={i} className="d fail" />)}
+          </div>
+        </>
+      );
+    }
+    if (attempts > 0) {
+      return (
+        <>
+          <span className="att-num">{attempts}</span>
+          <div className="dots">
+            {[0, 1, 2].map(i => (
+              <span key={i} className={`d${i < attempts ? ' fail' : ''}`} />
+            ))}
+          </div>
+        </>
+      );
+    }
+    return isInHand ? <span style={{ fontSize: 10 }}>🃏</span> : <span>·</span>;
+  };
+
+  const canReset = data?.solved || data?.failed || attempts > 0;
 
   return (
-    <div className="mt-cell mt-cell--active">
-      {/* Кружки использованных попыток */}
-      <div className="mt-cell__dots">
-        {[0, 1, 2].map(i => (
-          <span
-            key={i}
-            className={`mt-cell__dot ${i < attempts ? 'mt-cell__dot--used' : ''}`}
-          />
-        ))}
-      </div>
-      <div className="mt-cell__actions">
-        <Tooltip title={`Решено! (+${3 - attempts} очка)`}>
-          <button className="mt-cell__btn mt-cell__btn--ok" onClick={onSuccess}>
-            <CheckOutlined />
-          </button>
-        </Tooltip>
-        <Tooltip title={attempts < 2 ? `Неудача (попытка ${attempts + 1}/3)` : 'Последняя попытка — три неудачи дают 0 очков'}>
+    <div className={`tg-cell ${stateClass}`}>
+      <Popconfirm
+        title="Сбросить эту ячейку?"
+        onConfirm={onReset}
+        disabled={!canReset}
+        placement="top"
+      >
+        <div className="inner">
+          {innerContent()}
+        </div>
+      </Popconfirm>
+      {/* Hover: быстрые кнопки ✓ / ✗ */}
+      {!data?.solved && !data?.failed && (
+        <div className="quick">
           <button
-            className="mt-cell__btn mt-cell__btn--fail"
-            onClick={onFail}
+            className="qbtn ok"
+            onClick={e => { e.stopPropagation(); onSuccess(); }}
+            title="Решено"
+          >✓</button>
+          <button
+            className="qbtn fail"
+            onClick={e => { e.stopPropagation(); onFail(); }}
             disabled={attempts >= 3}
-          >
-            <CloseOutlined />
-          </button>
-        </Tooltip>
-      </div>
+            title="Неудача"
+          >✗</button>
+        </div>
+      )}
     </div>
   );
 }
+
+/* ================================================================
+   Main component
+   ================================================================ */
+
+const DENSITY_OPTIONS = [
+  { key: 'compact',     label: 'Компактно' },
+  { key: 'comfortable', label: 'Обычно'    },
+  { key: 'large',       label: 'Крупно'    },
+];
+
+const SORT_OPTIONS = [
+  { key: 'score', label: 'По счёту'   },
+  { key: 'alpha', label: 'А–Я'        },
+  { key: 'front', label: 'По фронту'  },
+];
 
 export default function MarathonTracker({
   tasks,
@@ -118,7 +174,23 @@ export default function MarathonTracker({
   setTrackingData,
   onSaveTracking,
 }) {
-  const [sortByScore, setSortByScore] = useState(true);
+  const [density, setDensity] = useState(() =>
+    localStorage.getItem('marathon.tracker.density') || 'comfortable'
+  );
+  const [sortKey, setSortKey] = useState(() =>
+    localStorage.getItem('marathon.tracker.sort') || 'score'
+  );
+
+  const setDensityPersist = (v) => {
+    setDensity(v);
+    localStorage.setItem('marathon.tracker.density', v);
+  };
+  const setSortPersist = (v) => {
+    setSortKey(v);
+    localStorage.setItem('marathon.tracker.sort', v);
+  };
+
+  /* ---- Attempt handlers ---- */
 
   const handleAttempt = useCallback((studentName, taskIdx, success) => {
     setTrackingData(prev => {
@@ -126,17 +198,15 @@ export default function MarathonTracker({
       const studentData = { ...(next[studentName] || {}) };
       const key = String(taskIdx);
       const current = studentData[key] || { attempts: 0, solved: false, failed: false };
-
       if (current.solved || current.failed) return prev;
 
       let updated;
       if (success) {
-        updated = { ...current, solved: true };
+        updated = { ...current, solved: true, _lastActivityAt: Date.now() };
       } else {
         const newAttempts = current.attempts + 1;
-        updated = { ...current, attempts: newAttempts, failed: newAttempts >= 3 };
+        updated = { ...current, attempts: newAttempts, failed: newAttempts >= 3, _lastActivityAt: Date.now() };
       }
-
       studentData[key] = updated;
       next[studentName] = studentData;
       if (onSaveTracking) onSaveTracking(next);
@@ -155,7 +225,6 @@ export default function MarathonTracker({
     });
   }, [setTrackingData, onSaveTracking]);
 
-  // Выдать следующую карточку ученику
   const handleIssueNext = useCallback((studentName) => {
     setTrackingData(prev => {
       const next = { ...prev };
@@ -169,107 +238,210 @@ export default function MarathonTracker({
     });
   }, [setTrackingData, onSaveTracking, tasks.length]);
 
-  const displayStudents = sortByScore
-    ? [...students].sort((a, b) => calcTotalScore(b, trackingData) - calcTotalScore(a, trackingData))
-    : students;
+  const handleIssueAll = useCallback(() => {
+    setTrackingData(prev => {
+      const next = { ...prev };
+      students.forEach(name => {
+        const studentData = { ...(next[name] || {}) };
+        const current = studentData._issued ?? 2;
+        if (current < tasks.length) {
+          studentData._issued = current + 1;
+          next[name] = studentData;
+        }
+      });
+      if (onSaveTracking) onSaveTracking(next);
+      return next;
+    });
+  }, [setTrackingData, onSaveTracking, students, tasks.length]);
+
+  /* ---- Derived data ---- */
+
+  const displayStudents = (() => {
+    const arr = [...students];
+    if (sortKey === 'score') {
+      arr.sort((a, b) => calcTotalScore(b, trackingData) - calcTotalScore(a, trackingData));
+    } else if (sortKey === 'alpha') {
+      arr.sort((a, b) => a.localeCompare(b, 'ru'));
+    } else if (sortKey === 'front') {
+      // по индексу первой нерешённой задачи (наименьший = ближе к финишу)
+      arr.sort((a, b) => {
+        const frontA = tasks.findIndex((_, i) => {
+          const d = (trackingData[a] || {})[String(i)];
+          return !d?.solved && !d?.failed;
+        });
+        const frontB = tasks.findIndex((_, i) => {
+          const d = (trackingData[b] || {})[String(i)];
+          return !d?.solved && !d?.failed;
+        });
+        return (frontA === -1 ? 999 : frontA) - (frontB === -1 ? 999 : frontB);
+      });
+    }
+    return arr;
+  })();
+
+  const popularTasks = getPopularTasks(students, tasks, trackingData);
+  const maxScore = tasks.length * 3;
 
   if (!students.length || !tasks.length) {
     return (
-      <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
-        Добавьте учеников и задачи в разделе «Настройка»
+      <div className="tg-empty">
+        Добавьте учеников и задачи в разделе «Содержимое»
       </div>
     );
   }
 
+  const n = tasks.length;
+
   return (
-    <div className="marathon-tracker">
-      <div className="marathon-tracker__toolbar">
-        <Button
-          size="small"
-          type={sortByScore ? 'primary' : 'default'}
-          onClick={() => setSortByScore(s => !s)}
-          icon={<ReloadOutlined />}
+    <div className="marathon-tracker-v2">
+      {/* ---- Toolbar ---- */}
+      <div className="tracker-toolbar">
+        {/* Плотность */}
+        <div className="seg">
+          {DENSITY_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              className={density === opt.key ? 'is-active' : ''}
+              onClick={() => setDensityPersist(opt.key)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Сортировка */}
+        <div className="seg">
+          {SORT_OPTIONS.map(opt => (
+            <button
+              key={opt.key}
+              className={sortKey === opt.key ? 'is-active' : ''}
+              onClick={() => setSortPersist(opt.key)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Выдать всем */}
+        <Popconfirm
+          title="Выдать всем по одной карточке?"
+          onConfirm={handleIssueAll}
+          placement="bottomLeft"
         >
-          {sortByScore ? 'Сортировка по счёту' : 'Порядок списка'}
-        </Button>
-        <span style={{ color: '#999', fontSize: 12 }}>
-          +3 / +2 / +1 за решение с 1, 2, 3-й попытки &nbsp;·&nbsp; −1 за три неудачи
-        </span>
+          <button className="btn-issue-all">+ Раздать всем карточку</button>
+        </Popconfirm>
+
+        {/* Легенда */}
+        <div className="legend">
+          <span><span className="legend-chip" style={{ background: '#14a85a' }} />+3</span>
+          <span><span className="legend-chip" style={{ background: '#2f7df0' }} />+2</span>
+          <span><span className="legend-chip" style={{ background: '#e89a14' }} />+1</span>
+          <span><span className="legend-chip" style={{ background: '#d8e0ec' }} />0</span>
+        </div>
       </div>
 
-      <div className="marathon-tracker__scroll">
-        <table className="marathon-tracker__table">
-          <thead>
-            <tr>
-              <th className="mt-th-name">Ученик</th>
-              {tasks.map((_, idx) => (
-                <th key={idx} className="mt-th-task">{idx + 1}</th>
-              ))}
-              <th className="mt-th-score">Счёт</th>
-            </tr>
-          </thead>
-          <tbody>
-            {displayStudents.map((student, rowIdx) => {
-              const total = calcTotalScore(student, trackingData);
-              const maxScore = tasks.length * 3;
-              const issuedCount = getIssuedCount(student, trackingData);
-              const handCards = getHandCards(student, tasks.length, trackingData);
-              return (
-                <tr key={student} className={rowIdx % 2 === 0 ? 'mt-row--even' : ''}>
-                  <td className="mt-td-name">
-                    <div className="mt-name-row">
-                      {rowIdx === 0 && sortByScore && total > 0 && (
-                        <span className="mt-leader-badge">🥇</span>
-                      )}
-                      {student}
-                    </div>
-                    <div className="mt-issued-row">
-                      <span className="mt-hand-cards">
-                        🃏 {handCards.length > 0 ? handCards.join(', ') : '—'}
-                      </span>
-                      <Tooltip title={issuedCount < tasks.length ? `Выдать карточку №${issuedCount + 1}` : 'Все карточки выданы'}>
-                        <button
-                          className="mt-issue-btn"
-                          onClick={() => handleIssueNext(student)}
-                          disabled={issuedCount >= tasks.length}
-                        >
-                          +
-                        </button>
-                      </Tooltip>
-                    </div>
-                  </td>
-                  {tasks.map((_, taskIdx) => {
-                    const data = (trackingData[student] || {})[String(taskIdx)];
-                    const isInHand = taskIdx < issuedCount && !data?.solved && !data?.failed;
-                    return (
-                      <td key={taskIdx} className={`mt-td-task${isInHand ? ' mt-td-task--inhand' : ''}`}>
-                        <TaskCell
-                          data={data}
-                          onSuccess={() => handleAttempt(student, taskIdx, true)}
-                          onFail={() => handleAttempt(student, taskIdx, false)}
-                          onReset={() => handleReset(student, taskIdx)}
-                        />
-                      </td>
-                    );
-                  })}
-                  <td className="mt-td-score">
-                    <Tag color={total >= maxScore * 0.8 ? 'green' : total > 0 ? 'blue' : total < 0 ? 'red' : 'default'}>
-                      {total > 0 ? `+${total}` : total}
-                    </Tag>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* ---- Grid ---- */}
+      <div className="tracker-scroll">
+        <div
+          className={`tgrid is-${density}`}
+          style={{
+            '--n': n,
+            '--name-col': '220px',
+          }}
+        >
+          {/* Head */}
+          <div className="tgrid-thead" style={{ gridTemplateColumns: `220px repeat(${n}, var(--cell-w)) 96px` }}>
+            <div className="head-name">Ученик</div>
+            {tasks.map((task, idx) => (
+              <div
+                key={idx}
+                className={`head-task${popularTasks.has(idx) ? ' is-popular' : ''}`}
+                title={task.code}
+              >
+                <span>{idx + 1}</span>
+                {task.difficulty && (
+                  <span style={{ fontSize: 9, opacity: 0.7 }}>{DIFF_LABEL[task.difficulty]}</span>
+                )}
+              </div>
+            ))}
+            <div style={{ justifyContent: 'flex-end', paddingRight: 14, fontSize: 11, color: 'var(--ink-500)' }}>
+              Счёт
+            </div>
+          </div>
+
+          {/* Rows */}
+          {displayStudents.map((student, rowIdx) => {
+            const total = calcTotalScore(student, trackingData);
+            const issuedCount = getIssuedCount(student, trackingData);
+            const handCards = getHandCards(student, tasks.length, trackingData);
+            const isLeader = rowIdx === 0 && sortKey === 'score' && total > 0;
+            const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
+
+            return (
+              <div
+                key={student}
+                className={`tgrid-row${isLeader ? ' is-leader' : ''}`}
+                style={{ gridTemplateColumns: `220px repeat(${n}, var(--cell-w)) 96px` }}
+              >
+                {/* Sticky name */}
+                <div className="tg-name">
+                  <div className="name">
+                    {isLeader && <span className="medal">🥇</span>}
+                    {rowIdx === 1 && sortKey === 'score' && total > 0 && <span className="medal">🥈</span>}
+                    {rowIdx === 2 && sortKey === 'score' && total > 0 && <span className="medal">🥉</span>}
+                    <span>{student}</span>
+                  </div>
+                  <div className="hand">
+                    <span>🃏</span>
+                    <span className={`cards${handCards.length === 0 ? ' cards-empty' : ''}`}>
+                      {handCards.length > 0 ? handCards.join(', ') : '—'}
+                    </span>
+                    <button
+                      className="issue"
+                      onClick={() => handleIssueNext(student)}
+                      disabled={issuedCount >= tasks.length}
+                      title={issuedCount < tasks.length ? `Выдать карточку №${issuedCount + 1}` : 'Все выданы'}
+                    >+</button>
+                  </div>
+                </div>
+
+                {/* Task cells */}
+                {tasks.map((_, taskIdx) => {
+                  const data = (trackingData[student] || {})[String(taskIdx)];
+                  const isInHand = taskIdx < issuedCount && !data?.solved && !data?.failed;
+                  return (
+                    <TgCell
+                      key={taskIdx}
+                      data={data}
+                      isInHand={isInHand}
+                      onSuccess={() => handleAttempt(student, taskIdx, true)}
+                      onFail={() => handleAttempt(student, taskIdx, false)}
+                      onReset={() => handleReset(student, taskIdx)}
+                    />
+                  );
+                })}
+
+                {/* Score */}
+                <div className="tg-score">
+                  <span className="total">{total}</span>
+                  <span className="max">/ {maxScore}</span>
+                  <div className="bar">
+                    <span style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Легенда */}
-      <div className="marathon-tracker__legend">
-        <span className="mt-legend__item" style={{ color: '#52c41a' }}>+3 — с первой попытки</span>
-        <span className="mt-legend__item" style={{ color: '#1890ff' }}>+2 — со второй попытки</span>
-        <span className="mt-legend__item" style={{ color: '#faad14' }}>+1 — с третьей попытки</span>
-        <span className="mt-legend__item" style={{ color: '#999' }}>0 — три неудачи</span>
+      {/* ---- Legend ---- */}
+      <div className="tracker-legend">
+        <span style={{ color: '#14a85a' }}>+3 — с первой попытки</span>
+        <span style={{ color: '#2f7df0' }}>+2 — со второй</span>
+        <span style={{ color: '#e89a14' }}>+1 — с третьей</span>
+        <span style={{ color: '#999' }}>0 — три неудачи</span>
+        <span style={{ color: 'var(--brand, #4f56e3)' }}>🃏 — карточка на руках</span>
       </div>
     </div>
   );
