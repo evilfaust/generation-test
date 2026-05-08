@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import { SaveOutlined, PrinterOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import { api } from '../../shared/services/pocketbase';
-import { buildOptions } from '../../utils/distractorGenerator';
+import { buildOptionsWithAI } from '../../utils/aiDistractorGenerator';
 import { generateTrigTaskCodes } from '../../utils/taskCodeGenerator';
 
 const { Option } = Select;
@@ -97,9 +97,9 @@ async function createTasksAndBuildVariants(tasksData, optionsCount, generatorTyp
         createdIds.push(record.id);
         tasks.push({
           task_id:  record.id,
-          question: task.exprLatex,   // сохраняем для печати (TrigMCPrintLayout)
-          answer:   task.resultLatex, // сохраняем для ключа учителя
-          options:  buildOptions(task.resultLatex, optionsCount),
+          question: task.exprLatex,
+          answer:   task.resultLatex,
+          options:  await buildOptionsWithAI(task.resultLatex, task.exprLatex, generatorType, optionsCount),
         });
         done++;
         // Прогресс 5–90 % — создание задач; 90–100 % — сохранение теста
