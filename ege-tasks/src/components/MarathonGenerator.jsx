@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  Button, Card, Input, InputNumber, Tabs, Space, List, Tag, Tooltip,
-  Modal, Empty, Spin, message, Popconfirm, Typography, Divider, Badge, Switch,
+  Button, Card, Input, InputNumber, Space, List, Tag, Tooltip,
+  Modal, Empty, Spin, message, Popconfirm, Typography, Switch,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, SaveOutlined, FolderOpenOutlined,
@@ -24,6 +24,20 @@ const { Text } = Typography;
 const DIFFICULTY_COLOR = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f' };
 const DIFFICULTY_LABEL = { 1: 'Лёгкая', 2: 'Средняя', 3: 'Сложная' };
 
+// Есть ли реальный прогресс в trackingData
+function hasProgress(trackingData) {
+  return Object.values(trackingData).some(studentData =>
+    Object.entries(studentData).some(([k, v]) =>
+      !k.startsWith('_') && (v.solved || v.failed || v.attempts > 0)
+    )
+  );
+}
+
+// Инициализирован ли трекер (есть записи по ученикам)
+function isTrackerInitialized(students, trackingData) {
+  return students.length > 0 && students.every(s => s in trackingData);
+}
+
 export default function MarathonGenerator() {
   const { topics, subtopics, tags } = useReferenceData();
 
@@ -38,12 +52,15 @@ export default function MarathonGenerator() {
     initTracking,
   } = useMarathon();
 
-  const [activeTab, setActiveTab] = useState('setup');
+  // --- Фазы и подвкладки ---
+  const [phase, setPhase] = useState('prep'); // 'prep' | 'live'
+  const [prepTab, setPrepTab] = useState('content'); // 'content' | 'cards' | 'teacher' | 'rating'
+  const [liveTab, setLiveTab] = useState('tracker'); // 'tracker'
+
+  // --- Прочий UI-стейт ---
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
-
-  // Для печати
   const [printMode, setPrintMode] = useState(null); // 'cards' | 'teacher' | 'rating' | null
   const [showLogo, setShowLogo] = useState(true);
 
@@ -63,7 +80,6 @@ export default function MarathonGenerator() {
       style.textContent = '@page { size: A4 portrait; margin: 0; }';
     }
     document.head.appendChild(style);
-    // 300мс — достаточно для загрузки логотипа и KaTeX-шрифтов
     const timer = setTimeout(() => {
       window.print();
       setTimeout(() => {
@@ -101,31 +117,18 @@ export default function MarathonGenerator() {
   const handleLoadItem = async (item) => {
     setShowLoadModal(false);
     try {
-      // Загружаем полную запись через getOne — expand работает надёжнее, чем в списке
       const full = await api.getMarathon(item.id);
-
-      // --- RECOVERY FOR MISSING TASKS ---
-      // В старой схеме maxSelect мог быть 1, из-за чего PocketBase сохранял только 1 ID задачи в связях.
-      // Но в task_order сохранялся полный массив ID.
       const order = full.task_order || [];
       const raw = full.expand?.tasks;
       const expandedTasks = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      
+
       if (order.length > expandedTasks.length && order.length > 0) {
-        // Загружаем задачи, которых не хватает
         const missingIds = order.filter(id => !expandedTasks.find(t => t.id === id));
         if (missingIds.length > 0) {
-          // Ищем задачи через API
-          // В api нет getTasksByIds, но мы можем использовать getTasks с фильтром
-          const idFilters = missingIds.map(id => `id="${id}"`);
-          const filterStr = idFilters.join(' || ');
-          
           try {
             const recoveredTasks = await Promise.all(
               missingIds.map(id => api.getTask(id).catch(() => null))
             );
-            
-            // Добавляем найденные
             full.expand = full.expand || {};
             full.expand.tasks = [...expandedTasks, ...recoveredTasks.filter(Boolean)];
           } catch (e) {
@@ -133,12 +136,10 @@ export default function MarathonGenerator() {
           }
         }
       }
-
       loadMarathon(full);
       message.success('Марафон загружен');
     } catch (e) {
       console.error(e);
-      // Fallback на данные из списка
       loadMarathon(item);
       message.success('Марафон загружен (ошибка полной загрузки)');
     }
@@ -153,9 +154,7 @@ export default function MarathonGenerator() {
     }
   };
 
-  const handlePrint = (type) => {
-    setPrintMode(type);
-  };
+  const handlePrint = (type) => setPrintMode(type);
 
   const handleInitTracking = () => {
     if (!students.length) return message.warning('Добавьте учеников');
@@ -164,8 +163,22 @@ export default function MarathonGenerator() {
     message.success('Трекер инициализирован');
   };
 
-  // --- Вкладка 1: Настройка ---
-  const setupTab = (
+  // Переключение в фазу урока: инициализировать если нужно
+  const handleSwitchToLive = () => {
+    if (!students.length || !tasks.length) {
+      message.warning('Добавьте учеников и задачи перед началом урока');
+      return;
+    }
+    setPhase('live');
+    setLiveTab('tracker');
+  };
+
+  // =====================================================================
+  // ФАЗА «ПОДГОТОВКА» — подвкладки
+  // =====================================================================
+
+  // Подвкладка: Содержимое (задачи + ученики + параметры)
+  const contentTab = (
     <div className="mg-setup">
       {/* Основные параметры */}
       <Card size="small" title="Параметры марафона" className="mg-card">
@@ -347,11 +360,11 @@ export default function MarathonGenerator() {
     </div>
   );
 
-  // --- Вкладка 2: Карточки ---
+  // Подвкладка: Карточки учеников
   const cardsTab = (
     <div className="mg-print-tab">
       {tasks.length === 0 ? (
-        <Empty description="Добавьте задачи в разделе «Настройка»" />
+        <Empty description="Добавьте задачи в разделе «Содержимое»" />
       ) : (
         <>
           <div className="mg-print-actions">
@@ -364,11 +377,7 @@ export default function MarathonGenerator() {
               Печать карточек (A6, 4 на лист)
             </Button>
             <Space>
-              <Switch
-                size="small"
-                checked={showLogo}
-                onChange={setShowLogo}
-              />
+              <Switch size="small" checked={showLogo} onChange={setShowLogo} />
               <Text type="secondary" style={{ fontSize: 13 }}>Логотип</Text>
             </Space>
             <Text type="secondary" style={{ fontSize: 12 }}>
@@ -376,7 +385,6 @@ export default function MarathonGenerator() {
             </Text>
           </div>
 
-          {/* Экранный превью */}
           <div className="mg-cards-preview">
             {tasks.map((task, idx) => {
               const diff = task.difficulty || 1;
@@ -402,11 +410,11 @@ export default function MarathonGenerator() {
     </div>
   );
 
-  // --- Вкладка 3: Лист учителя ---
+  // Подвкладка: Лист учителя
   const teacherTab = (
     <div className="mg-print-tab">
       {tasks.length === 0 ? (
-        <Empty description="Добавьте задачи в разделе «Настройка»" />
+        <Empty description="Добавьте задачи в разделе «Содержимое»" />
       ) : (
         <>
           <div className="mg-print-actions">
@@ -423,7 +431,6 @@ export default function MarathonGenerator() {
             </Text>
           </div>
 
-          {/* Экранный превью таблицы */}
           <div className="mg-teacher-preview">
             <table className="mg-teacher-preview__table">
               <thead>
@@ -455,142 +462,221 @@ export default function MarathonGenerator() {
     </div>
   );
 
-  // --- Вкладка 4: Рейтинг ---
+  // Подвкладка: Печатный бланк рейтинга
   const ratingTab = (
-    <div className="mg-rating-tab">
-      <Tabs
-        defaultActiveKey="tracker"
-        size="small"
-        items={[
-          {
-            key: 'tracker',
-            label: <><TrophyOutlined /> Цифровой трекер</>,
-            children: (
-              <div>
-                <div className="mg-print-actions" style={{ marginBottom: 12 }}>
-                  <Button
-                    type="default"
-                    icon={<ReloadOutlined />}
-                    onClick={handleInitTracking}
-                  >
-                    Инициализировать трекер
-                  </Button>
-                  {savedId && (
-                    <Button
-                      type="primary"
-                      icon={<DashboardOutlined />}
-                      onClick={() => {
-                        const base = import.meta.env.VITE_STUDENT_URL || `${window.location.origin}/student`;
-                        window.open(`${base}/marathon-live/${savedId}`, '_blank');
-                      }}
-                    >
-                      Открыть дешборд
-                    </Button>
-                  )}
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    Нажмите для сброса и инициализации всех студентов
-                  </Text>
-                </div>
-                <MarathonTracker
-                  tasks={tasks}
-                  students={students}
-                  trackingData={trackingData}
-                  setTrackingData={setTrackingData}
-                  onSaveTracking={savedId ? saveTracking : null}
-                />
-              </div>
-            ),
-          },
-          {
-            key: 'print',
-            label: <><PrinterOutlined /> Бумажный бланк</>,
-            children: (
-              <div>
-                <div className="mg-print-actions">
-                  <Button
-                    type="primary"
-                    icon={<PrinterOutlined />}
-                    onClick={() => handlePrint('rating')}
-                    className="marathon-print-rating-trigger"
-                    disabled={!students.length || !tasks.length}
-                  >
-                    Печать рейтингового бланка (A4)
-                  </Button>
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    Бланк для ручного заполнения во время марафона.
-                    Кружки — попытки, галочка — задача решена.
-                  </Text>
-                </div>
+    <div className="mg-print-tab">
+      <div className="mg-print-actions">
+        <Button
+          type="primary"
+          icon={<PrinterOutlined />}
+          onClick={() => handlePrint('rating')}
+          className="marathon-print-rating-trigger"
+          disabled={!students.length || !tasks.length}
+        >
+          Печать рейтингового бланка (A4)
+        </Button>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Бланк для ручного заполнения во время марафона.
+          Кружки — попытки, галочка — задача решена.
+        </Text>
+      </div>
 
-                {students.length > 0 && tasks.length > 0 ? (
-                  <div className="mg-rating-preview">
-                    <table className="mg-rating-preview__table">
-                      <thead>
-                        <tr>
-                          <th>Ученик</th>
-                          {tasks.map((_, i) => <th key={i}>{i + 1}</th>)}
-                          <th>Итого</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {students.map(name => (
-                          <tr key={name}>
-                            <td>{name}</td>
-                            {tasks.map((_, i) => (
-                              <td key={i} style={{ textAlign: 'center', color: '#ccc', fontSize: 10 }}>
-                                ○○○
-                              </td>
-                            ))}
-                            <td></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <Empty description="Добавьте учеников и задачи" />
-                )}
-              </div>
-            ),
-          },
-        ]}
+      {students.length > 0 && tasks.length > 0 ? (
+        <div className="mg-rating-preview">
+          <table className="mg-rating-preview__table">
+            <thead>
+              <tr>
+                <th>Ученик</th>
+                {tasks.map((_, i) => <th key={i}>{i + 1}</th>)}
+                <th>Итого</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map(name => (
+                <tr key={name}>
+                  <td>{name}</td>
+                  {tasks.map((_, i) => (
+                    <td key={i} style={{ textAlign: 'center', color: '#ccc', fontSize: 10 }}>
+                      ○○○
+                    </td>
+                  ))}
+                  <td></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <Empty description="Добавьте учеников и задачи" />
+      )}
+    </div>
+  );
+
+  // =====================================================================
+  // ФАЗА «УРОК ИДЁТ» — трекер
+  // =====================================================================
+
+  const trackerInitialized = isTrackerInitialized(students, trackingData);
+
+  // Экран до инициализации трекера
+  const initScreen = (
+    <div className="mg-init-screen">
+      <div className="mg-init-icon">🏁</div>
+      <h2 className="mg-init-title">Готовы запустить марафон?</h2>
+      <p className="mg-init-desc">
+        Трекер отслеживает прогресс каждого ученика по каждой задаче в реальном времени.
+      </p>
+      <div className="mg-init-summary">
+        <div className="mg-init-stat">
+          <strong>{students.length}</strong>
+          <span>учеников</span>
+        </div>
+        <div className="mg-init-stat">
+          <strong>{tasks.length}</strong>
+          <span>задач</span>
+        </div>
+        <div className="mg-init-stat">
+          <strong>{tasks.length * 3}</strong>
+          <span>max очков</span>
+        </div>
+      </div>
+      <Button
+        type="primary"
+        size="large"
+        onClick={() => {
+          handleInitTracking();
+        }}
+        style={{ marginTop: 8 }}
+      >
+        🚀 Старт марафона
+      </Button>
+      {hasProgress(trackingData) && (
+        <p className="mg-init-warn">
+          ⚠️ Это сбросит текущий прогресс трекера
+        </p>
+      )}
+    </div>
+  );
+
+  const trackerView = (
+    <div>
+      <div className="mg-print-actions" style={{ marginBottom: 12 }}>
+        <Button
+          type="default"
+          icon={<ReloadOutlined />}
+          onClick={handleInitTracking}
+        >
+          Переинициализировать трекер
+        </Button>
+        {savedId && (
+          <Button
+            type="primary"
+            icon={<DashboardOutlined />}
+            onClick={() => {
+              const base = import.meta.env.VITE_STUDENT_URL || `${window.location.origin}/student`;
+              window.open(`${base}/marathon-live/${savedId}`, '_blank');
+            }}
+          >
+            Открыть дашборд
+          </Button>
+        )}
+      </div>
+      <MarathonTracker
+        tasks={tasks}
+        students={students}
+        trackingData={trackingData}
+        setTrackingData={setTrackingData}
+        onSaveTracking={savedId ? saveTracking : null}
       />
     </div>
   );
 
-  const tabItems = [
-    {
-      key: 'setup',
-      label: <><OrderedListOutlined /> Настройка</>,
-      children: setupTab,
-    },
-    {
-      key: 'cards',
-      label: <><FileTextOutlined /> Карточки учеников</>,
-      children: cardsTab,
-    },
-    {
-      key: 'teacher',
-      label: <><UserOutlined /> Лист учителя</>,
-      children: teacherTab,
-    },
-    {
-      key: 'rating',
-      label: <><TrophyOutlined /> Рейтинг</>,
-      children: ratingTab,
-    },
+  // =====================================================================
+  // ПОДВКЛАДКИ — рендер по фазе
+  // =====================================================================
+
+  const PREP_TABS = [
+    { key: 'content', label: 'Содержимое', icon: <OrderedListOutlined /> },
+    { key: 'cards',   label: 'Карточки учеников', icon: <FileTextOutlined /> },
+    { key: 'teacher', label: 'Лист учителя', icon: <UserOutlined /> },
+    { key: 'rating',  label: 'Бланк рейтинга', icon: <TrophyOutlined /> },
   ];
+
+  const LIVE_TABS = [
+    { key: 'tracker', label: 'Трекер', icon: <TrophyOutlined /> },
+  ];
+
+  const currentPrepContent = {
+    content: contentTab,
+    cards: cardsTab,
+    teacher: teacherTab,
+    rating: ratingTab,
+  };
+
+  const currentLiveContent = {
+    tracker: trackerInitialized ? trackerView : initScreen,
+  };
+
+  const activeTabs = phase === 'prep' ? PREP_TABS : LIVE_TABS;
+  const activeSubtab = phase === 'prep' ? prepTab : liveTab;
+  const setActiveSubtab = phase === 'prep' ? setPrepTab : setLiveTab;
+  const tabContent = phase === 'prep'
+    ? currentPrepContent[prepTab]
+    : currentLiveContent[liveTab];
+
+  // =====================================================================
+  // RENDER
+  // =====================================================================
 
   return (
     <div className="marathon-generator">
-      <Tabs
-        activeKey={activeTab}
-        onChange={setActiveTab}
-        items={tabItems}
-        className="mg-tabs"
-      />
+      {/* ---- Шапка с phase-toggle ---- */}
+      <div className="mg-phase-header">
+        <div className="mg-phase-toggle">
+          <button
+            className={`mg-phase-btn${phase === 'prep' ? ' is-active' : ''}`}
+            onClick={() => setPhase('prep')}
+          >
+            Подготовка
+          </button>
+          <button
+            className={`mg-phase-btn mg-phase-btn--live${phase === 'live' ? ' is-active is-live' : ''}`}
+            onClick={handleSwitchToLive}
+          >
+            {phase === 'live' && <span className="mg-live-dot" />}
+            Урок идёт
+          </button>
+          <span className="mg-phase-pill" data-phase={phase} />
+        </div>
 
-      {/* Модал выбора задач */}
+        <div className="mg-phase-meta">
+          {title && <span className="mg-phase-title">{title}</span>}
+          {classNumber && <span className="mg-phase-chip">{classNumber} класс</span>}
+          {tasks.length > 0 && <span className="mg-phase-chip">{tasks.length} задач</span>}
+          {students.length > 0 && <span className="mg-phase-chip">{students.length} учеников</span>}
+        </div>
+      </div>
+
+      {/* ---- Подвкладки ---- */}
+      <div className="mg-subtabs">
+        {activeTabs.map(tab => (
+          <button
+            key={tab.key}
+            className={`mg-subtab${activeSubtab === tab.key ? ' is-active' : ''}`}
+            onClick={() => setActiveSubtab(tab.key)}
+          >
+            {tab.icon}
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ---- Контент подвкладки ---- */}
+      <div className="mg-tab-content">
+        {tabContent}
+      </div>
+
+      {/* ---- Модал выбора задач ---- */}
       <TaskSelectModal
         visible={showTaskModal}
         onCancel={() => setShowTaskModal(false)}
@@ -605,7 +691,7 @@ export default function MarathonGenerator() {
         excludeIds={tasks.map(t => t.id)}
       />
 
-      {/* Модал загрузки */}
+      {/* ---- Модал загрузки ---- */}
       <Modal
         title="Загрузить марафон"
         open={showLoadModal}
@@ -623,17 +709,10 @@ export default function MarathonGenerator() {
             renderItem={(item) => (
               <List.Item
                 actions={[
-                  <Button
-                    size="small"
-                    type="primary"
-                    onClick={() => handleLoadItem(item)}
-                  >
+                  <Button size="small" type="primary" onClick={() => handleLoadItem(item)}>
                     Загрузить
                   </Button>,
-                  <Popconfirm
-                    title="Удалить марафон?"
-                    onConfirm={() => handleDelete(item.id)}
-                  >
+                  <Popconfirm title="Удалить марафон?" onConfirm={() => handleDelete(item.id)}>
                     <Button size="small" danger>Удалить</Button>
                   </Popconfirm>,
                 ]}
@@ -657,8 +736,7 @@ export default function MarathonGenerator() {
         )}
       </Modal>
 
-      {/* Блоки для печати — рендерятся в дереве компонента, как в QRWorksheetGenerator.
-          @media print скрывает body:has(.root) и показывает только print-root. */}
+      {/* ---- Блоки для печати ---- */}
       {printMode === 'cards' && (
         <MarathonCardsPrint tasks={tasks} title={title} showLogo={showLogo} />
       )}

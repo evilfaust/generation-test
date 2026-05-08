@@ -436,6 +436,245 @@
 }
 
 /* ================================================
+   Phase toggle + subtabs (Коммит 1 — Reshape IA)
+   ================================================ */
+
+.mg-phase-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0 0;
+  flex-wrap: wrap;
+}
+
+/* Pill-toggle «Подготовка / Урок идёт» */
+.mg-phase-toggle {
+  position: relative;
+  display: inline-flex;
+  background: #f5f5f5;
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.mg-phase-btn {
+  position: relative;
+  z-index: 1;
+  height: 34px;
+  padding: 0 18px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #8294b1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.18s;
+}
+
+.mg-phase-btn.is-active {
+  color: #0d1424;
+}
+
+.mg-phase-btn.is-active.is-live {
+  color: #fff;
+}
+
+/* Скользящая белая плашка */
+.mg-phase-toggle::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(13,20,36,.08);
+  transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1), background 0.25s;
+  left: 4px;
+  pointer-events: none;
+}
+
+/* Когда фаза = live, плашка сдвигается вправо и становится тёмной */
+.mg-phase-toggle:has(.mg-phase-btn--live.is-live)::before {
+  transform: translateX(100%);
+  background: linear-gradient(135deg, #18243f, #2c3a55);
+}
+
+/* Пульсирующая красная точка «LIVE» */
+.mg-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: mgLivePulse 1.6s infinite;
+}
+
+@keyframes mgLivePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  70%  { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Мета-чипы справа от toggle */
+.mg-phase-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mg-phase-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a2236;
+}
+
+.mg-phase-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  background: #eef2f8;
+  color: #5b6b86;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Подвкладки */
+.mg-subtabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 14px;
+  border-bottom: 1px solid #d8e0ec;
+}
+
+.mg-subtab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px 11px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #5b6b86;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.mg-subtab:hover {
+  color: #1a2236;
+}
+
+.mg-subtab.is-active {
+  color: #0d1424;
+  font-weight: 600;
+}
+
+.mg-subtab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  background: #4f56e3;
+  border-radius: 2px;
+}
+
+.mg-subtab svg {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.mg-subtab.is-active svg {
+  opacity: 1;
+}
+
+/* Контент подвкладки */
+.mg-tab-content {
+  padding-top: 20px;
+}
+
+/* ================================================
+   Init-экран фазы «Урок идёт»
+   ================================================ */
+
+.mg-init-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 56px 32px 72px;
+}
+
+.mg-init-icon {
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.mg-init-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0d1424;
+  margin: 0 0 10px;
+}
+
+.mg-init-desc {
+  color: #5b6b86;
+  font-size: 14px;
+  max-width: 480px;
+  line-height: 1.55;
+  margin: 0 0 24px;
+}
+
+.mg-init-summary {
+  display: inline-flex;
+  gap: 28px;
+  background: #fff;
+  padding: 14px 28px;
+  border-radius: 12px;
+  border: 1px solid #d8e0ec;
+  box-shadow: 0 1px 2px rgba(13,20,36,.05);
+  margin-bottom: 28px;
+  font-size: 13px;
+}
+
+.mg-init-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.mg-init-stat strong {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0d1424;
+  line-height: 1;
+}
+
+.mg-init-stat span {
+  color: #5b6b86;
+  font-size: 12px;
+}
+
+.mg-init-warn {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #8294b1;
+}
+
+/* ================================================
    PRINT STYLES
    ================================================ */
 
