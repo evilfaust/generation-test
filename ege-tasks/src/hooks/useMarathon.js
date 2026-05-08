@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { api } from '../services/pocketbase';
 
 // Начальное состояние трекинга для одного студента
@@ -29,6 +29,54 @@ export function useMarathon() {
   const [saved, setSaved] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  // 'idle' | 'dirty' | 'saving' | 'saved'
+  const [saveStatus, setSaveStatus] = useState('idle');
+
+  // Ref для дебаунса автосохранения
+  const autosaveTimerRef = useRef(null);
+  const savedIdRef = useRef(savedId);
+  savedIdRef.current = savedId;
+
+  // Данные для автосохранения — ref чтобы не устаревали в замыкании таймера
+  const autosaveDataRef = useRef({ title, classNumber, tasks, students, trackingData });
+  autosaveDataRef.current = { title, classNumber, tasks, students, trackingData };
+
+  // --- Автосохранение с дебаунсом 800мс ---
+
+  const triggerAutosave = useCallback(() => {
+    if (!savedIdRef.current) return; // нечего сохранять без savedId
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    setSaveStatus('dirty');
+    autosaveTimerRef.current = setTimeout(async () => {
+      if (!savedIdRef.current) return;
+      const { title: t, classNumber: cn, tasks: tk, students: st, trackingData: td } = autosaveDataRef.current;
+      setSaveStatus('saving');
+      setSaving(true);
+      try {
+        await api.updateMarathon(savedIdRef.current, {
+          title: t,
+          class_number: cn,
+          tasks: tk.map(x => x.id),
+          task_order: tk.map(x => x.id),
+          students: st,
+          tracking_data: td,
+        });
+        setSaveStatus('saved');
+      } catch (e) {
+        console.error('Autosave error:', e);
+        setSaveStatus('dirty');
+      } finally {
+        setSaving(false);
+      }
+    }, 800);
+  }, []);
+
+  // Сбрасываем статус saved → idle через 4 секунды после сохранения
+  useEffect(() => {
+    if (saveStatus !== 'saved') return;
+    const t = setTimeout(() => setSaveStatus('idle'), 4000);
+    return () => clearTimeout(t);
+  }, [saveStatus]);
 
   // --- Управление задачами ---
 
@@ -38,11 +86,13 @@ export function useMarathon() {
       const toAdd = newTasks.filter(t => !existingIds.has(t.id));
       return [...prev, ...toAdd];
     });
-  }, []);
+    triggerAutosave();
+  }, [triggerAutosave]);
 
   const removeTask = useCallback((taskId) => {
     setTasks(prev => prev.filter(t => t.id !== taskId));
-  }, []);
+    triggerAutosave();
+  }, [triggerAutosave]);
 
   const moveTask = useCallback((fromIdx, toIdx) => {
     setTasks(prev => {
@@ -51,7 +101,8 @@ export function useMarathon() {
       arr.splice(toIdx, 0, item);
       return arr;
     });
-  }, []);
+    triggerAutosave();
+  }, [triggerAutosave]);
 
   // --- Управление учениками ---
 
@@ -62,11 +113,13 @@ export function useMarathon() {
       if (prev.includes(trimmed)) return prev;
       return [...prev, trimmed];
     });
-  }, []);
+    triggerAutosave();
+  }, [triggerAutosave]);
 
   const removeStudent = useCallback((name) => {
     setStudents(prev => prev.filter(s => s !== name));
-  }, []);
+    triggerAutosave();
+  }, [triggerAutosave]);
 
   const updateStudentName = useCallback((oldName, newName) => {
     const trimmed = newName.trim();
@@ -79,13 +132,15 @@ export function useMarathon() {
       delete next[oldName];
       return next;
     });
-  }, []);
+    triggerAutosave();
+  }, [triggerAutosave]);
 
   // --- Трекинг ---
 
   const initTracking = useCallback(() => {
     setTrackingData(initTrackingData(students, tasks.length));
-  }, [students, tasks.length]);
+    triggerAutosave();
+  }, [students, tasks.length, triggerAutosave]);
 
   // Отметить попытку: success=true → задача решена, success=false → провал попытки
   const markAttempt = useCallback((studentName, taskIndex, success) => {
@@ -222,15 +277,27 @@ export function useMarathon() {
       .sort((a, b) => b.solved - a.solved);
   };
 
+  // Автосохранение при изменении title/classNumber
+  const handleSetTitle = useCallback((v) => {
+    setTitle(v);
+    triggerAutosave();
+  }, [triggerAutosave]);
+
+  const handleSetClassNumber = useCallback((v) => {
+    setClassNumber(v);
+    triggerAutosave();
+  }, [triggerAutosave]);
+
   return {
-    title, setTitle,
-    classNumber, setClassNumber,
+    title, setTitle: handleSetTitle,
+    classNumber, setClassNumber: handleSetClassNumber,
     tasks,
     students,
     trackingData, setTrackingData,
     savedId,
     saved, loadingSaved,
     saving,
+    saveStatus,
     addTasks,
     removeTask,
     moveTask,

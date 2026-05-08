@@ -45,7 +45,7 @@ export default function MarathonGenerator() {
     title, setTitle,
     classNumber, setClassNumber,
     tasks, students, trackingData, setTrackingData,
-    savedId, saved, loadingSaved, saving,
+    savedId, saved, loadingSaved, saving, saveStatus,
     addTasks, removeTask, moveTask,
     addStudent, removeStudent,
     saveMarathon, saveTracking, loadMarathon, loadSavedList, deleteMarathon, reset,
@@ -630,45 +630,94 @@ export default function MarathonGenerator() {
 
   return (
     <div className="marathon-generator">
-      {/* ---- Шапка с phase-toggle ---- */}
-      <div className="mg-phase-header">
-        <div className="mg-phase-toggle">
+      {/* ---- Sticky-шапка ---- */}
+      <div className="m-header">
+        <div className="m-title-row">
+          <input
+            className="m-title-input"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Название марафона"
+            spellCheck={false}
+          />
+          <div className="m-actions">
+            {saveStatus === 'saving' && (
+              <span className="m-chip is-saving">⏳ Сохранение…</span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="m-chip is-saved">✓ Сохранено</span>
+            )}
+            {saveStatus === 'dirty' && (
+              <span className="m-chip">● Не сохранено</span>
+            )}
+            <button className="btn" onClick={handleLoad}>
+              <FolderOpenOutlined /> Загрузить
+            </button>
+            {(!savedId || saveStatus === 'dirty' || saveStatus === 'idle') && (
+              <button
+                className="btn is-primary"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                <SaveOutlined /> {savedId ? 'Обновить' : 'Сохранить'}
+              </button>
+            )}
+            <Popconfirm title="Сбросить всё?" onConfirm={reset}>
+              <button className="btn">
+                <ReloadOutlined /> Новый
+              </button>
+            </Popconfirm>
+          </div>
+        </div>
+
+        <div className="m-meta">
+          <span className="m-chip">
+            {classNumber} класс
+          </span>
+          <span className="m-chip">
+            <span className="m-chip-num">{tasks.length}</span> задач
+          </span>
+          <span className="m-chip">
+            <span className="m-chip-num">{students.length}</span> учеников
+          </span>
+          {savedId && (
+            <span className="m-chip" style={{ fontFamily: 'monospace', fontSize: 11 }}>
+              #{savedId.slice(-6)}
+            </span>
+          )}
+        </div>
+
+        {/* Phase toggle */}
+        <div className={`phase-toggle${phase === 'live' ? ' is-live' : ''}`}>
+          <span className="pill" />
           <button
-            className={`mg-phase-btn${phase === 'prep' ? ' is-active' : ''}`}
+            className={phase === 'prep' ? 'is-active' : ''}
             onClick={() => setPhase('prep')}
           >
             Подготовка
           </button>
           <button
-            className={`mg-phase-btn mg-phase-btn--live${phase === 'live' ? ' is-active is-live' : ''}`}
+            className={`${phase === 'live' ? 'is-active is-live' : ''}`}
             onClick={handleSwitchToLive}
           >
-            {phase === 'live' && <span className="mg-live-dot" />}
+            {phase === 'live' && <span className="live-dot" />}
             Урок идёт
           </button>
-          <span className="mg-phase-pill" data-phase={phase} />
         </div>
 
-        <div className="mg-phase-meta">
-          {title && <span className="mg-phase-title">{title}</span>}
-          {classNumber && <span className="mg-phase-chip">{classNumber} класс</span>}
-          {tasks.length > 0 && <span className="mg-phase-chip">{tasks.length} задач</span>}
-          {students.length > 0 && <span className="mg-phase-chip">{students.length} учеников</span>}
+        {/* Subtabs */}
+        <div className="subtabs">
+          {activeTabs.map(tab => (
+            <div
+              key={tab.key}
+              className={`subtab${activeSubtab === tab.key ? ' is-active' : ''}`}
+              onClick={() => setActiveSubtab(tab.key)}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </div>
+          ))}
         </div>
-      </div>
-
-      {/* ---- Подвкладки ---- */}
-      <div className="mg-subtabs">
-        {activeTabs.map(tab => (
-          <button
-            key={tab.key}
-            className={`mg-subtab${activeSubtab === tab.key ? ' is-active' : ''}`}
-            onClick={() => setActiveSubtab(tab.key)}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
       </div>
 
       {/* ---- Контент подвкладки ---- */}
