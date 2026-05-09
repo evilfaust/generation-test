@@ -69,27 +69,44 @@ function mkText(text, px, py, color, fontSize = 14, bold = false) {
 /**
  * Заполненный сектор дуги угла.
  *
- * GeoGebra хранит inputs в порядке CCW от ptFrom к ptTo (в математических
- * координатах y-вверх). В SVG (y-вниз) тот же визуальный поворот соответствует
- * уменьшению screen-угла (atan2), что даёт sweep=0 (CCW на экране).
+ * targetAngleRad — реальный угол в радианах (0, π], взятый из <value> GeoGebra.
+ * Мы вычисляем оба возможных размаха (CW/CCW на экране) и выбираем тот,
+ * что совпадает с targetAngleRad. Это надёжнее, чем любая эвристика на знаке
+ * (a1−a2), которая ломается, когда оба луча смотрят вверх/влево и a1 < a2.
  *
- * span = a1 − a2 (mod 2π) — это размах дуги при sweep=0.
- * angleStyle не меняет порядок ptFrom/ptTo, только сигнализирует о рефлекс-угле.
+ * Если targetAngleRad не передан, используем старый fallback (sweep=0).
  */
-function mkArcSector(pxF, pyF, pxV, pyV, pxT, pyT, r, color, fillOpacity, sw) {
+function mkArcSector(pxF, pyF, pxV, pyV, pxT, pyT, r, color, fillOpacity, sw, targetAngleRad) {
   const a1 = Math.atan2(pyF - pyV, pxF - pxV);
   const a2 = Math.atan2(pyT - pyV, pxT - pxV);
 
   const ax1 = pxV + r * Math.cos(a1), ay1 = pyV + r * Math.sin(a1);
   const ax2 = pxV + r * Math.cos(a2), ay2 = pyV + r * Math.sin(a2);
 
-  // Размах: от a1 до a2 уменьшая угол (CCW на экране = CCW в математике)
-  let span = a1 - a2;
-  if (span <= 0) span += 2 * Math.PI;
-  const large = span > Math.PI ? 1 : 0;
+  let sweep, span;
 
+  if (targetAngleRad !== undefined && targetAngleRad > 0) {
+    // Размах дуги при sweep=0 (уменьшение screen-угла от a1 к a2)
+    const spanDec = ((a1 - a2) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    // Размах дуги при sweep=1 (увеличение screen-угла от a1 к a2)
+    const spanInc = ((a2 - a1) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+
+    // Выбираем направление, чьё расстояние до targetAngleRad меньше
+    if (Math.abs(spanDec - targetAngleRad) <= Math.abs(spanInc - targetAngleRad)) {
+      sweep = 0; span = spanDec;
+    } else {
+      sweep = 1; span = spanInc;
+    }
+  } else {
+    // Fallback: старое поведение (работало для случаев, где a1 > a2)
+    span = a1 - a2;
+    if (span <= 0) span += 2 * Math.PI;
+    sweep = 0;
+  }
+
+  const large = span > Math.PI ? 1 : 0;
   const d = `M ${f(pxV)} ${f(pyV)} L ${f(ax1)} ${f(ay1)} ` +
-            `A ${f(r)} ${f(r)} 0 ${large} 0 ${f(ax2)} ${f(ay2)} Z`;
+            `A ${f(r)} ${f(r)} 0 ${large} ${sweep} ${f(ax2)} ${f(ay2)} Z`;
   return `<path d="${d}" fill="${color}" fill-opacity="${fillOpacity}" ` +
          `stroke="${color}" stroke-width="${sw}"/>`;
 }
@@ -407,12 +424,17 @@ export function ggbXmlToSvg(xmlString) {
     if (isRight) {
       parts.push(mkRightSquare(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r, ep.color));
     } else {
+      // Реальный угол из XML: если > π (рефлекс-хранение), берём дополнение до 2π
+      const displayedAngle = (!isNaN(ep.valueRad) && ep.valueRad > 0)
+        ? (ep.valueRad > Math.PI ? 2 * Math.PI - ep.valueRad : ep.valueRad)
+        : undefined;
+
       const fa = ep.alpha > 0 ? ep.alpha : 0.15;
-      parts.push(mkArcSector(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r, ep.color, fa, 1));
+      parts.push(mkArcSector(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r, ep.color, fa, 1, displayedAngle));
 
       if (ep.decoration === 1) {
         // Двойная дуга: второй контурный arc меньшего радиуса
-        parts.push(mkArcSector(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r * 0.75, ep.color, 0, 1));
+        parts.push(mkArcSector(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r * 0.75, ep.color, 0, 1, displayedAngle));
       }
     }
   });
