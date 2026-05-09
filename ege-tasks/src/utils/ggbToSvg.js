@@ -68,8 +68,13 @@ function mkText(text, px, py, color, fontSize = 14, bold = false) {
 
 /**
  * Заполненный сектор дуги угла.
- * Направление: sweep=1 (CW в SVG = CCW в математике) — стандарт GeoGebra.
- * Для angleStyle=1 (CW в математике) — поменяйте местами pFrom/pTo снаружи.
+ *
+ * GeoGebra хранит inputs в порядке CCW от ptFrom к ptTo (в математических
+ * координатах y-вверх). В SVG (y-вниз) тот же визуальный поворот соответствует
+ * уменьшению screen-угла (atan2), что даёт sweep=0 (CCW на экране).
+ *
+ * span = a1 − a2 (mod 2π) — это размах дуги при sweep=0.
+ * angleStyle не меняет порядок ptFrom/ptTo, только сигнализирует о рефлекс-угле.
  */
 function mkArcSector(pxF, pyF, pxV, pyV, pxT, pyT, r, color, fillOpacity, sw) {
   const a1 = Math.atan2(pyF - pyV, pxF - pxV);
@@ -78,13 +83,13 @@ function mkArcSector(pxF, pyF, pxV, pyV, pxT, pyT, r, color, fillOpacity, sw) {
   const ax1 = pxV + r * Math.cos(a1), ay1 = pyV + r * Math.sin(a1);
   const ax2 = pxV + r * Math.cos(a2), ay2 = pyV + r * Math.sin(a2);
 
-  // Угловой размах по часовой стрелке (CW в SVG = CCW в математике)
+  // Размах: от a1 до a2 уменьшая угол (CCW на экране = CCW в математике)
   let span = a1 - a2;
   if (span <= 0) span += 2 * Math.PI;
   const large = span > Math.PI ? 1 : 0;
 
   const d = `M ${f(pxV)} ${f(pyV)} L ${f(ax1)} ${f(ay1)} ` +
-            `A ${f(r)} ${f(r)} 0 ${large} 1 ${f(ax2)} ${f(ay2)} Z`;
+            `A ${f(r)} ${f(r)} 0 ${large} 0 ${f(ax2)} ${f(ay2)} Z`;
   return `<path d="${d}" fill="${color}" fill-opacity="${fillOpacity}" ` +
          `stroke="${color}" stroke-width="${sw}"/>`;
 }
@@ -386,17 +391,12 @@ export function ggbXmlToSvg(xmlString) {
     if (isRight) {
       parts.push(mkRightSquare(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r, ep.color));
     } else {
-      // angleStyle=1 (CW в математике) → меняем местами from и to
-      const [fPx, fPy, tPx, tPy] = ep.angleStyle === 1
-        ? [pT.px, pT.py, pF.px, pF.py]
-        : [pF.px, pF.py, pT.px, pT.py];
-
       const fa = ep.alpha > 0 ? ep.alpha : 0.15;
-      parts.push(mkArcSector(fPx, fPy, pV.px, pV.py, tPx, tPy, r, ep.color, fa, 1));
+      parts.push(mkArcSector(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r, ep.color, fa, 1));
 
       if (ep.decoration === 1) {
         // Двойная дуга: второй контурный arc меньшего радиуса
-        parts.push(mkArcSector(fPx, fPy, pV.px, pV.py, tPx, tPy, r * 0.75, ep.color, 0, 1));
+        parts.push(mkArcSector(pF.px, pF.py, pV.px, pV.py, pT.px, pT.py, r * 0.75, ep.color, 0, 1));
       }
     }
   });
