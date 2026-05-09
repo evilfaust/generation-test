@@ -142,6 +142,7 @@ function parseXml(xmlString) {
     const loEl    = el.querySelector('labelOffset');
     const lmEl    = el.querySelector('labelMode');
     const asEl    = el.querySelector('angleStyle');
+    const valEl   = el.querySelector('value');
 
     elProps[label] = {
       type:        el.getAttribute('type'),
@@ -164,6 +165,8 @@ function parseXml(xmlString) {
         y: parseFloat(coordEl.getAttribute('y') ?? '0'),
         z: parseFloat(coordEl.getAttribute('z') ?? '1'),
       } : null,
+      // Сохранённое значение угла в радианах (для angle-элементов)
+      valueRad: valEl ? parseFloat(valEl.getAttribute('val') ?? 'NaN') : NaN,
     };
   });
 
@@ -267,8 +270,21 @@ function parseXml(xmlString) {
     const ay = epF.coords.y / zF - epV.coords.y / zV;
     const bx = epT.coords.x / zT - epV.coords.x / zV;
     const by = epT.coords.y / zT - epV.coords.y / zV;
-    const cosA = (ax * bx + ay * by) / (Math.sqrt(ax*ax+ay*ay) * Math.sqrt(bx*bx+by*by));
-    const deg = Math.round(Math.acos(Math.max(-1, Math.min(1, cosA))) * 180 / Math.PI);
+
+    // Используем сохранённое значение из XML (<value val="..."> в радианах).
+    // Это исключает накопление ошибок floating-point при вычислении через arccos.
+    // Fallback: вычисляем из координат (для файлов без <value>).
+    let deg;
+    if (!isNaN(ep.valueRad) && ep.valueRad > 0) {
+      // GeoGebra хранит углы >180° как рефлекс-угол; нормализуем для отображения
+      let rad = ep.valueRad;
+      if (rad > Math.PI) rad = 2 * Math.PI - rad; // рефлекс → основной угол
+      deg = Math.round(rad * 180 / Math.PI);
+    } else {
+      const cosA = (ax * bx + ay * by) / (Math.sqrt(ax * ax + ay * ay) * Math.sqrt(bx * bx + by * by));
+      deg = Math.round(Math.acos(Math.max(-1, Math.min(1, cosA))) * 180 / Math.PI);
+    }
+
     // Позиция: вдоль биссектрисы на расстоянии arcSize * 1.4 от вершины
     const r = ep.arcSize / scale; // math units
     const midAngle = Math.atan2(ay + by, ax + bx);
