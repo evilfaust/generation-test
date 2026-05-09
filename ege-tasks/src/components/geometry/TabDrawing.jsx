@@ -146,6 +146,11 @@ export default function TabDrawing({
   onSaveDrawingAsImage,
   onCropApplied,
   onClearDrawing,
+  drawingSvg,
+  convertingSvg,
+  savingSvg,
+  onConvertToSvg,
+  onSaveSvg,
 }) {
   const drawingContainerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -272,6 +277,7 @@ export default function TabDrawing({
               options={[
                 { value: 'image', label: 'Картинку (PNG)' },
                 { value: 'geogebra', label: 'GeoGebra объект' },
+                { value: 'svg', label: 'SVG (векторный)', disabled: !drawingSvg },
               ]}
             />
           </div>
@@ -318,6 +324,25 @@ export default function TabDrawing({
             {isFullscreen ? 'Свернуть' : 'На весь экран'}
           </Button>
 
+          <Button
+            onClick={onConvertToSvg}
+            loading={convertingSvg}
+            disabled={!onConvertToSvg}
+          >
+            Конвертировать в SVG
+          </Button>
+
+          {drawingSvg && onSaveSvg && (
+            <Button
+              type="primary"
+              ghost
+              onClick={onSaveSvg}
+              loading={savingSvg}
+            >
+              Сохранить SVG
+            </Button>
+          )}
+
           <Button onClick={onClearDrawing} danger>
             Очистить
           </Button>
@@ -359,6 +384,19 @@ export default function TabDrawing({
             src={imageBase64}
             alt="Чертёж"
             style={{ width: '100%', maxHeight: 320, objectFit: 'contain', display: 'block' }}
+          />
+        </Card>
+      )}
+
+      {!!drawingSvg && (
+        <Card
+          size="small"
+          title="SVG-превью (векторный чертёж)"
+          styles={{ body: { padding: 12 } }}
+        >
+          <div
+            dangerouslySetInnerHTML={{ __html: drawingSvg }}
+            style={{ lineHeight: 0, background: 'transparent', maxWidth: 360 }}
           />
         </Card>
       )}

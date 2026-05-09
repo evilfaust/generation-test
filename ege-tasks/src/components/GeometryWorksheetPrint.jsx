@@ -22,7 +22,8 @@ const DRAWING_SIZE_CFG = {
 
 function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet }) {
   const imageUrl = api.getGeometryImageUrl(task);
-  const hasImage = !!imageUrl;
+  const hasSvg   = task.drawing_view === 'svg' && !!task.drawing_svg;
+  const hasImage = !!imageUrl && !hasSvg;
 
   const dcfg = DRAWING_SIZE_CFG[drawingSize] ?? DRAWING_SIZE_CFG.m;
   const maxH = dcfg.h[tasksPerSheet] ?? dcfg.h[2];
@@ -63,7 +64,13 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet })
           </svg>
         </div>
 
-        {/* Чертёж — плавает поверх сетки в левом верхнем углу (только если есть картинка) */}
+        {/* Чертёж — плавает поверх сетки в левом верхнем углу */}
+        {showDrawing && hasSvg && (
+          <div className="geo-worksheet-task-drawing" style={drawingStyle}>
+            {/* SVG хранится с style="width:100%;height:auto" — масштабируется в контейнере */}
+            <div dangerouslySetInnerHTML={{ __html: task.drawing_svg }} style={{ lineHeight: 0 }} />
+          </div>
+        )}
         {showDrawing && hasImage && (
           <div className="geo-worksheet-task-drawing" style={drawingStyle}>
             <img src={imageUrl} alt={`Чертёж ${task.code || ''}`} style={imgStyle} />

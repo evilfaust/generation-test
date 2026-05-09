@@ -206,7 +206,7 @@
   top: 2mm;
   left: 2mm;
   /* width задаётся inline через maxWidth — контейнер сжимается до картинки */
-  background: #fff;
+  background: none;
   border-radius: 0.8mm;
   padding: 1mm;
   z-index: 1;

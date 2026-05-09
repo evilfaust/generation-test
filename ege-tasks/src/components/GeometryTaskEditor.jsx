@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
 import { normalizeLayout, safeParseLayout } from './GeometryTaskPreview';
+import { ggbXmlToSvg } from '../utils/ggbToSvg';
 import TabCondition from './geometry/TabCondition';
 import TabDrawing from './geometry/TabDrawing';
 import TabLayout from './geometry/TabLayout';
@@ -61,7 +62,10 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
   const existingDrawingUrl = api.getGeometryImageUrl(task);
   const [savingDrawing, setSavingDrawing] = useState(false);
   const [appName, setAppName] = useState(task?.geogebra_appname || 'geometry');
-  const [drawingView, setDrawingView] = useState(task?.drawing_view === 'geogebra' ? 'geogebra' : 'image');
+  const [drawingView, setDrawingView] = useState(task?.drawing_view ?? 'image');
+  const [drawingSvg, setDrawingSvg] = useState(task?.drawing_svg || '');
+  const [convertingSvg, setConvertingSvg] = useState(false);
+  const [savingSvg, setSavingSvg] = useState(false);
 
   // ── Состояние макета ─────────────────────────────────────────────────────
   const [layoutPrint, setLayoutPrint] = useState(() => {
@@ -152,6 +156,43 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
     setGgbSaved(true);
   }, []);
 
+  const handleConvertToSvg = useCallback(() => {
+    if (!ggbApiRef.current) {
+      message.warning('GeoGebra ещё не загружена');
+      return;
+    }
+    setConvertingSvg(true);
+    try {
+      const xml = ggbApiRef.current.getXML();
+      const svg = ggbXmlToSvg(xml);
+      setDrawingSvg(svg);
+      message.success('SVG сконвертирован — нажмите «Сохранить SVG» или сохраните задачу целиком');
+    } catch (err) {
+      message.error(`Ошибка конвертации SVG: ${err?.message || 'неизвестная ошибка'}`);
+    } finally {
+      setConvertingSvg(false);
+    }
+  }, []);
+
+  const handleSaveSvg = useCallback(async () => {
+    if (!drawingSvg || !task?.id) return;
+    setSavingSvg(true);
+    try {
+      await api.updateGeometryTask(task.id, { drawing_svg: drawingSvg, drawing_view: 'svg' });
+      setDrawingView('svg');
+      message.success('SVG сохранён, режим отображения переключён на SVG');
+    } catch (err) {
+      console.error('SVG save error:', err);
+      console.error('SVG save error data:', JSON.stringify(err?.data));
+      const details = err?.data
+        ? Object.entries(err.data).map(([k, v]) => `${k}: ${v?.message || JSON.stringify(v)}`).join('; ')
+        : err?.message || 'неизвестная ошибка';
+      message.error(`Ошибка сохранения SVG: ${details}`);
+    } finally {
+      setSavingSvg(false);
+    }
+  }, [drawingSvg, task?.id]);
+
   // ── Управление макетом ────────────────────────────────────────────────────
   const handleEditorLayoutChange = useCallback((layerName, patch) => {
     setLayoutPrint((prev) => normalizeLayout({
@@ -219,6 +260,7 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
         geogebra_base64: finalGgbBase64,
         geogebra_appname: appName,
         drawing_view: drawingView,
+        drawing_svg: drawingSvg || '',
         source: values.source || '',
         year: values.year || null,
         preview_layout: {
@@ -323,6 +365,11 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
         onSaveDrawingAsImage={handleSaveDrawingAsImage}
         onCropApplied={handleCropApplied}
         onClearDrawing={handleClearDrawing}
+        drawingSvg={drawingSvg}
+        convertingSvg={convertingSvg}
+        savingSvg={savingSvg}
+        onConvertToSvg={handleConvertToSvg}
+        onSaveSvg={task?.id ? handleSaveSvg : null}
       />,
     },
     {

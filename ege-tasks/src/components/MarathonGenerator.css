@@ -32,7 +32,6 @@
   --font-display: "Manrope", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  max-width: 1280px;
   background: var(--paper);
 }
 
@@ -735,84 +734,6 @@
   gap: 4px;
 }
 
-/* ================================================
-   Клавиатурные шорткаты — плашка ?
-   ================================================ */
-
-.kbd-help-btn {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--ink-800, #1a2236);
-  color: rgba(255,255,255,.8);
-  font-size: 15px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 100;
-  box-shadow: 0 4px 12px rgba(13,20,36,.25);
-  user-select: none;
-  transition: background 0.15s;
-}
-
-.kbd-help-btn:hover { background: var(--brand, #4f56e3); }
-
-.kbd-help-panel {
-  position: fixed;
-  bottom: 64px;
-  right: 24px;
-  width: 260px;
-  background: var(--ink-900, #0d1424);
-  color: rgba(255,255,255,.9);
-  border-radius: 12px;
-  padding: 14px 16px;
-  z-index: 100;
-  box-shadow: 0 16px 40px -8px rgba(13,20,36,.45);
-}
-
-.kbd-help-title {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .1em;
-  color: rgba(255,255,255,.5);
-  margin-bottom: 10px;
-}
-
-.kbd-help-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.kbd-help-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-}
-
-.kbd-key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 72px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 5px;
-  background: rgba(255,255,255,.12);
-  border: 1px solid rgba(255,255,255,.15);
-  font-family: var(--font-mono, monospace);
-  font-size: 10.5px;
-  font-weight: 700;
-  color: rgba(255,255,255,.85);
-  flex-shrink: 0;
-}
 
 @keyframes mgLivePulse {
   0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
@@ -824,10 +745,144 @@
    Tracker v2 — heat-grid
    ================================================ */
 
+/* Density custom properties живут на marathon-tracker-v2 */
 .marathon-tracker-v2 {
   display: flex;
   flex-direction: column;
   gap: 0;
+  --cell-h: 54px;
+  --cell-w: 54px;
+}
+.marathon-tracker-v2.is-compact     { --cell-h: 44px; --cell-w: 44px; }
+.marathon-tracker-v2.is-comfortable { --cell-h: 54px; --cell-w: 54px; }
+.marathon-tracker-v2.is-large       { --cell-h: 64px; --cell-w: 64px; }
+
+/* ================================================================
+   3-panel layout: [Names] | [Tasks scroll] | [Scores]
+   ================================================================ */
+
+.tg-panel-wrap {
+  border: 1px solid var(--ink-200, #d8e0ec);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Sticky header row ── */
+.tg-panel-head {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 2px solid var(--ink-200, #d8e0ec);
+  background: white;
+  flex-shrink: 0;
+}
+
+.tg-ph-name,
+.tg-ph-score {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.tg-ph-name {
+  width: 220px;
+  padding-left: 14px;
+  color: var(--ink-700, #2c3a55);
+  border-right: 1px solid var(--ink-200, #d8e0ec);
+}
+
+.tg-ph-score {
+  width: 96px;
+  justify-content: flex-end;
+  padding-right: 14px;
+  color: var(--ink-500, #5b6b86);
+  border-left: 1px solid var(--ink-100, #eef2f8);
+}
+
+/* Task number headers — overflow:hidden, scrolled by JS */
+.tg-ph-tasks {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.tg-ph-tasks-inner {
+  display: flex;
+  height: 36px;
+}
+
+.tg-ph-tasks-inner .head-task {
+  flex: 1 1 var(--cell-w);
+  min-width: var(--cell-w);
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-700, #2c3a55);
+  border-right: 1px solid var(--ink-100, #eef2f8);
+  gap: 1px;
+}
+
+.tg-ph-tasks-inner .head-task.is-popular {
+  color: var(--brand, #4f56e3);
+  background: var(--brand-50, #eef0ff);
+}
+
+.tg-ph-tasks-inner .diff-lbl {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+/* ── Body ── */
+.tg-panel-body {
+  display: flex;
+  align-items: stretch;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+/* Left: names column */
+.tg-panel-names {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--ink-200, #d8e0ec);
+  background: white;
+}
+
+/* Middle: task cells — only this panel scrolls horizontally */
+.tg-panel-tasks {
+  flex: 1;
+  overflow-x: auto;
+  min-width: 0;
+}
+
+/* Right: score column */
+.tg-panel-scores {
+  width: 96px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--ink-100, #eef2f8);
+  background: white;
+}
+
+/* Task body row */
+.tg-task-row {
+  display: flex;
+  border-bottom: 1px solid var(--ink-100, #eef2f8);
+  transition: background 0.12s;
+}
+
+.tg-task-row:hover { background: #f9fbff; }
+
+.tg-task-row.is-leader {
+  background: linear-gradient(90deg, #fff8db 0%, white 60%);
 }
 
 /* Empty state */
@@ -897,6 +952,88 @@
   background: var(--brand-50, #eef0ff);
 }
 
+/* Кнопка активации клавиатурного режима */
+.btn-kbd {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--ink-200, #d8e0ec);
+  background: white;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-700, #2c3a55);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.btn-kbd:hover {
+  background: var(--ink-100, #eef2f8);
+}
+
+.btn-kbd.is-active {
+  background: var(--brand, #4f56e3);
+  border-color: var(--brand, #4f56e3);
+  color: white;
+}
+
+/* Inline KB hint bar */
+.tg-kb-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 7px 16px;
+  background: linear-gradient(90deg, #1a2236, #2c3a55);
+  color: rgba(255,255,255,.8);
+  font-size: 11.5px;
+  border-left: 1px solid var(--ink-200, #d8e0ec);
+  border-right: 1px solid var(--ink-200, #d8e0ec);
+}
+
+.tg-kb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tg-kk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+}
+
+/* Обёртка ячейки — растягивается, чтобы заполнить ширину */
+.tg-cell-wrap {
+  flex: 1 1 var(--cell-w);
+  min-width: var(--cell-w);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tg-cell-wrap.is-focused {
+  outline: 3px solid var(--brand, #4f56e3);
+  outline-offset: -2px;
+  border-radius: 10px;
+  background: var(--brand-50, #eef0ff);
+  z-index: 1;
+  position: relative;
+}
+
 .tracker-toolbar .legend {
   display: flex;
   gap: 10px;
@@ -916,98 +1053,23 @@
   margin-right: 3px;
 }
 
-/* ---- Grid scroll container ---- */
 
-.tracker-scroll {
-  overflow: auto;
-  max-height: 72vh;
-  border: 1px solid var(--ink-200, #d8e0ec);
-  border-top: none;
-  border-radius: 0 0 12px 12px;
-}
-
-/* ---- tgrid — CSS Grid ---- */
-
-.tgrid {
-  font-size: 12.5px;
-  --cell-h: 54px;
-  --cell-w: 54px;
-  min-width: max-content;
-}
-
-.tgrid.is-compact     { --cell-h: 44px; --cell-w: 44px; }
-.tgrid.is-comfortable { --cell-h: 54px; --cell-w: 54px; }
-.tgrid.is-large       { --cell-h: 64px; --cell-w: 64px; }
-
-/* Header */
-.tgrid-thead {
-  display: grid;
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  background: white;
-  border-bottom: 2px solid var(--ink-200, #d8e0ec);
-}
-
-.tgrid-thead > div {
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11.5px;
-  color: var(--ink-500, #5b6b86);
-  font-weight: 600;
-  border-right: 1px solid var(--ink-100, #eef2f8);
-  gap: 3px;
-  flex-direction: column;
-}
-
-.tgrid-thead > div:last-child { border-right: none; }
-
-.head-name {
-  justify-content: flex-start !important;
-  padding-left: 14px;
-  color: var(--ink-700, #2c3a55) !important;
-}
-
-.head-task {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--ink-700, #2c3a55) !important;
-}
-
-.head-task.is-popular {
-  color: var(--brand, #4f56e3) !important;
-  background: var(--brand-50, #eef0ff);
-}
-
-/* Row */
-.tgrid-row {
-  display: grid;
-  border-bottom: 1px solid var(--ink-100, #eef2f8);
-  transition: background 0.12s;
-}
-
-.tgrid-row:hover { background: #f9fbff; }
-
-.tgrid-row.is-leader {
-  background: linear-gradient(90deg, #fff8db 0%, white 60%);
-}
-
-/* Sticky name col */
+/* Name cell — left panel, no sticky needed */
 .tg-name {
-  position: sticky;
-  left: 0;
-  background: inherit;
-  background: linear-gradient(90deg, white 0%, white 88%, transparent 100%);
-  z-index: 2;
   padding: 6px 14px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  border-right: 1px solid var(--ink-100, #eef2f8);
-  min-height: var(--cell-h);
+  height: var(--cell-h);
+  border-bottom: 1px solid var(--ink-100, #eef2f8);
+  background: white;
+  overflow: hidden;
+  transition: background 0.12s;
+}
+
+.tg-name.is-leader {
+  background: linear-gradient(90deg, #fff8db, white);
 }
 
 .tg-name .name {
@@ -1205,7 +1267,7 @@
 .tg-cell .quick .qbtn.ok   { background: rgba(20,168,90,.95); }
 .tg-cell .quick .qbtn.fail { background: rgba(226,61,78,.95); }
 
-/* Score column */
+/* Score cell — right panel, no sticky needed */
 .tg-score {
   display: flex;
   flex-direction: column;
@@ -1213,11 +1275,9 @@
   justify-content: center;
   padding: 0 14px;
   gap: 3px;
-  background: linear-gradient(90deg, transparent 0%, white 40%);
-  position: sticky;
-  right: 0;
-  z-index: 2;
-  border-left: 1px solid var(--ink-100, #eef2f8);
+  height: var(--cell-h);
+  border-bottom: 1px solid var(--ink-100, #eef2f8);
+  background: white;
 }
 
 .tg-score .total {

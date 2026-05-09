@@ -1660,7 +1660,7 @@ export const api = {
       const LIGHT_FIELDS = [
         'id', 'code', 'title', 'topic', 'subtopic', 'difficulty',
         'statement_md',  // нужен для быстрого предпросмотра
-        'answer', 'hints', 'geogebra_appname', 'drawing_view', 'source', 'year',
+        'answer', 'hints', 'geogebra_appname', 'drawing_view', 'drawing_svg', 'source', 'year',
         'preview_layout', 'geogebra_image_base64', 'drawing_image', 'created', 'updated',
         'expand.topic.id', 'expand.topic.title',
         'expand.subtopic.id', 'expand.subtopic.title',
@@ -1723,7 +1723,7 @@ export const api = {
       // Текстовые поля — копируем как есть
       const TEXT_FIELDS = [
         'title', 'topic', 'subtopic', 'difficulty', 'statement_md',
-        'answer', 'hints', 'geogebra_appname', 'drawing_view',
+        'answer', 'hints', 'geogebra_appname', 'drawing_view', 'drawing_svg',
         'source', 'year', 'preview_layout', 'solution_md', 'geogebra_base64',
       ];
       for (const field of TEXT_FIELDS) {

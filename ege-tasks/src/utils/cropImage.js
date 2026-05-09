@@ -12,6 +12,20 @@ export const normalizeCrop = (crop = {}) => ({
   bottom: clamp(crop.bottom, 0, 45),
 });
 
+/** Конвертирует любой URL (в т.ч. PocketBase) в data URL через fetch.
+ *  Это нужно чтобы canvas не становился tainted при drawImage с внешнего домена. */
+async function ensureDataUrl(src) {
+  if (!src || String(src).startsWith('data:')) return src;
+  const resp = await fetch(src);
+  const blob = await resp.blob();
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = (e) => res(e.target.result);
+    reader.onerror = rej;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export const loadImage = (src) => new Promise((resolve, reject) => {
   const img = new Image();
   img.onload = () => resolve(img);
@@ -19,8 +33,10 @@ export const loadImage = (src) => new Promise((resolve, reject) => {
   img.src = src;
 });
 
-export const cropPngByMargins = async (dataUrl, crop) => {
+export const cropPngByMargins = async (srcUrl, crop) => {
   const normalized = normalizeCrop(crop);
+  // Конвертируем в data URL, чтобы canvas не был tainted
+  const dataUrl = await ensureDataUrl(srcUrl);
   const img = await loadImage(dataUrl);
   const sx = Math.round((normalized.left / 100) * img.width);
   const sy = Math.round((normalized.top / 100) * img.height);
