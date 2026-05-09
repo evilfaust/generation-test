@@ -510,7 +510,20 @@ export function parseGgbPoints(xmlString) {
     const y = parseFloat(coords.getAttribute('y') || '0') / z;
     const px = xZero + x * scale;
     const py = yZero - y * yscale;
-    points.push({ label, x, y, px, py });
+
+    const showEl  = el.querySelector('show');
+    const showLabel = showEl?.getAttribute('label') === 'true';
+    const loEl    = el.querySelector('labelOffset');
+    const loX     = loEl ? parseInt(loEl.getAttribute('x') || '0') : 5;
+    const loY     = loEl ? parseInt(loEl.getAttribute('y') || '0') : -16;
+
+    points.push({
+      label, x, y, px, py,
+      showLabel,
+      labelOffset: { x: loX, y: loY },
+      labelPx: px + loX,
+      labelPy: py + loY,
+    });
   });
 
   return { points, coordSys };
@@ -527,14 +540,41 @@ export function applyPointOverrides(xmlString, overrides) {
   if (!overrides || !Object.keys(overrides).length) return xmlString;
   const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
   for (const [label, { x, y }] of Object.entries(overrides)) {
-    const el = doc.querySelector(`element[type="point"][label="${CSS.escape(label)}"]`)
-            ?? [...doc.querySelectorAll('element[type="point"]')].find(e => e.getAttribute('label') === label);
+    const el = [...doc.querySelectorAll('element[type="point"]')].find(e => e.getAttribute('label') === label);
     if (!el) continue;
     const coords = el.querySelector('coords');
     if (!coords) continue;
     coords.setAttribute('x', String(x));
     coords.setAttribute('y', String(y));
     coords.setAttribute('z', '1');
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+
+/**
+ * Обновляет <labelOffset> для указанных точек в GeoGebra XML.
+ * overrides: { [label]: { x, y } } — смещение в SVG-пикселях (те же значения, что хранит GeoGebra)
+ * Возвращает новую XML-строку.
+ */
+export function applyLabelOffsets(xmlString, overrides) {
+  if (!overrides || !Object.keys(overrides).length) return xmlString;
+  const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+  for (const [label, { x, y }] of Object.entries(overrides)) {
+    const el = [...doc.querySelectorAll('element[type="point"]')].find(e => e.getAttribute('label') === label);
+    if (!el) continue;
+    let loEl = el.querySelector('labelOffset');
+    if (!loEl) {
+      loEl = doc.createElement('labelOffset');
+      // Вставляем после <show> или в начало элемента
+      const showEl = el.querySelector('show');
+      if (showEl?.nextSibling) {
+        el.insertBefore(loEl, showEl.nextSibling);
+      } else {
+        el.appendChild(loEl);
+      }
+    }
+    loEl.setAttribute('x', String(Math.round(x)));
+    loEl.setAttribute('y', String(Math.round(y)));
   }
   return new XMLSerializer().serializeToString(doc);
 }
