@@ -480,3 +480,61 @@ export function ggbXmlToSvg(xmlString) {
     `</svg>`,
   ].join('\n');
 }
+
+// ── Вспомогательные экспорты для SVG-редактора ───────────────────────────────
+
+/**
+ * Парсит видимые точки из GeoGebra XML и возвращает их координаты
+ * в обоих пространствах: математических (GeoGebra) и пиксельных (SVG).
+ *
+ * @param {string} xmlString — строка GeoGebra XML
+ * @returns {{ points: Array<{label,x,y,px,py}>, coordSys: {xZero,yZero,scale,yscale} }}
+ */
+export function parseGgbPoints(xmlString) {
+  const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+  const csEl   = doc.querySelector('euclidianView coordSystem');
+  const xZero  = parseFloat(csEl?.getAttribute('xZero')  ?? '300');
+  const yZero  = parseFloat(csEl?.getAttribute('yZero')  ?? '300');
+  const scale  = parseFloat(csEl?.getAttribute('scale')  ?? '50');
+  const yscale = parseFloat(csEl?.getAttribute('yscale') ?? String(scale));
+  const coordSys = { xZero, yZero, scale, yscale };
+
+  const points = [];
+  doc.querySelectorAll('construction > element[type="point"]').forEach((el) => {
+    if (el.querySelector('show')?.getAttribute('object') === 'false') return;
+    const label  = el.getAttribute('label');
+    const coords = el.querySelector('coords');
+    if (!label || !coords) return;
+    const z = parseFloat(coords.getAttribute('z') || '1') || 1;
+    const x = parseFloat(coords.getAttribute('x') || '0') / z;
+    const y = parseFloat(coords.getAttribute('y') || '0') / z;
+    const px = xZero + x * scale;
+    const py = yZero - y * yscale;
+    points.push({ label, x, y, px, py });
+  });
+
+  return { points, coordSys };
+}
+
+/**
+ * Обновляет <coords> для указанных точек в GeoGebra XML и возвращает новую XML-строку.
+ *
+ * @param {string} xmlString — исходный XML
+ * @param {Record<string, {x: number, y: number}>} overrides — {label: {x, y}} в координатах GeoGebra
+ * @returns {string} — обновлённый XML
+ */
+export function applyPointOverrides(xmlString, overrides) {
+  if (!overrides || !Object.keys(overrides).length) return xmlString;
+  const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+  for (const [label, { x, y }] of Object.entries(overrides)) {
+    const el = doc.querySelector(`element[type="point"][label="${CSS.escape(label)}"]`)
+            ?? [...doc.querySelectorAll('element[type="point"]')].find(e => e.getAttribute('label') === label);
+    if (!el) continue;
+    const coords = el.querySelector('coords');
+    if (!coords) continue;
+    coords.setAttribute('x', String(x));
+    coords.setAttribute('y', String(y));
+    coords.setAttribute('z', '1');
+  }
+  return new XMLSerializer().serializeToString(doc);
+}

@@ -370,6 +370,8 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
         savingSvg={savingSvg}
         onConvertToSvg={handleConvertToSvg}
         onSaveSvg={task?.id ? handleSaveSvg : null}
+        onGetXml={() => ggbApiRef.current?.getXML?.() ?? ''}
+        onSvgChange={setDrawingSvg}
       />,
     },
     {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Select, Space, Tag, Typography, message } from 'antd';
+import { Alert, Button, Card, Modal, Select, Space, Tag, Typography, message } from 'antd';
 import {
+  EditOutlined,
   FullscreenExitOutlined,
   FullscreenOutlined,
   SaveOutlined,
@@ -8,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import GeoGebraApplet from '../GeoGebraApplet';
 import CropModal from '../shared/CropModal';
+import SvgEditor from './SvgEditor';
 
 // ── Удаление фона: flood-fill от 4 углов с зоной защиты ─────────────────
 //
@@ -151,6 +153,8 @@ export default function TabDrawing({
   savingSvg,
   onConvertToSvg,
   onSaveSvg,
+  onGetXml,
+  onSvgChange,
 }) {
   const drawingContainerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -160,6 +164,30 @@ export default function TabDrawing({
   );
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [removingBg, setRemovingBg] = useState(false);
+
+  // ── SVG-редактор ──────────────────────────────────────────────────────────
+  const [svgEditorOpen, setSvgEditorOpen] = useState(false);
+  const [editorXml, setEditorXml] = useState('');
+
+  const handleOpenSvgEditor = useCallback(() => {
+    const xml = onGetXml?.() ?? '';
+    if (!xml) {
+      message.warning('GeoGebra ещё не загружена. Откройте вкладку «Чертёж» и подождите загрузки апплета.');
+      return;
+    }
+    setEditorXml(xml);
+    setSvgEditorOpen(true);
+  }, [onGetXml]);
+
+  const handleSvgEditorSave = useCallback((newSvg) => {
+    onSvgChange?.(newSvg);
+    setSvgEditorOpen(false);
+    message.success('SVG обновлён — нажмите «Сохранить SVG» или «Сохранить» задачу целиком');
+  }, [onSvgChange]);
+
+  const handleSvgEditorCancel = useCallback(() => {
+    setSvgEditorOpen(false);
+  }, []);
 
   useEffect(() => {
     const onResize = () => setViewportHeight(window.innerHeight);
@@ -343,6 +371,15 @@ export default function TabDrawing({
             </Button>
           )}
 
+          {drawingSvg && onSvgChange && (
+            <Button
+              icon={<EditOutlined />}
+              onClick={handleOpenSvgEditor}
+            >
+              Редактировать SVG
+            </Button>
+          )}
+
           <Button onClick={onClearDrawing} danger>
             Очистить
           </Button>
@@ -429,6 +466,26 @@ export default function TabDrawing({
         emptyMessage="Сначала сохраните PNG из GeoGebra"
         messageApi={message}
       />
+
+      {/* SVG-редактор */}
+      <Modal
+        open={svgEditorOpen}
+        onCancel={handleSvgEditorCancel}
+        title="Редактор SVG-чертежа"
+        footer={null}
+        width={680}
+        destroyOnClose
+        styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: '16px' } }}
+      >
+        {svgEditorOpen && editorXml && drawingSvg && (
+          <SvgEditor
+            xmlString={editorXml}
+            svgString={drawingSvg}
+            onSave={handleSvgEditorSave}
+            onCancel={handleSvgEditorCancel}
+          />
+        )}
+      </Modal>
     </Space>
   );
 }
