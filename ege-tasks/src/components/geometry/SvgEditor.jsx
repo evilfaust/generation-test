@@ -1,12 +1,13 @@
 /**
  * SvgEditor — интерактивный редактор SVG-чертежа.
  *
- * Два типа drag-хэндлов:
- *   • Синий кружок  — на геометрической точке. Drag меняет coords в XML.
- *   • Оранжевый кружок — на подписи вершины. Drag меняет labelOffset в XML.
+ * Три типа drag-хэндлов:
+ *   • Синий   — геометрическая точка (меняет coords в XML)
+ *   • Оранжевый — подпись вершины (меняет labelOffset точки)
+ *   • Фиолетовый — подпись угла, например "45°" (меняет labelOffset угла)
  *
  * Props:
- *   xmlString  {string}  — GeoGebra XML (источник координат и смещений)
+ *   xmlString  {string}  — GeoGebra XML
  *   svgString  {string}  — текущий SVG-чертёж
  *   onSave     {(svg: string) => void}
  *   onCancel   {() => void}
@@ -30,53 +31,60 @@ function parseViewBox(svgStr) {
   return { x, y, w, h };
 }
 
-// Типы хэндлов
 const HANDLE_POINT = 'point';
 const HANDLE_LABEL = 'label';
+const HANDLE_ANGLE = 'angle';
+
+// Цвета хэндлов
+const COLOR = {
+  [HANDLE_POINT]: { fill: 'rgba(24,144,255,0.25)', active: 'rgba(24,144,255,0.5)', stroke: '#1890ff' },
+  [HANDLE_LABEL]: { fill: 'rgba(250,140,22,0.25)', active: 'rgba(250,140,22,0.5)',  stroke: '#fa8c16' },
+  [HANDLE_ANGLE]: { fill: 'rgba(114,59,134,0.25)', active: 'rgba(114,59,134,0.5)',  stroke: '#722b86' },
+};
 
 export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
   const [currentXml, setCurrentXml] = useState(xmlString);
   const [currentSvg, setCurrentSvg] = useState(svgString);
 
-  // Хэндлы: { label, px, py } для точек и { label, px, py, pointPx, pointPy } для меток
-  const [pointHandles, setPointHandles] = useState([]);
-  const [labelHandles, setLabelHandles] = useState([]);
-  const [coordSys, setCoordSys] = useState(null);
-  const [viewBox, setViewBox] = useState(null);
+  const [pointHandles, setPointHandles]  = useState([]); // { label, px, py }
+  const [labelHandles, setLabelHandles]  = useState([]); // { label, px, py, pointPx, pointPy }
+  const [angleHandles, setAngleHandles]  = useState([]); // { label, px, py, basePx, basePy }
+  const [coordSys, setCoordSys]          = useState(null);
+  const [viewBox, setViewBox]            = useState(null);
 
   const containerRef = useRef(null);
-  // Текущий drag: { type, label, startPx, startPy, startClientX, startClientY, pointPx?, pointPy? }
+  // { type, label, startPx, startPy, startClientX, startClientY, basePx?, basePy?, pointPx?, pointPy? }
   const dragRef = useRef(null);
   const [activeHandle, setActiveHandle] = useState(null); // { type, label }
 
-  // ── Парсим точки при смене XML ───────────────────────────────────────────
+  // ── Парсим при смене XML ─────────────────────────────────────────────────
   useEffect(() => {
     try {
-      const { points, coordSys: cs } = parseGgbPoints(currentXml);
+      const { points, angleLabels, coordSys: cs } = parseGgbPoints(currentXml);
       setCoordSys(cs);
       setPointHandles(points.map(({ label, px, py }) => ({ label, px, py })));
       setLabelHandles(
         points
           .filter((p) => p.showLabel)
           .map(({ label, labelPx, labelPy, px, py }) => ({
-            label,
-            px:      labelPx,
-            py:      labelPy,
-            pointPx: px,
-            pointPy: py,
+            label, px: labelPx, py: labelPy, pointPx: px, pointPy: py,
           })),
       );
+      setAngleHandles(
+        angleLabels.map(({ label, px, py, basePx, basePy }) => ({
+          label, px, py, basePx, basePy,
+        })),
+      );
     } catch (err) {
-      console.error('[SvgEditor] parseGgbPoints:', err);
+      console.error('[SvgEditor] parse:', err);
     }
   }, [currentXml]);
 
-  // ── Парсим viewBox при смене SVG ─────────────────────────────────────────
   useEffect(() => {
     setViewBox(parseViewBox(currentSvg));
   }, [currentSvg]);
 
-  // ── Масштаб: экранные пиксели → SVG-пиксели ─────────────────────────────
+  // ── Масштаб экран → SVG ──────────────────────────────────────────────────
   const getScale = useCallback(() => {
     if (!containerRef.current || !viewBox) return { sx: 1, sy: 1 };
     const rect = containerRef.current.getBoundingClientRect();
@@ -85,25 +93,16 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
   }, [viewBox]);
 
   // ── Pointer down ─────────────────────────────────────────────────────────
-  const handlePointerDown = useCallback((e, type, label, px, py, pointPx, pointPy) => {
+  const handlePointerDown = useCallback((e, type, label, px, py, extra = {}) => {
     e.preventDefault();
     e.stopPropagation();
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
-    dragRef.current = {
-      type,
-      label,
-      startPx:      px,
-      startPy:      py,
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      // Нужно для label-drag (чтобы вычислить новый offset относительно точки)
-      pointPx: pointPx ?? px,
-      pointPy: pointPy ?? py,
-    };
+    dragRef.current = { type, label, startPx: px, startPy: py,
+                        startClientX: e.clientX, startClientY: e.clientY, ...extra };
     setActiveHandle({ type, label });
   }, []);
 
-  // ── Pointer move: двигаем только хэндл, SVG не перерисовываем ───────────
+  // ── Pointer move: двигаем хэндл, SVG не перерисовываем ──────────────────
   const handlePointerMove = useCallback((e) => {
     if (!dragRef.current) return;
     const { type, label, startPx, startPy, startClientX, startClientY } = dragRef.current;
@@ -112,20 +111,19 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
     const newPy = startPy + (e.clientY - startClientY) * sy;
 
     if (type === HANDLE_POINT) {
-      setPointHandles((prev) =>
-        prev.map((h) => (h.label === label ? { ...h, px: newPx, py: newPy } : h)),
-      );
+      setPointHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
+    } else if (type === HANDLE_LABEL) {
+      setLabelHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
     } else {
-      setLabelHandles((prev) =>
-        prev.map((h) => (h.label === label ? { ...h, px: newPx, py: newPy } : h)),
-      );
+      setAngleHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
     }
   }, [getScale]);
 
-  // ── Pointer up: пересчитываем координаты и перерисовываем SVG ───────────
+  // ── Pointer up: обновляем XML и перерисовываем SVG ───────────────────────
   const handlePointerUp = useCallback((e) => {
     if (!dragRef.current) return;
-    const { type, label, startPx, startPy, startClientX, startClientY, pointPx, pointPy } = dragRef.current;
+    const { type, label, startPx, startPy, startClientX, startClientY,
+            pointPx, pointPy, basePx, basePy } = dragRef.current;
     dragRef.current = null;
     setActiveHandle(null);
 
@@ -136,17 +134,16 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
     try {
       let newXml;
       if (type === HANDLE_POINT) {
-        // SVG-пиксели → математические координаты GeoGebra
         if (!coordSys) return;
         const newX = (finalPx - coordSys.xZero) / coordSys.scale;
-        const newY = (coordSys.yZero - finalPy) / coordSys.yscale;
+        const newY = (coordSys.yZero - finalPy)  / coordSys.yscale;
         newXml = applyPointOverrides(currentXml, { [label]: { x: newX, y: newY } });
+      } else if (type === HANDLE_LABEL) {
+        // Смещение относительно геометрической точки (в SVG-пикселях)
+        newXml = applyLabelOffsets(currentXml, { [label]: { x: finalPx - pointPx, y: finalPy - pointPy } });
       } else {
-        // Смещение относительно точки (в SVG-пикселях = GeoGebra screen pixels)
-        // pointPx/Py — позиция самой точки ДО этого drag (из dragRef, не изменялась)
-        newXml = applyLabelOffsets(currentXml, {
-          [label]: { x: finalPx - pointPx, y: finalPy - pointPy },
-        });
+        // Смещение относительно базовой позиции по биссектрисе
+        newXml = applyLabelOffsets(currentXml, { [label]: { x: finalPx - basePx, y: finalPy - basePy } });
       }
       const newSvg = ggbXmlToSvg(newXml);
       setCurrentXml(newXml);
@@ -156,135 +153,118 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
     }
   }, [coordSys, getScale, currentXml]);
 
-  // ── Сброс к исходному состоянию ──────────────────────────────────────────
   const handleReset = useCallback(() => {
     setCurrentXml(xmlString);
     setCurrentSvg(svgString);
   }, [xmlString, svgString]);
 
-  // ── Рендер ────────────────────────────────────────────────────────────────
-  const isDragging = !!activeHandle;
+  // ── Универсальный рендер хэндла ──────────────────────────────────────────
+  function Handle({ type, label, px, py, onDown }) {
+    const isActive = activeHandle?.type === type && activeHandle?.label === label;
+    const c = COLOR[type];
+    return (
+      <g
+        style={{ cursor: isActive ? 'grabbing' : 'grab' }}
+        onPointerDown={onDown}
+      >
+        <circle cx={px} cy={py} r={14} fill="transparent" />
+        <circle cx={px} cy={py}
+          r={isActive ? 7 : 5}
+          fill={isActive ? c.active : c.fill}
+          stroke={c.stroke}
+          strokeWidth={1.5}
+        />
+      </g>
+    );
+  }
 
+  // ── Рендер ────────────────────────────────────────────────────────────────
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       {/* Легенда */}
-      <Space size={16}>
-        <Space size={4}>
-          <svg width={14} height={14}>
-            <circle cx={7} cy={7} r={5} fill="rgba(24,144,255,0.3)" stroke="#1890ff" strokeWidth={1.5}/>
-          </svg>
-          <Text style={{ fontSize: 12 }}>вершина</Text>
-        </Space>
-        <Space size={4}>
-          <svg width={14} height={14}>
-            <circle cx={7} cy={7} r={5} fill="rgba(250,140,22,0.3)" stroke="#fa8c16" strokeWidth={1.5}/>
-          </svg>
-          <Text style={{ fontSize: 12 }}>подпись</Text>
-        </Space>
+      <Space size={16} wrap>
+        {[
+          [HANDLE_POINT, 'вершина'],
+          [HANDLE_LABEL, 'подпись вершины'],
+          [HANDLE_ANGLE, 'подпись угла'],
+        ].map(([type, name]) => (
+          <Space key={type} size={4}>
+            <svg width={14} height={14}>
+              <circle cx={7} cy={7} r={5}
+                fill={COLOR[type].fill}
+                stroke={COLOR[type].stroke}
+                strokeWidth={1.5}
+              />
+            </svg>
+            <Text style={{ fontSize: 12 }}>{name}</Text>
+          </Space>
+        ))}
         <Text type="secondary" style={{ fontSize: 12 }}>— перетащите нужный маркер</Text>
       </Space>
 
       {/* Холст */}
       <div
         style={{
-          position:    'relative',
-          touchAction: 'none',
-          userSelect:  'none',
-          background:  '#ffffff',
-          border:      '1px solid #d9d9d9',
-          borderRadius: 8,
-          overflow:    'hidden',
-          cursor:      isDragging ? 'grabbing' : 'default',
+          position: 'relative', touchAction: 'none', userSelect: 'none',
+          background: '#ffffff', border: '1px solid #d9d9d9',
+          borderRadius: 8, overflow: 'hidden',
+          cursor: dragRef.current ? 'grabbing' : 'default',
         }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        {/* SVG-чертёж */}
-        <div
-          ref={containerRef}
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: currentSvg }}
-        />
+        <div ref={containerRef} dangerouslySetInnerHTML={{ __html: currentSvg }} />
 
-        {/* Оверлей с хэндлами */}
         {viewBox && (
           <svg
             viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
-            style={{
-              position: 'absolute',
-              top:      0,
-              left:     0,
-              width:    '100%',
-              height:   '100%',
-              overflow: 'visible',
-            }}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'visible' }}
           >
-            {/* Соединительные линии: точка → подпись */}
+            {/* Пунктирные линии: точка → подпись вершины */}
             {labelHandles.map(({ label, px: lx, py: ly }) => {
               const ph = pointHandles.find((h) => h.label === label);
               if (!ph) return null;
               return (
-                <line
-                  key={`line-${label}`}
-                  x1={ph.px} y1={ph.py}
-                  x2={lx}    y2={ly}
-                  stroke="#fa8c16"
-                  strokeWidth={0.8}
-                  strokeDasharray="3,3"
-                  opacity={0.6}
+                <line key={`line-lbl-${label}`}
+                  x1={ph.px} y1={ph.py} x2={lx} y2={ly}
+                  stroke={COLOR[HANDLE_LABEL].stroke}
+                  strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5}
                   style={{ pointerEvents: 'none' }}
                 />
               );
             })}
 
-            {/* Хэндлы точек (синие) */}
-            {pointHandles.map(({ label, px, py }) => {
-              const isActive = activeHandle?.type === HANDLE_POINT && activeHandle?.label === label;
-              return (
-                <g
-                  key={`pt-${label}`}
-                  style={{ cursor: isActive ? 'grabbing' : 'grab' }}
-                  onPointerDown={(e) => handlePointerDown(e, HANDLE_POINT, label, px, py)}
-                >
-                  {/* Зона захвата */}
-                  <circle cx={px} cy={py} r={14} fill="transparent" />
-                  {/* Маркер */}
-                  <circle
-                    cx={px} cy={py}
-                    r={isActive ? 7 : 5}
-                    fill={isActive ? 'rgba(24,144,255,0.5)' : 'rgba(24,144,255,0.25)'}
-                    stroke="#1890ff"
-                    strokeWidth={1.5}
-                  />
-                </g>
-              );
-            })}
+            {/* Пунктирные линии: точка-вершина → подпись угла */}
+            {angleHandles.map(({ label, px: ax, py: ay, basePx, basePy }) => (
+              <line key={`line-ang-${label}`}
+                x1={basePx} y1={basePy} x2={ax} y2={ay}
+                stroke={COLOR[HANDLE_ANGLE].stroke}
+                strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5}
+                style={{ pointerEvents: 'none' }}
+              />
+            ))}
 
-            {/* Хэндлы подписей (оранжевые) */}
-            {labelHandles.map(({ label, px, py, pointPx, pointPy }) => {
-              const isActive = activeHandle?.type === HANDLE_LABEL && activeHandle?.label === label;
-              return (
-                <g
-                  key={`lbl-${label}`}
-                  style={{ cursor: isActive ? 'grabbing' : 'grab' }}
-                  onPointerDown={(e) =>
-                    handlePointerDown(e, HANDLE_LABEL, label, px, py, pointPx, pointPy)
-                  }
-                >
-                  {/* Зона захвата */}
-                  <circle cx={px} cy={py} r={14} fill="transparent" />
-                  {/* Маркер */}
-                  <circle
-                    cx={px} cy={py}
-                    r={isActive ? 7 : 5}
-                    fill={isActive ? 'rgba(250,140,22,0.5)' : 'rgba(250,140,22,0.25)'}
-                    stroke="#fa8c16"
-                    strokeWidth={1.5}
-                  />
-                </g>
-              );
-            })}
+            {/* Хэндлы точек (синие) */}
+            {pointHandles.map(({ label, px, py }) => (
+              <Handle key={`pt-${label}`} type={HANDLE_POINT} label={label} px={px} py={py}
+                onDown={(e) => handlePointerDown(e, HANDLE_POINT, label, px, py)}
+              />
+            ))}
+
+            {/* Хэндлы подписей вершин (оранжевые) */}
+            {labelHandles.map(({ label, px, py, pointPx, pointPy }) => (
+              <Handle key={`lbl-${label}`} type={HANDLE_LABEL} label={label} px={px} py={py}
+                onDown={(e) => handlePointerDown(e, HANDLE_LABEL, label, px, py, { pointPx, pointPy })}
+              />
+            ))}
+
+            {/* Хэндлы подписей углов (фиолетовые) */}
+            {angleHandles.map(({ label, px, py, basePx, basePy }) => (
+              <Handle key={`ang-${label}`} type={HANDLE_ANGLE} label={label} px={px} py={py}
+                onDown={(e) => handlePointerDown(e, HANDLE_ANGLE, label, px, py, { basePx, basePy })}
+              />
+            ))}
           </svg>
         )}
       </div>

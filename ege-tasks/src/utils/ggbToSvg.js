@@ -506,6 +506,12 @@ export function ggbXmlToSvg(xmlString) {
  * @param {string} xmlString — строка GeoGebra XML
  * @returns {{ points: Array<{label,x,y,px,py}>, coordSys: {xZero,yZero,scale,yscale} }}
  */
+/**
+ * Парсит все перетаскиваемые объекты SVG-чертежа:
+ *   points      — геометрические точки с позициями их подписей
+ *   angleLabels — подписи значений углов (текст "45°" и т.п.)
+ *   coordSys    — параметры координатной системы GeoGebra
+ */
 export function parseGgbPoints(xmlString) {
   const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
   const csEl   = doc.querySelector('euclidianView coordSystem');
@@ -515,34 +521,94 @@ export function parseGgbPoints(xmlString) {
   const yscale = parseFloat(csEl?.getAttribute('yscale') ?? String(scale));
   const coordSys = { xZero, yZero, scale, yscale };
 
-  const points = [];
-  doc.querySelectorAll('construction > element[type="point"]').forEach((el) => {
-    if (el.querySelector('show')?.getAttribute('object') === 'false') return;
-    const label  = el.getAttribute('label');
+  // ── Все элементы (точки и углы) ───────────────────────────────────────────
+  const elData = {};
+  doc.querySelectorAll('construction > element').forEach((el) => {
+    const label = el.getAttribute('label');
+    if (!label) return;
+    const showEl = el.querySelector('show');
     const coords = el.querySelector('coords');
-    if (!label || !coords) return;
-    const z = parseFloat(coords.getAttribute('z') || '1') || 1;
-    const x = parseFloat(coords.getAttribute('x') || '0') / z;
-    const y = parseFloat(coords.getAttribute('y') || '0') / z;
+    const loEl   = el.querySelector('labelOffset');
+    const lmEl   = el.querySelector('labelMode');
+    const arcEl  = el.querySelector('arcSize');
+    elData[label] = {
+      type:       el.getAttribute('type'),
+      visible:    showEl?.getAttribute('object') === 'true',
+      showLabel:  showEl?.getAttribute('label')  === 'true',
+      labelMode:  parseInt(lmEl?.getAttribute('val') ?? '0'),
+      arcSize:    parseInt(arcEl?.getAttribute('val') ?? '30'),
+      labelOffset: loEl
+        ? { x: parseInt(loEl.getAttribute('x') || '0'), y: parseInt(loEl.getAttribute('y') || '0') }
+        : { x: 5, y: -16 },
+      coords: coords ? {
+        x: parseFloat(coords.getAttribute('x') || '0'),
+        y: parseFloat(coords.getAttribute('y') || '0'),
+        z: parseFloat(coords.getAttribute('z') || '1'),
+      } : null,
+    };
+  });
+
+  // ── Команды: для нахождения вершин углов ─────────────────────────────────
+  const cmdByOutput = {};
+  doc.querySelectorAll('construction > command').forEach((cmd) => {
+    const name  = cmd.getAttribute('name');
+    const inEl  = cmd.querySelector('input');
+    const outEl = cmd.querySelector('output');
+    if (!inEl || !outEl) return;
+    const inputs = [];
+    for (let i = 0; inEl.hasAttribute(`a${i}`); i++) inputs.push(inEl.getAttribute(`a${i}`));
+    for (let j = 0; outEl.hasAttribute(`a${j}`); j++) {
+      cmdByOutput[outEl.getAttribute(`a${j}`)] = { name, inputs };
+    }
+  });
+
+  // ── Точки ─────────────────────────────────────────────────────────────────
+  const points = [];
+  Object.entries(elData).forEach(([label, ep]) => {
+    if (ep.type !== 'point' || !ep.visible || !ep.coords) return;
+    const z  = ep.coords.z || 1;
+    const x  = ep.coords.x / z;
+    const y  = ep.coords.y / z;
     const px = xZero + x * scale;
     const py = yZero - y * yscale;
-
-    const showEl  = el.querySelector('show');
-    const showLabel = showEl?.getAttribute('label') === 'true';
-    const loEl    = el.querySelector('labelOffset');
-    const loX     = loEl ? parseInt(loEl.getAttribute('x') || '0') : 5;
-    const loY     = loEl ? parseInt(loEl.getAttribute('y') || '0') : -16;
-
     points.push({
       label, x, y, px, py,
-      showLabel,
-      labelOffset: { x: loX, y: loY },
-      labelPx: px + loX,
-      labelPy: py + loY,
+      showLabel:   ep.showLabel,
+      labelOffset: ep.labelOffset,
+      labelPx:     px + ep.labelOffset.x,
+      labelPy:     py + ep.labelOffset.y,
     });
   });
 
-  return { points, coordSys };
+  // ── Подписи углов ─────────────────────────────────────────────────────────
+  // Позиция = вдоль биссектрисы на arcSize*1.4 от вершины + labelOffset.
+  // Это та же формула, что в ggbXmlToSvg (секция freeTexts для углов).
+  const angleLabels = [];
+  Object.entries(cmdByOutput).forEach(([label, cmd]) => {
+    if (cmd.name !== 'Angle' || cmd.inputs.length !== 3) return;
+    const ep  = elData[label];
+    if (!ep?.visible || !ep.showLabel || ep.labelMode !== 2) return;
+    const epF = elData[cmd.inputs[0]], epV = elData[cmd.inputs[1]], epT = elData[cmd.inputs[2]];
+    if (!epF?.coords || !epV?.coords || !epT?.coords) return;
+    const zF = epF.coords.z || 1, zV = epV.coords.z || 1, zT = epT.coords.z || 1;
+    const ax = epF.coords.x / zF - epV.coords.x / zV;
+    const ay = epF.coords.y / zF - epV.coords.y / zV;
+    const bx = epT.coords.x / zT - epV.coords.x / zV;
+    const by = epT.coords.y / zT - epV.coords.y / zV;
+    const r  = ep.arcSize / scale;
+    const midAngle = Math.atan2(ay + by, ax + bx);
+    const basePx = xZero + (epV.coords.x / zV + Math.cos(midAngle) * r * 1.4) * scale;
+    const basePy = yZero - (epV.coords.y / zV + Math.sin(midAngle) * r * 1.4) * yscale;
+    angleLabels.push({
+      label,
+      basePx, basePy,
+      px: basePx + ep.labelOffset.x,
+      py: basePy + ep.labelOffset.y,
+      labelOffset: { ...ep.labelOffset },
+    });
+  });
+
+  return { points, angleLabels, coordSys };
 }
 
 /**
@@ -576,12 +642,13 @@ export function applyLabelOffsets(xmlString, overrides) {
   if (!overrides || !Object.keys(overrides).length) return xmlString;
   const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
   for (const [label, { x, y }] of Object.entries(overrides)) {
-    const el = [...doc.querySelectorAll('element[type="point"]')].find(e => e.getAttribute('label') === label);
+    // Ищем и в point-, и в angle-элементах
+    const el = [...doc.querySelectorAll('element[type="point"], element[type="angle"]')]
+                 .find((e) => e.getAttribute('label') === label);
     if (!el) continue;
     let loEl = el.querySelector('labelOffset');
     if (!loEl) {
       loEl = doc.createElement('labelOffset');
-      // Вставляем после <show> или в начало элемента
       const showEl = el.querySelector('show');
       if (showEl?.nextSibling) {
         el.insertBefore(loEl, showEl.nextSibling);
