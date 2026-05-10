@@ -83,7 +83,7 @@ export default function useCrossword() {
 
   const [words, setWords]   = useState(saved?.words ?? []);
   const [theme, setTheme]   = useState(saved?.theme ?? 'ocean');
-  const [title, setTitle]   = useState(saved?.title ?? 'Crossword');
+  const [title, setTitle]   = useState(saved?.title ?? 'Кроссворд');
   const [showAnswers, setShowAnswers] = useState(false);
 
   useEffect(() => {
@@ -125,7 +125,7 @@ export default function useCrossword() {
 
   const clearAll = useCallback(() => {
     setWords([]);
-    setTitle('Crossword');
+    setTitle('Кроссворд');
   }, []);
 
   const unplacedWords = useMemo(() => {

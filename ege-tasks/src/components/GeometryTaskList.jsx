@@ -791,8 +791,10 @@ export default function GeometryTaskList() {
                       ) : (
                         <Text type="secondary">Сложность: —</Text>
                       )}
-                      {imageUrl ? (
-                        <Tag color="gold" style={{ margin: 0 }}>IMG</Tag>
+                      {(imageUrl || (record.drawing_view === 'svg' && record.drawing_svg)) ? (
+                        <Tag color="gold" style={{ margin: 0 }}>
+                          {record.drawing_view === 'svg' ? 'SVG' : 'IMG'}
+                        </Tag>
                       ) : (
                         <Tag style={{ margin: 0 }}>Без чертежа</Tag>
                       )}
@@ -806,7 +808,27 @@ export default function GeometryTaskList() {
                         : <Text type="secondary">—</Text>}
                     </div>
 
-                    {imageUrl && (
+                    {record.drawing_view === 'svg' && record.drawing_svg ? (
+                      <div
+                        style={{
+                          border: '1px solid #f0f0f0',
+                          borderRadius: 8,
+                          background: '#fff',
+                          padding: 8,
+                          maxHeight: 140,
+                          overflow: 'hidden',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <div
+                          // eslint-disable-next-line react/no-danger
+                          dangerouslySetInnerHTML={{ __html: record.drawing_svg }}
+                          style={{ width: '100%', maxHeight: 124, overflow: 'hidden' }}
+                        />
+                      </div>
+                    ) : imageUrl ? (
                       <div
                         style={{
                           border: '1px solid #f0f0f0',
@@ -826,7 +848,7 @@ export default function GeometryTaskList() {
                           }}
                         />
                       </div>
-                    )}
+                    ) : null}
 
                     <div>
                       <Text type="secondary" style={{ fontSize: 11 }}>Ответ:</Text>

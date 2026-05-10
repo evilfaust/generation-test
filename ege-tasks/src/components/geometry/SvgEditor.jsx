@@ -17,6 +17,8 @@ import { Button, Space, Typography } from 'antd';
 import {
   applyLabelOffsets,
   applyPointOverrides,
+  applyTextPositions,
+  applyTextStartPoints,
   ggbXmlToSvg,
   parseGgbPoints,
 } from '../../utils/ggbToSvg';
@@ -31,24 +33,30 @@ function parseViewBox(svgStr) {
   return { x, y, w, h };
 }
 
-const HANDLE_POINT = 'point';
-const HANDLE_LABEL = 'label';
-const HANDLE_ANGLE = 'angle';
+const HANDLE_POINT    = 'point';
+const HANDLE_LABEL    = 'label';
+const HANDLE_ANGLE    = 'angle';
+const HANDLE_SEGLABEL = 'seglabel';
+const HANDLE_TEXT     = 'text';
 
 // Цвета хэндлов
 const COLOR = {
-  [HANDLE_POINT]: { fill: 'rgba(24,144,255,0.25)', active: 'rgba(24,144,255,0.5)', stroke: '#1890ff' },
-  [HANDLE_LABEL]: { fill: 'rgba(250,140,22,0.25)', active: 'rgba(250,140,22,0.5)',  stroke: '#fa8c16' },
-  [HANDLE_ANGLE]: { fill: 'rgba(114,59,134,0.25)', active: 'rgba(114,59,134,0.5)',  stroke: '#722b86' },
+  [HANDLE_POINT]:    { fill: 'rgba(24,144,255,0.25)',  active: 'rgba(24,144,255,0.5)',  stroke: '#1890ff' },
+  [HANDLE_LABEL]:    { fill: 'rgba(250,140,22,0.25)',  active: 'rgba(250,140,22,0.5)',  stroke: '#fa8c16' },
+  [HANDLE_ANGLE]:    { fill: 'rgba(114,59,134,0.25)', active: 'rgba(114,59,134,0.5)',  stroke: '#722b86' },
+  [HANDLE_SEGLABEL]: { fill: 'rgba(19,194,194,0.25)', active: 'rgba(19,194,194,0.5)',  stroke: '#13c2c2' },
+  [HANDLE_TEXT]:     { fill: 'rgba(82,196,26,0.25)',   active: 'rgba(82,196,26,0.5)',   stroke: '#52c41a' },
 };
 
 export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
   const [currentXml, setCurrentXml] = useState(xmlString);
   const [currentSvg, setCurrentSvg] = useState(svgString);
 
-  const [pointHandles, setPointHandles]  = useState([]); // { label, px, py }
-  const [labelHandles, setLabelHandles]  = useState([]); // { label, px, py, pointPx, pointPy }
-  const [angleHandles, setAngleHandles]  = useState([]); // { label, px, py, basePx, basePy }
+  const [pointHandles,    setPointHandles]    = useState([]); // { label, px, py }
+  const [labelHandles,    setLabelHandles]    = useState([]); // { label, px, py, pointPx, pointPy }
+  const [angleHandles,    setAngleHandles]    = useState([]); // { label, px, py, basePx, basePy }
+  const [segLabelHandles, setSegLabelHandles] = useState([]); // { label, px, py, basePx, basePy }
+  const [textHandles,     setTextHandles]     = useState([]); // { label, text, px, py }
   const [coordSys, setCoordSys]          = useState(null);
   const [viewBox, setViewBox]            = useState(null);
 
@@ -60,7 +68,7 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
   // ── Парсим при смене XML ─────────────────────────────────────────────────
   useEffect(() => {
     try {
-      const { points, angleLabels, coordSys: cs } = parseGgbPoints(currentXml);
+      const { points, angleLabels, segLabels, freeTexts, coordSys: cs } = parseGgbPoints(currentXml);
       setCoordSys(cs);
       setPointHandles(points.map(({ label, px, py }) => ({ label, px, py })));
       setLabelHandles(
@@ -75,6 +83,12 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
           label, px, py, basePx, basePy,
         })),
       );
+      setSegLabelHandles(
+        (segLabels ?? []).map(({ label, px, py, basePx, basePy }) => ({
+          label, px, py, basePx, basePy,
+        })),
+      );
+      setTextHandles((freeTexts ?? []).map(({ label, text, px, py, posType }) => ({ label, text, px, py, posType })));
     } catch (err) {
       console.error('[SvgEditor] parse:', err);
     }
@@ -114,8 +128,12 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
       setPointHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
     } else if (type === HANDLE_LABEL) {
       setLabelHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
-    } else {
+    } else if (type === HANDLE_ANGLE) {
       setAngleHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
+    } else if (type === HANDLE_SEGLABEL) {
+      setSegLabelHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
+    } else {
+      setTextHandles((prev) => prev.map((h) => h.label === label ? { ...h, px: newPx, py: newPy } : h));
     }
   }, [getScale]);
 
@@ -141,9 +159,22 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
       } else if (type === HANDLE_LABEL) {
         // Смещение относительно геометрической точки (в SVG-пикселях)
         newXml = applyLabelOffsets(currentXml, { [label]: { x: finalPx - pointPx, y: finalPy - pointPy } });
-      } else {
-        // Смещение относительно базовой позиции по биссектрисе
+      } else if (type === HANDLE_ANGLE || type === HANDLE_SEGLABEL) {
+        // Смещение относительно базовой позиции (биссектриса угла / середина отрезка)
         newXml = applyLabelOffsets(currentXml, { [label]: { x: finalPx - basePx, y: finalPy - basePy } });
+      } else {
+        // HANDLE_TEXT
+        const { posType } = dragRef.current;
+        if (posType === 'start') {
+          // startPoint: позиция в математических координатах GeoGebra
+          if (!coordSys) return;
+          const mathX = (finalPx - coordSys.xZero) / coordSys.scale;
+          const mathY = (coordSys.yZero - finalPy)  / coordSys.yscale;
+          newXml = applyTextStartPoints(currentXml, { [label]: { x: mathX, y: mathY } });
+        } else {
+          // absoluteScreenLocation: позиция в SVG-пикселях напрямую
+          newXml = applyTextPositions(currentXml, { [label]: { x: finalPx, y: finalPy } });
+        }
       }
       const newSvg = ggbXmlToSvg(newXml);
       setCurrentXml(newXml);
@@ -184,9 +215,11 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
       {/* Легенда */}
       <Space size={16} wrap>
         {[
-          [HANDLE_POINT, 'вершина'],
-          [HANDLE_LABEL, 'подпись вершины'],
-          [HANDLE_ANGLE, 'подпись угла'],
+          [HANDLE_POINT,    'вершина'],
+          [HANDLE_LABEL,    'подпись вершины'],
+          [HANDLE_ANGLE,    'подпись угла'],
+          [HANDLE_SEGLABEL, 'длина стороны'],
+          [HANDLE_TEXT,     'свободный текст'],
         ].map(([type, name]) => (
           <Space key={type} size={4}>
             <svg width={14} height={14}>
@@ -245,6 +278,16 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
               />
             ))}
 
+            {/* Пунктирные линии: середина отрезка → подпись длины */}
+            {segLabelHandles.map(({ label, px: sx, py: sy, basePx, basePy }) => (
+              <line key={`line-seg-${label}`}
+                x1={basePx} y1={basePy} x2={sx} y2={sy}
+                stroke={COLOR[HANDLE_SEGLABEL].stroke}
+                strokeWidth={0.8} strokeDasharray="3,3" opacity={0.5}
+                style={{ pointerEvents: 'none' }}
+              />
+            ))}
+
             {/* Хэндлы точек (синие) */}
             {pointHandles.map(({ label, px, py }) => (
               <Handle key={`pt-${label}`} type={HANDLE_POINT} label={label} px={px} py={py}
@@ -263,6 +306,20 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
             {angleHandles.map(({ label, px, py, basePx, basePy }) => (
               <Handle key={`ang-${label}`} type={HANDLE_ANGLE} label={label} px={px} py={py}
                 onDown={(e) => handlePointerDown(e, HANDLE_ANGLE, label, px, py, { basePx, basePy })}
+              />
+            ))}
+
+            {/* Хэндлы подписей длин отрезков (голубые) */}
+            {segLabelHandles.map(({ label, px, py, basePx, basePy }) => (
+              <Handle key={`seg-${label}`} type={HANDLE_SEGLABEL} label={label} px={px} py={py}
+                onDown={(e) => handlePointerDown(e, HANDLE_SEGLABEL, label, px, py, { basePx, basePy })}
+              />
+            ))}
+
+            {/* Хэндлы свободных текстов (зелёные) */}
+            {textHandles.map(({ label, px, py, posType }) => (
+              <Handle key={`txt-${label}`} type={HANDLE_TEXT} label={label} px={px} py={py}
+                onDown={(e) => handlePointerDown(e, HANDLE_TEXT, label, px, py, { posType })}
               />
             ))}
           </svg>

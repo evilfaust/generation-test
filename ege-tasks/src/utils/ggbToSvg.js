@@ -630,7 +630,127 @@ export function parseGgbPoints(xmlString) {
     });
   });
 
-  return { points, angleLabels, coordSys };
+  // ── Подписи длин отрезков (segment с showLabel=true, labelMode=2) ────────────
+  // Позиция = середина отрезка в SVG-пикселях + labelOffset.
+  // Это та же формула, что в ggbXmlToSvg (секция freeTexts для отрезков).
+  const segLabels = [];
+  Object.entries(cmdByOutput).forEach(([label, cmd]) => {
+    if (cmd.name !== 'Segment') return;
+    const ep = elData[label];
+    if (!ep?.visible || !ep.showLabel || ep.labelMode !== 2) return;
+    const ep1 = elData[cmd.inputs[0]], ep2 = elData[cmd.inputs[1]];
+    if (!ep1?.coords || !ep2?.coords) return;
+    const z1 = ep1.coords.z || 1, z2 = ep2.coords.z || 1;
+    const x1 = ep1.coords.x / z1, y1 = ep1.coords.y / z1;
+    const x2 = ep2.coords.x / z2, y2 = ep2.coords.y / z2;
+    const basePx = xZero + ((x1 + x2) / 2) * scale;
+    const basePy = yZero - ((y1 + y2) / 2) * yscale;
+    segLabels.push({
+      label,
+      basePx, basePy,
+      px: basePx + ep.labelOffset.x,
+      py: basePy + ep.labelOffset.y,
+      labelOffset: { ...ep.labelOffset },
+    });
+  });
+
+  // ── Свободные тексты (element[type="text"]) — два вида позиционирования ─────
+  //   posType='abs'   → <absoluteScreenLocation x y>  (экранные пиксели напрямую)
+  //   posType='start' → <startPoint x y z>            (математические координаты)
+  // Тексты, привязанные к объекту по имени (<startPoint exp="A"/>), не трогаем.
+  const exprByLabel2 = {};
+  doc.querySelectorAll('construction > expression').forEach((ex) => {
+    const lbl = ex.getAttribute('label');
+    const exp  = ex.getAttribute('exp') ?? '';
+    if (lbl) exprByLabel2[lbl] = exp;
+  });
+
+  const freeTexts = [];
+  doc.querySelectorAll('construction > element[type="text"]').forEach((el) => {
+    const label = el.getAttribute('label') ?? '';
+    if (el.querySelector('show')?.getAttribute('object') === 'false') return;
+
+    let raw = exprByLabel2[label] ?? '';
+    if (!raw) {
+      const teEl = el.querySelector('textExpression');
+      raw = teEl ? (teEl.getAttribute('val') ?? '') : '';
+    }
+    let text = (raw.startsWith('"') && raw.endsWith('"')) ? raw.slice(1, -1) : raw;
+    text = text.replace(/\{,\}/g, ',');
+    if (!text.trim()) return;
+
+    const absEl = el.querySelector('absoluteScreenLocation');
+    if (absEl) {
+      freeTexts.push({
+        label, text, posType: 'abs',
+        px: parseFloat(absEl.getAttribute('x') ?? '0'),
+        py: parseFloat(absEl.getAttribute('y') ?? '0'),
+      });
+      return;
+    }
+
+    // startPoint с прямыми координатами (не ссылка на объект по имени)
+    const spEl = el.querySelector('startPoint');
+    if (spEl && !spEl.getAttribute('exp') && !spEl.getAttribute('name') && spEl.hasAttribute('x')) {
+      const z  = parseFloat(spEl.getAttribute('z') ?? '1') || 1;
+      const mx = parseFloat(spEl.getAttribute('x') ?? '0') / z;
+      const my = parseFloat(spEl.getAttribute('y') ?? '0') / z;
+      freeTexts.push({
+        label, text, posType: 'start',
+        px: xZero + mx * scale,
+        py: yZero - my * yscale,
+      });
+    }
+  });
+
+  return { points, angleLabels, segLabels, freeTexts, coordSys };
+}
+
+/**
+ * Обновляет <absoluteScreenLocation> для текстовых объектов в GeoGebra XML.
+ * overrides: { [label]: { x, y } } — позиция в SVG-пикселях
+ * Возвращает новую XML-строку.
+ */
+export function applyTextPositions(xmlString, overrides) {
+  if (!overrides || !Object.keys(overrides).length) return xmlString;
+  const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+  for (const [label, { x, y }] of Object.entries(overrides)) {
+    const el = [...doc.querySelectorAll('element[type="text"]')]
+                 .find((e) => e.getAttribute('label') === label);
+    if (!el) continue;
+    let absEl = el.querySelector('absoluteScreenLocation');
+    if (!absEl) {
+      absEl = doc.createElement('absoluteScreenLocation');
+      el.appendChild(absEl);
+    }
+    absEl.setAttribute('x', String(Math.round(x)));
+    absEl.setAttribute('y', String(Math.round(y)));
+  }
+  return new XMLSerializer().serializeToString(doc);
+}
+
+/**
+ * Обновляет <startPoint x y z> для текстовых объектов в GeoGebra XML.
+ * overrides: { [label]: { x, y } } — позиция в математических координатах GeoGebra
+ * Возвращает новую XML-строку.
+ */
+export function applyTextStartPoints(xmlString, overrides) {
+  if (!overrides || !Object.keys(overrides).length) return xmlString;
+  const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
+  for (const [label, { x, y }] of Object.entries(overrides)) {
+    const el = [...doc.querySelectorAll('element[type="text"]')]
+                 .find((e) => e.getAttribute('label') === label);
+    if (!el) continue;
+    let spEl = el.querySelector('startPoint');
+    if (!spEl) {
+      spEl = doc.createElement('startPoint');
+      el.appendChild(spEl);
+    }
+    spEl.setAttribute('x', String(x));
+    spEl.setAttribute('y', String(y));
+    spEl.setAttribute('z', '1');
+  }
+  return new XMLSerializer().serializeToString(doc);
 }
 
 /**
@@ -664,8 +784,8 @@ export function applyLabelOffsets(xmlString, overrides) {
   if (!overrides || !Object.keys(overrides).length) return xmlString;
   const doc = new DOMParser().parseFromString(xmlString, 'text/xml');
   for (const [label, { x, y }] of Object.entries(overrides)) {
-    // Ищем и в point-, и в angle-элементах
-    const el = [...doc.querySelectorAll('element[type="point"], element[type="angle"]')]
+    // Ищем в point-, angle- и segment-элементах
+    const el = [...doc.querySelectorAll('element[type="point"], element[type="angle"], element[type="segment"]')]
                  .find((e) => e.getAttribute('label') === label);
     if (!el) continue;
     let loEl = el.querySelector('labelOffset');

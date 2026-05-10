@@ -1,7 +1,7 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useMemo } from 'react';
 import {
   Button, Input, InputNumber, Typography, Space, Tooltip,
-  Popconfirm, Alert, Divider,
+  Popconfirm, Alert, Divider, Tag,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, PrinterOutlined,
@@ -106,10 +106,10 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
   }, [word.imageDataUrl, onUpdate]);
 
   return (
-    <div className="cwg-word-card" style={isUnplaced ? { borderColor: '#ff4d4f' } : {}}>
-      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4, paddingTop:2 }}>
+    <div className={`cwg-word-card${isUnplaced ? ' is-unplaced' : ''}`}>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:5, paddingTop:1 }}>
         <span className="cwg-num-badge">{word.number}</span>
-        <Text style={{ fontSize:10, color:'#aaa' }}>×{word.number}</Text>
+        <Text style={{ fontSize:10, color:'#64748b', textAlign:'center', lineHeight:1.1 }}>картинок</Text>
       </div>
 
       <div
@@ -134,13 +134,13 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
       <div className="cwg-word-fields">
         <Input
           value={word.text}
-          onChange={e => onUpdate({ text: e.target.value.toUpperCase().replace(/[^A-Z]/g,'') })}
-          placeholder="WORD"
-          style={{ fontWeight:700, letterSpacing:2 }}
+          onChange={e => onUpdate({ text: e.target.value.toUpperCase().replace(/[^A-ZА-ЯЁ]/g,'') })}
+          placeholder="СЛОВО"
+          style={{ fontWeight:700, letterSpacing:1.5 }}
           maxLength={20}
         />
         <div className="cwg-word-row">
-          <Text style={{ fontSize:12, color:'#888' }}>Картинок:</Text>
+          <Text style={{ fontSize:12, color:'#64748b' }}>Номер и количество:</Text>
           <InputNumber
             min={1} max={20}
             value={word.number}
@@ -157,8 +157,8 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
           )}
         </div>
         {isUnplaced && (
-          <Text style={{ fontSize:11, color:'#ff4d4f' }}>
-            ⚠ Нет общих букв с другими словами
+          <Text style={{ fontSize:11, color:'#dc2626' }}>
+            Нет общих букв с другими словами
           </Text>
         )}
       </div>
@@ -173,30 +173,16 @@ function WordCard({ word, onUpdate, onRemove, isUnplaced }) {
 // ── Theme selector ─────────────────────────────────────────────────────────
 function ThemeSelector({ value, onChange }) {
   return (
-    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+    <div className="cwg-theme-list">
       {Object.entries(THEMES).map(([key, t]) => (
         <button
           key={key}
+          type="button"
           onClick={() => onChange(key)}
-          style={{
-            background: t.bg,
-            border: value === key ? '3px solid #fff' : '3px solid transparent',
-            outline: value === key ? '2px solid #1677ff' : 'none',
-            outlineOffset: 1,
-            borderRadius: 10,
-            padding: '7px 14px',
-            cursor: 'pointer',
-            fontSize: 13,
-            fontWeight: 700,
-            color: '#fff',
-            textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-            boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
-            transition: 'transform 0.12s, box-shadow 0.12s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform='scale(1.06)'; e.currentTarget.style.boxShadow='0 5px 16px rgba(0,0,0,0.3)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 3px 10px rgba(0,0,0,0.2)'; }}
+          className={`cwg-theme-btn${value === key ? ' active' : ''}`}
         >
-          {t.symbol} {t.name}
+          <span className="cwg-theme-swatch" style={{ background: t.bg }} />
+          {t.name}
         </button>
       ))}
     </div>
@@ -217,13 +203,29 @@ export default function CrosswordGenerator() {
   } = useCrossword();
 
   const unplacedSet = new Set(unplacedWords);
+  const placedCount = layout ? layout.placed.filter(p => !p.unplaced).length : 0;
+  const imageCount = words.reduce((sum, w) => sum + (w.imageDataUrl ? Number(w.number || 1) : 0), 0);
+  const duplicateNumbers = useMemo(() => {
+    const seen = new Map();
+    for (const w of words) {
+      if (!w.number) continue;
+      seen.set(w.number, (seen.get(w.number) || 0) + 1);
+    }
+    return [...seen.entries()].filter(([, count]) => count > 1).map(([num]) => num);
+  }, [words]);
 
   const handlePrint = () => doPrint();
 
   return (
-    <div style={{ padding: '16px 20px' }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-        <Title level={4} style={{ margin:0 }}>Генератор кроссвордов</Title>
+    <div className="cwg-page">
+      <div className="cwg-topbar">
+        <div className="cwg-title-block">
+          <span className="cwg-eyebrow">Геймификация</span>
+          <Title level={3} style={{ margin:0 }}>Генератор кроссвордов</Title>
+          <Text className="cwg-subtitle">
+            Соберите слова и картинки. На листе ученик считает одинаковые изображения и вписывает слово под соответствующим номером.
+          </Text>
+        </div>
         <Space>
           <Button
             icon={showAnswers ? <EyeInvisibleOutlined /> : <EyeOutlined />}
@@ -245,57 +247,83 @@ export default function CrosswordGenerator() {
       <div className="cwg-root">
         {/* ── Editor panel ── */}
         <div className="cwg-panel">
-          <div>
-            <Text strong style={{ display:'block', marginBottom:4 }}>Заголовок листа</Text>
-            <Input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="Crossword"
-              maxLength={50}
-            />
+          <div className="cwg-stats">
+            <div className="cwg-stat"><strong>{words.length}</strong><span>слов</span></div>
+            <div className="cwg-stat"><strong>{placedCount}</strong><span>в сетке</span></div>
+            <div className="cwg-stat"><strong>{imageCount}</strong><span>картинок</span></div>
           </div>
 
-          <div>
-            <Text strong style={{ display:'block', marginBottom:8 }}>Тема оформления</Text>
+          <div className="cwg-section">
+            <div>
+              <Text className="cwg-label">Заголовок листа</Text>
+              <Input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Кроссворд"
+                maxLength={50}
+                size="large"
+              />
+            </div>
+          </div>
+
+          <div className="cwg-section">
+            <Text className="cwg-label">Акцент предпросмотра</Text>
             <ThemeSelector value={theme} onChange={setTheme} />
           </div>
 
-          <Divider style={{ margin:'4px 0' }} />
+          <Divider style={{ margin:'0' }} />
 
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-            <Text strong>Слова ({words.length})</Text>
-            <Space size={4}>
-              <Button size="small" icon={<PlusOutlined />} onClick={addWord} type="primary">
-                Добавить
-              </Button>
-              {words.length > 0 && (
-                <Popconfirm title="Очистить все слова?" onConfirm={clearAll} okText="Да" cancelText="Нет">
-                  <Button size="small" icon={<ClearOutlined />} danger />
-                </Popconfirm>
-              )}
-            </Space>
-          </div>
+          <div className="cwg-section">
+            <div className="cwg-section-head">
+              <div>
+                <Text strong>Слова</Text>
+                <Text type="secondary" style={{ display:'block', fontSize:12 }}>
+                  Номер слова равен количеству его картинок на листе.
+                </Text>
+              </div>
+              <Space size={4}>
+                <Button size="small" icon={<PlusOutlined />} onClick={addWord} type="primary">
+                  Добавить
+                </Button>
+                {words.length > 0 && (
+                  <Popconfirm title="Очистить все слова?" onConfirm={clearAll} okText="Да" cancelText="Нет">
+                    <Button size="small" icon={<ClearOutlined />} danger />
+                  </Popconfirm>
+                )}
+              </Space>
+            </div>
 
-          {words.length === 0 && (
-            <Alert
-              type="info"
-              showIcon
-              message="Как это работает"
-              description="Добавьте слова на английском + картинку для каждого. Число = сколько раз картинка будет разбросана по листу. Ученик считает и вписывает слово."
-              style={{ fontSize:12 }}
-            />
-          )}
-
-          <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:'58vh', overflowY:'auto' }}>
-            {words.map(w => (
-              <WordCard
-                key={w.id}
-                word={w}
-                onUpdate={ch => updateWord(w.id, ch)}
-                onRemove={() => removeWord(w.id)}
-                isUnplaced={unplacedSet.has(w.text.toUpperCase())}
+            {words.length === 0 && (
+              <Alert
+                type="info"
+                showIcon
+                message="Начните с 3-6 слов"
+                description="Лучше брать слова с общими буквами. Картинки можно загрузить сразу или позже."
+                style={{ fontSize:12 }}
               />
-            ))}
+            )}
+
+            {duplicateNumbers.length > 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                message={`Повторяются номера: ${duplicateNumbers.join(', ')}`}
+                description="Для печати лучше сделать количество картинок уникальным, иначе в сетке будут одинаковые номера."
+                style={{ fontSize:12 }}
+              />
+            )}
+
+            <div className="cwg-word-list">
+              {words.map(w => (
+                <WordCard
+                  key={w.id}
+                  word={w}
+                  onUpdate={ch => updateWord(w.id, ch)}
+                  onRemove={() => removeWord(w.id)}
+                  isUnplaced={unplacedSet.has(w.text.toUpperCase())}
+                />
+              ))}
+            </div>
           </div>
 
           {unplacedWords.length > 0 && (
@@ -310,9 +338,12 @@ export default function CrosswordGenerator() {
 
         {/* ── Preview (scaled, screen only) ── */}
         <div className="cwg-preview-col">
-          <Text type="secondary" style={{ alignSelf:'flex-start', marginBottom:4 }}>
-            Предпросмотр ({Math.round(SCALE * 100)}%)
-          </Text>
+          <div className="cwg-preview-head">
+            <span>Предпросмотр печати ({Math.round(SCALE * 100)}%)</span>
+            <Tag color={showAnswers ? 'blue' : 'default'}>
+              {showAnswers ? 'Ответы включены' : 'Лист ученика'}
+            </Tag>
+          </div>
           <div
             className="cwg-print-wrapper"
             style={{ width: PREVIEW_W, height: Math.round(1123 * SCALE) }}

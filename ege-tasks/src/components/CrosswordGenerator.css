@@ -1,49 +1,151 @@
-/* ── Layout ─────────────────────────────────────────────────────────────── */
-.cwg-root {
+.cwg-page {
+  padding: 18px 22px 28px;
+  background: #f5f7fb;
+  min-height: calc(100vh - 64px);
+}
+
+.cwg-topbar {
   display: flex;
-  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.cwg-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cwg-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cwg-subtitle {
+  color: #64748b;
+  max-width: 720px;
+}
+
+.cwg-root {
+  display: grid;
+  grid-template-columns: minmax(390px, 440px) minmax(480px, 1fr);
+  gap: 18px;
   align-items: flex-start;
   min-height: calc(100vh - 120px);
 }
 
 .cwg-panel {
-  width: 380px;
-  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+}
+
+.cwg-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cwg-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cwg-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.cwg-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cwg-stat {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #f8fafc;
+}
+
+.cwg-stat strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.1;
+  color: #111827;
+}
+
+.cwg-stat span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: #64748b;
 }
 
 .cwg-preview-col {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 10px;
+  position: sticky;
+  top: 12px;
+}
+
+.cwg-preview-head {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  color: #64748b;
+  font-size: 13px;
 }
 
 /* ── Word card ──────────────────────────────────────────────────────────── */
 .cwg-word-card {
   background: #fff;
-  border: 1px solid #e8e8e8;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 10px;
-  display: flex;
-  gap: 8px;
+  padding: 10px 10px 10px 8px;
+  display: grid;
+  grid-template-columns: 34px 70px minmax(0, 1fr) 28px;
+  gap: 10px;
   align-items: flex-start;
-  transition: box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .cwg-word-card:hover {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border-color: #bfdbfe;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+}
+
+.cwg-word-card.is-unplaced {
+  border-color: #fca5a5;
+  background: #fff7f7;
 }
 
 .cwg-word-img-box {
-  width: 64px;
-  height: 64px;
-  border: 1.5px dashed #d9d9d9;
-  border-radius: 6px;
-  background: #fafafa;
+  width: 70px;
+  height: 70px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,7 +156,8 @@
   transition: border-color 0.15s;
 }
 .cwg-word-img-box:hover {
-  border-color: #1677ff;
+  border-color: #2563eb;
+  background: #eff6ff;
 }
 .cwg-word-img-box img {
   width: 100%;
@@ -87,7 +190,8 @@
 .cwg-word-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .cwg-word-num-label {
@@ -102,12 +206,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #1677ff;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #111827;
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -120,33 +224,218 @@
 
 /* ── Print area ─────────────────────────────────────────────────────────── */
 .cwg-print-wrapper {
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  background: #ffffff;
+  border: 1px solid #d7dde8;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.14);
   transform-origin: top center;
 }
 
 /* ── Theme selector ─────────────────────────────────────────────────────── */
-.cwg-theme-btn {
-  border: 2px solid transparent;
-  border-radius: 8px;
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: border-color 0.15s, transform 0.1s;
+.cwg-theme-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
 }
-.cwg-theme-btn:hover  { transform: scale(1.04); }
-.cwg-theme-btn.active { border-color: #1677ff; }
+
+.cwg-theme-btn {
+  min-height: 44px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: #111827;
+  background: #ffffff;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.cwg-theme-btn:hover  {
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+.cwg-theme-btn.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.cwg-theme-swatch {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+
+.cwg-word-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* ── Printable crossword sheet ─────────────────────────────────────────── */
+.cw-sheet-header {
+  position: absolute;
+  top: 28px;
+  left: 34px;
+  right: 34px;
+  height: 56px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.cw-sheet-kicker {
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.cw-sheet-title {
+  margin-top: 8px;
+  font-size: 27px;
+  line-height: 1.05;
+  font-weight: 850;
+  color: #111827;
+  letter-spacing: 0;
+  max-width: 420px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cw-sheet-fields {
+  min-width: 265px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+  font-size: 12px;
+  color: #111827;
+}
+
+.cw-sheet-rule {
+  position: absolute;
+  left: 34px;
+  right: 34px;
+  top: 96px;
+  border-top: 2px solid #111827;
+}
+
+.cw-sheet-instruction {
+  position: absolute;
+  left: 34px;
+  right: 34px;
+  top: 101px;
+  padding: 8px 0 0;
+  font-size: 12px;
+  color: #475569;
+}
+
+.cw-grid-zone {
+  position: absolute;
+  left: 34px;
+  top: 112px;
+  width: 726px;
+  height: 555px;
+}
+
+.cw-grid-paper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(#f1f5f9 1px, transparent 1px),
+    linear-gradient(90deg, #f1f5f9 1px, transparent 1px);
+  background-size: 24px 24px;
+  border: 1px solid #d9dee8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cw-empty-print {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cw-clue-zone {
+  position: absolute;
+  left: 34px;
+  top: 710px;
+  width: 726px;
+  height: 379px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  padding: 14px 16px 16px;
+  box-sizing: border-box;
+}
+
+.cw-clue-zone-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #d1d5db;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #334155;
+}
+
+.cw-clue-grid {
+  display: grid;
+  align-content: start;
+  justify-content: center;
+}
+
+.cw-clue-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.cw-clue-tile img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  filter: grayscale(1) contrast(1.08);
+}
+
+.cw-clue-empty {
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: 44px 0;
+  text-align: center;
+  color: #94a3b8;
+  font-weight: 700;
+}
 
 /* ── Скрываем на экране без display:none (чтобы браузер держал layout рендеренным) */
 .cw-print-root {
   position: absolute;
   left: 0;
   top: 0;
-  height: 0;
-  overflow: hidden;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
   pointer-events: none;
 }
 
@@ -154,6 +443,7 @@
 @media print {
   body:has(.cw-print-root) { visibility: hidden; }
   .cw-print-root {
+    width: auto !important;
     height: auto !important;
     overflow: visible !important;
     visibility: visible !important;
@@ -163,4 +453,13 @@
     pointer-events: auto !important;
   }
   .cw-print-root * { visibility: visible !important; }
+}
+
+@media (max-width: 1180px) {
+  .cwg-root {
+    grid-template-columns: 1fr;
+  }
+  .cwg-preview-col {
+    position: static;
+  }
 }

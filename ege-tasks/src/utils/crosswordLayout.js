@@ -80,7 +80,7 @@ export function generateCrossword(words) {
   if (!words || words.length === 0) return null;
 
   const sanitized = words
-    .map(w => ({ ...w, text: (w.text || '').toUpperCase().replace(/[^A-Z]/g, '') }))
+    .map(w => ({ ...w, text: (w.text || '').toUpperCase().replace(/[^A-ZА-ЯЁ]/g, '') }))
     .filter(w => w.text.length >= 2)
     .sort((a, b) => b.text.length - a.text.length);
 
