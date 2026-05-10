@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
+  App,
   Button,
   Form,
   Popconfirm,
@@ -8,7 +8,6 @@ import {
   Tabs,
   Tag,
   Typography,
-  message,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -49,6 +48,7 @@ const getGeoGebraBase64 = (ggbApi) => new Promise((resolve) => {
  *   totalTasks — общее кол-во задач (для генерации кода)
  */
 export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks = 0 }) {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
   const isCreate = !task;
 
@@ -445,15 +445,6 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
           </Button>
         </Space>
       </div>
-
-      {!isCreate && (
-        <Alert
-          type="info"
-          showIcon
-          message="Изменения будут применены немедленно. Чертёж нужно сохранить отдельно кнопкой «Сохранить чертёж»."
-          style={{ marginBottom: 16 }}
-        />
-      )}
 
       <Form form={form} layout="vertical" initialValues={initialValues}>
         <Tabs items={tabItems} type="card" />

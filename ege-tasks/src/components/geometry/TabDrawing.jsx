@@ -1,28 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Modal, Select, Space, Tag, Typography, message } from 'antd';
+import { App, Button, Card, Divider, Modal, Popconfirm, Select, Tag, Tooltip, Typography } from 'antd';
 import {
+  ClearOutlined,
+  DeleteOutlined,
   EditOutlined,
+  FileImageOutlined,
   FullscreenExitOutlined,
   FullscreenOutlined,
   SaveOutlined,
+  ScissorOutlined,
   UploadOutlined,
 } from '@ant-design/icons';
 import GeoGebraApplet from '../GeoGebraApplet';
 import CropModal from '../shared/CropModal';
 import SvgEditor from './SvgEditor';
 
-// ── Удаление фона: flood-fill от 4 углов с зоной защиты ─────────────────
-//
-// Алгоритм:
-//  1. Находим все «тёмные» пиксели (линии, текст, точки).
-//  2. BFS: расширяем зону защиты на PROTECT_R пикселей вокруг каждого тёмного.
-//  3. Flood-fill от углов убирает белый фон, пропуская защищённые пиксели.
-//
-// Так даже при щедром tolerance белое внутри/рядом с рисунком не трогается.
-//
-// Важно: remote URL (PocketBase) → canvas tainted → getImageData бросит
-// SecurityError. Поэтому сначала конвертируем в data URL через fetch.
-
+// ── Удаление фона: flood-fill от 4 углов с зоной защиты ─────────────────────
 async function toDataUrl(src) {
   if (String(src).startsWith('data:')) return src;
   const resp = await fetch(src);
@@ -36,87 +29,59 @@ async function toDataUrl(src) {
 }
 
 async function removeWhiteBackground(src) {
-  const DARK_MIN_DIFF = 20;  // пиксель «тёмный» если хотя бы один канал отличается от 255 на ≥20
-  const PROTECT_R    = 4;    // пикселей защитной зоны вокруг тёмного контента
-  const BG_TOLERANCE = 30;   // допуск flood-fill (щедрый — зона защиты нас страхует)
-
+  const DARK_MIN_DIFF = 20;
+  const PROTECT_R    = 4;
+  const BG_TOLERANCE = 30;
   const dataUrl = await toDataUrl(src);
-
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = img.width; canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
       const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const { data, width, height } = id;
       const n = width * height;
-
-      // ── Шаг 1: помечаем тёмные пиксели ─────────────────────────────────
       const dark = new Uint8Array(n);
       for (let i = 0; i < n; i++) {
         const p = i * 4;
-        if (
-          255 - data[p]     >= DARK_MIN_DIFF ||
-          255 - data[p + 1] >= DARK_MIN_DIFF ||
-          255 - data[p + 2] >= DARK_MIN_DIFF
-        ) dark[i] = 1;
+        if (255-data[p]>=DARK_MIN_DIFF || 255-data[p+1]>=DARK_MIN_DIFF || 255-data[p+2]>=DARK_MIN_DIFF) dark[i]=1;
       }
-
-      // ── Шаг 2: BFS — расширяем защитную зону на PROTECT_R пикселей ─────
       const protect = new Uint8Array(n);
-      const dist    = new Int16Array(n).fill(-1);
-      const queue   = [];
-      for (let i = 0; i < n; i++) {
-        if (dark[i]) { protect[i] = 1; dist[i] = 0; queue.push(i); }
-      }
+      const dist = new Int16Array(n).fill(-1);
+      const queue = [];
+      for (let i = 0; i < n; i++) { if (dark[i]) { protect[i]=1; dist[i]=0; queue.push(i); } }
       let head = 0;
       while (head < queue.length) {
-        const idx = queue[head++];
-        const d = dist[idx];
+        const idx = queue[head++]; const d = dist[idx];
         if (d >= PROTECT_R) continue;
-        const x = idx % width, y = (idx / width) | 0;
-        const nb = [];
-        if (x > 0)         nb.push(idx - 1);
-        if (x < width - 1) nb.push(idx + 1);
-        if (y > 0)         nb.push(idx - width);
-        if (y < height - 1) nb.push(idx + width);
-        for (const ni of nb) {
-          if (dist[ni] === -1) {
-            dist[ni] = d + 1;
-            protect[ni] = 1;
-            queue.push(ni);
-          }
+        const x = idx % width, y = (idx/width)|0;
+        for (const ni of [idx-1,idx+1,idx-width,idx+width]) {
+          if (ni<0||ni>=n) continue;
+          const nx=ni%width;
+          if (Math.abs(nx - x) > 1) continue; // не переходить через край
+          if (dist[ni]===-1) { dist[ni]=d+1; protect[ni]=1; queue.push(ni); }
         }
       }
-
-      // ── Шаг 3: flood-fill от углов, пропуская защищённые пиксели ────────
-      const corners = [[0, 0], [width - 1, 0], [0, height - 1], [width - 1, height - 1]];
-      let bgR = 0, bgG = 0, bgB = 0;
-      for (const [cx, cy] of corners) {
-        const p = (cy * width + cx) * 4;
-        bgR += data[p]; bgG += data[p + 1]; bgB += data[p + 2];
-      }
-      bgR = bgR / 4 | 0; bgG = bgG / 4 | 0; bgB = bgB / 4 | 0;
-
+      const corners = [[0,0],[width-1,0],[0,height-1],[width-1,height-1]];
+      let bgR=0,bgG=0,bgB=0;
+      for (const [cx,cy] of corners) { const p=(cy*width+cx)*4; bgR+=data[p]; bgG+=data[p+1]; bgB+=data[p+2]; }
+      bgR=bgR/4|0; bgG=bgG/4|0; bgB=bgB/4|0;
       const visited = new Uint8Array(n);
-      const stack   = [...corners];
+      const stack = [...corners];
       while (stack.length) {
-        const [x, y] = stack.pop();
-        if (x < 0 || x >= width || y < 0 || y >= height) continue;
-        const idx = y * width + x;
+        const [x,y] = stack.pop();
+        if (x<0||x>=width||y<0||y>=height) continue;
+        const idx=y*width+x;
         if (visited[idx]) continue;
-        visited[idx] = 1;
-        const pi = idx * 4;
-        const diff = Math.abs(data[pi] - bgR) + Math.abs(data[pi + 1] - bgG) + Math.abs(data[pi + 2] - bgB);
-        if (diff > BG_TOLERANCE * 3) continue; // тёмный пиксель — стоп, не распространяться
-        // Стираем ТОЛЬКО если не в защитной зоне; но распространяемся всегда
-        if (!protect[idx]) data[pi + 3] = 0;
-        stack.push([x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]);
+        visited[idx]=1;
+        const pi=idx*4;
+        const diff=Math.abs(data[pi]-bgR)+Math.abs(data[pi+1]-bgG)+Math.abs(data[pi+2]-bgB);
+        if (diff>BG_TOLERANCE*3) continue;
+        if (!protect[idx]) data[pi+3]=0;
+        stack.push([x-1,y],[x+1,y],[x,y-1],[x,y+1]);
       }
-
       ctx.putImageData(id, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
@@ -129,10 +94,12 @@ const { Text } = Typography;
 
 const APPNAME_OPTIONS = [
   { value: 'geometry', label: 'Геометрия' },
-  { value: 'graphing', label: 'Графики функций' },
-  { value: 'classic', label: 'Классик (все инструменты)' },
-  { value: '3d', label: '3D — стереометрия' },
+  { value: 'graphing', label: 'Графики' },
+  { value: 'classic', label: 'Классик' },
+  { value: '3d', label: '3D' },
 ];
+
+const DIVIDER = <Divider type="vertical" style={{ height: 20, margin: '0 2px' }} />;
 
 export default function TabDrawing({
   appName,
@@ -156,6 +123,7 @@ export default function TabDrawing({
   onGetXml,
   onSvgChange,
 }) {
+  const { message } = App.useApp();
   const drawingContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -177,28 +145,21 @@ export default function TabDrawing({
     }
     setEditorXml(xml);
     setSvgEditorOpen(true);
-  }, [onGetXml]);
+  }, [onGetXml, message]);
 
   const handleSvgEditorSave = useCallback((newSvg) => {
     onSvgChange?.(newSvg);
     setSvgEditorOpen(false);
-    message.success('SVG обновлён — нажмите «Сохранить SVG» или «Сохранить» задачу целиком');
-  }, [onSvgChange]);
+    message.success('SVG обновлён — нажмите «Сохр. SVG» или сохраните задачу целиком');
+  }, [onSvgChange, message]);
 
-  const handleSvgEditorCancel = useCallback(() => {
-    setSvgEditorOpen(false);
-  }, []);
+  const handleSvgEditorCancel = useCallback(() => setSvgEditorOpen(false), []);
 
   useEffect(() => {
     const onResize = () => setViewportHeight(window.innerHeight);
     const onFullscreenChange = () => {
-      if (!drawingContainerRef.current) {
-        setIsFullscreen(false);
-        return;
-      }
       setIsFullscreen(document.fullscreenElement === drawingContainerRef.current);
     };
-
     window.addEventListener('resize', onResize);
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => {
@@ -210,57 +171,34 @@ export default function TabDrawing({
   const toggleFullscreen = useCallback(async () => {
     try {
       if (!document.fullscreenElement) {
-        if (drawingContainerRef.current?.requestFullscreen) {
-          await drawingContainerRef.current.requestFullscreen();
-        }
-        return;
-      }
-      if (document.exitFullscreen) {
-        await document.exitFullscreen();
+        await drawingContainerRef.current?.requestFullscreen?.();
+      } else {
+        await document.exitFullscreen?.();
       }
     } catch {
       message.warning('Не удалось переключить полноэкранный режим.');
     }
-  }, []);
+  }, [message]);
 
-  const appletHeight = isFullscreen
-    ? Math.max(680, viewportHeight - 96)
-    : 680;
+  const appletHeight = isFullscreen ? Math.max(680, viewportHeight - 96) : 680;
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      message.error('Пожалуйста, выберите файл изображения');
-      return;
-    }
+    if (!file.type.startsWith('image/')) { message.error('Выберите файл изображения'); return; }
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      onCropApplied(ev.target.result);
-      message.success('Изображение загружено');
-    };
+    reader.onload = (ev) => { onCropApplied(ev.target.result); message.success('Изображение загружено'); };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
 
   const handleOpenCrop = () => {
-    if (!imageBase64) {
-      message.warning('Сначала сохраните PNG');
-      return;
-    }
+    if (!imageBase64) { message.warning('Сначала сохраните PNG'); return; }
     setCropModalOpen(true);
   };
 
-  const handleCropped = (croppedDataUrl) => {
-    onCropApplied(croppedDataUrl);
-    setCropModalOpen(false);
-  };
-
   const handleRemoveBg = useCallback(async () => {
-    if (!imageBase64) {
-      message.warning('Сначала сохраните PNG');
-      return;
-    }
+    if (!imageBase64) { message.warning('Сначала сохраните PNG'); return; }
     setRemovingBg(true);
     try {
       const result = await removeWhiteBackground(imageBase64);
@@ -271,174 +209,159 @@ export default function TabDrawing({
     } finally {
       setRemovingBg(false);
     }
-  }, [imageBase64, onCropApplied]);
+  }, [imageBase64, onCropApplied, message]);
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%', padding: '16px 0' }}>
-      {/* Панель управления */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={handleFileChange}
-      />
+    <div style={{ paddingTop: 12 }}>
+      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
 
-      <Card size="small">
-        <Space wrap>
-          <div>
-            <Text type="secondary" style={{ marginRight: 8 }}>Режим:</Text>
-            <Select
-              value={appName}
-              onChange={onAppNameChange}
-              options={APPNAME_OPTIONS}
-              style={{ width: 220 }}
-            />
-          </div>
+      {/* ── Компактная панель инструментов ───────────────────────────────── */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 6,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          padding: '6px 10px',
+          background: '#fafafa',
+          border: '1px solid #f0f0f0',
+          borderRadius: 8,
+          marginBottom: 12,
+        }}
+      >
+        {/* Режим + Показывать */}
+        <Tooltip title="Режим GeoGebra">
+          <Select
+            size="small"
+            value={appName}
+            onChange={onAppNameChange}
+            options={APPNAME_OPTIONS}
+            style={{ width: 120 }}
+          />
+        </Tooltip>
+        <Tooltip title="Что показывать в задаче">
+          <Select
+            size="small"
+            value={drawingView}
+            onChange={onDrawingViewChange}
+            style={{ width: 120 }}
+            options={[
+              { value: 'image',    label: 'PNG' },
+              { value: 'geogebra', label: 'GeoGebra' },
+              { value: 'svg',      label: 'SVG', disabled: !drawingSvg },
+            ]}
+          />
+        </Tooltip>
 
-          <div>
-            <Text type="secondary" style={{ marginRight: 8 }}>Показывать:</Text>
-            <Select
-              value={drawingView}
-              onChange={onDrawingViewChange}
-              style={{ width: 220 }}
-              options={[
-                { value: 'image', label: 'Картинку (PNG)' },
-                { value: 'geogebra', label: 'GeoGebra объект' },
-                { value: 'svg', label: 'SVG (векторный)', disabled: !drawingSvg },
-              ]}
-            />
-          </div>
+        {DIVIDER}
 
+        {/* Сохранение */}
+        <Button size="small" type="primary" icon={<SaveOutlined />} loading={savingDrawing} onClick={onSaveDrawing}>
+          Сохранить
+        </Button>
+        <Tooltip title="Сохранить только PNG">
+          <Button size="small" icon={<FileImageOutlined />} loading={savingDrawing} onClick={onSaveDrawingAsImage} />
+        </Tooltip>
+        <Tooltip title="Загрузить из файла">
+          <Button size="small" icon={<UploadOutlined />} onClick={() => fileInputRef.current?.click()} />
+        </Tooltip>
+
+        {DIVIDER}
+
+        {/* Редактирование PNG */}
+        <Tooltip title="Обрезать PNG">
+          <Button size="small" icon={<ScissorOutlined />} onClick={handleOpenCrop} disabled={!imageBase64} />
+        </Tooltip>
+        <Tooltip title="Убрать белый фон">
+          <Button size="small" icon={<ClearOutlined />} loading={removingBg} disabled={!imageBase64} onClick={handleRemoveBg} />
+        </Tooltip>
+        <Tooltip title={isFullscreen ? 'Свернуть' : 'На весь экран'}>
           <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            loading={savingDrawing}
-            onClick={onSaveDrawing}
-          >
-            Сохранить чертёж (GeoGebra + PNG)
-          </Button>
-
-          <Button
-            loading={savingDrawing}
-            onClick={onSaveDrawingAsImage}
-          >
-            Сохранить как картинку (PNG)
-          </Button>
-
-          <Button
-            icon={<UploadOutlined />}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            Загрузить из файла
-          </Button>
-
-          <Button onClick={handleOpenCrop} disabled={!imageBase64}>
-            Обрезать PNG
-          </Button>
-
-          <Button
-            onClick={handleRemoveBg}
-            disabled={!imageBase64}
-            loading={removingBg}
-          >
-            Убрать фон
-          </Button>
-
-          <Button
+            size="small"
             icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
             onClick={toggleFullscreen}
-          >
-            {isFullscreen ? 'Свернуть' : 'На весь экран'}
-          </Button>
-
-          <Button
-            onClick={onConvertToSvg}
-            loading={convertingSvg}
-            disabled={!onConvertToSvg}
-          >
-            Конвертировать в SVG
-          </Button>
-
-          {drawingSvg && onSaveSvg && (
-            <Button
-              type="primary"
-              ghost
-              onClick={onSaveSvg}
-              loading={savingSvg}
-            >
-              Сохранить SVG
-            </Button>
-          )}
-
-          {drawingSvg && onSvgChange && (
-            <Button
-              icon={<EditOutlined />}
-              onClick={handleOpenSvgEditor}
-            >
-              Редактировать SVG
-            </Button>
-          )}
-
-          <Button onClick={onClearDrawing} danger>
-            Очистить
-          </Button>
-
-          {ggbSaved && (
-            <Tag color="success" style={{ fontSize: 13, padding: '4px 10px' }}>
-              ✓ Чертёж сохранён
-            </Tag>
-          )}
-          {!ggbSaved && (
-            <Tag color="warning" style={{ fontSize: 13, padding: '4px 10px' }}>
-              Чертёж не сохранён
-            </Tag>
-          )}
-        </Space>
-      </Card>
-
-      <Alert
-        type="info"
-        showIcon
-        message={
-          <span>
-            Нарисуйте чертёж в поле ниже. Можно сохранить в формате GeoGebra
-            кнопкой <strong>«Сохранить чертёж (GeoGebra + PNG)»</strong> или обновить только картинку
-            кнопкой <strong>«Сохранить как картинку (PNG)»</strong>.
-            После этого можно обрезать лишние поля кнопкой <strong>«Обрезать PNG»</strong>,
-            а белый фон убрать кнопкой <strong>«Убрать фон»</strong>.
-          </span>
-        }
-      />
-
-      {!!imageBase64 && (
-        <Card
-          size="small"
-          title="Текущая сохранённая картинка (PNG)"
-          styles={{ body: { padding: 12 } }}
-        >
-          <img
-            src={imageBase64}
-            alt="Чертёж"
-            style={{ width: '100%', maxHeight: 320, objectFit: 'contain', display: 'block' }}
           />
-        </Card>
+        </Tooltip>
+
+        {DIVIDER}
+
+        {/* SVG */}
+        <Button size="small" loading={convertingSvg} disabled={!onConvertToSvg} onClick={onConvertToSvg}>
+          → SVG
+        </Button>
+        {drawingSvg && onSaveSvg && (
+          <Button size="small" type="primary" ghost loading={savingSvg} onClick={onSaveSvg}>
+            Сохр. SVG
+          </Button>
+        )}
+        {drawingSvg && onSvgChange && (
+          <Tooltip title="Редактировать SVG">
+            <Button size="small" icon={<EditOutlined />} onClick={handleOpenSvgEditor} />
+          </Tooltip>
+        )}
+
+        {DIVIDER}
+
+        {/* Очистить */}
+        <Popconfirm
+          title="Очистить чертёж?"
+          okText="Да"
+          cancelText="Нет"
+          okButtonProps={{ danger: true, size: 'small' }}
+          onConfirm={onClearDrawing}
+        >
+          <Button size="small" danger icon={<DeleteOutlined />}>Очистить</Button>
+        </Popconfirm>
+
+        {/* Статус */}
+        <Tag
+          color={ggbSaved ? 'success' : 'warning'}
+          style={{ margin: '0 0 0 auto', lineHeight: '20px' }}
+        >
+          {ggbSaved ? '✓ Сохранён' : 'Не сохранён'}
+        </Tag>
+      </div>
+
+      {/* ── Превью PNG и SVG рядом ───────────────────────────────────────── */}
+      {(imageBase64 || drawingSvg) && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: (imageBase64 && drawingSvg) ? '1fr 1fr' : '1fr',
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          {imageBase64 && (
+            <Card
+              size="small"
+              title={<Text type="secondary" style={{ fontSize: 12 }}>PNG-чертёж</Text>}
+              styles={{ body: { padding: 8 } }}
+            >
+              <img
+                src={imageBase64}
+                alt="PNG"
+                style={{ width: '100%', maxHeight: 200, objectFit: 'contain', display: 'block' }}
+              />
+            </Card>
+          )}
+          {drawingSvg && (
+            <Card
+              size="small"
+              title={<Text type="secondary" style={{ fontSize: 12 }}>SVG-чертёж</Text>}
+              styles={{ body: { padding: 8, display: 'flex', justifyContent: 'center' } }}
+            >
+              <div
+                // eslint-disable-next-line react/no-danger
+                dangerouslySetInnerHTML={{ __html: drawingSvg }}
+                style={{ lineHeight: 0, maxHeight: 200, overflow: 'hidden' }}
+              />
+            </Card>
+          )}
+        </div>
       )}
 
-      {!!drawingSvg && (
-        <Card
-          size="small"
-          title="SVG-превью (векторный чертёж)"
-          styles={{ body: { padding: 12 } }}
-        >
-          <div
-            dangerouslySetInnerHTML={{ __html: drawingSvg }}
-            style={{ lineHeight: 0, background: 'transparent', maxWidth: 360 }}
-          />
-        </Card>
-      )}
-
-      {/* GeoGebra апплет */}
+      {/* ── GeoGebra апплет ──────────────────────────────────────────────── */}
       <div
         ref={drawingContainerRef}
         style={{
@@ -460,7 +383,7 @@ export default function TabDrawing({
       <CropModal
         open={cropModalOpen}
         onCancel={() => setCropModalOpen(false)}
-        onCropped={handleCropped}
+        onCropped={(url) => { onCropApplied(url); setCropModalOpen(false); }}
         imageUrl={imageBase64}
         title="Обрезка PNG"
         emptyMessage="Сначала сохраните PNG из GeoGebra"
@@ -475,7 +398,7 @@ export default function TabDrawing({
         footer={null}
         width={680}
         destroyOnClose
-        styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: '16px' } }}
+        styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: 16 } }}
       >
         {svgEditorOpen && editorXml && drawingSvg && (
           <SvgEditor
@@ -486,6 +409,6 @@ export default function TabDrawing({
           />
         )}
       </Modal>
-    </Space>
+    </div>
   );
 }
