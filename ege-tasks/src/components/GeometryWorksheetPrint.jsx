@@ -7,6 +7,12 @@ import './GeometryWorksheetPrint.css';
 
 const { Text } = Typography;
 
+const TEXT_SIZE_CFG = {
+  s: { statement: '3.2mm', badge: '3.2mm' },
+  m: { statement: '3.8mm', badge: '3.8mm' },
+  l: { statement: '4.5mm', badge: '4.5mm' },
+};
+
 /**
  * Размеры чертежей: ширина контейнера (%) и max-height (mm) для каждого
  * сочетания drawingSize × tasksPerSheet.
@@ -20,7 +26,7 @@ const DRAWING_SIZE_CFG = {
 
 // ── Одна задача (половина листа) ─────────────────────────────────────────────
 
-function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet }) {
+function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet, textSize }) {
   const imageUrl = api.getGeometryImageUrl(task);
   const hasSvg   = task.drawing_view === 'svg' && !!task.drawing_svg;
   const hasImage = !!imageUrl && !hasSvg;
@@ -31,16 +37,18 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, tasksPerSheet })
   const drawingStyle = { maxWidth: dcfg.w, maxHeight: maxH };
   const imgStyle    = { maxHeight: maxH };
 
+  const tcfg = TEXT_SIZE_CFG[textSize] ?? TEXT_SIZE_CFG.s;
+
   return (
     <div className="geo-worksheet-task">
       {/* Строка: бейдж + условие */}
       <div className="geo-worksheet-task-header">
-        <span className="geo-worksheet-task-badge">№{index + 1}</span>
-        <div className="geo-worksheet-task-statement">
+        <span className="geo-worksheet-task-badge" style={{ fontSize: tcfg.badge }}>№{index + 1}</span>
+        <div className="geo-worksheet-task-statement" style={{ fontSize: tcfg.statement }}>
           {task.statement_md ? (
             <MathRenderer text={task.statement_md} />
           ) : (
-            <Text type="secondary" style={{ fontSize: '3.2mm' }}>Условие не задано</Text>
+            <Text type="secondary" style={{ fontSize: tcfg.statement }}>Условие не задано</Text>
           )}
         </div>
       </div>
@@ -93,6 +101,7 @@ function WorksheetSheet({
   isFirstSheet,
   tasksPerSheet,
   drawingSize,
+  textSize,
 }) {
   const showPrimaryHeader = isFirstSheet;
   const showCompactTitle = !isFirstSheet && topicLabel;
@@ -132,7 +141,7 @@ function WorksheetSheet({
         </div>
       )}
 
-      {/* Задачи (разделены линией если их две) */}
+      {/* Задачи */}
       {sheetTasks.map((task, i) => (
         <>
           {i > 0 && <div key={`div-${task.id}`} className="geo-worksheet-divider" />}
@@ -143,6 +152,7 @@ function WorksheetSheet({
             showDrawing={showDrawing}
             drawingSize={drawingSize}
             tasksPerSheet={tasksPerSheet}
+            textSize={textSize}
           />
         </>
       ))}
@@ -164,6 +174,7 @@ export default function GeometryWorksheetPrint({
   const [showDrawing, setShowDrawing] = useState(true);
   const [tasksPerSheet, setTasksPerSheet] = useState(2);
   const [drawingSize, setDrawingSize] = useState('m');
+  const [textSize, setTextSize] = useState('s');
 
   const handlePrint = () => {
     const size = tasksPerSheet === 2 ? 'A5 portrait' : 'A4 portrait';
@@ -260,6 +271,19 @@ export default function GeometryWorksheetPrint({
               />
             </Space>
           )}
+          <Space size={6}>
+            <Text style={{ fontSize: 13 }}>Размер текста:</Text>
+            <Segmented
+              size="small"
+              value={textSize}
+              onChange={setTextSize}
+              options={[
+                { label: 'S', value: 's' },
+                { label: 'M', value: 'm' },
+                { label: 'L', value: 'l' },
+              ]}
+            />
+          </Space>
         </Space>
       </Card>
 
@@ -278,6 +302,7 @@ export default function GeometryWorksheetPrint({
             isFirstSheet={i === 0}
             tasksPerSheet={tasksPerSheet}
             drawingSize={drawingSize}
+            textSize={textSize}
           />
         ))}
       </div>
