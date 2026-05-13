@@ -36,21 +36,19 @@ export const useWorksheetGeneration = () => {
       const generatedVariants = [];
 
       if (variantsMode === 'different') {
-        // Разные задачи в каждом варианте
+        // Загружаем задачи по всем блокам параллельно — один раз
+        const blockPools = await Promise.all(
+          structure.map(block => api.getTasks(buildFilters(block)))
+        );
+
         const usedTaskIds = new Set();
 
         for (let i = 0; i < variantsCount; i++) {
           let variantTasks = [];
 
-          for (const block of structure) {
-            // Получаем задачи для этого блока
-            const filters = buildFilters(block);
-            const availableTasks = await api.getTasks(filters);
+          structure.forEach((block, bi) => {
+            const filteredTasks = blockPools[bi].filter(t => !usedTaskIds.has(t.id));
 
-            // Исключаем уже использованные задачи
-            const filteredTasks = availableTasks.filter(t => !usedTaskIds.has(t.id));
-
-            // Выбор задач (прогрессия или случайно)
             const selected = progressiveDifficulty
               ? selectTasksWithProgressiveDifficulty(filteredTasks, block.count)
               : shuffleArray(filteredTasks).slice(0, block.count);
@@ -61,12 +59,10 @@ export const useWorksheetGeneration = () => {
               );
             }
 
-            // Добавляем в использованные
             selected.forEach(t => usedTaskIds.add(t.id));
             variantTasks.push(...selected);
-          }
+          });
 
-          // Сортировка задач в варианте
           if (sortType === 'random') {
             variantTasks = shuffleArray(variantTasks);
           } else if (sortType === 'code') {
