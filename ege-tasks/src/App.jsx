@@ -13,6 +13,7 @@ import {
   FormOutlined, QrcodeOutlined, PictureOutlined, HeatMapOutlined,
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
+  CalculatorOutlined,
 } from '@ant-design/icons';
 import TaskList from './components/TaskList';
 import TaskSheetGenerator from './components/OralWorksheetGenerator';
@@ -56,6 +57,7 @@ import ReductionFormulasGenerator from './components/ReductionFormulasGenerator'
 import AdditionFormulasGenerator from './components/AdditionFormulasGenerator';
 import TrigMixedGenerator from './components/TrigMixedGenerator';
 import DoubleAngleGenerator from './components/DoubleAngleGenerator';
+import OralCountingGenerator from './components/OralCountingGenerator';
 import MarathonGenerator from './components/MarathonGenerator';
 import CrosswordGenerator from './components/CrosswordGenerator';
 import EgeScoreCalculator from './components/EgeScoreCalculator';
@@ -119,6 +121,8 @@ export const R = {
   ADDITION:            '/app/trig/addition',
   DOUBLE_ANGLE:        '/app/trig/double-angle',
   TRIG_CRYPTOGRAM:     '/app/trig/cryptogram',
+  // Арифметика
+  ORAL_COUNTING:       '/app/arith/oral-counting',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',
@@ -191,6 +195,7 @@ const ROUTE_META = [
   { re: /^\/app\/trig\/addition/,          menuKey: 'addition-formulas', menuGroup: 'trig', title: 'Тригонометрия — Формулы сложения' },
   { re: /^\/app\/trig\/double-angle/,      menuKey: 'double-angle',     menuGroup: 'trig', title: 'Тригонометрия — Двойной аргумент' },
   { re: /^\/app\/trig\/cryptogram/,        menuKey: 'trig-cryptogram',  menuGroup: 'trig', title: 'Тригонометрия — Шифровки' },
+  { re: /^\/app\/arith\/oral-counting/,   menuKey: 'oral-counting',    menuGroup: 'arith', title: 'Арифметика — Устный счёт' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -239,6 +244,7 @@ const MENU_KEY_PATH = {
   'addition-formulas':      R.ADDITION,
   'double-angle':           R.DOUBLE_ANGLE,
   'trig-cryptogram':        R.TRIG_CRYPTOGRAM,
+  'oral-counting':          R.ORAL_COUNTING,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -254,6 +260,7 @@ const GROUP_META = {
   geometry:             { label: 'Геометрия',    path: R.GEOMETRY_TASKS },
   'tdf-group':          { label: 'ТДФ',          path: R.TDF },
   trig:                 { label: 'Тригонометрия' },
+  arith:                { label: 'Арифметика' },
   theory:               { label: 'Теория',        path: R.THEORY },
   lab:                  { label: 'Лаборатория' },
 };
@@ -551,6 +558,12 @@ function AppLayout() {
       ],
     },
     {
+      key: 'arith', icon: <CalculatorOutlined />, label: 'Арифметика',
+      children: [
+        { key: 'oral-counting', icon: <CalculatorOutlined />, label: 'Устный счёт' },
+      ],
+    },
+    {
       key: 'theory', icon: <BookOutlined />, label: 'Теория',
       children: [
         { key: 'theory-browser',    icon: <ReadOutlined />,    label: 'Библиотека' },
@@ -734,6 +747,9 @@ function App() {
               <Route path={R.ADDITION}           element={<AdditionFormulasGenerator />} />
               <Route path={R.DOUBLE_ANGLE}       element={<DoubleAngleGenerator />} />
               <Route path={R.TRIG_CRYPTOGRAM}    element={<UnitCircleCryptogramGenerator />} />
+
+              {/* Арифметика */}
+              <Route path={R.ORAL_COUNTING} element={<OralCountingGenerator />} />
 
               {/* Теория */}
               <Route path={R.THEORY}            element={<TheoryPage />} />

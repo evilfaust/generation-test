@@ -1,0 +1,263 @@
+/* Скрыто на экране */
+.oral-print-root {
+  display: none;
+}
+
+@media print {
+  /* Scoped: скрываем всё приложение, показываем только наш блок */
+  body:has(.oral-print-root) {
+    visibility: hidden;
+  }
+  .oral-print-root {
+    display: block !important;
+    visibility: visible;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .oral-print-root * {
+    visibility: visible;
+  }
+
+  /* ─── Страница ──────────────────────────────────────────────────────────── */
+  .oral-page {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 11pt;
+    line-height: 1.4;
+    color: #000;
+    background: #fff;
+  }
+
+  /* Один вариант — полная страница */
+  .oral-page--full {
+    min-height: 100vh;
+    padding: 10mm 16mm 10mm 20mm;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* Старый режим: два варианта на одном листе (сверху/снизу) */
+  .oral-page--half {
+    padding: 6mm 12mm 4mm 14mm;
+    min-height: 50vh;
+    border-bottom: 1px dashed #888;
+  }
+  .oral-page--half:last-of-type {
+    border-bottom: none;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  /* Новый режим: два варианта рядом (левый/правый) — вертикальное разделение */
+  .oral-pair-page {
+    display: flex;
+    flex-direction: row;
+    min-height: 100vh;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .oral-page--side {
+    width: 50%;
+    box-sizing: border-box;
+    padding: 8mm 5mm 8mm 7mm;
+    border-right: 1px dashed #aaa;
+  }
+  .oral-page--side:last-child {
+    border-right: none;
+    padding: 8mm 7mm 8mm 5mm;
+  }
+
+  /* ─── Шапка ──────────────────────────────────────────────────────────────── */
+  .oral-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5mm;
+    margin-bottom: 1.5mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 1px solid #000;
+  }
+
+  .oral-header-row1 {
+    display: flex;
+    align-items: baseline;
+    gap: 3mm;
+  }
+
+  .oral-header-row2 {
+    display: flex;
+    align-items: baseline;
+    gap: 6mm;
+    padding-left: 0;
+  }
+
+  .oral-variant-badge {
+    font-weight: bold;
+    font-size: 11pt;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .oral-field {
+    display: flex;
+    align-items: baseline;
+    gap: 1.5mm;
+    font-size: 10pt;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ФИО растягивается на всю строку */
+  .oral-field--fio {
+    flex: 1;
+    min-width: 0;
+  }
+  .oral-field--fio .oral-line {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* В узком режиме (side) уменьшаем шрифт шапки */
+  .oral-page--side .oral-variant-badge { font-size: 9.5pt; }
+  .oral-page--side .oral-field         { font-size: 9pt; }
+  .oral-page--side .oral-line--name    { min-width: 25mm; }
+  .oral-page--side .oral-line--short   { width: 14mm; }
+
+  .oral-line {
+    display: inline-block;
+    border-bottom: 1px solid #000;
+    vertical-align: bottom;
+  }
+  .oral-line--name  { min-width: 50mm; width: 100%; }
+  .oral-line--short { width: 20mm; }
+
+  /* ─── Подзаголовок и инструкция ─────────────────────────────────────────── */
+  .oral-subtitle {
+    font-size: 10pt;
+    font-weight: bold;
+    margin-bottom: 1.5mm;
+  }
+
+  .oral-instruction {
+    font-size: 10.5pt;
+    font-weight: bold;
+    margin-bottom: 2mm;
+  }
+
+  /* ─── Двухколоночная сетка заданий ──────────────────────────────────────── */
+  .oral-grid {
+    display: grid;
+    gap: 0 8mm;
+  }
+  .oral-grid--2col { grid-template-columns: 1fr 1fr; }
+  .oral-grid--1col { grid-template-columns: 1fr; }
+
+  /* ─── Одно задание ───────────────────────────────────────────────────────── */
+  .oral-task {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    padding: 1mm 0;
+    border-bottom: 1px dotted #ccc;
+    min-height: 7mm;
+    break-inside: avoid;
+  }
+  .oral-task:last-child {
+    border-bottom: none;
+  }
+
+  .oral-task-num {
+    font-weight: bold;
+    font-size: 10pt;
+    min-width: 18px;
+    flex-shrink: 0;
+    color: #000;
+  }
+
+  /* Выражение НЕ растягивается — = стоит сразу за ним */
+  .oral-task-expr {
+    font-size: 10pt;
+    flex-shrink: 0;
+  }
+
+  .oral-task-eq {
+    padding: 0 0 0 2px;
+    font-size: 10.5pt;
+    flex-shrink: 0;
+  }
+
+  /* ─── Страница ответов для учителя ──────────────────────────────────────── */
+  .oral-key-page {
+    padding: 10mm 16mm;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .oral-key-header {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-bottom: 4mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #000;
+  }
+
+  .oral-key-variants {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4mm 10mm;
+  }
+
+  .oral-key-variant {
+    break-inside: avoid;
+  }
+
+  .oral-key-variant-title {
+    font-weight: bold;
+    font-size: 10pt;
+    margin-bottom: 1mm;
+    padding-bottom: 0.5mm;
+    border-bottom: 1px dotted #666;
+  }
+
+  .oral-key-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 4mm;
+  }
+
+  .oral-key-row {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    font-size: 8.5pt;
+    margin-bottom: 0.8mm;
+    flex-wrap: nowrap;
+  }
+
+  .oral-key-num {
+    font-weight: bold;
+    min-width: 14px;
+    flex-shrink: 0;
+  }
+
+  .oral-key-expr {
+    flex: 1;
+    font-size: 8pt;
+    color: #444;
+    overflow: hidden;
+  }
+
+  .oral-key-eq {
+    padding: 0 1px;
+    flex-shrink: 0;
+  }
+
+  .oral-key-ans {
+    font-weight: bold;
+    font-size: 8.5pt;
+    flex-shrink: 0;
+  }
+}
