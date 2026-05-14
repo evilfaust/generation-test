@@ -1,5 +1,44 @@
 # Changelog — История изменений
 
+## [3.9.24] - 2026-05-15
+
+### ТДФ — Новый тип «Геометрические формулы»
+
+Восьмой тип пункта ТДФ — `geometry_formula` (lime). Для тренировки формул площади, объёма
+и т.п.: ученику даётся **частичный чертёж**, он подписывает буквы и записывает формулу.
+
+**Два чертежа на одну карточку:**
+- **Подготовка** (`drawing_image` + `geogebra_base64`) — полный чертёж со всеми обозначениями
+- **Контроль** (`drawing_image_control` + `geogebra_base64_control`) — частичный, без подписей
+
+**Workflow редактора** (вкладка «Чертежи» в `TDFItemModal`):
+1. Вкладка «🟢 Подготовка» — учитель рисует полный чертёж в GeoGebra, нажимает «Сохранить PNG»
+2. Вкладка «🔴 Контроль» — нажимает «Загрузить эталонный чертёж» → копия XML переносится
+   через `prepApi.getBase64()` → `ctrlApi.setBase64()`, далее удаляет лишние подписи
+3. «Сохранить PNG» в контроле — частичный чертёж готов
+
+**Компактный формат печати контрольного варианта** (`TDFPrintView`):
+- Автодетект: вариант состоит только из `geometry_formula` И mode='blank' → новый layout
+- A4 portrait делится на 1 или 2 узкие полоски (переключатель в тулбаре)
+- Каждая полоска: заголовок + ФИ + список {№, чертёж контроля, «S = ____» с линией для записи}
+- Лишние контролы (ориентация, размер чертежа, сетка) скрыты — неприменимы
+
+**БД (миграции 1772000037-39):**
+- `drawing_image_control` (file 5MB) + `geogebra_base64_control` (text, max 500000)
+- `formula_control_hidden` (bool, default true)
+- `geometry_formula` добавлен в select `type`
+- ⚠️ Лимит `geogebra_base64` поднят с дефолтных 5000 до 500000 — PB 0.36.4 не понимает `max:0`
+
+**Файлы:**
+- `pocketbase/pb_migrations/1772000037_add_geometry_formula_to_tdf.js`
+- `pocketbase/pb_migrations/1772000038_expand_tdf_geogebra_fields.js`
+- `pocketbase/pb_migrations/1772000039_set_explicit_max_geogebra_fields.js`
+- `ege-tasks/src/components/tdf/TDFItemModal.jsx` — UI с двумя GeoGebra-апплетами и динамической высотой
+- `ege-tasks/src/components/tdf/TDFPrintView.jsx` + CSS — гео-формат печати
+- `ege-tasks/src/shared/services/pocketbase.js` — `getTdfItemControlDrawingUrl(item)`
+
+---
+
 ## [3.9.23] - 2026-05-14
 
 ### Арифметика — Генератор «Степени и логарифмы»

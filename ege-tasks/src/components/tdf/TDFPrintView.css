@@ -338,3 +338,120 @@
     height: 297mm;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/* Компактный формат «геометрические формулы» — две полоски на A4 portrait  */
+/* ════════════════════════════════════════════════════════════════════════ */
+
+.tdf-print-page--geo {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 8mm 5mm;
+  display: flex;
+  gap: 4mm;
+  font-family: 'Times New Roman', serif;
+  font-size: 11pt;
+}
+
+.tdf-geo-strip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;          /* предотвращает overflow flex-children */
+  padding: 0 2mm;
+  border-right: 1px dashed #ccc;
+}
+.tdf-geo-strip:last-child { border-right: none; }
+
+.tdf-geo-title {
+  text-align: center;
+  font-size: 13pt;
+  font-weight: bold;
+  text-decoration: underline;
+  margin: 0 0 4mm 0;
+}
+
+.tdf-geo-fio {
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+  margin-bottom: 5mm;
+  font-size: 11pt;
+}
+.tdf-geo-fio-line {
+  flex: 1;
+  border-bottom: 1px solid #000;
+  height: 1.1em;
+}
+
+.tdf-geo-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3mm;
+  flex: 1;
+}
+
+.tdf-geo-item {
+  display: grid;
+  grid-template-columns: 8mm 1fr 40mm;
+  align-items: center;
+  gap: 2mm;
+  min-height: 18mm;
+}
+
+.tdf-geo-num {
+  font-size: 11pt;
+  align-self: flex-start;
+  padding-top: 1mm;
+}
+
+.tdf-geo-figure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.tdf-geo-figure img {
+  max-width: 100%;
+  max-height: 28mm;
+  object-fit: contain;
+}
+.tdf-geo-figure--empty {
+  height: 22mm;
+  border: 1px dashed #bbb;
+  width: 100%;
+}
+
+.tdf-geo-formula {
+  font-style: italic;
+  font-size: 12pt;
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+}
+.tdf-geo-formula-line {
+  flex: 1;
+  border-bottom: 1px solid #000;
+  height: 1em;
+  min-width: 20mm;
+}
+
+/* Print specifics */
+@media print {
+  .tdf-print-page--geo {
+    width: 210mm;
+    height: 297mm;
+    padding: 8mm 5mm;
+    box-shadow: none;
+    box-sizing: border-box;
+    overflow: hidden;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid-page;
+  }
+  .tdf-geo-strip { border-right-color: #888; }
+}
+

@@ -11,6 +11,7 @@ const { Text } = Typography;
 const TYPE_LABELS = {
   theorem: 'Теорема', definition: 'Определение', formula: 'Формула',
   axiom: 'Аксиома', property: 'Свойство', criterion: 'Признак', corollary: 'Следствие',
+  geometry_formula: 'Геом. формула',
 };
 
 const MM_TO_PX = 3.7795; // фолбэк, если measureRootRef не готов
@@ -61,8 +62,16 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   const [stretchMode, setStretchMode] = useState(false); // blank: 1 vs 2 листа
   const [showGrid, setShowGrid] = useState(false);       // blank: сетка в ячейках
   const [pagination, setPagination] = useState({ key: null, pages: null, stretchRowH: null });
+  const [geoStripsPerPage, setGeoStripsPerPage] = useState(2); // geo: 1 или 2 полоски на A4
 
   const isBlank = mode === 'blank';
+
+  // Если в варианте только геом. формулы и режим — контроль, используем
+  // спец. компактный формат: A4 portrait, поделенный на N полосок-вариантов
+  const nonHeaderItems = items.filter(i => !i.is_section_header);
+  const isAllGeoFormula = nonHeaderItems.length > 0
+    && nonHeaderItems.every(i => i.type === 'geometry_formula');
+  const useGeoLayout = isAllGeoFormula && isBlank;
 
   const DRAWING_CFG = {
     s:  { drawingCol: '22%', contentCol: '50%', notationCol: '24%', imgH: portrait ?  50 :  60 },
@@ -85,6 +94,7 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   const pageHeightMm = portrait ? 297 : 210;
 
   useLayoutEffect(() => {
+    if (useGeoLayout) return;       // в гео-режиме измерения не нужны
     if (!needsMeasure) return;
 
     // Точный px/mm: берём реальную ширину контейнера-измерителя в px и делим на известную ширину в mm
@@ -131,8 +141,9 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   });
 
   const handlePrint = () => {
+    const orientation = useGeoLayout ? 'portrait' : (portrait ? 'portrait' : 'landscape');
     const style = document.createElement('style');
-    style.textContent = `@page { size: A4 ${portrait ? 'portrait' : 'landscape'}; margin: 0; }`;
+    style.textContent = `@page { size: A4 ${orientation}; margin: 0; }`;
     document.head.appendChild(style);
     window.print();
     setTimeout(() => document.head.removeChild(style), 1500);
@@ -142,7 +153,8 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     const filename = isBlank
       ? `ТДФ_Вариант${variantNumber}_${tdfSet?.title || ''}.pdf`
       : `ТДФ_Конспект_${tdfSet?.title || ''}.pdf`;
-    exportToPDF(printRef, filename, { format: 'A4', landscape: !portrait });
+    const landscape = useGeoLayout ? false : !portrait;
+    exportToPDF(printRef, filename, { format: 'A4', landscape });
   };
 
   // ── Переиспользуемые части ──────────────────────────────────────────────────
@@ -167,6 +179,50 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
         </tr>
       );
     }
+
+    // ── Геометрическая формула: особый рендер ───────────────────────────────
+    if (item.type === 'geometry_formula') {
+      const formulaHidden = isBlank && (item.formula_control_hidden !== false);
+
+      // В blank-режиме — контрольный чертёж (частичный), в etalon — полный
+      const drawingCell = isBlank
+        ? (item.drawing_image_control
+            ? <img src={api.getTdfItemControlDrawingUrl(item)} alt="контроль" className="tdf-drawing-img" style={{ maxHeight: dcfg.imgH }} />
+            : <div className={`tdf-blank-area${gridCls}`} />)
+        : (item.drawing_image
+            ? <img src={api.getTdfItemDrawingUrl(item)} alt="подготовка" className="tdf-drawing-img" style={{ maxHeight: dcfg.imgH }} />
+            : <span className="tdf-empty">—</span>);
+
+      return (
+        <tr key={item.id} ref={refCb} style={rowStyle} className="tdf-item-row">
+          <td className="tdf-cell tdf-cell-num">
+            <div className="tdf-num-content">
+              <span className="tdf-num-value">{num}</span>
+              <span className="tdf-type-vertical">{TYPE_LABELS.geometry_formula}</span>
+            </div>
+          </td>
+          <td className={`tdf-cell tdf-cell-name-formulation`}>
+            <div className="tdf-item-name">{item.name}</div>
+          </td>
+          <td className={`tdf-cell tdf-cell-drawing${gridCls}`}>
+            {drawingCell}
+          </td>
+          <td className={`tdf-cell tdf-cell-notation${gridCls}`}>
+            {formulaHidden ? (
+              <div className="tdf-blank-area" />
+            ) : (
+              <div className="tdf-math-content">
+                {item.short_notation_md
+                  ? <MathRenderer content={item.short_notation_md} />
+                  : <span className="tdf-empty">—</span>}
+              </div>
+            )}
+          </td>
+        </tr>
+      );
+    }
+
+    // ── Стандартный пункт ТДФ ───────────────────────────────────────────────
     return (
       <tr key={item.id} ref={refCb} style={rowStyle} className="tdf-item-row">
         <td className="tdf-cell tdf-cell-num">
@@ -245,42 +301,55 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     <div className="tdf-print-controls no-print">
       <Space wrap>
         <Button icon={<ArrowLeftOutlined />} onClick={onBack}>Назад</Button>
-        <Segmented
-          value={portrait ? 'portrait' : 'landscape'}
-          onChange={v => setPortrait(v === 'portrait')}
-          options={[
-            { label: 'Альбомная', value: 'landscape' },
-            { label: 'Книжная', value: 'portrait' },
-          ]}
-        />
-        <Segmented
-          value={drawingSize}
-          onChange={setDrawingSize}
-          options={[
-            { label: 'Чертёж S', value: 's' },
-            { label: 'Чертёж M', value: 'm' },
-            { label: 'Чертёж L', value: 'l' },
-            { label: 'Чертёж XL', value: 'xl' },
-          ]}
-        />
-        {isBlank && (
+        {useGeoLayout ? (
+          <Segmented
+            value={String(geoStripsPerPage)}
+            onChange={v => setGeoStripsPerPage(Number(v))}
+            options={[
+              { label: '1 полоска', value: '1' },
+              { label: '2 полоски', value: '2' },
+            ]}
+          />
+        ) : (
           <>
             <Segmented
-              value={stretchMode ? '2' : '1'}
-              onChange={v => setStretchMode(v === '2')}
+              value={portrait ? 'portrait' : 'landscape'}
+              onChange={v => setPortrait(v === 'portrait')}
               options={[
-                { label: '1 лист', value: '1' },
-                { label: '2 листа', value: '2' },
+                { label: 'Альбомная', value: 'landscape' },
+                { label: 'Книжная', value: 'portrait' },
               ]}
             />
             <Segmented
-              value={showGrid ? 'grid' : 'plain'}
-              onChange={v => setShowGrid(v === 'grid')}
+              value={drawingSize}
+              onChange={setDrawingSize}
               options={[
-                { label: 'Без сетки', value: 'plain' },
-                { label: 'В клетку', value: 'grid' },
+                { label: 'Чертёж S', value: 's' },
+                { label: 'Чертёж M', value: 'm' },
+                { label: 'Чертёж L', value: 'l' },
+                { label: 'Чертёж XL', value: 'xl' },
               ]}
             />
+            {isBlank && (
+              <>
+                <Segmented
+                  value={stretchMode ? '2' : '1'}
+                  onChange={v => setStretchMode(v === '2')}
+                  options={[
+                    { label: '1 лист', value: '1' },
+                    { label: '2 листа', value: '2' },
+                  ]}
+                />
+                <Segmented
+                  value={showGrid ? 'grid' : 'plain'}
+                  onChange={v => setShowGrid(v === 'grid')}
+                  options={[
+                    { label: 'Без сетки', value: 'plain' },
+                    { label: 'В клетку', value: 'grid' },
+                  ]}
+                />
+              </>
+            )}
           </>
         )}
         <Button icon={<PrinterOutlined />} onClick={handlePrint}>Печать</Button>
@@ -293,6 +362,56 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
       </Text>
     </div>
   );
+
+  // ── Гео-формат: компактные полоски-варианты на A4 portrait ────────────────
+  if (useGeoLayout) {
+    const stripTitle = (variantTitle || tdfSet?.title || '').trim();
+    const stripsArr = Array.from({ length: geoStripsPerPage }, (_, idx) => (
+      <div key={idx} className="tdf-geo-strip">
+        <h2 className="tdf-geo-title">{stripTitle}</h2>
+        <div className="tdf-geo-fio">
+          <span>ФИ</span>
+          <span className="tdf-geo-fio-line" />
+        </div>
+        <ol className="tdf-geo-list">
+          {nonHeaderItems.map((item, i) => {
+            const showFormula = item.formula_control_hidden === false;
+            return (
+              <li key={item.id} className="tdf-geo-item">
+                <span className="tdf-geo-num">{i + 1}).</span>
+                <div className="tdf-geo-figure">
+                  {item.drawing_image_control
+                    ? <img src={api.getTdfItemControlDrawingUrl(item)} alt="" />
+                    : <div className="tdf-geo-figure--empty" />}
+                </div>
+                <span className="tdf-geo-formula">
+                  {showFormula && item.short_notation_md ? (
+                    <MathRenderer content={item.short_notation_md} />
+                  ) : (
+                    <>
+                      <span>S =</span>
+                      <span className="tdf-geo-formula-line" />
+                    </>
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    ));
+
+    return (
+      <div className="tdf-print-wrapper">
+        {controls}
+        <div ref={printRef} className="tdf-print-book">
+          <div className="tdf-print-page tdf-print-page--geo">
+            {stripsArr}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Фаза 1: скрытый рендер для замера высот ─────────────────────────────────
   if (needsMeasure) {

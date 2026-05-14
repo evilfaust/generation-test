@@ -1911,6 +1911,11 @@ export const api = {
     return `${PB_BASE_URL}/api/files/tdf_items/${item.id}/${item.drawing_image}`;
   },
 
+  getTdfItemControlDrawingUrl(item) {
+    if (!item?.drawing_image_control) return null;
+    return `${PB_BASE_URL}/api/files/tdf_items/${item.id}/${item.drawing_image_control}`;
+  },
+
   // --- tdf_variants ---
   async getTdfVariants(setId) {
     try {
