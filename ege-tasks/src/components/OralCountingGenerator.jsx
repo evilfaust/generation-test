@@ -222,6 +222,7 @@ export default function OralCountingGenerator() {
           tasksData={tasksData}
           settings={settings}
           title={title}
+          fontSize={settings.fontSize || 's'}
         />
       )}
 

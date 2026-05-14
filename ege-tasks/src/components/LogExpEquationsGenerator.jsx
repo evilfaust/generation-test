@@ -235,6 +235,7 @@ export default function LogExpEquationsGenerator() {
           settings={settings}
           title={title}
           equationMode
+          fontSize={settings.fontSize || 's'}
         />
       )}
 
