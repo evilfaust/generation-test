@@ -142,13 +142,14 @@ function SaveTab({ tasksData, generatorType, generatorTitle, settings, onSaved }
         (pct) => setProgress(pct),
       );
       setProgress(95);
-      const record = await api.createTrigMCTest({
-        title:          values.title,
-        class_number:   values.classNumber || null,
-        generator_type: generatorType,
-        options_count:  values.optionsCount,
-        shuffle_mode:   values.shuffleMode,
-        settings:       settings || {},
+      const record = await api.createMCTest({
+        title:              values.title,
+        class_number:       values.classNumber || null,
+        source_type:        'generator',
+        generator_type:     generatorType,
+        generator_settings: settings || {},
+        options_count:      values.optionsCount,
+        shuffle_mode:       values.shuffleMode,
         variants,
       });
       setProgress(100);
@@ -249,8 +250,7 @@ function SavedTab({ generatorType, onPrint }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const all = await api.getTrigMCTests();
-      setTests(all.filter(t => t.generator_type === generatorType));
+      setTests(await api.getMCTestsByGeneratorType(generatorType));
     } finally {
       setLoading(false);
     }
@@ -267,7 +267,7 @@ function SavedTab({ generatorType, onPrint }) {
           .flatMap(v => (v.tasks || []).map(t => t.task_id).filter(Boolean));
         await Promise.allSettled(taskIds.map(tid => api.deleteTask(tid)));
       }
-      await api.deleteTrigMCTest(id);
+      await api.deleteMCTest(id);
       message.success('Тест удалён');
       setTests(prev => prev.filter(t => t.id !== id));
     } catch {

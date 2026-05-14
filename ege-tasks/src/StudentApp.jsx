@@ -449,7 +449,7 @@ function StudentApp() {
         )}
 
         {currentView === 'test' && (
-          (session?.mc_test || session?.trig_mc_test)
+          session?.mc_test
             ? <StudentMCTestPage studentSession={studentSession} />
             : <StudentTestPage studentSession={studentSession} />
         )}

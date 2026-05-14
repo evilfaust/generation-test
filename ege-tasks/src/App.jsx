@@ -58,6 +58,7 @@ import AdditionFormulasGenerator from './components/AdditionFormulasGenerator';
 import TrigMixedGenerator from './components/TrigMixedGenerator';
 import DoubleAngleGenerator from './components/DoubleAngleGenerator';
 import OralCountingGenerator from './components/OralCountingGenerator';
+import LogExpEquationsGenerator from './components/LogExpEquationsGenerator';
 import MarathonGenerator from './components/MarathonGenerator';
 import CrosswordGenerator from './components/CrosswordGenerator';
 import EgeScoreCalculator from './components/EgeScoreCalculator';
@@ -123,6 +124,7 @@ export const R = {
   TRIG_CRYPTOGRAM:     '/app/trig/cryptogram',
   // Арифметика
   ORAL_COUNTING:       '/app/arith/oral-counting',
+  LOG_EXP_EQUATIONS:   '/app/arith/log-exp',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',

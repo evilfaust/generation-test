@@ -3,12 +3,6 @@ import { api } from '../services/pocketbase';
 import { shuffleArray } from '../utils/shuffle';
 import { shuffleOptionsWithSeed, hashStringToSeed } from '../utils/distractorGenerator';
 
-// Загрузка задач варианта trig MC-теста.
-// Задачи теперь хранятся как реальные записи в tasks по task_id — формат идентичен mc_tests.
-async function loadTrigMCVariantTasks(trigMcTest, variantNumber, attemptId, deviceId, authStudentId) {
-  return loadMCVariantTasks(trigMcTest, variantNumber, attemptId, deviceId, authStudentId);
-}
-
 // Загрузка задач варианта MC-теста: getTasksByIds + прикрепляем mc_options
 async function loadMCVariantTasks(mcTest, variantNumber, attemptId, deviceId, authStudentId) {
   const variantData = mcTest.variants.find(v => String(v.number) === String(variantNumber));
@@ -129,18 +123,7 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
             issueNumber: getIssueNumber(existingAttempt, allAttempts),
           });
 
-          if (sessionData.trig_mc_test) {
-            // Тригонометрический MC-тест: inline задачи из trig_mc_tests
-            const trigMcTest = await api.getTrigMCTest(sessionData.trig_mc_test);
-            const { variant: tVariant, tasks: tTasks } = await loadTrigMCVariantTasks(
-              trigMcTest,
-              existingAttempt.mc_variant ?? existingAttempt.variant,
-              existingAttempt.id,
-              deviceId,
-              authStudentId
-            );
-            if (tVariant) { setVariant(tVariant); setTasks(tTasks); }
-          } else if (sessionData.mc_test) {
+          if (sessionData.mc_test) {
             // MC-тест: загрузить mc_test и собрать задачи с опциями
             const mcTest = await api.getMCTest(sessionData.mc_test);
             const { variant: mcVariant, tasks: mcTasks } = await loadMCVariantTasks(
@@ -219,13 +202,7 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
           ...resolvedAttempt,
           issueNumber: getIssueNumber(resolvedAttempt, allAttempts),
         });
-        if (session.trig_mc_test) {
-          const trigMcTest = await api.getTrigMCTest(session.trig_mc_test);
-          const { variant: tVariant, tasks: tTasks } = await loadTrigMCVariantTasks(
-            trigMcTest, resolvedAttempt.mc_variant ?? resolvedAttempt.variant, resolvedAttempt.id, deviceId, authStudentId
-          );
-          if (tVariant) { setVariant(tVariant); setTasks(tTasks); }
-        } else if (session.mc_test) {
+        if (session.mc_test) {
           const mcTest = await api.getMCTest(session.mc_test);
           const { variant: mcVariant, tasks: mcTasks } = await loadMCVariantTasks(
             mcTest, resolvedAttempt.mc_variant ?? resolvedAttempt.variant, resolvedAttempt.id, deviceId, authStudentId
@@ -239,44 +216,6 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
           }
         }
         return resolvedAttempt;
-      }
-
-      // === Trig MC-тест: round-robin по trig_mc_test.variants ===
-      if (session.trig_mc_test) {
-        const trigMcTest = await api.getTrigMCTest(session.trig_mc_test);
-        const trigVariants = trigMcTest.variants || [];
-        if (!trigVariants.length) { setError('В тесте нет вариантов'); return null; }
-        const allAttemptsAll = await api.getAttemptsBySession(sessionId);
-        const counts = {};
-        trigVariants.forEach(v => { counts[String(v.number)] = 0; });
-        allAttemptsAll.forEach(a => {
-          const key = String(a.mc_variant ?? a.variant ?? '');
-          if (counts[key] !== undefined) counts[key]++;
-        });
-        const min = Math.min(...Object.values(counts));
-        const candidates = Object.keys(counts).filter(k => counts[k] === min);
-        const chosenNumber = shuffleArray([...candidates])[0];
-        const chosenVariant = trigVariants.find(v => String(v.number) === chosenNumber);
-
-        const newAttempt = await api.createAttempt({
-          session: sessionId,
-          student_name: studentName,
-          device_id: deviceId,
-          ...(authStudentId ? { student: authStudentId } : {}),
-          mc_variant: Number(chosenNumber),
-          status: 'started',
-          score: 0,
-          total: (chosenVariant.tasks || []).length,
-        });
-        const { variant: tVariant, tasks: tTasks } = await loadTrigMCVariantTasks(
-          trigMcTest, chosenNumber, newAttempt.id, deviceId, authStudentId
-        );
-        setAttempt({
-          ...newAttempt,
-          issueNumber: getIssueNumber(newAttempt, [...allAttemptsAll, newAttempt]),
-        });
-        if (tVariant) { setVariant(tVariant); setTasks(tTasks); }
-        return newAttempt;
       }
 
       // === MC-тест: round-robin по mc_test.variants ===

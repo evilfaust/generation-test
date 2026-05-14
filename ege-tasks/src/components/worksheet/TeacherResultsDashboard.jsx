@@ -89,11 +89,9 @@ const TeacherResultsDashboard = ({ sessionId }) => {
       try {
         const session = await api.getSession(sessionId);
         if (cancelled) return;
-        const mcTestId = session?.mc_test || session?.trig_mc_test;
+        const mcTestId = session?.mc_test;
         if (!mcTestId) { setMcTestData(null); return; }
-        const mcTest = session?.mc_test
-          ? await api.getMCTest(mcTestId)
-          : await api.getTrigMCTest(mcTestId);
+        const mcTest = await api.getMCTest(mcTestId);
         if (!cancelled) setMcTestData(mcTest);
       } catch (_) { /* не критично */ }
     };

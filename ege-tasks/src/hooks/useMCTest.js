@@ -11,6 +11,9 @@ export function useMCTest() {
   const [topicIds, setTopicIds] = useState([]);
   const [optionsCount, setOptionsCount] = useState(DEFAULT_OPTIONS_COUNT);
   const [shuffleMode, setShuffleMode] = useState('per_student'); // 'fixed' | 'per_student'
+  const [sourceType, setSourceType] = useState('catalog'); // 'catalog' | 'generator'
+  const [generatorType, setGeneratorType] = useState(null);
+  const [generatorSettings, setGeneratorSettings] = useState(null);
   const [variants, setVariants] = useState([]); // [{ number, tasks: [{task_id, options}] }]
   const [tasksMap, setTasksMap] = useState({}); // { [taskId]: taskRecord }
   const [savedId, setSavedId] = useState(null);
@@ -23,6 +26,9 @@ export function useMCTest() {
     setTopicIds([]);
     setOptionsCount(DEFAULT_OPTIONS_COUNT);
     setShuffleMode('per_student');
+    setSourceType('catalog');
+    setGeneratorType(null);
+    setGeneratorSettings(null);
     setVariants([]);
     setTasksMap({});
     setSavedId(null);
@@ -129,8 +135,11 @@ export function useMCTest() {
     topics: topicIds,
     options_count: optionsCount,
     shuffle_mode: shuffleMode,
+    source_type: sourceType,
+    ...(generatorType ? { generator_type: generatorType } : {}),
+    ...(generatorSettings ? { generator_settings: generatorSettings } : {}),
     variants,
-  }), [title, description, classNumber, topicIds, optionsCount, shuffleMode, variants]);
+  }), [title, description, classNumber, topicIds, optionsCount, shuffleMode, sourceType, generatorType, generatorSettings, variants]);
 
   const save = useCallback(async () => {
     setLoading(true);
@@ -160,6 +169,9 @@ export function useMCTest() {
       setTopicIds(rec.topics || []);
       setOptionsCount(rec.options_count || DEFAULT_OPTIONS_COUNT);
       setShuffleMode(rec.shuffle_mode || 'per_student');
+      setSourceType(rec.source_type || 'catalog');
+      setGeneratorType(rec.generator_type || null);
+      setGeneratorSettings(rec.generator_settings || null);
       const v = rec.variants || [];
       setVariants(v);
 
@@ -181,6 +193,7 @@ export function useMCTest() {
     topicIds, setTopicIds,
     optionsCount, setOptionsCount,
     shuffleMode, setShuffleMode,
+    sourceType, generatorType, generatorSettings,
     variants,
     tasksMap,
     savedId,

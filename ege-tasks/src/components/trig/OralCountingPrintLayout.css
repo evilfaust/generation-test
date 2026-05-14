@@ -183,10 +183,24 @@
     flex-shrink: 0;
   }
 
+  /* В режиме уравнений выражение занимает всё доступное место */
+  .oral-task-expr--eq {
+    flex: 1;
+    min-width: 0;
+  }
+
   .oral-task-eq {
     padding: 0 0 0 2px;
     font-size: 10.5pt;
     flex-shrink: 0;
+  }
+
+  /* Подсказка «x =» в режиме уравнений */
+  .oral-task-x-prompt {
+    font-size: 10pt;
+    flex-shrink: 0;
+    padding-left: 4px;
+    white-space: nowrap;
   }
 
   /* ─── Страница ответов для учителя ──────────────────────────────────────── */

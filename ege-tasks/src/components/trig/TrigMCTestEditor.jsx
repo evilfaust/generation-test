@@ -36,7 +36,7 @@ export default function TrigMCTestEditor({ testId, open, onClose, onSaved }) {
     if (!testId) return;
     setLoading(true);
     try {
-      const t = await api.getTrigMCTest(testId);
+      const t = await api.getMCTest(testId);
       setTest(t);
       form.setFieldsValue({
         title:        t.title || '',
@@ -156,7 +156,7 @@ export default function TrigMCTestEditor({ testId, open, onClose, onSaved }) {
         ...v,
         tasks: v.tasks.map(({ _taskRecord, ...rest }) => rest),
       }));
-      const updated = await api.updateTrigMCTest(testId, {
+      const updated = await api.updateMCTest(testId, {
         title:         values.title,
         class_number:  values.classNumber || null,
         options_count: values.optionsCount,
@@ -282,7 +282,7 @@ export default function TrigMCTestEditor({ testId, open, onClose, onSaved }) {
     {
       key: 'issue',
       label: 'Выдача',
-      children: testId ? <SessionPanel trigMcTestId={testId} /> : null,
+      children: testId ? <SessionPanel mcTestId={testId} /> : null,
     },
   ];
 

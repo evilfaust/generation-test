@@ -2496,77 +2496,56 @@ export const api = {
     }
   },
 
-  // --- trig_mc_tests (MC-тесты из тригонометрических генераторов) ---
+  // --- MC-тесты из генераторов: фильтр по generator_type ---
 
-  async getTrigMCTests() {
+  async getMCTestsByGeneratorType(generatorType) {
     try {
-      return await pb.collection('trig_mc_tests').getFullList({ sort: '-created' });
-    } catch (error) {
-      console.error('Error fetching trig_mc_tests:', error);
-      return [];
-    }
-  },
-
-  async getTrigMCTest(id) {
-    try {
-      return await pb.collection('trig_mc_tests').getOne(id);
-    } catch (error) {
-      console.error('Error fetching trig_mc_test:', error);
-      throw error;
-    }
-  },
-
-  async createTrigMCTest(data) {
-    try {
-      return await pb.collection('trig_mc_tests').create(data);
-    } catch (error) {
-      console.error('Error creating trig_mc_test:', error);
-      throw error;
-    }
-  },
-
-  async updateTrigMCTest(id, data) {
-    try {
-      return await pb.collection('trig_mc_tests').update(id, data);
-    } catch (error) {
-      console.error('Error updating trig_mc_test:', error);
-      throw error;
-    }
-  },
-
-  async deleteTrigMCTest(id) {
-    try {
-      return await pb.collection('trig_mc_tests').delete(id);
-    } catch (error) {
-      console.error('Error deleting trig_mc_test:', error);
-      throw error;
-    }
-  },
-
-  // Сессия для trig_mc_test (без поля work)
-  async createTrigMCTestSession(trigMcTestId, extra = {}) {
-    try {
-      return await pb.collection('work_sessions').create({
-        trig_mc_test: trigMcTestId,
-        is_open: true,
-        achievements_enabled: false,
-        ...extra,
-      });
-    } catch (error) {
-      console.error('Error creating trig MC test session:', error);
-      throw error;
-    }
-  },
-
-  async getSessionsByTrigMCTest(trigMcTestId) {
-    try {
-      return await pb.collection('work_sessions').getFullList({
-        filter: `trig_mc_test = "${trigMcTestId}"`,
+      return await pb.collection('mc_tests').getFullList({
+        filter: `source_type = "generator" && generator_type = "${generatorType}"`,
         sort: '-created',
       });
     } catch (error) {
-      console.error('Error getting sessions by trig_mc_test:', error);
+      console.error('Error fetching mc_tests by generator_type:', error);
       return [];
+    }
+  },
+
+  // --- Аналитика по MC-тесту ---
+
+  async getMCTestAnalytics(mcTestId) {
+    try {
+      const sessions = await pb.collection('work_sessions').getFullList({
+        filter: `mc_test = "${mcTestId}"`,
+        fields: 'id',
+      });
+      if (!sessions.length) return { attempts: [], answerStats: {} };
+
+      const sessionFilter = sessions.map(s => `session = "${s.id}"`).join(' || ');
+      const attempts = await pb.collection('attempts').getFullList({
+        filter: `(${sessionFilter}) && status = "submitted"`,
+        sort: '-created',
+      });
+      if (!attempts.length) return { attempts, answerStats: {} };
+
+      const attemptFilter = attempts.map(a => `attempt = "${a.id}"`).join(' || ');
+      const answers = await pb.collection('attempt_answers').getFullList({
+        filter: attemptFilter,
+      });
+
+      const answerStats = {};
+      for (const ans of answers) {
+        const taskId = ans.task;
+        if (!answerStats[taskId]) answerStats[taskId] = { choices: {}, correctCount: 0, total: 0 };
+        const key = String(ans.answer_normalized ?? ans.answer_raw ?? '');
+        answerStats[taskId].choices[key] = (answerStats[taskId].choices[key] || 0) + 1;
+        answerStats[taskId].total++;
+        if (ans.is_correct) answerStats[taskId].correctCount++;
+      }
+
+      return { attempts, answerStats };
+    } catch (error) {
+      console.error('Error fetching mc_test analytics:', error);
+      return { attempts: [], answerStats: {} };
     }
   },
 

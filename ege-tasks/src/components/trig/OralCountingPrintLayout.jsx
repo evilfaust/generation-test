@@ -12,18 +12,23 @@ function MathInline({ latex }) {
 }
 
 // ─── Одно задание ─────────────────────────────────────────────────────────────
-function TaskRow({ q, qi }) {
+function TaskRow({ q, qi, equationMode }) {
   return (
     <div className="oral-task">
       <span className="oral-task-num">{LABELS[qi]})</span>
-      <span className="oral-task-expr"><MathInline latex={q.exprLatex} /></span>
-      <span className="oral-task-eq">=</span>
+      <span className={equationMode ? 'oral-task-expr oral-task-expr--eq' : 'oral-task-expr'}>
+        <MathInline latex={q.exprLatex} />
+      </span>
+      {equationMode
+        ? <span className="oral-task-x-prompt">x =</span>
+        : <span className="oral-task-eq">=</span>
+      }
     </div>
   );
 }
 
 // ─── Страница ученика ─────────────────────────────────────────────────────────
-function StudentPage({ variant, variantIndex, title, mode, columnsCount }) {
+function StudentPage({ variant, variantIndex, title, mode, columnsCount, equationMode }) {
   const pageClass =
     mode === 'side' ? 'oral-page oral-page--side' :
     mode === 'half' ? 'oral-page oral-page--half' :
@@ -44,11 +49,13 @@ function StudentPage({ variant, variantIndex, title, mode, columnsCount }) {
       </div>
 
       {title && <div className="oral-subtitle">{title}</div>}
-      <div className="oral-instruction">Вычислите:</div>
+      <div className="oral-instruction">
+        {equationMode ? 'Решите уравнения:' : 'Вычислите:'}
+      </div>
 
       <div className={gridClass}>
         {variant.map((q, qi) => (
-          <TaskRow key={qi} q={q} qi={qi} />
+          <TaskRow key={qi} q={q} qi={qi} equationMode={equationMode} />
         ))}
       </div>
     </div>
@@ -56,7 +63,7 @@ function StudentPage({ variant, variantIndex, title, mode, columnsCount }) {
 }
 
 // ─── Страница ответов для учителя ─────────────────────────────────────────────
-function TeacherKeyPage({ tasksData, title }) {
+function TeacherKeyPage({ tasksData, title, equationMode }) {
   return (
     <div className="oral-key-page">
       <div className="oral-key-header">{title} — Ответы (для учителя)</div>
@@ -71,7 +78,7 @@ function TeacherKeyPage({ tasksData, title }) {
                   <span className="oral-key-expr">
                     <MathInline latex={q.exprLatex} />
                   </span>
-                  <span className="oral-key-eq">=</span>
+                  <span className="oral-key-eq">{equationMode ? 'x =' : '='}</span>
                   <span className="oral-key-ans">
                     <MathInline latex={`\\color{#c0392b}{${q.resultLatex}}`} />
                   </span>
@@ -86,14 +93,13 @@ function TeacherKeyPage({ tasksData, title }) {
 }
 
 // ─── Корневой компонент ────────────────────────────────────────────────────────
-export default function OralCountingPrintLayout({ tasksData, settings, title }) {
+export default function OralCountingPrintLayout({ tasksData, settings, title, equationMode = false }) {
   if (!tasksData) return null;
   const { twoPerPage, sideBySide, showTeacherKey, columnsCount = 2 } = settings;
 
   let pages;
 
   if (sideBySide) {
-    // Новый режим: левая/правая колонка на одном листе
     pages = [];
     for (let i = 0; i < tasksData.length; i += 2) {
       const pair = tasksData.slice(i, i + 2);
@@ -107,13 +113,13 @@ export default function OralCountingPrintLayout({ tasksData, settings, title }) 
               title={title}
               mode="side"
               columnsCount={1}
+              equationMode={equationMode}
             />
           ))}
         </div>
       );
     }
   } else if (twoPerPage) {
-    // Старый режим: верхняя/нижняя половина листа
     pages = [];
     for (let i = 0; i < tasksData.length; i += 2) {
       const pair = tasksData.slice(i, i + 2);
@@ -127,6 +133,7 @@ export default function OralCountingPrintLayout({ tasksData, settings, title }) 
               title={title}
               mode="half"
               columnsCount={columnsCount}
+              equationMode={equationMode}
             />
           ))}
         </div>
@@ -141,6 +148,7 @@ export default function OralCountingPrintLayout({ tasksData, settings, title }) 
         title={title}
         mode="full"
         columnsCount={columnsCount}
+        equationMode={equationMode}
       />
     ));
   }
@@ -149,7 +157,7 @@ export default function OralCountingPrintLayout({ tasksData, settings, title }) 
     <div className="oral-print-root">
       {pages}
       {showTeacherKey && (
-        <TeacherKeyPage tasksData={tasksData} title={title} />
+        <TeacherKeyPage tasksData={tasksData} title={title} equationMode={equationMode} />
       )}
     </div>
   );

@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Card, Button, Input, Select, InputNumber, Space, Divider, Modal, App, Empty, Tag, Tooltip, Collapse, Radio, Tabs, Popconfirm, Spin } from 'antd';
+import {
+  Card, Button, Input, Select, InputNumber, Space, Divider, Modal, App, Empty,
+  Tag, Tooltip, Collapse, Radio, Popconfirm, Spin, Tabs,
+} from 'antd';
 import {
   PlusOutlined, SaveOutlined, DeleteOutlined, PrinterOutlined, ArrowLeftOutlined,
   EditOutlined, FileTextOutlined, CloseOutlined, ArrowUpOutlined, ArrowDownOutlined,
-  AppstoreAddOutlined, ReloadOutlined, ShareAltOutlined,
+  AppstoreAddOutlined, ReloadOutlined, ShareAltOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { api } from '../services/pocketbase';
@@ -13,6 +16,7 @@ import MathRenderer from './MathRenderer';
 import TaskSelectModal from './TaskSelectModal';
 import MCOptionsEditor from './mc-test/MCOptionsEditor';
 import MCTestPrintLayout from './mc-test/MCTestPrintLayout';
+import MCTestAnalytics from './mc-test/MCTestAnalytics';
 import TrigMCPrintLayout from './trig/TrigMCPrintLayout';
 import TrigMCTestEditor from './trig/TrigMCTestEditor';
 import SessionPanel from './worksheet/SessionPanel';
@@ -25,105 +29,15 @@ const GENERATOR_LABELS = {
   trig_equations_advanced: 'Уравнения f(kx+b)=a',
   reduction_formulas:      'Формулы приведения',
   addition_formulas:       'Формулы сложения',
+  oral_counting:           'Устный счёт',
 };
 
-function TrigMCTestsList({ onPrint }) {
-  const { message: msg } = App.useApp();
-  const [tests, setTests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState(null);
-  const [issueOpenId, setIssueOpenId] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try { setTests(await api.getTrigMCTests()); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const handleDelete = async (id, title) => {
-    setDeletingId(id);
-    try {
-      await api.deleteTrigMCTest(id);
-      msg.success('Тест удалён');
-      setTests(prev => prev.filter(t => t.id !== id));
-    } catch { msg.error('Ошибка удаления'); }
-    finally { setDeletingId(null); }
-  };
-
-  if (loading) return <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>;
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-        <Button icon={<ReloadOutlined />} size="small" onClick={load}>Обновить</Button>
-      </div>
-      {tests.length === 0 ? (
-        <Empty description="Сохранённых тестов из генераторов нет. Нажмите «Тест с выбором» в любом тригонометрическом генераторе." />
-      ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
-          {tests.map(t => {
-            const variantsCount = Array.isArray(t.variants) ? t.variants.length : 0;
-            const tasksPerVariant = variantsCount > 0 ? (t.variants[0]?.tasks?.length ?? 0) : 0;
-            return (
-              <Card key={t.id} size="small" hoverable>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600 }}>{t.title || '(без названия)'}</div>
-                    <Space size={8} style={{ marginTop: 6 }} wrap>
-                      {t.class_number && <Tag>{t.class_number} класс</Tag>}
-                      <Tag color="cyan">{GENERATOR_LABELS[t.generator_type] ?? t.generator_type}</Tag>
-                      <Tag color="blue">{variantsCount} вар.</Tag>
-                      <Tag color="geekblue">{tasksPerVariant} зад./вар.</Tag>
-                      <Tag color="purple">{t.options_count} вар. ответа</Tag>
-                      <Tag color={t.shuffle_mode === 'fixed' ? 'orange' : 'green'}>
-                        {t.shuffle_mode === 'fixed' ? 'Фикс. порядок' : 'Перемешивать'}
-                      </Tag>
-                      <span style={{ fontSize: 11, color: '#aaa' }}>
-                        {new Date(t.created).toLocaleDateString('ru')}
-                      </span>
-                    </Space>
-                  </div>
-                  <Space>
-                    <Button
-                      icon={<ShareAltOutlined />}
-                      type={issueOpenId === t.id ? 'primary' : 'default'}
-                      onClick={() => setIssueOpenId(prev => prev === t.id ? null : t.id)}
-                    >
-                      Выдать
-                    </Button>
-                    <Button icon={<EditOutlined />} onClick={() => setEditingId(t.id)}>Редактировать</Button>
-                    <Button icon={<PrinterOutlined />} onClick={() => onPrint(t)}>Печать</Button>
-                    <Popconfirm
-                      title={`Удалить тест «${t.title}»?`}
-                      onConfirm={() => handleDelete(t.id, t.title)}
-                      okText="Да" cancelText="Нет" okType="danger"
-                    >
-                      <Button danger icon={<DeleteOutlined />} loading={deletingId === t.id} />
-                    </Popconfirm>
-                  </Space>
-                </div>
-                {issueOpenId === t.id && (
-                  <div style={{ marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
-                    <SessionPanel trigMcTestId={t.id} />
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      <TrigMCTestEditor
-        testId={editingId}
-        open={!!editingId}
-        onClose={() => setEditingId(null)}
-        onSaved={() => load()}
-      />
-    </div>
-  );
+function SourceBadge({ test }) {
+  if (test.source_type === 'generator') {
+    const label = GENERATOR_LABELS[test.generator_type] ?? test.generator_type ?? 'Генератор';
+    return <Tag color="purple">{label}</Tag>;
+  }
+  return <Tag color="blue">Задачник</Tag>;
 }
 
 const { TextArea } = Input;
@@ -133,25 +47,26 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
   const { topics, subtopics, tags } = useReferenceData();
 
   const [mode, setMode] = useState('list'); // 'list' | 'edit'
-  const [listTab, setListTab] = useState('tasks'); // 'tasks' | 'trig'
   const [list, setList] = useState([]);
   const [listLoading, setListLoading] = useState(false);
+  const [issueOpenId, setIssueOpenId] = useState(null);
+  const [analyticsOpenId, setAnalyticsOpenId] = useState(null);
+  const [editingTrigId, setEditingTrigId] = useState(null);
 
   const { printTest: trigPrintTest, handlePrint: handleTrigPrint } = useTrigMCModal();
 
   const mc = useMCTest();
-  const [taskSelectFor, setTaskSelectFor] = useState(null); // index of variant
+  const [taskSelectFor, setTaskSelectFor] = useState(null);
   const [activeVariantKey, setActiveVariantKey] = useState(['0']);
 
-  const loadList = async () => {
+  const loadList = useCallback(async () => {
     setListLoading(true);
     try {
-      const data = await api.getMCTests();
-      setList(data);
+      setList(await api.getMCTests());
     } finally { setListLoading(false); }
-  };
+  }, []);
 
-  useEffect(() => { if (mode === 'list') loadList(); }, [mode]);
+  useEffect(() => { if (mode === 'list') loadList(); }, [mode, loadList]);
 
   useEffect(() => {
     if (initialMcTestId) {
@@ -179,7 +94,7 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
       await mc.load(id);
       setActiveVariantKey(['0']);
       setMode('edit');
-    } catch (e) {
+    } catch {
       message.error('Не удалось загрузить тест');
     }
   };
@@ -187,14 +102,16 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
   const handleDelete = (id, title) => {
     modal.confirm({
       title: `Удалить тест "${title}"?`,
-      content: 'Связанные сессии останутся, но станут недоступны.',
+      content: 'Связанные сессии останутся, но тест будет недоступен.',
       okText: 'Удалить',
       okType: 'danger',
       onOk: async () => {
         try {
           await api.deleteMCTest(id);
           message.success('Тест удалён');
-          loadList();
+          setList(prev => prev.filter(t => t.id !== id));
+          if (issueOpenId === id) setIssueOpenId(null);
+          if (analyticsOpenId === id) setAnalyticsOpenId(null);
         } catch {
           message.error('Ошибка удаления');
         }
@@ -214,7 +131,7 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
     try {
       await mc.save();
       message.success(mc.savedId ? 'Тест обновлён' : 'Тест создан');
-    } catch (e) {
+    } catch {
       message.error('Ошибка сохранения');
     }
   };
@@ -227,68 +144,120 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
     window.print();
   };
 
-  if (mode === 'list') {
-    const tabItems = [
-      {
-        key: 'tasks',
-        label: 'Из задач',
-        children: (
-          <div>
-            {listLoading ? <Empty description="Загрузка..." /> :
-              list.length === 0 ? <Empty description="Нет сохранённых тестов" /> : (
-                <div style={{ display: 'grid', gap: 12 }}>
-                  {list.map(t => {
-                    const totalTasks = (t.variants || []).reduce((s, v) => s + (v.tasks?.length || 0), 0);
-                    return (
-                      <Card key={t.id} size="small" hoverable>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 16, fontWeight: 600 }}>{t.title || '(без названия)'}</div>
-                            {t.description && <div style={{ color: '#666', marginTop: 4 }}>{t.description}</div>}
-                            <Space size={8} style={{ marginTop: 6 }} wrap>
-                              <Tag color="blue">{t.variants?.length || 0} вар.</Tag>
-                              <Tag color="green">{totalTasks} задач</Tag>
-                              {t.class_number && <Tag>{t.class_number} класс</Tag>}
-                              <Tag color={t.shuffle_mode === 'fixed' ? 'orange' : 'purple'}>
-                                {t.shuffle_mode === 'fixed' ? 'Фикс. порядок' : 'Перемешивать'}
-                              </Tag>
-                            </Space>
-                          </div>
-                          <Space>
-                            <Button icon={<EditOutlined />} onClick={() => openTest(t.id)}>Открыть</Button>
-                            <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(t.id, t.title)} />
-                          </Space>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-          </div>
-        ),
-      },
-      {
-        key: 'trig',
-        label: 'Из генераторов',
-        children: <TrigMCTestsList onPrint={handleTrigPrint} />,
-      },
-    ];
+  // ─── LIST MODE ────────────────────────────────────────────────────────────
 
+  if (mode === 'list') {
     return (
       <div style={{ padding: 16 }}>
         <Card
           title="Тесты с выбором ответа"
-          extra={listTab === 'tasks' && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={startNew}>Создать тест</Button>
-          )}
+          extra={<Button type="primary" icon={<PlusOutlined />} onClick={startNew}>Создать тест</Button>}
         >
-          <Tabs
-            activeKey={listTab}
-            onChange={setListTab}
-            items={tabItems}
-            size="small"
-          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <Button icon={<ReloadOutlined />} size="small" onClick={loadList}>Обновить</Button>
+          </div>
+
+          {listLoading ? (
+            <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>
+          ) : list.length === 0 ? (
+            <Empty description="Нет сохранённых тестов. Нажмите «Создать тест» или сохраните тест из тригогенератора." />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {list.map(t => {
+                const variantsCount = Array.isArray(t.variants) ? t.variants.length : 0;
+                const tasksPerVariant = variantsCount > 0 ? (t.variants[0]?.tasks?.length ?? 0) : 0;
+                const isIssueOpen = issueOpenId === t.id;
+                const isAnalyticsOpen = analyticsOpenId === t.id;
+                const isGenerator = t.source_type === 'generator';
+
+                return (
+                  <Card key={t.id} size="small" hoverable style={{ borderRadius: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 15, fontWeight: 600 }}>{t.title || '(без названия)'}</span>
+                          <SourceBadge test={t} />
+                        </div>
+                        {t.description && (
+                          <div style={{ color: '#666', marginTop: 2, fontSize: 13 }}>{t.description}</div>
+                        )}
+                        <Space size={6} style={{ marginTop: 6 }} wrap>
+                          {t.class_number && <Tag>{t.class_number} класс</Tag>}
+                          <Tag color="geekblue">{variantsCount} вар.</Tag>
+                          <Tag color="cyan">{tasksPerVariant} зад./вар.</Tag>
+                          <Tag color="purple">{t.options_count} отв.</Tag>
+                          <Tag color={t.shuffle_mode === 'fixed' ? 'orange' : 'green'}>
+                            {t.shuffle_mode === 'fixed' ? 'Фикс.' : 'Перемешать'}
+                          </Tag>
+                          <span style={{ fontSize: 11, color: '#aaa' }}>
+                            {new Date(t.created).toLocaleDateString('ru')}
+                          </span>
+                        </Space>
+                      </div>
+
+                      <Space wrap style={{ flexShrink: 0 }}>
+                        <Tooltip title="Аналитика">
+                          <Button
+                            icon={<BarChartOutlined />}
+                            type={isAnalyticsOpen ? 'primary' : 'default'}
+                            onClick={() => {
+                              setAnalyticsOpenId(prev => prev === t.id ? null : t.id);
+                              if (isIssueOpen) setIssueOpenId(null);
+                            }}
+                          />
+                        </Tooltip>
+                        <Button
+                          icon={<ShareAltOutlined />}
+                          type={isIssueOpen ? 'primary' : 'default'}
+                          onClick={() => {
+                            setIssueOpenId(prev => prev === t.id ? null : t.id);
+                            if (isAnalyticsOpen) setAnalyticsOpenId(null);
+                          }}
+                        >
+                          Выдать
+                        </Button>
+                        <Button
+                          icon={<PrinterOutlined />}
+                          onClick={() => isGenerator ? handleTrigPrint(t) : openTest(t.id).then(() => setTimeout(window.print, 300))}
+                        >
+                          Печать
+                        </Button>
+                        <Button icon={<EditOutlined />} onClick={() => isGenerator ? setEditingTrigId(t.id) : openTest(t.id)}>
+                          Редактировать
+                        </Button>
+                        <Popconfirm
+                          title={`Удалить «${t.title}»?`}
+                          onConfirm={() => handleDelete(t.id, t.title)}
+                          okText="Да" cancelText="Нет" okType="danger"
+                        >
+                          <Button danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                      </Space>
+                    </div>
+
+                    {isIssueOpen && (
+                      <div style={{ marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
+                        <SessionPanel mcTestId={t.id} />
+                      </div>
+                    )}
+
+                    {isAnalyticsOpen && (
+                      <div style={{ marginTop: 12, borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
+                        <MCTestAnalytics
+                          mcTestId={t.id}
+                          variants={t.variants || []}
+                          shuffleMode={t.shuffle_mode}
+                        />
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </Card>
+
+        {/* Печать тестов из генераторов (через TrigMCPrintLayout) */}
         {trigPrintTest && (
           <TrigMCPrintLayout
             variants={trigPrintTest.variants}
@@ -296,11 +265,20 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
             shuffleMode={trigPrintTest.shuffle_mode || 'fixed'}
           />
         )}
+
+        {/* Редактор тестов из генераторов */}
+        <TrigMCTestEditor
+          testId={editingTrigId}
+          open={!!editingTrigId}
+          onClose={() => setEditingTrigId(null)}
+          onSaved={() => loadList()}
+        />
       </div>
     );
   }
 
-  // === EDIT MODE ===
+  // ─── EDIT MODE (тесты из задачника) ──────────────────────────────────────
+
   const collapseItems = mc.variants.map((variant, vi) => ({
     key: String(vi),
     label: (
@@ -362,6 +340,93 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
     ),
   }));
 
+  const editTabItems = [
+    {
+      key: 'editor',
+      label: 'Редактор',
+      children: (
+        <>
+          <Card title="Параметры теста" size="small" style={{ marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>Название</label>
+                <Input value={mc.title} onChange={e => mc.setTitle(e.target.value)}
+                  placeholder="Например: Производная — контрольная" />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>Класс</label>
+                <InputNumber value={mc.classNumber} onChange={mc.setClassNumber}
+                  min={1} max={11} style={{ width: '100%' }} placeholder="11" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', marginBottom: 4 }}>Описание</label>
+                <TextArea value={mc.description} onChange={e => mc.setDescription(e.target.value)}
+                  rows={2} placeholder="Краткое описание (необязательно)" />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>Темы</label>
+                <Select mode="multiple" value={mc.topicIds} onChange={mc.setTopicIds}
+                  placeholder="Можно несколько" style={{ width: '100%' }}
+                  showSearch optionFilterProp="label"
+                  options={topics.map(t => ({ value: t.id, label: t.title }))} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4 }}>Вариантов ответа на задачу</label>
+                <InputNumber value={mc.optionsCount} onChange={mc.setOptionsCount}
+                  min={2} max={6} style={{ width: '100%' }} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', marginBottom: 4 }}>Порядок вариантов ответа</label>
+                <Radio.Group value={mc.shuffleMode} onChange={e => mc.setShuffleMode(e.target.value)}>
+                  <Radio value="fixed">Фиксированный (как в редакторе)</Radio>
+                  <Radio value="per_student">Перемешивать для каждого ученика</Radio>
+                </Radio.Group>
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Варианты" size="small" extra={
+            <Button icon={<PlusOutlined />} onClick={mc.addVariant}>Добавить вариант</Button>
+          } style={{ marginBottom: 16 }}>
+            {mc.variants.length === 0 ? (
+              <Empty description="Нажмите «Добавить вариант», чтобы начать" />
+            ) : (
+              <Collapse
+                activeKey={activeVariantKey}
+                onChange={setActiveVariantKey}
+                items={collapseItems}
+              />
+            )}
+          </Card>
+        </>
+      ),
+    },
+    {
+      key: 'issue',
+      label: 'Выдача',
+      disabled: !mc.savedId,
+      children: mc.savedId ? (
+        <Card title={<Space><FileTextOutlined /> Выдача ученикам</Space>} size="small">
+          <SessionPanel mcTestId={mc.savedId} />
+        </Card>
+      ) : null,
+    },
+    {
+      key: 'analytics',
+      label: 'Аналитика',
+      disabled: !mc.savedId,
+      children: mc.savedId ? (
+        <Card title={<Space><BarChartOutlined /> Аналитика по тесту</Space>} size="small">
+          <MCTestAnalytics
+            mcTestId={mc.savedId}
+            variants={mc.variants}
+            shuffleMode={mc.shuffleMode}
+          />
+        </Card>
+      ) : null,
+    },
+  ];
+
   return (
     <>
       <div style={{ padding: 16 }} className="mc-test-editor-screen">
@@ -373,64 +438,7 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
           <Button icon={<PrinterOutlined />} onClick={handlePrint}>Печать</Button>
         </Space>
 
-        <Card title="Параметры теста" size="small" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 4 }}>Название</label>
-              <Input value={mc.title} onChange={e => mc.setTitle(e.target.value)}
-                placeholder="Например: Производная — контрольная" />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: 4 }}>Класс</label>
-              <InputNumber value={mc.classNumber} onChange={mc.setClassNumber}
-                min={1} max={11} style={{ width: '100%' }} placeholder="11" />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Описание</label>
-              <TextArea value={mc.description} onChange={e => mc.setDescription(e.target.value)}
-                rows={2} placeholder="Краткое описание (необязательно)" />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: 4 }}>Темы</label>
-              <Select mode="multiple" value={mc.topicIds} onChange={mc.setTopicIds}
-                placeholder="Можно несколько" style={{ width: '100%' }}
-                showSearch optionFilterProp="label"
-                options={topics.map(t => ({ value: t.id, label: t.title }))} />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: 4 }}>Вариантов ответа на задачу</label>
-              <InputNumber value={mc.optionsCount} onChange={mc.setOptionsCount}
-                min={2} max={6} style={{ width: '100%' }} />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: 4 }}>Порядок вариантов ответа</label>
-              <Radio.Group value={mc.shuffleMode} onChange={e => mc.setShuffleMode(e.target.value)}>
-                <Radio value="fixed">Фиксированный (как в редакторе)</Radio>
-                <Radio value="per_student">Перемешивать для каждого ученика</Radio>
-              </Radio.Group>
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Варианты" size="small" extra={
-          <Button icon={<PlusOutlined />} onClick={mc.addVariant}>Добавить вариант</Button>
-        } style={{ marginBottom: 16 }}>
-          {mc.variants.length === 0 ? (
-            <Empty description="Нажмите «Добавить вариант», чтобы начать" />
-          ) : (
-            <Collapse
-              activeKey={activeVariantKey}
-              onChange={setActiveVariantKey}
-              items={collapseItems}
-            />
-          )}
-        </Card>
-
-        {mc.savedId && (
-          <Card title={<Space><FileTextOutlined /> Выдача ученикам</Space>} size="small">
-            <SessionPanel mcTestId={mc.savedId} />
-          </Card>
-        )}
+        <Tabs items={editTabItems} />
       </div>
 
       {/* Печать */}
