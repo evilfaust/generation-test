@@ -195,7 +195,7 @@
     flex-shrink: 0;
   }
 
-  /* Подсказка «x =» в режиме уравнений */
+  /* Подсказка «x =» в режиме уравнений — фикс. ширина = место для ответа */
   .oral-task-x-prompt {
     display: inline-flex;
     align-items: baseline;
@@ -204,6 +204,7 @@
     flex-shrink: 0;
     padding-left: 6px;
     white-space: nowrap;
+    min-width: 30mm;
   }
 
 
