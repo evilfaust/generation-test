@@ -197,10 +197,22 @@
 
   /* Подсказка «x =» в режиме уравнений */
   .oral-task-x-prompt {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 2px;
     font-size: 10pt;
     flex-shrink: 0;
-    padding-left: 4px;
+    padding-left: 6px;
     white-space: nowrap;
+  }
+
+  /* Линия для вписывания ответа после «x =» */
+  .oral-task-x-line {
+    display: inline-block;
+    border-bottom: 1px solid #000;
+    width: 22mm;
+    vertical-align: bottom;
+    margin-left: 2px;
   }
 
   /* ─── Страница ответов для учителя ──────────────────────────────────────── */

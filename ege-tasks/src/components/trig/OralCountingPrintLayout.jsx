@@ -20,7 +20,11 @@ function TaskRow({ q, qi, equationMode }) {
         <MathInline latex={q.exprLatex} />
       </span>
       {equationMode
-        ? <span className="oral-task-x-prompt">x =</span>
+        ? (
+          <span className="oral-task-x-prompt">
+            <MathInline latex="x" /> =<span className="oral-task-x-line" />
+          </span>
+        )
         : <span className="oral-task-eq">=</span>
       }
     </div>

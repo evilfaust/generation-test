@@ -197,8 +197,8 @@ const ROUTE_META = [
   { re: /^\/app\/trig\/addition/,          menuKey: 'addition-formulas', menuGroup: 'trig', title: 'Тригонометрия — Формулы сложения' },
   { re: /^\/app\/trig\/double-angle/,      menuKey: 'double-angle',     menuGroup: 'trig', title: 'Тригонометрия — Двойной аргумент' },
   { re: /^\/app\/trig\/cryptogram/,        menuKey: 'trig-cryptogram',  menuGroup: 'trig', title: 'Тригонометрия — Шифровки' },
-  { re: /^\/app\/arith\/oral-counting/,   menuKey: 'oral-counting',    menuGroup: 'arith', title: 'Арифметика — Устный счёт' },
-  { re: /^\/app\/arith\/log-exp/,         menuKey: 'log-exp',          menuGroup: 'arith', title: 'Арифметика — Степени и логарифмы' },
+  { re: /^\/app\/arith\/oral-counting/,   menuKey: 'oral-counting',    menuGroup: 'arith', title: 'Устный счёт — Арифметика' },
+  { re: /^\/app\/arith\/log-exp/,         menuKey: 'log-exp',          menuGroup: 'arith', title: 'Устный счёт — Степени и логарифмы' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -264,7 +264,7 @@ const GROUP_META = {
   geometry:             { label: 'Геометрия',    path: R.GEOMETRY_TASKS },
   'tdf-group':          { label: 'ТДФ',          path: R.TDF },
   trig:                 { label: 'Тригонометрия' },
-  arith:                { label: 'Арифметика' },
+  arith:                { label: 'Устный счёт' },
   theory:               { label: 'Теория',        path: R.THEORY },
   lab:                  { label: 'Лаборатория' },
 };
@@ -562,9 +562,9 @@ function AppLayout() {
       ],
     },
     {
-      key: 'arith', icon: <CalculatorOutlined />, label: 'Арифметика',
+      key: 'arith', icon: <CalculatorOutlined />, label: 'Устный счёт',
       children: [
-        { key: 'oral-counting', icon: <CalculatorOutlined />, label: 'Устный счёт' },
+        { key: 'oral-counting', icon: <CalculatorOutlined />, label: 'Арифметика' },
         { key: 'log-exp',       icon: <FunctionOutlined />,  label: 'Степени и логарифмы' },
       ],
     },
