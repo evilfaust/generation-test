@@ -22,7 +22,7 @@ function TaskRow({ q, qi, equationMode }) {
       {equationMode
         ? (
           <span className="oral-task-x-prompt">
-            <MathInline latex="x" /> =<span className="oral-task-x-line" />
+            <MathInline latex="x" /> =
           </span>
         )
         : <span className="oral-task-eq">=</span>

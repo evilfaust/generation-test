@@ -206,14 +206,6 @@
     white-space: nowrap;
   }
 
-  /* Линия для вписывания ответа после «x =» */
-  .oral-task-x-line {
-    display: inline-block;
-    border-bottom: 1px solid #000;
-    width: 22mm;
-    vertical-align: bottom;
-    margin-left: 2px;
-  }
 
   /* ─── Страница ответов для учителя ──────────────────────────────────────── */
   .oral-key-page {
