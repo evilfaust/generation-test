@@ -279,4 +279,208 @@
     font-size: 8.5pt;
     flex-shrink: 0;
   }
+
+  /* ─── Размеры шрифта M / L (print) ──────────────────────────────────────── */
+  .oral-print-root[data-fs="m"] .oral-page           { font-size: 13pt; }
+  .oral-print-root[data-fs="m"] .oral-variant-badge  { font-size: 13pt; }
+  .oral-print-root[data-fs="m"] .oral-field          { font-size: 12pt; }
+  .oral-print-root[data-fs="m"] .oral-task-num,
+  .oral-print-root[data-fs="m"] .oral-task-expr,
+  .oral-print-root[data-fs="m"] .oral-task-eq,
+  .oral-print-root[data-fs="m"] .oral-task-x-prompt  { font-size: 12pt; }
+  .oral-print-root[data-fs="m"] .oral-instruction    { font-size: 12.5pt; }
+  .oral-print-root[data-fs="m"] .oral-subtitle       { font-size: 12pt; }
+  .oral-print-root[data-fs="m"] .oral-page--side .oral-variant-badge { font-size: 11pt; }
+  .oral-print-root[data-fs="m"] .oral-page--side .oral-field         { font-size: 10.5pt; }
+
+  .oral-print-root[data-fs="l"] .oral-page           { font-size: 15pt; }
+  .oral-print-root[data-fs="l"] .oral-variant-badge  { font-size: 15pt; }
+  .oral-print-root[data-fs="l"] .oral-field          { font-size: 14pt; }
+  .oral-print-root[data-fs="l"] .oral-task-num,
+  .oral-print-root[data-fs="l"] .oral-task-expr,
+  .oral-print-root[data-fs="l"] .oral-task-eq,
+  .oral-print-root[data-fs="l"] .oral-task-x-prompt  { font-size: 14pt; }
+  .oral-print-root[data-fs="l"] .oral-instruction    { font-size: 14.5pt; }
+  .oral-print-root[data-fs="l"] .oral-subtitle       { font-size: 14pt; }
+  .oral-print-root[data-fs="l"] .oral-page--side .oral-variant-badge { font-size: 12.5pt; }
+  .oral-print-root[data-fs="l"] .oral-page--side .oral-field         { font-size: 12pt; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Экранный предпросмотр (screenMode)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.oral-screen-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 8px 32px;
+  background: #e8e8e8;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+/* Размеры шрифта */
+.oral-screen-root--fs-s { font-size: 10pt; }
+.oral-screen-root--fs-m { font-size: 12pt; }
+.oral-screen-root--fs-l { font-size: 14pt; }
+
+/* ── A4 лист (один вариант) ─────────────────────────────────────────────── */
+.oral-screen-root .oral-page {
+  width: 210mm;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1.5px solid #bbb;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+  font-family: 'Times New Roman', Times, serif;
+  line-height: 1.4;
+  color: #000;
+  font-size: inherit;
+}
+.oral-screen-root .oral-page--full {
+  min-height: 297mm;
+  padding: 10mm 16mm 10mm 20mm;
+}
+.oral-screen-root .oral-page--half {
+  padding: 6mm 12mm 4mm 14mm;
+  min-height: 148mm;
+  border-bottom: 1px dashed #888;
+}
+.oral-screen-root .oral-pair-page {
+  display: flex;
+  flex-direction: row;
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  border: 1.5px solid #bbb;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+}
+.oral-screen-root .oral-page--side {
+  width: 50%;
+  box-sizing: border-box;
+  padding: 8mm 5mm 8mm 7mm;
+  border-right: 1px dashed #aaa;
+  font-size: inherit;
+}
+.oral-screen-root .oral-page--side:last-child {
+  border-right: none;
+  padding: 8mm 7mm 8mm 5mm;
+}
+
+/* ── Шапка ──────────────────────────────────────────────────────────────── */
+.oral-screen-root .oral-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+  margin-bottom: 1.5mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 1px solid #000;
+}
+.oral-screen-root .oral-header-row1 {
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+}
+.oral-screen-root .oral-header-row2 {
+  display: flex;
+  align-items: baseline;
+  gap: 6mm;
+}
+.oral-screen-root .oral-variant-badge {
+  font-weight: bold;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.oral-screen-root .oral-field {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5mm;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 0.92em;
+}
+.oral-screen-root .oral-field--fio      { flex: 1; min-width: 0; }
+.oral-screen-root .oral-field--fio .oral-line { flex: 1; min-width: 0; }
+.oral-screen-root .oral-line {
+  display: inline-block;
+  border-bottom: 1px solid #000;
+  vertical-align: bottom;
+}
+.oral-screen-root .oral-line--name  { min-width: 50mm; width: 100%; }
+.oral-screen-root .oral-line--short { width: 20mm; }
+.oral-screen-root .oral-page--side .oral-variant-badge { font-size: 0.87em; }
+.oral-screen-root .oral-page--side .oral-field         { font-size: 0.82em; }
+.oral-screen-root .oral-page--side .oral-line--name    { min-width: 25mm; }
+.oral-screen-root .oral-page--side .oral-line--short   { width: 14mm; }
+
+/* ── Инструкция ─────────────────────────────────────────────────────────── */
+.oral-screen-root .oral-subtitle    { font-size: 0.95em; font-weight: bold; margin-bottom: 1.5mm; }
+.oral-screen-root .oral-instruction { font-weight: bold; margin-bottom: 2mm; }
+
+/* ── Сетка заданий ──────────────────────────────────────────────────────── */
+.oral-screen-root .oral-grid         { display: grid; gap: 0 8mm; }
+.oral-screen-root .oral-grid--2col   { grid-template-columns: 1fr 1fr; }
+.oral-screen-root .oral-grid--1col   { grid-template-columns: 1fr; }
+
+/* ── Задание ────────────────────────────────────────────────────────────── */
+.oral-screen-root .oral-task {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 1mm 0;
+  border-bottom: 1px dotted #ccc;
+  min-height: 7mm;
+}
+.oral-screen-root .oral-task:last-child { border-bottom: none; }
+.oral-screen-root .oral-task-num     { font-weight: bold; min-width: 18px; flex-shrink: 0; font-size: 0.95em; }
+.oral-screen-root .oral-task-expr    { flex-shrink: 0; }
+.oral-screen-root .oral-task-expr--eq { flex: 1; min-width: 0; }
+.oral-screen-root .oral-task-eq      { padding: 0 0 0 2px; flex-shrink: 0; }
+.oral-screen-root .oral-task-x-prompt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  flex-shrink: 0;
+  padding-left: 6px;
+  white-space: nowrap;
+  min-width: 30mm;
+}
+
+/* ── Страница ответов ───────────────────────────────────────────────────── */
+.oral-screen-root .oral-key-page {
+  width: 210mm;
+  padding: 10mm 16mm;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1.5px solid #bbb;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+  font-family: 'Times New Roman', Times, serif;
+  font-size: inherit;
+  color: #000;
+}
+.oral-screen-root .oral-key-header {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-bottom: 4mm;
+  padding-bottom: 2mm;
+  border-bottom: 1px solid #000;
+}
+.oral-screen-root .oral-key-variants {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4mm 10mm;
+}
+.oral-screen-root .oral-key-variant-title {
+  font-weight: bold;
+  font-size: 0.95em;
+  margin-bottom: 1mm;
+  padding-bottom: 0.5mm;
+  border-bottom: 1px dotted #666;
+}
+.oral-screen-root .oral-key-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; }
+.oral-screen-root .oral-key-row    { display: flex; align-items: baseline; gap: 2px; font-size: 0.8em; margin-bottom: 0.8mm; }
+.oral-screen-root .oral-key-num    { font-weight: bold; min-width: 14px; flex-shrink: 0; }
+.oral-screen-root .oral-key-expr   { flex: 1; font-size: 0.75em; color: #444; overflow: hidden; }
+.oral-screen-root .oral-key-eq     { padding: 0 1px; flex-shrink: 0; }
+.oral-screen-root .oral-key-ans    { font-weight: bold; flex-shrink: 0; }

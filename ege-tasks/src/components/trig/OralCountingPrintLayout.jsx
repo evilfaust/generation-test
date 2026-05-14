@@ -97,7 +97,12 @@ function TeacherKeyPage({ tasksData, title, equationMode }) {
 }
 
 // ─── Корневой компонент ────────────────────────────────────────────────────────
-export default function OralCountingPrintLayout({ tasksData, settings, title, equationMode = false }) {
+export default function OralCountingPrintLayout({
+  tasksData, settings, title,
+  equationMode = false,
+  screenMode = false,
+  fontSize = 's',
+}) {
   if (!tasksData) return null;
   const { twoPerPage, sideBySide, showTeacherKey, columnsCount = 2 } = settings;
 
@@ -157,12 +162,26 @@ export default function OralCountingPrintLayout({ tasksData, settings, title, eq
     ));
   }
 
-  return (
-    <div className="oral-print-root">
+  const inner = (
+    <>
       {pages}
       {showTeacherKey && (
         <TeacherKeyPage tasksData={tasksData} title={title} equationMode={equationMode} />
       )}
+    </>
+  );
+
+  if (screenMode) {
+    return (
+      <div className={`oral-screen-root oral-screen-root--fs-${fontSize}`}>
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <div className="oral-print-root" data-fs={fontSize}>
+      {inner}
     </div>
   );
 }

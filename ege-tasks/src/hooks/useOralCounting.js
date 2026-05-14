@@ -336,6 +336,7 @@ export const DEFAULT_SETTINGS = {
   showTeacherKey: true,
   showWorkSpace:  false,
   columnsCount:   2,      // 2 колонки заданий на листе
+  fontSize:       's',    // размер шрифта: s | m | l
   categories: {
     fracTimesInt:    true,
     intDivFrac:      true,

@@ -343,6 +343,7 @@ export const DEFAULT_SETTINGS_LOGEXP = {
   sideBySide:     true,
   showTeacherKey: true,
   columnsCount:   2,
+  fontSize:       's',
   categories: {
     basicExp:      true,
     fracBaseEqual: true,

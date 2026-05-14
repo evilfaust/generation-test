@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import katex from 'katex';
 import {
-  Button, Slider, Checkbox, Space, Switch, Divider,
+  Button, Slider, Checkbox, Space, Switch, Divider, Segmented,
 } from 'antd';
 import {
   PrinterOutlined, CheckSquareOutlined, ThunderboltOutlined,
@@ -17,7 +16,6 @@ import {
   TrigSettingsSection,
   TrigActions,
   TrigPreviewPane,
-  TrigPreviewCard,
   TrigStatBadge,
 } from './trig/TrigGeneratorLayout';
 
@@ -44,14 +42,6 @@ const CATEGORY_GROUPS = [
   { label: 'Логарифмические уравнения', keys: ['simpleLog', 'logAsBase', 'logLinear', 'logSumConst', 'logDiffConst', 'constPlusLog', 'logFraction', 'logRhsSum'] },
 ];
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
-
-const LABELS = Array.from({ length: 30 }, (_, i) => String(i + 1));
 
 export default function LogExpEquationsGenerator() {
   const {
@@ -162,6 +152,15 @@ export default function LogExpEquationsGenerator() {
                 >
                   Лист ответов (учитель)
                 </Checkbox>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13 }}>Шрифт:</span>
+                  <Segmented
+                    size="small"
+                    options={['S', 'M', 'L']}
+                    value={(settings.fontSize || 's').toUpperCase()}
+                    onChange={v => updateSetting('fontSize', v.toLowerCase())}
+                  />
+                </div>
               </Space>
             </TrigSettingsSection>
 
@@ -212,33 +211,19 @@ export default function LogExpEquationsGenerator() {
               <TrigStatBadge key="cats" tone="accent">{enabledCount} кат.</TrigStatBadge>,
               <TrigStatBadge key="q">{qCount} зад.</TrigStatBadge>,
               <TrigStatBadge key="v" tone="success">{varCount || settings.variantsCount} вар.</TrigStatBadge>,
-              settings.sideBySide ? <TrigStatBadge key="side">лево/право</TrigStatBadge> : null,
-              settings.twoPerPage ? <TrigStatBadge key="2pp">верх/низ</TrigStatBadge> : null,
+              <TrigStatBadge key="fs">{(settings.fontSize || 's').toUpperCase()}</TrigStatBadge>,
             ].filter(Boolean)}
           >
-            {tasksData?.map((variant, vi) => (
-              <TrigPreviewCard key={vi} title={`Вариант ${vi + 1}`} meta={`${variant.length} заданий`}>
-                {variant.map((q, qi) => (
-                  <div key={qi} style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: 6,
-                    padding: '4px 0',
-                    borderBottom: qi < variant.length - 1 ? '1px dotted var(--rule-soft)' : 'none',
-                    fontSize: 13,
-                  }}>
-                    <span style={{ fontWeight: 600, minWidth: 20, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                      {LABELS[qi]})
-                    </span>
-                    <span style={{ flex: 1, fontSize: 12 }}><MathInline latex={q.exprLatex} /></span>
-                    <span style={{ color: 'var(--rule)', padding: '0 3px', fontSize: 11 }}>x =</span>
-                    <span style={{ color: 'var(--accent)', fontWeight: 500, fontSize: 12 }}>
-                      <MathInline latex={q.resultLatex} />
-                    </span>
-                  </div>
-                ))}
-              </TrigPreviewCard>
-            ))}
+            {tasksData && (
+              <OralCountingPrintLayout
+                tasksData={tasksData}
+                settings={settings}
+                title={title}
+                equationMode
+                screenMode
+                fontSize={settings.fontSize || 's'}
+              />
+            )}
           </TrigPreviewPane>
         }
       />
