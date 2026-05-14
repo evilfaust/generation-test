@@ -198,6 +198,7 @@ const ROUTE_META = [
   { re: /^\/app\/trig\/double-angle/,      menuKey: 'double-angle',     menuGroup: 'trig', title: 'Тригонометрия — Двойной аргумент' },
   { re: /^\/app\/trig\/cryptogram/,        menuKey: 'trig-cryptogram',  menuGroup: 'trig', title: 'Тригонометрия — Шифровки' },
   { re: /^\/app\/arith\/oral-counting/,   menuKey: 'oral-counting',    menuGroup: 'arith', title: 'Арифметика — Устный счёт' },
+  { re: /^\/app\/arith\/log-exp/,         menuKey: 'log-exp',          menuGroup: 'arith', title: 'Арифметика — Степени и логарифмы' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -247,6 +248,7 @@ const MENU_KEY_PATH = {
   'double-angle':           R.DOUBLE_ANGLE,
   'trig-cryptogram':        R.TRIG_CRYPTOGRAM,
   'oral-counting':          R.ORAL_COUNTING,
+  'log-exp':                R.LOG_EXP_EQUATIONS,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -563,6 +565,7 @@ function AppLayout() {
       key: 'arith', icon: <CalculatorOutlined />, label: 'Арифметика',
       children: [
         { key: 'oral-counting', icon: <CalculatorOutlined />, label: 'Устный счёт' },
+        { key: 'log-exp',       icon: <FunctionOutlined />,  label: 'Степени и логарифмы' },
       ],
     },
     {
@@ -752,6 +755,7 @@ function App() {
 
               {/* Арифметика */}
               <Route path={R.ORAL_COUNTING} element={<OralCountingGenerator />} />
+              <Route path={R.LOG_EXP_EQUATIONS} element={<LogExpEquationsGenerator />} />
 
               {/* Теория */}
               <Route path={R.THEORY}            element={<TheoryPage />} />
