@@ -13,7 +13,7 @@ import {
   FormOutlined, QrcodeOutlined, PictureOutlined, HeatMapOutlined,
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
-  CalculatorOutlined,
+  CalculatorOutlined, ExperimentOutlined,
 } from '@ant-design/icons';
 import TaskList from './components/TaskList';
 import TaskSheetGenerator from './components/OralWorksheetGenerator';
@@ -59,6 +59,7 @@ import TrigMixedGenerator from './components/TrigMixedGenerator';
 import DoubleAngleGenerator from './components/DoubleAngleGenerator';
 import OralCountingGenerator from './components/OralCountingGenerator';
 import LogExpEquationsGenerator from './components/LogExpEquationsGenerator';
+import OralPowersRootsGenerator from './components/OralPowersRootsGenerator';
 import MarathonGenerator from './components/MarathonGenerator';
 import CrosswordGenerator from './components/CrosswordGenerator';
 import EgeScoreCalculator from './components/EgeScoreCalculator';
@@ -125,6 +126,7 @@ export const R = {
   // Арифметика
   ORAL_COUNTING:       '/app/arith/oral-counting',
   LOG_EXP_EQUATIONS:   '/app/arith/log-exp',
+  POWERS_ROOTS:        '/app/arith/powers-roots',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',
@@ -199,6 +201,7 @@ const ROUTE_META = [
   { re: /^\/app\/trig\/cryptogram/,        menuKey: 'trig-cryptogram',  menuGroup: 'trig', title: 'Тригонометрия — Шифровки' },
   { re: /^\/app\/arith\/oral-counting/,   menuKey: 'oral-counting',    menuGroup: 'arith', title: 'Устный счёт — Арифметика' },
   { re: /^\/app\/arith\/log-exp/,         menuKey: 'log-exp',          menuGroup: 'arith', title: 'Устный счёт — Степени и логарифмы' },
+  { re: /^\/app\/arith\/powers-roots/,    menuKey: 'powers-roots',     menuGroup: 'arith', title: 'Устный счёт — Степени и корни' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -249,6 +252,7 @@ const MENU_KEY_PATH = {
   'trig-cryptogram':        R.TRIG_CRYPTOGRAM,
   'oral-counting':          R.ORAL_COUNTING,
   'log-exp':                R.LOG_EXP_EQUATIONS,
+  'powers-roots':           R.POWERS_ROOTS,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -566,6 +570,7 @@ function AppLayout() {
       children: [
         { key: 'oral-counting', icon: <CalculatorOutlined />, label: 'Арифметика' },
         { key: 'log-exp',       icon: <FunctionOutlined />,  label: 'Степени и логарифмы' },
+        { key: 'powers-roots',  icon: <ExperimentOutlined />, label: 'Степени и корни' },
       ],
     },
     {
@@ -756,6 +761,7 @@ function App() {
               {/* Арифметика */}
               <Route path={R.ORAL_COUNTING} element={<OralCountingGenerator />} />
               <Route path={R.LOG_EXP_EQUATIONS} element={<LogExpEquationsGenerator />} />
+              <Route path={R.POWERS_ROOTS} element={<OralPowersRootsGenerator />} />
 
               {/* Теория */}
               <Route path={R.THEORY}            element={<TheoryPage />} />
