@@ -1,5 +1,59 @@
 # Changelog — История изменений
 
+## [3.9.25] - 2026-05-15
+
+### Тестовая инфраструктура (Vitest + Testing Library)
+
+Добавлено покрытие unit-тестами для критических модулей: парсеры ответов, генераторы
+дистракторов, движок достижений, утилиты пиксель-арта, парсер заданий и др. 287 тестов
+в 21 файле, прогон ~2 сек.
+
+**Установлено:** `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`.
+
+**Запуск:**
+```bash
+cd ege-tasks
+npm test            # однократный прогон
+npm run test:watch  # режим наблюдения
+```
+
+**Покрытие — утилиты** (`src/utils/`):
+- `answerChecker` — числа, дроби, LaTeX `\frac`/`\dfrac`, смешанные дроби, альтернативы `|`
+- `normalize`, `filterTaskText`, `shuffle`, `taskCodeGenerator`, `matrixOps`
+- `distractorGenerator` — детерминированный shuffle с seed (FNV-1a + Mulberry)
+- `cryptogram` — нормализация фразы, биекция букв↔задач, decoys
+- `escapeFilter` — экранирование для PocketBase filter (защита от инъекций)
+- `splitMatrix` — разбиение на тайлы для командного пиксель-арта
+- `markdownTaskParser` — `parseEgeTasks`, `parseYamlFrontmatter`, `convertToLatex`
+- `qrMatrix` + `qrGridFill` — QR-листы
+- `crosswordLayout` — алгоритм расстановки слов
+- `achievementEngine` — fallback-цепочка редкостей, условные достижения
+
+**Покрытие — компоненты и хуки:**
+- `MathRenderer` — Markdown + LaTeX рендеринг
+- `AchievementBadge` — рендер по rarity, locked, размеры
+- `RouteStatementRenderer` — токенизация LaTeX + плейсхолдеры `[①]–[⑨]`
+- `EgeScoreCalculator` — клики по тайлам, переключение баллов
+- `useAutosave` — fakeTimers, localStorage с articleId
+- `useDistribution` — CRUD items, валидация, `expectedTotal`
+- `useMarathon` — управление задачами/учениками, `markAttempt` с лимитом 3 попытки
+
+**Конфигурация:**
+- `vitest.config.js` — jsdom environment, alias `@shared`
+- `src/__tests__/setup.js` — polyfills для `window.matchMedia` и `ResizeObserver`
+  (требуются Ant Design в jsdom)
+
+### Fix — KaTeX warnings в консоли
+
+Плейсхолдеры маршрутного листа `[①]–[⑨]` внутри LaTeX-блоков (`$...$`) выдавали в консоль
+сотни warning'ов: `Unrecognized Unicode character` + `No character metrics`.
+
+**Решение** — `MathRenderer.jsx`:
+- Препроцессор `preprocessLatex()` оборачивает `①–⑩`, `❶–❿` внутри `$...$`/`$$...$$` в `\text{…}`
+- Опции `rehype-katex`: `strict: 'ignore'`, `trust: true`, `throwOnError: false`
+
+Теперь кружковые цифры в формулах рендерятся как обычный текст, консоль чистая.
+
 ## [3.9.24] - 2026-05-15
 
 ### ТДФ — Новый тип «Геометрические формулы»

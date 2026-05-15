@@ -3,6 +3,39 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
+// Unicode-символы вне ASCII, которых нет в дефолтных шрифтах KaTeX
+// (кружковые цифры из маршрутных листов и т.п.). Внутри $...$ KaTeX падает
+// в strict mode с "Unrecognized Unicode character" + "No character metrics".
+// Оборачиваем их в \text{…} перед передачей в rehype-katex.
+const UNICODE_TEXT_CHARS = /[①②③④⑤⑥⑦⑧⑨⑩❶❷❸❹❺❻❼❽❾❿]/g;
+
+/**
+ * Препроцессинг: внутри $...$ и $$...$$ оборачивает «неизвестные» символы
+ * в \text{…}, чтобы KaTeX мог их корректно отрисовать.
+ */
+function preprocessLatex(text) {
+  if (!text || typeof text !== 'string') return text;
+  if (!UNICODE_TEXT_CHARS.test(text)) return text;
+  UNICODE_TEXT_CHARS.lastIndex = 0;
+
+  // Сначала $$...$$ (жадно по содержимому, но не пересекая блоки),
+  // затем $...$. Текст вне математических разделителей не трогаем.
+  const wrap = (mathBody) =>
+    mathBody.replace(UNICODE_TEXT_CHARS, (ch) => `\\text{${ch}}`);
+
+  return text
+    .replace(/\$\$([\s\S]+?)\$\$/g, (_, body) => `$$${wrap(body)}$$`)
+    .replace(/\$([^$\n]+?)\$/g, (_, body) => `$${wrap(body)}$`);
+}
+
+// strict: 'ignore' — пропускать неизвестные символы без warnings в консоль.
+// trust: true — разрешает \textcolor и подобные команды (плейсхолдеры маршрут. листов).
+const rehypeKatexOptions = {
+  strict: 'ignore',
+  trust: true,
+  throwOnError: false,
+};
+
 /**
  * Универсальный компонент для рендеринга текста с Markdown и LaTeX формулами
  * Поддерживает:
@@ -13,6 +46,8 @@ import rehypeKatex from 'rehype-katex';
 const MathRenderer = ({ text, content, inline = true }) => {
   const sourceText = text ?? content;
   if (!sourceText) return null;
+
+  const processedText = preprocessLatex(sourceText);
 
   // Кастомные компоненты для react-markdown
   const components = {
@@ -41,10 +76,10 @@ const MathRenderer = ({ text, content, inline = true }) => {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm, remarkMath]}
-      rehypePlugins={[rehypeKatex]}
+      rehypePlugins={[[rehypeKatex, rehypeKatexOptions]]}
       components={components}
     >
-      {sourceText}
+      {processedText}
     </ReactMarkdown>
   );
 };
