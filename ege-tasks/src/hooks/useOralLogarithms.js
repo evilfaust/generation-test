@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { isFiniteDecimalAnswer } from '../utils/oralAnswerFilter';
 
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -358,6 +359,7 @@ export const DEFAULT_SETTINGS_LOG = {
   showTeacherKey: true,
   columnsCount:   2,
   fontSize:       's',
+  decimalOnly:    false,
   categories: {
     basicLog:           true,
     logReciprocal:      true,
@@ -395,7 +397,7 @@ export function useOralLogarithms() {
     const s = override
       ? { ...DEFAULT_SETTINGS_LOG, ...settings, ...override }
       : settings;
-    const { variantsCount, questionsCount, categories } = s;
+    const { variantsCount, questionsCount, categories, decimalOnly } = s;
 
     const enabledCats = Object.entries(categories)
       .filter(([, v]) => v)
@@ -403,16 +405,20 @@ export function useOralLogarithms() {
 
     if (enabledCats.length === 0) return;
 
+    const maxAttempts = decimalOnly ? questionsCount * 30 : questionsCount * 5;
+
     const variants = Array.from({ length: variantsCount }, () => {
       const questions = [];
       let catIdx = 0;
-      while (questions.length < questionsCount && catIdx < questionsCount * 5) {
+      while (questions.length < questionsCount && catIdx < maxAttempts) {
         const cat = enabledCats[catIdx % enabledCats.length];
         catIdx++;
         const gen = GENERATORS_LOG[cat];
         if (!gen) continue;
         const q = gen();
-        if (q) questions.push({ ...q, cat });
+        if (q && (!decimalOnly || isFiniteDecimalAnswer(q.resultLatex))) {
+          questions.push({ ...q, cat });
+        }
       }
       return questions;
     });

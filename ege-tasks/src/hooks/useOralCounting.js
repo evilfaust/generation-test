@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { isFiniteDecimalAnswer } from '../utils/oralAnswerFilter';
 
 // ─── Вспомогательные функции ──────────────────────────────────────────────────
 function gcd(a, b) {
@@ -337,6 +338,7 @@ export const DEFAULT_SETTINGS = {
   showWorkSpace:  false,
   columnsCount:   2,      // 2 колонки заданий на листе
   fontSize:       's',    // размер шрифта: s | m | l
+  decimalOnly:    false,  // только целые / конечные десятичные ответы
   categories: {
     fracTimesInt:    true,
     intDivFrac:      true,
@@ -368,7 +370,7 @@ export function useOralCounting() {
 
   const generate = useCallback((override) => {
     const s = override ? { ...DEFAULT_SETTINGS, ...settings, ...override } : settings;
-    const { variantsCount, questionsCount, categories } = s;
+    const { variantsCount, questionsCount, categories, decimalOnly } = s;
 
     const enabledCats = Object.entries(categories)
       .filter(([, v]) => v)
@@ -376,19 +378,21 @@ export function useOralCounting() {
 
     if (enabledCats.length === 0) return;
 
+    // При decimalOnly требуется больше попыток — многие категории дают дробные ответы
+    const maxFails = decimalOnly ? 600 : 120;
+
     const variants = Array.from({ length: variantsCount }, () => {
       const questions = [];
       let failCount = 0;
       let catIdx = 0;
 
-      while (questions.length < questionsCount && failCount < 120) {
-        // Равномерный перебор категорий (round-robin + shuffle)
+      while (questions.length < questionsCount && failCount < maxFails) {
         const cat = enabledCats[catIdx % enabledCats.length];
         catIdx++;
         const gen = GENERATORS[cat];
         if (!gen) { failCount++; continue; }
         const q = gen();
-        if (q) {
+        if (q && (!decimalOnly || isFiniteDecimalAnswer(q.resultLatex))) {
           questions.push({ ...q, cat });
         } else {
           failCount++;

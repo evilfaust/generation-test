@@ -141,6 +141,12 @@ export default function OralCountingGenerator() {
                 >
                   Лист ответов (учитель)
                 </Checkbox>
+                <Checkbox
+                  checked={!!settings.decimalOnly}
+                  onChange={e => updateSetting('decimalOnly', e.target.checked)}
+                >
+                  Только целые / десятичные ответы
+                </Checkbox>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 13 }}>Шрифт:</span>
                   <Segmented
