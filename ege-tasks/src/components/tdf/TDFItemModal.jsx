@@ -497,8 +497,13 @@ export default function TDFItemModal({ open, item, setId, onClose, onSaved, next
               </Form.Item>
               {isGeoFormula ? (
                 <>
-                  <Form.Item name="short_notation_md" label="Формула (LaTeX)">
-                    <TextArea rows={2} placeholder="Например: $S = \dfrac{(a+b)}{2} \cdot h$"
+                  <Form.Item
+                    name="short_notation_md"
+                    label="Формула(-ы) (LaTeX, каждая с новой строки)"
+                    extra="Если формул несколько — пишите каждую на отдельной строке. В контрольном варианте отобразится отдельный слот «X = ___» для каждой."
+                  >
+                    <TextArea rows={3}
+                      placeholder={'Например (две формулы для трапеции):\n$S = \\dfrac{a+b}{2} \\cdot h$\n$S = m \\cdot h$'}
                       onChange={e => setNotationPreview(e.target.value)} />
                   </Form.Item>
                   <Form.Item name="formula_control_hidden" valuePropName="checked" label="Скрывать формулу в контроле">

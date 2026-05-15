@@ -16,6 +16,38 @@ const TYPE_LABELS = {
 
 const MM_TO_PX = 3.7795; // фолбэк, если measureRootRef не готов
 
+const COUNT_LABELS = ['формула', 'формулы', 'формул'];
+function pluralRu(n, forms) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1];
+  return forms[2];
+}
+
+/**
+ * Разбирает short_notation_md на список формул.
+ * Каждая непустая строка/абзац — отдельная формула.
+ * Из каждой извлекается LHS (левая часть до первого `=`).
+ *
+ * Пример входа: "$S = \\frac{(a+b)}{2} \\cdot h$\n$S = m h, m = \\frac{a+b}{2}$"
+ * Выход: [
+ *   { full: "$S = \\frac{(a+b)}{2} \\cdot h$", lhs: "$S =$" },
+ *   { full: "$S = m h, ...", lhs: "$S =$" },
+ * ]
+ */
+function parseFormulas(md) {
+  if (!md || !md.trim()) return [{ full: '', lhs: '$S =$' }];
+  const lines = md.split(/\n\s*\n|\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return [{ full: '', lhs: '$S =$' }];
+  return lines.map(line => {
+    // Снимаем внешние $...$ если есть, ищем "X =" до первого знака равенства
+    const stripped = line.replace(/^\$+|\$+$/g, '').trim();
+    const m = /^(.+?)=/.exec(stripped);
+    const lhs = m ? `$${m[1].trim()} =$` : '$S =$';
+    return { full: line, lhs };
+  });
+}
+
 /**
  * Жадно распределяет items по страницам.
  * Страница 1 учитывает заголовок (firstPageAreaPx), страницы 2+ — полную высоту (otherPageAreaPx).
@@ -376,6 +408,8 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
         <ol className="tdf-geo-list">
           {nonHeaderItems.map((item, i) => {
             const showFormula = item.formula_control_hidden === false;
+            const formulas = parseFormulas(item.short_notation_md);
+            const multi = formulas.length > 1;
             return (
               <li key={item.id} className="tdf-geo-item">
                 <span className="tdf-geo-num">{i + 1}).</span>
@@ -384,16 +418,30 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
                     ? <img src={api.getTdfItemControlDrawingUrl(item)} alt="" />
                     : <div className="tdf-geo-figure--empty" />}
                 </div>
-                <span className="tdf-geo-formula">
-                  {showFormula && item.short_notation_md ? (
-                    <MathRenderer content={item.short_notation_md} />
-                  ) : (
-                    <>
-                      <span>S =</span>
-                      <span className="tdf-geo-formula-line" />
-                    </>
+                <div className="tdf-geo-formulas">
+                  {item.name && (
+                    <div className="tdf-geo-name">{item.name}</div>
                   )}
-                </span>
+                  {multi && (
+                    <div className="tdf-geo-hint">
+                      Запишите {formulas.length} {pluralRu(formulas.length, COUNT_LABELS)}:
+                    </div>
+                  )}
+                  {showFormula && item.short_notation_md ? (
+                    <div className="tdf-geo-formula-shown">
+                      <MathRenderer content={item.short_notation_md} />
+                    </div>
+                  ) : (
+                    formulas.map((f, idx) => (
+                      <div key={idx} className="tdf-geo-formula-row">
+                        <span className="tdf-geo-formula-lhs">
+                          <MathRenderer content={f.lhs} />
+                        </span>
+                        <span className="tdf-geo-formula-line" />
+                      </div>
+                    ))
+                  )}
+                </div>
               </li>
             );
           })}
