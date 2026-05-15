@@ -1,25 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
-import { Card, Form, Select, Space, Row, Col, Switch, Radio, InputNumber, Input, Spin, Tag, Divider, Collapse, Badge, Alert, App } from 'antd';
-import {
-  FilterOutlined,
-  SearchOutlined,
-  TagsOutlined,
-  BarChartOutlined,
-  ThunderboltOutlined,
-  PrinterOutlined,
-} from '@ant-design/icons';
-import PrintableWorksheet from './PrintableWorksheet';
-import WorksheetGridPrint from './worksheet/WorksheetGridPrint';
+import { Form, App } from 'antd';
 import TaskReplaceModal from './TaskReplaceModal';
 import TaskEditModal from './TaskEditModal';
 import SaveWorkModal from './worksheet/SaveWorkModal';
 import LoadWorkModal from './worksheet/LoadWorkModal';
-import VariantRenderer from './worksheet/VariantRenderer';
-import AnswersPage from './worksheet/AnswersPage';
-import VariantStats from './worksheet/VariantStats';
-import ActionButtons from './worksheet/ActionButtons';
-import DistributionPanel from './worksheet/DistributionPanel';
-import FormatSettings from './worksheet/FormatSettings';
+import GeneratorHeader from './worksheet/oral-generator/GeneratorHeader';
+import HeroSection from './worksheet/oral-generator/HeroSection';
+import FiltersAndDistribution from './worksheet/oral-generator/FiltersAndDistribution';
+import AppearanceSection from './worksheet/oral-generator/AppearanceSection';
+import ResultActionBar from './worksheet/oral-generator/ResultActionBar';
+import WorksheetPreview from './worksheet/oral-generator/WorksheetPreview';
 import {
   useWorksheetGeneration,
   useTaskDragDrop,
@@ -32,7 +22,13 @@ import {
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import './TaskWorksheet.css';
 
-const { Option } = Select;
+const DIFFICULTY_OPTIONS = [
+  { value: '1', label: '1 - Базовый' },
+  { value: '2', label: '2 - Средний' },
+  { value: '3', label: '3 - Повышенный' },
+  { value: '4', label: '4 - Высокий' },
+  { value: '5', label: '5 - Олимпиадный' },
+];
 
 const TaskSheetGenerator = () => {
   const { message } = App.useApp();
@@ -40,84 +36,95 @@ const TaskSheetGenerator = () => {
   const [form] = Form.useForm();
   const worksheetGen = useWorksheetGeneration();
   const { variants, setVariants, loading, generateFromFilters } = worksheetGen;
+
+  // Output mode + appearance
+  const [outputMode, setOutputMode] = useState('sheet');
+  const [sheetFormat, setSheetFormat] = useState('A4');
   const [columns, setColumns] = useState(1);
   const [fontSize, setFontSize] = useState(12);
-  const [showAnswersInline, setShowAnswersInline] = useState(false);
-  const [showAnswersPage, setShowAnswersPage] = useState(true);
-  const [showStudentInfo, setShowStudentInfo] = useState(true);
-  const [variantLabel, setVariantLabel] = useState('Вариант');
   const [solutionSpace, setSolutionSpace] = useState('medium');
-  const [cryptogramEnabled, setCryptogramEnabled] = useState(false);
-  const [cryptogramPhrase, setCryptogramPhrase] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState(null);
-  const [selectedSubtopic, setSelectedSubtopic] = useState(null);
   const [compactMode, setCompactMode] = useState(false);
   const [hideTaskPrefixes, setHideTaskPrefixes] = useState(false);
-  const [outputMode, setOutputMode] = useState('sheet'); // 'sheet' | 'cards'
-  const [sheetFormat, setSheetFormat] = useState('A4'); // 'A4' | 'A5'
+  const [showStudentInfo, setShowStudentInfo] = useState(true);
+  const [showAnswersInline, setShowAnswersInline] = useState(false);
+  const [showAnswersPage, setShowAnswersPage] = useState(true);
+  const [variantLabel, setVariantLabel] = useState('Вариант');
+  const [cryptogramEnabled, setCryptogramEnabled] = useState(false);
+  const [cryptogramPhrase, setCryptogramPhrase] = useState('');
   const [cardFormat, setCardFormat] = useState('А6');
   const [showCardAnswers, setShowCardAnswers] = useState(false);
   const [showCardSolutions, setShowCardSolutions] = useState(false);
   const [showCardStudentInfo, setShowCardStudentInfo] = useState(true);
-  const printRef = useRef();
 
-  // Хуки
-  const worksheetActions = useWorksheetActions();
-  const dragDropHandlers = useTaskDragDrop(variants, setVariants);
-  const taskEditing = useTaskEditing(variants, setVariants);
-
-  const syncTotal = (total) => form.setFieldValue('tasksPerVariant', total);
-  const tagDistribution = useDistribution('tag', {
-    onTotalChange: syncTotal,
-    itemLabel: 'тег',
-  });
-  const difficultyDistribution = useDistribution('difficulty', {
-    onTotalChange: syncTotal,
-    itemLabel: 'уровень сложности',
-  });
-
-  // Доступные теги (по выбранной теме/подтеме)
-  const { availableTags, loadingTags } = useAvailableTags(selectedTopic, selectedSubtopic, tags);
-
-  // Модальные окна сохранения/загрузки
+  const [selectedExamType, setSelectedExamType] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [selectedSubtopic, setSelectedSubtopic] = useState(null);
+  const [progressiveDifficulty, setProgressiveDifficulty] = useState(false);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
   const [savedWorks, setSavedWorks] = useState([]);
   const [loadingWorks, setLoadingWorks] = useState(false);
   const [currentWork, setCurrentWork] = useState(null);
-  const [progressiveDifficulty, setProgressiveDifficulty] = useState(false);
 
-  // Счётчик доступных задач (дебаунс 500мс)
+  const printRef = useRef();
+  const worksheetActions = useWorksheetActions();
+  const dragDropHandlers = useTaskDragDrop(variants, setVariants);
+  const taskEditing = useTaskEditing(variants, setVariants);
+
+  const syncTotal = (total) => form.setFieldValue('tasksPerVariant', total);
+  const tagDistribution = useDistribution('tag', { onTotalChange: syncTotal, itemLabel: 'тег' });
+  const difficultyDistribution = useDistribution('difficulty', { onTotalChange: syncTotal, itemLabel: 'уровень сложности' });
+
+  const { availableTags, loadingTags } = useAvailableTags(selectedTopic, selectedSubtopic, tags);
+
   const watchedValues = Form.useWatch([], form);
   const tasksPerVariantValue = Form.useWatch('tasksPerVariant', form) || 0;
   const { availableTasksCount, loadingTasksCount } = useTaskCounter(watchedValues);
 
-  // Опции сложности для DistributionPanel
-  const difficultyOptions = [
-    { value: '1', label: '1 - Базовый', color: '#52c41a' },
-    { value: '2', label: '2 - Средний', color: '#faad14' },
-    { value: '3', label: '3 - Повышенный', color: '#ff4d4f' },
-    { value: '4', label: '4 - Высокий', color: '#722ed1' },
-    { value: '5', label: '5 - Олимпиадный', color: '#13c2c2' },
-  ];
+  useEffect(() => {
+    if (!cryptogramEnabled) return;
+    setCompactMode(false);
+    setShowAnswersInline(false);
+  }, [cryptogramEnabled]);
+
+  const distributionsActive = tagDistribution.items.length > 0 || difficultyDistribution.items.length > 0;
+
+  const handleFormValuesChange = (changedValues) => {
+    if ('exam_type' in changedValues) {
+      setSelectedExamType(changedValues.exam_type || null);
+      setSelectedTopic(null);
+      setSelectedSubtopic(null);
+      form.setFieldValue('topic', undefined);
+      form.setFieldValue('subtopic', undefined);
+      form.setFieldValue('filterTags', []);
+      tagDistribution.reset();
+      difficultyDistribution.reset();
+    }
+    if ('topic' in changedValues) {
+      setSelectedTopic(changedValues.topic || null);
+      setSelectedSubtopic(null);
+      form.setFieldValue('subtopic', undefined);
+      form.setFieldValue('filterTags', []);
+      tagDistribution.reset();
+      difficultyDistribution.reset();
+    }
+    if ('subtopic' in changedValues) {
+      setSelectedSubtopic(changedValues.subtopic || null);
+    }
+  };
 
   const handleGenerate = async (values) => {
     const tasksPerVariant = values.tasksPerVariant || 20;
 
-    // Валидация распределений
-    if (values.progressiveDifficulty && (tagDistribution.items.length > 0 || difficultyDistribution.items.length > 0)) {
+    if (values.progressiveDifficulty && distributionsActive) {
       message.warning('Автопрогрессия несовместима с ручным распределением по тегам/сложности');
       return;
     }
-    if (tagDistribution.items.length > 0) {
-      if (!tagDistribution.validate(tasksPerVariant)) return;
-    }
-    if (difficultyDistribution.items.length > 0) {
-      if (!difficultyDistribution.validate(tasksPerVariant)) return;
-    }
+    if (tagDistribution.items.length > 0 && !tagDistribution.validate(tasksPerVariant)) return;
+    if (difficultyDistribution.items.length > 0 && !difficultyDistribution.validate(tasksPerVariant)) return;
 
-    // Базовые фильтры
     const filters = {};
+    if (values.exam_type) filters.exam_type = values.exam_type;
     if (values.topic) filters.topic = values.topic;
     if (values.subtopic) filters.subtopic = values.subtopic;
     if (values.difficulty) filters.difficulty = values.difficulty;
@@ -137,12 +144,13 @@ const TaskSheetGenerator = () => {
       difficultyDistribution: difficultyDistribution.items.length > 0 ? difficultyDistribution.items : undefined,
       progressiveDifficulty: values.progressiveDifficulty || false,
       getLabelForTag: (tagId) => availableTags.find(t => t.id === tagId)?.title || tagId,
-      getLabelForDifficulty: (val) => difficultyOptions.find(o => o.value === val)?.label || val,
+      getLabelForDifficulty: (val) => DIFFICULTY_OPTIONS.find(o => o.value === val)?.label || val,
     });
   };
 
   const handleReset = () => {
     worksheetGen.reset();
+    setSelectedExamType(null);
     setSelectedTopic(null);
     setSelectedSubtopic(null);
     tagDistribution.reset();
@@ -152,18 +160,6 @@ const TaskSheetGenerator = () => {
     setProgressiveDifficulty(false);
   };
 
-  const handleFormValuesChange = (changedValues) => {
-    if ('topic' in changedValues) {
-      setSelectedTopic(changedValues.topic || null);
-      setSelectedSubtopic(null);
-      form.setFieldValue('subtopic', undefined);
-      form.setFieldValue('filterTags', []);
-      tagDistribution.reset();
-      difficultyDistribution.reset();
-    }
-  };
-
-  // Обработчики сохранения/загрузки через useWorksheetActions
   const handleSaveWork = async (values) => {
     const topic = form.getFieldValue('topic') || null;
     if (currentWork?.id) {
@@ -199,7 +195,7 @@ const TaskSheetGenerator = () => {
     }
   };
 
-  const handleDeleteWork = async (workId, workTitle) => {
+  const handleDeleteWork = async (workId) => {
     await worksheetActions.handleDeleteWork(workId);
     setSavedWorks(savedWorks.filter(w => w.id !== workId));
   };
@@ -227,9 +223,6 @@ const TaskSheetGenerator = () => {
     message.success('Markdown успешно сохранён');
   };
 
-  /**
-   * Рендеринг варианта через переиспользуемый компонент
-   */
   const handleSheetPrint = () => {
     const styleId = 'sheet-print-page-style';
     document.getElementById(styleId)?.remove();
@@ -245,488 +238,43 @@ const TaskSheetGenerator = () => {
     window.print();
   };
 
-  const renderVariant = (variant, workTitle, variantIndex) => (
-    <VariantRenderer
-      key={variant.number}
-      variant={variant}
-      variantIndex={variantIndex}
-      compactMode={compactMode}
-      fontSize={fontSize}
-      columns={columns}
-      showStudentInfo={showStudentInfo}
-      showAnswersInline={showAnswersInline}
-      solutionSpace={solutionSpace}
-      variantLabel={variantLabel}
-      hideTaskPrefixes={hideTaskPrefixes}
-      dragDropHandlers={dragDropHandlers}
-      onEditTask={taskEditing.handleEditTask}
-      onReplaceTask={taskEditing.handleReplaceTask}
-      cryptogramEnabled={cryptogramEnabled}
-      cryptogramPhrase={cryptogramPhrase}
-    />
-  );
+  const sheetPDFOptions = {
+    format: sheetFormat,
+    marginTop: '5mm', marginBottom: '5mm', marginLeft: '5mm', marginRight: '5mm',
+    extraCSS: '.sheet-pages-preview { display: block !important; padding: 0 !important; background: none !important; } .sheet-page { box-shadow: none !important; break-after: avoid !important; page-break-after: avoid !important; border-bottom: 0.3mm solid #ccc; padding-bottom: 3mm !important; margin-bottom: 3mm !important; } .sheet-page:last-child { border-bottom: none !important; } .sheet-page-a4, .sheet-page-a5 { min-height: 0 !important; width: 100% !important; padding: 0 !important; } .sheet-page-label { display: none !important; } .sheet-page .variant-container { padding-top: 0 !important; } .variant-header { padding: 3px 5px !important; } .task-item { margin-bottom: 4px !important; }',
+  };
 
-  useEffect(() => {
-    if (!cryptogramEnabled) return;
-    setCompactMode(false);
-    setShowAnswersInline(false);
-  }, [cryptogramEnabled]);
+  const cardsPDFOptions = {
+    marginTop: '5mm', marginBottom: '5mm', marginLeft: '5mm', marginRight: '5mm',
+    extraCSS: `
+      .printable-worksheet { min-height: 0 !important; padding: 0 !important; }
+      .title-page { min-height: 0 !important; }
+      .variant-container { padding-top: 0 !important; margin-bottom: 6px !important; }
+      .variant-header { padding: 4px 8px !important; margin-bottom: 4px !important; }
+      .tasks-content { margin-top: 6px !important; }
+      .task-item { margin-bottom: 8px !important; padding-bottom: 6px !important; }
+      .answers-page { padding: 8px !important; }
+      .variant-answers { margin-bottom: 12px !important; }
+    `,
+  };
 
-  const collapseItems = [
-    {
-      key: 'filters',
-      label: (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FilterOutlined />
-          <span>Фильтры задач</span>
-          {selectedTopic ? (
-            <Badge
-              count={loadingTasksCount ? '...' : availableTasksCount}
-              overflowCount={9999}
-              style={{ backgroundColor: availableTasksCount > 0 ? '#52c41a' : '#ff4d4f' }}
-              showZero
-            />
-          ) : (
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>все темы</span>
-          )}
-        </span>
-      ),
-      children: (
-        <>
-          <Row gutter={16}>
-            <Col xs={24}>
-              <Form.Item name="search" label="Поиск по коду или тексту">
-                <Input
-                  placeholder="Введите код задачи или текст..."
-                  prefix={<SearchOutlined />}
-                  allowClear
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col xs={24} md={8}>
-              <Form.Item
-                name="topic"
-                label="Тема"
-              >
-                <Select
-                  placeholder="Все темы"
-                  showSearch
-                  optionFilterProp="children"
-                  allowClear
-                >
-                  {topics.map(topic => (
-                    <Option key={topic.id} value={topic.id}>
-                      {topic.ege_number ? `№${topic.ege_number} — ` : ""}{topic.title}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item name="subtopic" label="Подтема">
-                <Select
-                  placeholder={selectedTopic ? "Выберите подтему" : "Сначала выберите тему"}
-                  showSearch
-                  optionFilterProp="children"
-                  allowClear
-                  disabled={!selectedTopic}
-                  onChange={(value) => setSelectedSubtopic(value || null)}
-                >
-                  {subtopics
-                    .filter(subtopic => !selectedTopic || subtopic.topic === selectedTopic)
-                    .map(subtopic => (
-                      <Option key={subtopic.id} value={subtopic.id}>
-                        {subtopic.name}
-                      </Option>
-                    ))}
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item name="difficulty" label="Сложность">
-                <Select placeholder="Любая" allowClear>
-                  <Option value="1">1 - Базовый</Option>
-                  <Option value="2">2 - Средний</Option>
-                  <Option value="3">3 - Повышенный</Option>
-                  <Option value="4">4 - Высокий</Option>
-                  <Option value="5">5 - Олимпиадный</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col xs={24} md={8}>
-              <Form.Item name="filterTags" label="Теги">
-                <Select
-                  mode="multiple"
-                  placeholder="Фильтр по тегам"
-                  allowClear
-                  showSearch
-                  optionFilterProp="children"
-                  loading={loadingTags}
-                >
-                  {availableTags.map(tag => (
-                    <Option key={tag.id} value={tag.id}>
-                      <Tag color={tag.color} style={{ marginRight: 4 }}>{tag.title}</Tag>
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item name="source" label="Источник">
-                <Select placeholder="Любой" allowClear showSearch>
-                  {sources.map(s => (
-                    <Option key={s} value={s}>{s}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item name="year" label="Год">
-                <Select placeholder="Любой" allowClear showSearch>
-                  {years.map(y => (
-                    <Option key={y} value={y}>{y}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col xs={24} md={8}>
-              <Form.Item name="sortType" label="Сортировка">
-                <Select>
-                  <Option value="code">По коду</Option>
-                  <Option value="difficulty">По сложности</Option>
-                  <Option value="random">Случайная</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item name="hasAnswer" label="Наличие ответа">
-                <Radio.Group>
-                  <Radio.Button value={undefined}>Все</Radio.Button>
-                  <Radio.Button value="yes">С ответом</Radio.Button>
-                  <Radio.Button value="no">Без ответа</Radio.Button>
-                </Radio.Group>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item name="hasSolution" label="Наличие решения">
-                <Radio.Group>
-                  <Radio.Button value={undefined}>Все</Radio.Button>
-                  <Radio.Button value="yes">С решением</Radio.Button>
-                  <Radio.Button value="no">Без решения</Radio.Button>
-                </Radio.Group>
-              </Form.Item>
-            </Col>
-          </Row>
-        </>
-      ),
-    },
-    {
-      key: 'tags',
-      label: (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <TagsOutlined />
-          <span>Распределение по тегам</span>
-          <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400 }}>опционально</span>
-        </span>
-      ),
-      children: (
-        <>
-          {!selectedTopic && (
-            <Alert
-              message="Выберите тему, чтобы настроить распределение по тегам"
-              type="warning"
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
-          {selectedTopic && loadingTags && (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <Spin />
-              <div style={{ marginTop: 8, color: '#666' }}>Загрузка доступных тегов...</div>
-            </div>
-          )}
-
-          {selectedTopic && !loadingTags && availableTags.length === 0 && (
-            <Alert
-              message="В выбранной теме нет задач с тегами"
-              type="info"
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
-          {selectedTopic && !loadingTags && availableTags.length > 0 && (
-            <>
-              <Alert
-                message={`Найдено ${availableTags.length} тег(ов) в задачах этой темы. Настройте количество задач для каждого тега. Общее количество задач будет автоматически рассчитано.`}
-                type="info"
-                style={{ marginBottom: 16 }}
-              />
-
-              <DistributionPanel
-                items={tagDistribution.items}
-                options={availableTags.map(tag => ({ value: tag.id, label: tag.title }))}
-                keyField="tag"
-                onAdd={tagDistribution.addItem}
-                onRemove={tagDistribution.removeItem}
-                onChange={tagDistribution.updateItem}
-                total={tagDistribution.getTotal()}
-                expectedTotal={form.getFieldValue('tasksPerVariant') || 0}
-                addButtonText="Добавить тег"
-                selectPlaceholder="Выберите тег"
-              />
-            </>
-          )}
-        </>
-      ),
-    },
-    {
-      key: 'difficulty',
-      label: (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BarChartOutlined />
-          <span>Распределение по сложности</span>
-          <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400 }}>опционально</span>
-        </span>
-      ),
-      children: (
-        <>
-          {!selectedTopic && (
-            <Alert
-              message="Выберите тему, чтобы настроить распределение по сложности"
-              type="warning"
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
-          {selectedTopic && tagDistribution.items.length > 0 && (
-            <Alert
-              message="Распределение по сложности нельзя использовать одновременно с распределением по тегам"
-              type="warning"
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
-          <Form.Item name="progressiveDifficulty" valuePropName="checked">
-            <Space>
-              <Switch
-                checked={progressiveDifficulty}
-                onChange={(checked) => {
-                  setProgressiveDifficulty(checked);
-                  if (checked) {
-                    difficultyDistribution.reset();
-                  }
-                }}
-              />
-              <span>Автопрогрессия сложности</span>
-            </Space>
-          </Form.Item>
-
-          {selectedTopic && tagDistribution.items.length === 0 && !progressiveDifficulty && (
-            <DistributionPanel
-              items={difficultyDistribution.items}
-              options={difficultyOptions}
-              keyField="difficulty"
-              onAdd={difficultyDistribution.addItem}
-              onRemove={difficultyDistribution.removeItem}
-              onChange={difficultyDistribution.updateItem}
-              total={difficultyDistribution.getTotal()}
-              expectedTotal={form.getFieldValue('tasksPerVariant') || 0}
-              addButtonText="Добавить уровень сложности"
-              selectPlaceholder="Выберите уровень сложности"
-              showColorTags
-            />
-          )}
-        </>
-      ),
-    },
-    {
-      key: 'variants',
-      label: (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ThunderboltOutlined />
-          <span>Генерация вариантов</span>
-        </span>
-      ),
-      children: (
-        <Row gutter={16}>
-          <Col xs={24} md={8}>
-            <Form.Item name="variantsCount" label="Количество вариантов">
-              <InputNumber min={1} max={10} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Form.Item
-              name="tasksPerVariant"
-              label="Задач в варианте"
-              tooltip={tagDistribution.items.length > 0 || difficultyDistribution.items.length > 0 ? "Автоматически рассчитывается из распределения" : ""}
-            >
-              <InputNumber
-                min={1}
-                max={100}
-                style={{ width: '100%' }}
-                disabled={tagDistribution.items.length > 0 || difficultyDistribution.items.length > 0}
-              />
-            </Form.Item>
-          </Col>
-
-          <Col xs={24} md={8}>
-            <Form.Item name="variantsMode" label="Режим вариантов">
-              <Select>
-                <Option value="different">Разные задачи</Option>
-                <Option value="shuffled">Одинаковые, разный порядок</Option>
-                <Option value="same">Одинаковые задачи</Option>
-              </Select>
-            </Form.Item>
-          </Col>
-        </Row>
-      ),
-    },
-    {
-      key: 'format',
-      label: (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <PrinterOutlined />
-          <span>Формат печати</span>
-        </span>
-      ),
-      children: (
-        <>
-          <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col xs={24}>
-              <Form.Item label="Режим вывода" style={{ marginBottom: 0 }}>
-                <Radio.Group
-                  value={outputMode}
-                  onChange={(e) => setOutputMode(e.target.value)}
-                  buttonStyle="solid"
-                  size="large"
-                >
-                  <Radio.Button value="sheet">Лист задач</Radio.Button>
-                  <Radio.Button value="cards">Карточки</Radio.Button>
-                </Radio.Group>
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider style={{ margin: '8px 0 16px' }} />
-
-          {outputMode === 'sheet' && (
-            <>
-              <FormatSettings
-                columns={columns}
-                setColumns={setColumns}
-                fontSize={fontSize}
-                setFontSize={setFontSize}
-                solutionSpace={solutionSpace}
-                setSolutionSpace={setSolutionSpace}
-                compactMode={compactMode}
-                setCompactMode={setCompactMode}
-                hideTaskPrefixes={hideTaskPrefixes}
-                setHideTaskPrefixes={setHideTaskPrefixes}
-                showStudentInfo={showStudentInfo}
-                setShowStudentInfo={setShowStudentInfo}
-                showAnswersInline={showAnswersInline}
-                setShowAnswersInline={setShowAnswersInline}
-                showAnswersPage={showAnswersPage}
-                setShowAnswersPage={setShowAnswersPage}
-                variantLabel={variantLabel}
-                setVariantLabel={setVariantLabel}
-                cryptogramEnabled={cryptogramEnabled}
-                setCryptogramEnabled={setCryptogramEnabled}
-                cryptogramPhrase={cryptogramPhrase}
-                setCryptogramPhrase={setCryptogramPhrase}
-                tasksCount={tasksPerVariantValue}
-              />
-
-              <Row gutter={16}>
-                <Col xs={24} md={6}>
-                  <Form.Item label="Формат листа">
-                    <Radio.Group
-                      value={sheetFormat}
-                      onChange={(e) => setSheetFormat(e.target.value)}
-                      buttonStyle="solid"
-                    >
-                      <Radio.Button value="A4">A4</Radio.Button>
-                      <Radio.Button value="A5">A5</Radio.Button>
-                    </Radio.Group>
-                  </Form.Item>
-                </Col>
-              </Row>
-            </>
-          )}
-
-          {outputMode === 'cards' && (
-            <>
-              <Row gutter={16}>
-                <Col xs={24} md={6}>
-                  <Form.Item label="Формат карточек">
-                    <Select value={cardFormat} onChange={setCardFormat}>
-                      <Option value="А6">A6</Option>
-                      <Option value="А5">A5</Option>
-                      <Option value="А4">A4</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={6}>
-                  <Form.Item label="Показывать ответы">
-                    <Switch checked={showCardAnswers} onChange={setShowCardAnswers} />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={6}>
-                  <Form.Item label="Показывать решения">
-                    <Switch checked={showCardSolutions} onChange={setShowCardSolutions} />
-                  </Form.Item>
-                </Col>
-
-                <Col xs={24} md={6}>
-                  <Form.Item label="Поля для ФИО">
-                    <Switch checked={showCardStudentInfo} onChange={setShowCardStudentInfo} />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </>
-          )}
-        </>
-      ),
-    },
-  ];
+  const workTitle = form.getFieldValue('workTitle') || 'Лист задач';
 
   return (
     <div className="task-worksheet-container">
-      <Card
-        title={
-          <Space>
-            <FilterOutlined />
-            Листы задач - настройки
-          </Space>
-        }
-        className="no-print"
-      >
+      <div className="no-print">
+        <GeneratorHeader
+          outputMode={outputMode}
+          setOutputMode={setOutputMode}
+          onOpenLoad={handleOpenLoadModal}
+        />
+
         <Form
           form={form}
           layout="vertical"
           onFinish={handleGenerate}
           onValuesChange={handleFormValuesChange}
           initialValues={{
-            columns: 1,
-            fontSize: 12,
             sortType: 'random',
             variantsCount: 1,
             variantsMode: 'different',
@@ -735,164 +283,120 @@ const TaskSheetGenerator = () => {
             progressiveDifficulty: false,
           }}
         >
-          <Collapse defaultActiveKey={['filters', 'tags', 'variants', 'format']} items={collapseItems} />
+          <HeroSection
+            topics={topics}
+            subtopics={subtopics}
+            form={form}
+            loading={loading}
+            availableTasksCount={availableTasksCount}
+            loadingTasksCount={loadingTasksCount}
+            selectedExamType={selectedExamType}
+            selectedTopic={selectedTopic}
+            distributionsActive={distributionsActive}
+            onSubtopicChange={setSelectedSubtopic}
+          />
 
-          <Form.Item style={{ marginTop: 16 }}>
-            <ActionButtons
-              hasVariants={variants.length > 0}
-              loading={loading}
-              onGenerate
-              onOpenLoad={handleOpenLoadModal}
-              onSave={() => setSaveModalVisible(true)}
-              onPrint={outputMode === 'sheet' ? handleSheetPrint : worksheetActions.handlePrint}
-              onExportPDF={() => worksheetActions.handleExportPDF(
-                printRef,
-                form.getFieldValue('workTitle') || 'Лист задач',
-                outputMode === 'sheet'
-                  ? {
-                      format: sheetFormat,
-                      marginTop: '5mm', marginBottom: '5mm', marginLeft: '5mm', marginRight: '5mm',
-                      extraCSS: '.sheet-pages-preview { display: block !important; padding: 0 !important; background: none !important; } .sheet-page { box-shadow: none !important; break-after: avoid !important; page-break-after: avoid !important; border-bottom: 0.3mm solid #ccc; padding-bottom: 3mm !important; margin-bottom: 3mm !important; } .sheet-page:last-child { border-bottom: none !important; } .sheet-page-a4, .sheet-page-a5 { min-height: 0 !important; width: 100% !important; padding: 0 !important; } .sheet-page-label { display: none !important; } .sheet-page .variant-container { padding-top: 0 !important; } .variant-header { padding: 3px 5px !important; } .task-item { margin-bottom: 4px !important; }',
-                    }
-                  : {
-                      marginTop: '5mm', marginBottom: '5mm', marginLeft: '5mm', marginRight: '5mm',
-                      extraCSS: `
-                        .printable-worksheet { min-height: 0 !important; padding: 0 !important; }
-                        .title-page { min-height: 0 !important; }
-                        .variant-container { padding-top: 0 !important; margin-bottom: 6px !important; }
-                        .variant-header { padding: 4px 8px !important; margin-bottom: 4px !important; }
-                        .tasks-content { margin-top: 6px !important; }
-                        .task-item { margin-bottom: 8px !important; padding-bottom: 6px !important; }
-                        .answers-page { padding: 8px !important; }
-                        .variant-answers { margin-bottom: 12px !important; }
-                      `,
-                    }
-              )}
-              onExportMD={handleExportMD}
-              onReset={handleReset}
-              pdfMethod={worksheetActions.pdfMethod}
-              setPdfMethod={worksheetActions.setPdfMethod}
-              puppeteerAvailable={worksheetActions.puppeteerAvailable}
-              exporting={worksheetActions.exporting}
-              saving={worksheetActions.saving}
-              generateLabel="Сформировать лист"
-            />
-          </Form.Item>
+          <FiltersAndDistribution
+            form={form}
+            sources={sources}
+            years={years}
+            availableTags={availableTags}
+            loadingTags={loadingTags}
+            selectedTopic={selectedTopic}
+            tagDistribution={tagDistribution}
+            difficultyDistribution={difficultyDistribution}
+            progressiveDifficulty={progressiveDifficulty}
+            setProgressiveDifficulty={setProgressiveDifficulty}
+          />
+
+          <AppearanceSection
+            outputMode={outputMode}
+            sheetFormat={sheetFormat}
+            setSheetFormat={setSheetFormat}
+            columns={columns}
+            setColumns={setColumns}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
+            solutionSpace={solutionSpace}
+            setSolutionSpace={setSolutionSpace}
+            compactMode={compactMode}
+            setCompactMode={setCompactMode}
+            hideTaskPrefixes={hideTaskPrefixes}
+            setHideTaskPrefixes={setHideTaskPrefixes}
+            showStudentInfo={showStudentInfo}
+            setShowStudentInfo={setShowStudentInfo}
+            showAnswersInline={showAnswersInline}
+            setShowAnswersInline={setShowAnswersInline}
+            showAnswersPage={showAnswersPage}
+            setShowAnswersPage={setShowAnswersPage}
+            variantLabel={variantLabel}
+            setVariantLabel={setVariantLabel}
+            cryptogramEnabled={cryptogramEnabled}
+            setCryptogramEnabled={setCryptogramEnabled}
+            cryptogramPhrase={cryptogramPhrase}
+            setCryptogramPhrase={setCryptogramPhrase}
+            tasksCount={tasksPerVariantValue}
+            cardFormat={cardFormat}
+            setCardFormat={setCardFormat}
+            showCardAnswers={showCardAnswers}
+            setShowCardAnswers={setShowCardAnswers}
+            showCardSolutions={showCardSolutions}
+            setShowCardSolutions={setShowCardSolutions}
+            showCardStudentInfo={showCardStudentInfo}
+            setShowCardStudentInfo={setShowCardStudentInfo}
+          />
         </Form>
 
-        {/* Превью информация */}
-        <VariantStats variants={variants} showAnswersPage={showAnswersPage} />
-      </Card>
-
-      {/* Рабочий лист с клеткой — только в режиме «Лист задач» */}
-      {variants.length > 0 && outputMode === 'sheet' && (
-        <WorksheetGridPrint
-          pages={variants.map(v => ({
-            title: form.getFieldValue('workTitle') || 'Лист задач',
-            label: `${variantLabel} ${v.number}`,
-            tasks: v.tasks,
-          }))}
-          hideTaskPrefixes={hideTaskPrefixes}
+        <ResultActionBar
+          variants={variants}
+          outputMode={outputMode}
+          variantLabel={variantLabel}
+          sheetFormat={sheetFormat}
+          cardFormat={cardFormat}
+          showAnswersPage={showAnswersPage}
+          onSave={() => setSaveModalVisible(true)}
+          onOpenLoad={handleOpenLoadModal}
+          onPrint={outputMode === 'sheet' ? handleSheetPrint : worksheetActions.handlePrint}
+          onExportPDF={() => worksheetActions.handleExportPDF(
+            printRef,
+            workTitle,
+            outputMode === 'sheet' ? sheetPDFOptions : cardsPDFOptions
+          )}
+          onExportMD={handleExportMD}
+          onReset={handleReset}
+          worksheetActions={worksheetActions}
         />
-      )}
+      </div>
 
-      {/* Лист задач — постраничный предпросмотр */}
-      {variants.length > 0 && outputMode === 'sheet' && (() => {
-        const workTitle = form.getFieldValue('workTitle');
-        const pageClass = `sheet-page sheet-page-${sheetFormat.toLowerCase()}`;
-        const pageContents = [];
+      <WorksheetPreview
+        printRef={printRef}
+        variants={variants}
+        outputMode={outputMode}
+        workTitle={workTitle}
+        sheetFormat={sheetFormat}
+        columns={columns}
+        fontSize={fontSize}
+        compactMode={compactMode}
+        hideTaskPrefixes={hideTaskPrefixes}
+        showStudentInfo={showStudentInfo}
+        showAnswersInline={showAnswersInline}
+        showAnswersPage={showAnswersPage}
+        solutionSpace={solutionSpace}
+        variantLabel={variantLabel}
+        cryptogramEnabled={cryptogramEnabled}
+        cryptogramPhrase={cryptogramPhrase}
+        dragDropHandlers={dragDropHandlers}
+        taskEditing={taskEditing}
+        cardFormat={cardFormat}
+        showCardAnswers={showCardAnswers}
+        showCardSolutions={showCardSolutions}
+        showCardStudentInfo={showCardStudentInfo}
+        topics={topics}
+        tags={tags}
+        subtopics={subtopics}
+        setVariants={setVariants}
+      />
 
-        if (compactMode && columns > 1) {
-          for (let i = 0; i < variants.length; i += columns) {
-            const pageVariants = variants.slice(i, i + columns);
-            pageContents.push({
-              key: `page-${i}`,
-              content: (
-                <div
-                  className="compact-variants-grid"
-                  style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, columnGap: '10px' }}
-                >
-                  {pageVariants.map((variant, idx) => renderVariant(variant, workTitle, i + idx))}
-                </div>
-              ),
-            });
-          }
-        } else {
-          variants.forEach((variant, index) => {
-            pageContents.push({
-              key: `variant-${variant.number}`,
-              content: renderVariant(variant, workTitle, index),
-            });
-          });
-        }
-
-        if (showAnswersPage) {
-          pageContents.push({
-            key: 'answers',
-            content: (
-              <AnswersPage
-                variants={variants}
-                variantLabel={variantLabel}
-                show={true}
-                cryptogramEnabled={cryptogramEnabled}
-                cryptogramPhrase={cryptogramPhrase}
-              />
-            ),
-          });
-        }
-
-        const total = pageContents.length;
-        return (
-          <div ref={printRef} className="sheet-pages-preview">
-            {pageContents.map(({ key, content }, pageIdx) => (
-              <div key={key} className={pageClass}>
-                {content}
-                <div className="sheet-page-label no-print">{pageIdx + 1} / {total}</div>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* Режим карточек */}
-      {variants.length > 0 && outputMode === 'cards' && (
-        <PrintableWorksheet
-          ref={printRef}
-          key={variants.map(v => v.tasks.map(t => t.id).join(',')).join('|')}
-          cards={variants.map(v => v.tasks)}
-          title={variantLabel || 'Проверочная работа'}
-          showAnswers={showCardAnswers}
-          showSolutions={showCardSolutions}
-          format={cardFormat}
-          cardsCount={variants.length}
-          tasksPerCard={variants[0]?.tasks.length || 0}
-          topicName=""
-          variantLabel={variantLabel || 'Проверочная работа'}
-          topics={topics}
-          tags={tags}
-          subtopics={subtopics}
-          hideTaskPrefixes={hideTaskPrefixes}
-          fontSize={fontSize}
-          showStudentInfo={showCardStudentInfo}
-          onEditTask={taskEditing.handleEditTask}
-          onCardsChange={(newCards) => {
-            // Синхронизируем обратно в variants
-            const newVariants = variants.map((v, i) => ({
-              ...v,
-              tasks: newCards[i] || v.tasks,
-            }));
-            setVariants(newVariants);
-          }}
-        />
-      )}
-
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '50px 0' }}>
-          <Spin size="large" tip="Генерируем варианты..." />
-        </div>
-      )}
-
-      {/* Модальные окна */}
       <TaskReplaceModal
         visible={taskEditing.replaceModalVisible}
         taskToReplace={taskEditing.taskToReplace}
