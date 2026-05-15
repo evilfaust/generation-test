@@ -207,7 +207,7 @@ const ROUTE_META = [
   { re: /^\/app\/arith\/log-exp/,         menuKey: 'log-exp',          menuGroup: 'arith', title: 'Устный счёт — Степени и логарифмы' },
   { re: /^\/app\/arith\/powers-roots/,    menuKey: 'powers-roots',     menuGroup: 'arith', title: 'Устный счёт — Степени и корни' },
   { re: /^\/app\/arith\/logarithms/,      menuKey: 'logarithms',       menuGroup: 'arith', title: 'Устный счёт — Логарифмы' },
-  { re: /^\/app\/arith\/ege-base/,        menuKey: 'ege-base-oral',    menuGroup: 'arith', title: 'Устный счёт — ЕГЭ база' },
+  { re: /^\/app\/arith\/ege-base/,        menuKey: 'ege-base-oral',    menuGroup: 'arith', title: 'Устный счёт — Действия с десятичными' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -580,7 +580,7 @@ function AppLayout() {
         { key: 'log-exp',       icon: <FunctionOutlined />,  label: 'Степени и логарифмы' },
         { key: 'powers-roots',  icon: <ExperimentOutlined />, label: 'Степени и корни' },
         { key: 'logarithms',    icon: <LineChartOutlined />,  label: 'Логарифмы' },
-        { key: 'ege-base-oral', icon: <FieldNumberOutlined />, label: 'ЕГЭ база' },
+        { key: 'ege-base-oral', icon: <FieldNumberOutlined />, label: 'Действия с десятичными' },
       ],
     },
     {

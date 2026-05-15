@@ -267,7 +267,7 @@ export const DEFAULT_SETTINGS_EGE = {
 
 // ─── Хук ──────────────────────────────────────────────────────────────────────
 export function useOralEgeBase() {
-  const [title, setTitle]         = useState('Устный счёт: ЕГЭ база');
+  const [title, setTitle]         = useState('Устный счёт: действия с десятичными');
   const [settings, setSettings]   = useState({ ...DEFAULT_SETTINGS_EGE });
   const [tasksData, setTasksData] = useState(null);
 
@@ -315,7 +315,7 @@ export function useOralEgeBase() {
 
   const reset = useCallback(() => {
     setTasksData(null);
-    setTitle('Устный счёт: ЕГЭ база');
+    setTitle('Устный счёт: действия с десятичными');
     setSettings({ ...DEFAULT_SETTINGS_EGE });
   }, []);
 
