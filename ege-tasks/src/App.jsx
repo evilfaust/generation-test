@@ -13,7 +13,7 @@ import {
   FormOutlined, QrcodeOutlined, PictureOutlined, HeatMapOutlined,
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
-  CalculatorOutlined, ExperimentOutlined,
+  CalculatorOutlined, ExperimentOutlined, LineChartOutlined,
 } from '@ant-design/icons';
 import TaskList from './components/TaskList';
 import TaskSheetGenerator from './components/OralWorksheetGenerator';
@@ -60,6 +60,7 @@ import DoubleAngleGenerator from './components/DoubleAngleGenerator';
 import OralCountingGenerator from './components/OralCountingGenerator';
 import LogExpEquationsGenerator from './components/LogExpEquationsGenerator';
 import OralPowersRootsGenerator from './components/OralPowersRootsGenerator';
+import OralLogarithmsGenerator from './components/OralLogarithmsGenerator';
 import MarathonGenerator from './components/MarathonGenerator';
 import CrosswordGenerator from './components/CrosswordGenerator';
 import EgeScoreCalculator from './components/EgeScoreCalculator';
@@ -127,6 +128,7 @@ export const R = {
   ORAL_COUNTING:       '/app/arith/oral-counting',
   LOG_EXP_EQUATIONS:   '/app/arith/log-exp',
   POWERS_ROOTS:        '/app/arith/powers-roots',
+  LOGARITHMS:          '/app/arith/logarithms',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',
@@ -202,6 +204,7 @@ const ROUTE_META = [
   { re: /^\/app\/arith\/oral-counting/,   menuKey: 'oral-counting',    menuGroup: 'arith', title: 'Устный счёт — Арифметика' },
   { re: /^\/app\/arith\/log-exp/,         menuKey: 'log-exp',          menuGroup: 'arith', title: 'Устный счёт — Степени и логарифмы' },
   { re: /^\/app\/arith\/powers-roots/,    menuKey: 'powers-roots',     menuGroup: 'arith', title: 'Устный счёт — Степени и корни' },
+  { re: /^\/app\/arith\/logarithms/,      menuKey: 'logarithms',       menuGroup: 'arith', title: 'Устный счёт — Логарифмы' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -253,6 +256,7 @@ const MENU_KEY_PATH = {
   'oral-counting':          R.ORAL_COUNTING,
   'log-exp':                R.LOG_EXP_EQUATIONS,
   'powers-roots':           R.POWERS_ROOTS,
+  'logarithms':             R.LOGARITHMS,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -571,6 +575,7 @@ function AppLayout() {
         { key: 'oral-counting', icon: <CalculatorOutlined />, label: 'Арифметика' },
         { key: 'log-exp',       icon: <FunctionOutlined />,  label: 'Степени и логарифмы' },
         { key: 'powers-roots',  icon: <ExperimentOutlined />, label: 'Степени и корни' },
+        { key: 'logarithms',    icon: <LineChartOutlined />,  label: 'Логарифмы' },
       ],
     },
     {
@@ -762,6 +767,7 @@ function App() {
               <Route path={R.ORAL_COUNTING} element={<OralCountingGenerator />} />
               <Route path={R.LOG_EXP_EQUATIONS} element={<LogExpEquationsGenerator />} />
               <Route path={R.POWERS_ROOTS} element={<OralPowersRootsGenerator />} />
+              <Route path={R.LOGARITHMS} element={<OralLogarithmsGenerator />} />
 
               {/* Теория */}
               <Route path={R.THEORY}            element={<TheoryPage />} />
