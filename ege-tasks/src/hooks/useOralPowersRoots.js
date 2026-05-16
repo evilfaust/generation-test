@@ -375,6 +375,32 @@ export const DEFAULT_SETTINGS_PR = {
   },
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generatePowersRootsVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS_PR, ...settings };
+  const { variantsCount, questionsCount, categories, decimalOnly } = s;
+  const enabledCats = Object.entries(categories || {})
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  if (enabledCats.length === 0) return [];
+  const maxAttempts = decimalOnly ? questionsCount * 30 : questionsCount * 5;
+  return Array.from({ length: variantsCount }, () => {
+    const questions = [];
+    let catIdx = 0;
+    while (questions.length < questionsCount && catIdx < maxAttempts) {
+      const cat = enabledCats[catIdx % enabledCats.length];
+      catIdx++;
+      const gen = GENERATORS_PR[cat];
+      if (!gen) continue;
+      const q = gen();
+      if (q && (!decimalOnly || isFiniteDecimalAnswer(q.resultLatex))) {
+        questions.push({ ...q, cat });
+      }
+    }
+    return questions;
+  });
+}
+
 // ─── Хук ──────────────────────────────────────────────────────────────────────
 export function useOralPowersRoots() {
   const [title, setTitle]         = useState('Устный счёт: степени и корни');

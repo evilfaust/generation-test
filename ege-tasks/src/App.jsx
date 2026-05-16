@@ -64,6 +64,7 @@ import OralPowersRootsGenerator from './components/OralPowersRootsGenerator';
 import OralLogarithmsGenerator from './components/OralLogarithmsGenerator';
 import OralEgeBaseGenerator from './components/OralEgeBaseGenerator';
 import OralFractionsGenerator from './components/OralFractionsGenerator';
+import OralMixedGenerator from './components/OralMixedGenerator';
 import MarathonGenerator from './components/MarathonGenerator';
 import CrosswordGenerator from './components/CrosswordGenerator';
 import EgeScoreCalculator from './components/EgeScoreCalculator';
@@ -134,6 +135,7 @@ export const R = {
   LOGARITHMS:          '/app/arith/logarithms',
   EGE_BASE_ORAL:       '/app/arith/ege-base',
   FRACTIONS_ORAL:      '/app/arith/fractions',
+  ORAL_MIXED:          '/app/arith/mixed',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',
@@ -212,6 +214,7 @@ const ROUTE_META = [
   { re: /^\/app\/arith\/logarithms/,      menuKey: 'logarithms',       menuGroup: 'arith', title: 'Устный счёт — Логарифмы' },
   { re: /^\/app\/arith\/ege-base/,        menuKey: 'ege-base-oral',    menuGroup: 'arith', title: 'Устный счёт — Действия с десятичными' },
   { re: /^\/app\/arith\/fractions/,       menuKey: 'fractions-oral',   menuGroup: 'arith', title: 'Устный счёт — Действия с обыкновенными дробями' },
+  { re: /^\/app\/arith\/mixed/,           menuKey: 'oral-mixed',       menuGroup: 'arith', title: 'Устный счёт — Смешанная работа' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -266,6 +269,7 @@ const MENU_KEY_PATH = {
   'logarithms':             R.LOGARITHMS,
   'ege-base-oral':          R.EGE_BASE_ORAL,
   'fractions-oral':         R.FRACTIONS_ORAL,
+  'oral-mixed':             R.ORAL_MIXED,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -587,6 +591,7 @@ function AppLayout() {
         { key: 'logarithms',    icon: <LineChartOutlined />,  label: 'Логарифмы' },
         { key: 'ege-base-oral', icon: <FieldNumberOutlined />, label: 'Действия с десятичными' },
         { key: 'fractions-oral', icon: <PercentageOutlined />, label: 'Действия с обыкновенными дробями' },
+        { key: 'oral-mixed',     icon: <AppstoreOutlined />,   label: 'Смешанная работа' },
       ],
     },
     {
@@ -781,6 +786,7 @@ function App() {
               <Route path={R.LOGARITHMS} element={<OralLogarithmsGenerator />} />
               <Route path={R.EGE_BASE_ORAL} element={<OralEgeBaseGenerator />} />
               <Route path={R.FRACTIONS_ORAL} element={<OralFractionsGenerator />} />
+              <Route path={R.ORAL_MIXED} element={<OralMixedGenerator />} />
 
               {/* Теория */}
               <Route path={R.THEORY}            element={<TheoryPage />} />

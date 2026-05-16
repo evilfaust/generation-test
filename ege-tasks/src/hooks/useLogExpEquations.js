@@ -363,6 +363,32 @@ export const DEFAULT_SETTINGS_LOGEXP = {
   },
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateLogExpVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS_LOGEXP, ...settings };
+  const { variantsCount, questionsCount, categories, decimalOnly } = s;
+  const enabledCats = Object.entries(categories || {})
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  if (enabledCats.length === 0) return [];
+  const maxAttempts = decimalOnly ? questionsCount * 30 : questionsCount * 5;
+  return Array.from({ length: variantsCount }, () => {
+    const questions = [];
+    let catIdx = 0;
+    while (questions.length < questionsCount && catIdx < maxAttempts) {
+      const cat = enabledCats[catIdx % enabledCats.length];
+      catIdx++;
+      const gen = GENERATORS_LOGEXP[cat];
+      if (!gen) continue;
+      const q = gen();
+      if (q && (!decimalOnly || isFiniteDecimalAnswer(q.resultLatex))) {
+        questions.push({ ...q, cat });
+      }
+    }
+    return questions;
+  });
+}
+
 // ─── Хук ──────────────────────────────────────────────────────────────────────
 export function useLogExpEquations() {
   const [title, setTitle]         = useState('Уравнения: степени и логарифмы');

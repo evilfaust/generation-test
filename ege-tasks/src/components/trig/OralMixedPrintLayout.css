@@ -1,0 +1,38 @@
+/* Расширение OralCountingPrintLayout.css для смешанной работы */
+
+@media print {
+  .oral-mixed-section {
+    margin-top: 1mm;
+    break-inside: avoid;
+  }
+  .oral-mixed-section + .oral-mixed-section {
+    margin-top: 3mm;
+  }
+  .oral-mixed-section-title {
+    font-size: 10pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5pt;
+    color: #000;
+    margin-bottom: 1.5mm;
+    padding-bottom: 0.5mm;
+    border-bottom: 1px solid #888;
+  }
+  .oral-print-root[data-fs="m"] .oral-mixed-section-title { font-size: 12pt; }
+  .oral-print-root[data-fs="l"] .oral-mixed-section-title { font-size: 14pt; }
+}
+
+.oral-screen-root .oral-mixed-section + .oral-mixed-section {
+  margin-top: 3mm;
+}
+.oral-screen-root .oral-mixed-section-title {
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5pt;
+  color: #000;
+  margin-bottom: 1.5mm;
+  margin-top: 1mm;
+  padding-bottom: 0.5mm;
+  border-bottom: 1px solid #888;
+  font-size: 0.95em;
+}

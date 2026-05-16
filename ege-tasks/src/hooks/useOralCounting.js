@@ -353,6 +353,39 @@ export const DEFAULT_SETTINGS = {
   },
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateOralCountingVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS, ...settings };
+  const { variantsCount, questionsCount, categories, decimalOnly } = s;
+
+  const enabledCats = Object.entries(categories || {})
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+
+  if (enabledCats.length === 0) return [];
+
+  const maxFails = decimalOnly ? 600 : 120;
+
+  return Array.from({ length: variantsCount }, () => {
+    const questions = [];
+    let failCount = 0;
+    let catIdx = 0;
+    while (questions.length < questionsCount && failCount < maxFails) {
+      const cat = enabledCats[catIdx % enabledCats.length];
+      catIdx++;
+      const gen = GENERATORS[cat];
+      if (!gen) { failCount++; continue; }
+      const q = gen();
+      if (q && (!decimalOnly || isFiniteDecimalAnswer(q.resultLatex))) {
+        questions.push({ ...q, cat });
+      } else {
+        failCount++;
+      }
+    }
+    return questions;
+  });
+}
+
 // ─── Хук ──────────────────────────────────────────────────────────────────────
 export function useOralCounting() {
   const [title, setTitle]       = useState('Устный счёт');
