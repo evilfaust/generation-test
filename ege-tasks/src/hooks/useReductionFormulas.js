@@ -230,6 +230,16 @@ export const DEFAULT_RF_SETTINGS = {
   workSpaceSize: 25,
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateReductionFormulasVariants(settings) {
+  const s = { ...DEFAULT_RF_SETTINGS, ...settings };
+  const { variantsCount, tasksPerVariant, taskTypes, funcs, angleMode, numPatterns } = s;
+  if (!taskTypes?.length || !funcs?.length) return [];
+  return Array.from({ length: variantsCount }, () =>
+    generateVariant({ count: tasksPerVariant, taskTypes, funcs, angleMode, numPatterns })
+  );
+}
+
 export function useReductionFormulas() {
   const [title, setTitle] = useState('Формулы приведения');
   const [settings, setSettings] = useState(DEFAULT_RF_SETTINGS);

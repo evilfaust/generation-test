@@ -256,6 +256,16 @@ export const DEFAULT_DA_SETTINGS = {
 
 // ─── Хук ─────────────────────────────────────────────────────────────────────
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateDoubleAngleVariants(settings) {
+  const s = { ...DEFAULT_DA_SETTINGS, ...settings };
+  const { variantsCount, tasksPerVariant, taskTypes, funcs, incSin, incCos, incTan } = s;
+  if (!taskTypes?.length || !funcs?.length) return [];
+  return Array.from({ length: variantsCount }, () =>
+    generateVariant({ count: tasksPerVariant, taskTypes, funcs, incSin, incCos, incTan })
+  );
+}
+
 export function useDoubleAngle() {
   const [title, setTitle] = useState('Формулы двойного аргумента');
   const [settings, setSettings] = useState(DEFAULT_DA_SETTINGS);

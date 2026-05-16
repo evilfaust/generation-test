@@ -124,6 +124,12 @@ export const DEFAULT_SETTINGS = {
 };
 
 // ─── Хук ─────────────────────────────────────────────────────────────────────
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateUnitCircleVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS, ...settings };
+  return Array.from({ length: s.variantsCount }, () => generateVariant(s));
+}
+
 export function useUnitCircle() {
   const [title, setTitle] = useState('Единичная окружность');
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS });

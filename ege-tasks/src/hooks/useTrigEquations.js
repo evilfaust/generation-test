@@ -234,6 +234,18 @@ export const DEFAULT_SETTINGS = {
   workSpaceSize:  30,
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateTrigEquationsVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS, ...settings };
+  const { variantsCount, questionsCount, useSin, useCos, useTan, useCot } = s;
+  const fns = [
+    useSin && 'sin', useCos && 'cos',
+    useTan && 'tan', useCot && 'cot',
+  ].filter(Boolean);
+  if (fns.length === 0) return [];
+  return generateVariants({ variantsCount, questionsCount, fns });
+}
+
 // ─── Хук ──────────────────────────────────────────────────────────────────────
 export function useTrigEquations() {
   const [title, setTitle] = useState('Простейшие тригонометрические уравнения');

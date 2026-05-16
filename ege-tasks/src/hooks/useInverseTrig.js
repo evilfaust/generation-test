@@ -246,6 +246,37 @@ export const DEFAULT_SETTINGS = {
   workSpaceSize:  20,
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateInverseTrigVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS, ...settings };
+  const {
+    variantsCount, questionsCount, taskType,
+    useArcsin, useArccos, useArctan, useArccot,
+    useOuterSin, useOuterCos, useOuterTan, useOuterCot,
+    useDegrees,
+  } = s;
+  const arcFns = [
+    useArcsin && 'arcsin', useArccos && 'arccos',
+    useArctan && 'arctan', useArccot && 'arccot',
+  ].filter(Boolean);
+  if (arcFns.length === 0) return [];
+  const outerFns = [
+    useOuterSin && 'sin', useOuterCos && 'cos',
+    useOuterTan && 'tan', useOuterCot && 'cot',
+  ].filter(Boolean);
+  let pool = [];
+  if (taskType === 'basic'  || taskType === 'mixed') pool.push(...genBasic(arcFns, useDegrees));
+  if (taskType === 'sum'    || taskType === 'mixed') pool.push(...genSum(arcFns, useDegrees));
+  if ((taskType === 'nested' || taskType === 'mixed') && outerFns.length > 0) {
+    pool.push(...genNested(outerFns, arcFns));
+  }
+  if (pool.length === 0) return [];
+  return Array.from({ length: variantsCount }, () => {
+    const shuffled = shuffle(pool);
+    return shuffled.slice(0, Math.min(questionsCount, shuffled.length));
+  });
+}
+
 // ─── Хук ──────────────────────────────────────────────────────────────────────
 export function useInverseTrig() {
   const [title, setTitle] = useState('Вычислите значения выражений');

@@ -214,6 +214,30 @@ export const DEFAULT_SETTINGS = {
   workSpaceSize:   20,
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateTrigExpressionsVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS, ...settings };
+  const {
+    variantsCount, questionsCount, taskType, termsCount,
+    useSin, useCos, useTan, useCot, useNegAngles, useDegrees,
+  } = s;
+  const fns = [useSin && 'sin', useCos && 'cos', useTan && 'tan', useCot && 'cot'].filter(Boolean);
+  if (fns.length === 0) return [];
+  const anglePool = useNegAngles ? STD_ANGLES : STD_ANGLES.filter(a => a.num >= 0);
+  return Array.from({ length: variantsCount }, () => {
+    const questions = [];
+    let failCount = 0;
+    while (questions.length < questionsCount && failCount < 60) {
+      let type = taskType;
+      if (type === 'mixed') type = questions.length % 2 === 0 ? 'sum' : 'product';
+      const expr = generateExpression(type, termsCount, fns, anglePool, 400, useDegrees);
+      if (expr) questions.push(expr);
+      else failCount++;
+    }
+    return questions;
+  });
+}
+
 // ─── Хук ─────────────────────────────────────────────────────────────────────
 export function useTrigExpressions() {
   const [title, setTitle] = useState('Вычислите значения выражений');

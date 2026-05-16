@@ -195,6 +195,16 @@ export const DEFAULT_AF_SETTINGS = {
   workSpaceSize: 30,
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateAdditionFormulasVariants(settings) {
+  const s = { ...DEFAULT_AF_SETTINGS, ...settings };
+  const { variantsCount, tasksPerVariant, taskTypes, funcs, incSum, incDiff, showHint } = s;
+  if (!taskTypes?.length || !funcs?.length) return [];
+  return Array.from({ length: variantsCount }, () =>
+    generateVariant({ count: tasksPerVariant, taskTypes, funcs, incSum, incDiff, showHint })
+  );
+}
+
 export function useAdditionFormulas() {
   const [title, setTitle] = useState('Формулы сложения');
   const [settings, setSettings] = useState(DEFAULT_AF_SETTINGS);

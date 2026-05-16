@@ -290,6 +290,21 @@ export const DEFAULT_SETTINGS = {
   workSpaceSize:  35,
 };
 
+// ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
+export function generateTrigEquationsAdvancedVariants(settings) {
+  const s = { ...DEFAULT_SETTINGS, ...settings };
+  const { variantsCount, questionsCount, useType1, useType2 } = s;
+  const pool = [
+    ...(useType1 ? TYPE1_ENTRIES : []),
+    ...(useType2 ? TYPE2_ENTRIES : []),
+  ];
+  if (pool.length === 0) return [];
+  return Array.from({ length: variantsCount }, () => {
+    const shuffled = shuffle(pool);
+    return shuffled.slice(0, Math.min(questionsCount, shuffled.length));
+  });
+}
+
 // ─── Хук ──────────────────────────────────────────────────────────────────────
 export function useTrigEquationsAdvanced() {
   const [title, setTitle] = useState('Тригонометрические уравнения f(kx + b) = a');
