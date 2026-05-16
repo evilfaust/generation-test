@@ -257,9 +257,9 @@ export default function OralMixedGenerator() {
         />
       </div>
 
-      <SplitLayout leftWidth={360} gap={20} style={{ flex: 1 }}
+      <SplitLayout leftWidth={360} gap={20} style={{ flex: 1, minHeight: 0 }}
         left={
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 10 }}>
             {/* Вариантов */}
             <div style={{ padding: '10px 12px', background: 'var(--bg-sunken)', borderRadius: 'var(--radius)', border: '1px solid var(--rule-soft)' }}>
               <ConfigLabel>Настройки</ConfigLabel>
@@ -279,7 +279,7 @@ export default function OralMixedGenerator() {
               Разделы · {sections.length} · {totalTasks} зад. в варианте
             </div>
 
-            <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px 4px', margin: '0 -4px' }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px 4px', margin: '0 -4px' }}>
               {sections.map(sec => (
                 <SectionPanel
                   key={sec.id}
