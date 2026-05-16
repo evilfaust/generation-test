@@ -243,8 +243,8 @@
 
   .oral-key-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0 4mm;
+    grid-template-columns: 1fr;
+    gap: 0;
   }
 
   .oral-key-row {
@@ -478,7 +478,7 @@
   padding-bottom: 0.5mm;
   border-bottom: 1px dotted #666;
 }
-.oral-screen-root .oral-key-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 0 4mm; }
+.oral-screen-root .oral-key-grid   { display: grid; grid-template-columns: 1fr; gap: 0; }
 .oral-screen-root .oral-key-row    { display: flex; align-items: baseline; gap: 2px; font-size: 0.8em; margin-bottom: 0.8mm; }
 .oral-screen-root .oral-key-num    { font-weight: bold; min-width: 14px; flex-shrink: 0; }
 .oral-screen-root .oral-key-expr   { flex: 1; font-size: 0.75em; color: #444; overflow: hidden; }
