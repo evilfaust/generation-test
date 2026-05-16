@@ -14,6 +14,7 @@ import {
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
+  PercentageOutlined,
 } from '@ant-design/icons';
 import TaskList from './components/TaskList';
 import TaskSheetGenerator from './components/OralWorksheetGenerator';
@@ -62,6 +63,7 @@ import LogExpEquationsGenerator from './components/LogExpEquationsGenerator';
 import OralPowersRootsGenerator from './components/OralPowersRootsGenerator';
 import OralLogarithmsGenerator from './components/OralLogarithmsGenerator';
 import OralEgeBaseGenerator from './components/OralEgeBaseGenerator';
+import OralFractionsGenerator from './components/OralFractionsGenerator';
 import MarathonGenerator from './components/MarathonGenerator';
 import CrosswordGenerator from './components/CrosswordGenerator';
 import EgeScoreCalculator from './components/EgeScoreCalculator';
@@ -131,6 +133,7 @@ export const R = {
   POWERS_ROOTS:        '/app/arith/powers-roots',
   LOGARITHMS:          '/app/arith/logarithms',
   EGE_BASE_ORAL:       '/app/arith/ege-base',
+  FRACTIONS_ORAL:      '/app/arith/fractions',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',
@@ -208,6 +211,7 @@ const ROUTE_META = [
   { re: /^\/app\/arith\/powers-roots/,    menuKey: 'powers-roots',     menuGroup: 'arith', title: 'Устный счёт — Степени и корни' },
   { re: /^\/app\/arith\/logarithms/,      menuKey: 'logarithms',       menuGroup: 'arith', title: 'Устный счёт — Логарифмы' },
   { re: /^\/app\/arith\/ege-base/,        menuKey: 'ege-base-oral',    menuGroup: 'arith', title: 'Устный счёт — Действия с десятичными' },
+  { re: /^\/app\/arith\/fractions/,       menuKey: 'fractions-oral',   menuGroup: 'arith', title: 'Устный счёт — Действия с обыкновенными дробями' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -261,6 +265,7 @@ const MENU_KEY_PATH = {
   'powers-roots':           R.POWERS_ROOTS,
   'logarithms':             R.LOGARITHMS,
   'ege-base-oral':          R.EGE_BASE_ORAL,
+  'fractions-oral':         R.FRACTIONS_ORAL,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -581,6 +586,7 @@ function AppLayout() {
         { key: 'powers-roots',  icon: <ExperimentOutlined />, label: 'Степени и корни' },
         { key: 'logarithms',    icon: <LineChartOutlined />,  label: 'Логарифмы' },
         { key: 'ege-base-oral', icon: <FieldNumberOutlined />, label: 'Действия с десятичными' },
+        { key: 'fractions-oral', icon: <PercentageOutlined />, label: 'Действия с обыкновенными дробями' },
       ],
     },
     {
@@ -774,6 +780,7 @@ function App() {
               <Route path={R.POWERS_ROOTS} element={<OralPowersRootsGenerator />} />
               <Route path={R.LOGARITHMS} element={<OralLogarithmsGenerator />} />
               <Route path={R.EGE_BASE_ORAL} element={<OralEgeBaseGenerator />} />
+              <Route path={R.FRACTIONS_ORAL} element={<OralFractionsGenerator />} />
 
               {/* Теория */}
               <Route path={R.THEORY}            element={<TheoryPage />} />
