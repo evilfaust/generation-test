@@ -122,9 +122,13 @@ function isAchievementUnlocked(achievement, attemptData, allAttempts) {
   }
 
   switch (condition_type) {
-    case 'score':
-      // Процент правильных >= condition_value.min
-      return attemptData.percentage >= (condition_value.min || 0);
+    case 'score': {
+      // min — нижняя граница (включительно), max — верхняя граница (включительно)
+      const pct = attemptData.percentage;
+      if (condition_value.min !== undefined && pct < condition_value.min) return false;
+      if (condition_value.max !== undefined && pct > condition_value.max) return false;
+      return true;
+    }
 
     case 'speed':
       // Время выполнения <= condition_value.max_minutes
@@ -134,6 +138,19 @@ function isAchievementUnlocked(achievement, attemptData, allAttempts) {
       // Количество попыток >= condition_value.attempts
       // allAttempts уже включает текущую попытку
       return allAttempts.length >= (condition_value.attempts || 1);
+
+    case 'streak': {
+      // N попыток подряд с результатом >= min_score
+      const minScore = condition_value.min_score ?? 100;
+      const streakLen = condition_value.count ?? 3;
+      if (attemptData.percentage < minScore) return false;
+      // Предыдущие попытки с сохранённым процентом, отсортированные по дате
+      const prev = allAttempts
+        .filter((a) => typeof a.percentage === 'number')
+        .sort((a, b) => new Date(a.created || 0) - new Date(b.created || 0));
+      if (prev.length < streakLen - 1) return false;
+      return prev.slice(-(streakLen - 1)).every((a) => a.percentage >= minScore);
+    }
 
     case 'special':
       // Специальные условия (время суток, день недели и т.д.)

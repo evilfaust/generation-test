@@ -172,6 +172,7 @@ export default function MarathonLiveBoard({ marathonId }) {
   const [flashingRows, setFlashingRows] = useState(new Set());
   const [popScores, setPopScores] = useState({});
   const [isFrozen, setIsFrozen] = useState(false);
+  const [isLightTheme, setIsLightTheme] = useState(false);
 
   // ---- Refs ----
   const prevScoresRef = useRef({});
@@ -420,7 +421,7 @@ export default function MarathonLiveBoard({ marathonId }) {
   }
 
   return (
-    <div className="mlb-root">
+    <div className={`mlb-root${isLightTheme ? ' mlb-root--light' : ''}`}>
       <ConfettiContainer bursts={confettiBursts} />
 
       {/* ---- Header ---- */}
@@ -448,6 +449,14 @@ export default function MarathonLiveBoard({ marathonId }) {
             <span className="mlb-stat-label">Решений</span>
           </div>
           <div className="mlb-stat-divider" />
+
+          <button
+            className="mlb-theme-btn"
+            onClick={() => setIsLightTheme(v => !v)}
+            title={isLightTheme ? 'Тёмная тема' : 'Светлая тема (проектор)'}
+          >
+            {isLightTheme ? '🌙 Тёмная' : '☀️ Светлая'}
+          </button>
 
           <button
             className={`mlb-freeze-btn${isFrozen ? ' is-frozen' : ''}`}
