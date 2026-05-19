@@ -1,0 +1,333 @@
+/* ===== Marathon Worksheet Print ===== */
+
+.mwsp-root {
+  --ink: #151515;
+  --paper: #ffffff;
+  --grid-color: #c4cedf;
+  --border: #b0b8cc;
+  color: var(--ink);
+  max-width: 100%;
+}
+
+/* ── Toolbar ─────────────────────────────────────── */
+
+.mwsp-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Страницы ────────────────────────────────────── */
+
+.mwsp-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Лист A4 ─────────────────────────────────────── */
+
+.mwsp-sheet {
+  width: 210mm;
+  height: 297mm;
+  padding: 4mm;
+  box-sizing: border-box;
+  background: var(--paper);
+  border: 1.5px solid #c0c0c0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", Georgia, serif;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── Слот: вмещает CutLine + Block ──────────────── */
+
+.mwsp-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Линия разреза ───────────────────────────────── */
+
+.mwsp-cut-line {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 5mm;
+  padding: 0 1mm;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.mwsp-cut-dash {
+  flex: 1;
+  border-top: 1pt dashed #000;
+}
+
+.mwsp-cut-icon {
+  font-size: 3.8mm;
+  line-height: 1;
+  color: #000;
+  padding: 0 1.5mm;
+  /* ✂ смотрит вправо вдоль линии */
+  display: inline-block;
+  transform: rotate(270deg) scaleX(-1);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── Блок одной задачи ───────────────────────────── */
+
+.mwsp-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 0.7pt solid #000;
+  border-radius: 1.5mm;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.mwsp-block--empty {
+  border-color: transparent;
+  pointer-events: none;
+}
+
+/* ── Шапка блока: ФИ + квадратики ───────────────── */
+
+.mwsp-header {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding: 1.5mm 2.5mm;
+  border-bottom: 0.5pt solid #000;
+  flex-shrink: 0;
+  background: #f8f9fb;
+}
+
+.mwsp-name-area {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5mm;
+  flex: 1;
+  min-width: 0;
+}
+
+.mwsp-name-label {
+  font-size: 2.8mm;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.mwsp-name-line {
+  flex: 1;
+  border-bottom: 0.7pt solid #000;
+  min-width: 20mm;
+}
+
+/* Квадратики попыток */
+
+.mwsp-attempts {
+  display: flex;
+  gap: 1.5mm;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.mwsp-attempt-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6mm;
+}
+
+.mwsp-attempt-n {
+  font-size: 2mm;
+  color: #000;
+  font-weight: 700;
+  line-height: 1;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.mwsp-attempt-box {
+  width: 6mm;
+  height: 6mm;
+  border: 0.7pt solid #000;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+/* ── Область условия задачи ──────────────────────── */
+
+.mwsp-content {
+  display: flex;
+  align-items: baseline;
+  gap: 1mm;
+  padding: 1.5mm 2.5mm;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.mwsp-task-num {
+  /* font-size задаётся inline из TEXT_SIZE_CFG */
+  font-weight: 700;
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--ink);
+  line-height: 1.25;
+  font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", Georgia, serif;
+}
+
+.mwsp-task-text {
+  /* font-size задаётся inline из TEXT_SIZE_CFG */
+  line-height: 1.25;
+  font-style: italic;
+  flex: 1;
+  overflow: hidden;
+  font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", Georgia, serif;
+}
+
+.mwsp-task-text p {
+  margin: 0 0 0.3mm;
+}
+
+.mwsp-task-text .katex {
+  font-size: 0.92em;
+}
+
+/* ── Клетка для решения ──────────────────────────── */
+
+.mwsp-grid {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  border-top: 0.5pt solid #000;
+}
+
+/* Линии клетки — нативные HTML-элементы с физическими единицами.
+   mm для позиций → точный шаг 5 мм при печати.
+   pt для толщины → стабильная hairline-линия на любом dpi. */
+
+.mwsp-h-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 0.2pt solid #e1e3e8;
+  pointer-events: none;
+}
+
+.mwsp-v-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 0.2pt solid #e1e3e8;
+  pointer-events: none;
+}
+
+/* Чертёж поверх клетки — верхний левый угол */
+
+.mwsp-grid-drawing {
+  position: absolute;
+  top: 2mm;
+  left: 2mm;
+  z-index: 1;
+  background: #fff;
+  padding: 1mm;
+  border-radius: 0.8mm;
+  /* max-width задаётся inline из DRAWING_SIZE_CFG */
+}
+
+.mwsp-grid-drawing-img {
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════
+   Печать
+═══════════════════════════════════════════════════ */
+
+@media print {
+  body:has(.mwsp-root) {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body:has(.mwsp-root) * {
+    visibility: hidden;
+  }
+
+  body:has(.mwsp-root) .mwsp-root,
+  body:has(.mwsp-root) .mwsp-root * {
+    visibility: visible;
+  }
+
+  body:has(.mwsp-root) .mwsp-toolbar,
+  body:has(.mwsp-root) .ant-card {
+    display: none !important;
+  }
+
+  body:has(.mwsp-root) .mwsp-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: #fff;
+  }
+
+  .mwsp-pages {
+    gap: 0;
+  }
+
+  .mwsp-sheet {
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    margin: 0;
+    border: 0;
+    padding: 4mm;
+    box-shadow: none;
+  }
+
+  .mwsp-pages .mwsp-sheet {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .mwsp-pages .mwsp-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .mwsp-block--empty {
+    border-color: transparent !important;
+  }
+
+  .mwsp-header {
+    background: #fff;
+  }
+
+
+
+}

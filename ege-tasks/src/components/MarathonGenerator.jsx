@@ -15,7 +15,9 @@ import { api } from '../shared/services/pocketbase';
 import TaskSelectModal from './TaskSelectModal';
 import MarathonCardsPrint from './marathon/MarathonCardsPrint';
 import MarathonTeacherSheet from './marathon/MarathonTeacherSheet';
+import MarathonTeacherSheetFull from './marathon/MarathonTeacherSheetFull';
 import MarathonRatingPrint from './marathon/MarathonRatingPrint';
+import MarathonWorksheetPrint from './marathon/MarathonWorksheetPrint';
 import MarathonTracker from './marathon/MarathonTracker';
 import LessonSidebar from './marathon/LessonSidebar';
 import QueueBoard from './marathon/QueueBoard';
@@ -66,6 +68,9 @@ export default function MarathonGenerator() {
   const [printMode, setPrintMode] = useState(null); // 'cards' | 'teacher' | 'rating' | null
   const [showLogo, setShowLogo] = useState(true);
   const [trackerMode, setTrackerMode] = useState('grid'); // 'grid' | 'queue'
+  const [showWorksheet,    setShowWorksheet]    = useState(false);
+  const [showAnswerSheet,  setShowAnswerSheet]  = useState(false);
+  const [showTeacherFull,  setShowTeacherFull]  = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [showBulk, setShowBulk] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null); // имя редактируемого
@@ -81,8 +86,6 @@ export default function MarathonGenerator() {
     style.id = styleId;
     if (printMode === 'rating') {
       style.textContent = '@page { size: A4 landscape; margin: 10mm 12mm; }';
-    } else if (printMode === 'teacher') {
-      style.textContent = '@page { size: A4 portrait; margin: 10mm 12mm; }';
     } else {
       style.textContent = '@page { size: A4 portrait; margin: 0; }';
     }
@@ -483,6 +486,30 @@ export default function MarathonGenerator() {
     </div>
   );
 
+  // Подвкладка: Рабочий лист (2/3/4/5 задач на A4 с ФИ + клеткой)
+  const worksheetTab = (
+    <div className="mg-print-tab">
+      {tasks.length === 0 ? (
+        <Empty description="Добавьте задачи в разделе «Содержимое»" />
+      ) : (
+        <div className="mg-print-actions">
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
+            onClick={() => setShowWorksheet(true)}
+            size="large"
+          >
+            Открыть рабочий лист
+          </Button>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            Карточки задач с полем для имени, клетками для попыток и областью для записи решения.
+            Режимы: 2 / 3 / 4 / 5 задач на листе A4.
+          </Text>
+        </div>
+      )}
+    </div>
+  );
+
   // Подвкладка: Карточки учеников (flashcard-превью)
   const cardsTab = (
     <div className="mg-print-tab">
@@ -536,54 +563,43 @@ export default function MarathonGenerator() {
     </div>
   );
 
-  // Подвкладка: Лист учителя
+  // Подвкладка: Лист учителя (два варианта)
   const teacherTab = (
     <div className="mg-print-tab">
       {tasks.length === 0 ? (
         <Empty description="Добавьте задачи в разделе «Содержимое»" />
       ) : (
-        <>
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          {/* Вариант 1: компактный лист ответов */}
           <div className="mg-print-actions">
             <Button
               type="primary"
               icon={<PrinterOutlined />}
-              onClick={() => handlePrint('teacher')}
-              className="marathon-print-teacher-trigger"
+              onClick={() => setShowAnswerSheet(true)}
+              size="large"
             >
-              Печать листа учителя (A4)
+              Лист ответов
             </Button>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Компактная таблица со всеми задачами, ответами и решениями.
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Сетка карточек на одном A4: номер + чертёж + ответ. Без условия.
+              Удобно для большого набора простых задач.
             </Text>
           </div>
 
-          <div className="mg-teacher-preview">
-            <table className="mg-teacher-preview__table">
-              <thead>
-                <tr>
-                  <th>№</th>
-                  <th>Условие</th>
-                  <th>Ответ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((task, idx) => (
-                  <tr key={task.id}>
-                    <td style={{ fontWeight: 700, color: DIFFICULTY_COLOR[task.difficulty] }}>
-                      {idx + 1}
-                    </td>
-                    <td>
-                      <MathRenderer content={(task.statement_md || '').slice(0, 120)} />
-                    </td>
-                    <td>
-                      <strong><MathRenderer content={task.answer || '—'} /></strong>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Вариант 2: полный лист учителя */}
+          <div className="mg-print-actions">
+            <Button
+              icon={<PrinterOutlined />}
+              onClick={() => setShowTeacherFull(true)}
+              size="large"
+            >
+              Полный лист учителя
+            </Button>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Таблица с условием, ответом и решением. Для сложных задач, где нужен контекст при проверке.
+            </Text>
           </div>
-        </>
+        </Space>
       )}
     </div>
   );
@@ -758,10 +774,11 @@ export default function MarathonGenerator() {
   // =====================================================================
 
   const PREP_TABS = [
-    { key: 'content', label: 'Содержимое', icon: <OrderedListOutlined /> },
-    { key: 'cards',   label: 'Карточки учеников', icon: <FileTextOutlined /> },
-    { key: 'teacher', label: 'Лист учителя', icon: <UserOutlined /> },
-    { key: 'rating',  label: 'Бланк рейтинга', icon: <TrophyOutlined /> },
+    { key: 'content',   label: 'Содержимое',      icon: <OrderedListOutlined /> },
+    { key: 'worksheet', label: 'Рабочий лист',    icon: <PrinterOutlined /> },
+    { key: 'cards',     label: 'Карточки',         icon: <FileTextOutlined /> },
+    { key: 'teacher',   label: 'Лист учителя',    icon: <UserOutlined /> },
+    { key: 'rating',    label: 'Бланк рейтинга',  icon: <TrophyOutlined /> },
   ];
 
   const LIVE_TABS = [
@@ -770,6 +787,7 @@ export default function MarathonGenerator() {
 
   const currentPrepContent = {
     content: contentTab,
+    worksheet: worksheetTab,
     cards: cardsTab,
     teacher: teacherTab,
     rating: ratingTab,
@@ -789,6 +807,36 @@ export default function MarathonGenerator() {
   // =====================================================================
   // RENDER
   // =====================================================================
+
+  if (showWorksheet) {
+    return (
+      <MarathonWorksheetPrint
+        tasks={tasks}
+        title={title}
+        onBack={() => setShowWorksheet(false)}
+      />
+    );
+  }
+
+  if (showAnswerSheet) {
+    return (
+      <MarathonTeacherSheet
+        tasks={tasks}
+        title={title}
+        onBack={() => setShowAnswerSheet(false)}
+      />
+    );
+  }
+
+  if (showTeacherFull) {
+    return (
+      <MarathonTeacherSheetFull
+        tasks={tasks}
+        title={title}
+        onBack={() => setShowTeacherFull(false)}
+      />
+    );
+  }
 
   return (
     <div className="marathon-generator">
@@ -955,9 +1003,6 @@ export default function MarathonGenerator() {
       {/* ---- Блоки для печати ---- */}
       {printMode === 'cards' && (
         <MarathonCardsPrint tasks={tasks} title={title} showLogo={showLogo} />
-      )}
-      {printMode === 'teacher' && (
-        <MarathonTeacherSheet tasks={tasks} title={title} />
       )}
       {printMode === 'rating' && (
         <MarathonRatingPrint students={students} taskCount={tasks.length} title={title} />

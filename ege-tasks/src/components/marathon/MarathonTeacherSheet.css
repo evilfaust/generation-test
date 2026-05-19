@@ -1,0 +1,203 @@
+/* ===== Marathon Teacher Answer Sheet ===== */
+
+.mtas-root {
+  color: #111;
+  max-width: 100%;
+}
+
+/* ── Toolbar ──────────────────────────────────────── */
+
+.mtas-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Лист A4 ──────────────────────────────────────── */
+
+.mtas-sheet {
+  width: 210mm;
+  height: 297mm;
+  padding: 8mm 8mm 6mm;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1.5px solid #c0c0c0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── Заголовок листа ──────────────────────────────── */
+
+.mtas-title {
+  font-size: 4mm;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 4mm;
+  flex-shrink: 0;
+  color: #111;
+  border-bottom: 1pt solid #111;
+  padding-bottom: 2mm;
+}
+
+/* ── Сетка карточек ───────────────────────────────── */
+
+.mtas-grid {
+  flex: 1;
+  display: grid;
+  gap: 3mm;
+  align-content: start;
+  /* columns задаются через CSS-переменную из JSX */
+  grid-template-columns: repeat(var(--mtas-cols, 4), 1fr);
+}
+
+/* ── Одна карточка задачи ─────────────────────────── */
+
+.mtas-card {
+  border: 0.7pt solid #000;
+  border-radius: 1.5mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Верхняя строка с номером */
+
+.mtas-card__num {
+  width: 100%;
+  background: #111;
+  color: #fff;
+  font-size: 3.2mm;
+  font-weight: 700;
+  text-align: center;
+  padding: 1mm 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Область картинки */
+
+.mtas-card__img-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  padding: 1.5mm;
+  box-sizing: border-box;
+}
+
+.mtas-card__img {
+  max-width: 100%;
+  max-height: var(--mtas-img-h, 28mm);
+  object-fit: contain;
+  display: block;
+}
+
+/* Заглушка если нет картинки */
+
+.mtas-card__no-img {
+  width: 100%;
+  height: var(--mtas-img-h, 28mm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  font-size: 6mm;
+}
+
+/* Нижняя строка с ответом */
+
+.mtas-card__answer {
+  width: 100%;
+  border-top: 0.5pt solid #000;
+  background: #f5f5f5;
+  padding: 1.5mm 2mm;
+  text-align: center;
+  font-size: 5mm;
+  font-weight: 700;
+  color: #111;
+  line-height: 1.25;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", Georgia, serif;
+}
+
+.mtas-card__answer .katex {
+  font-size: 0.92em;
+}
+
+.mtas-card__no-answer {
+  color: #aaa;
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════
+   Печать
+═══════════════════════════════════════════════════ */
+
+@media print {
+  body:has(.mtas-root) {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body:has(.mtas-root) * {
+    visibility: hidden;
+  }
+
+  body:has(.mtas-root) .mtas-root,
+  body:has(.mtas-root) .mtas-root * {
+    visibility: visible;
+  }
+
+  body:has(.mtas-root) .mtas-toolbar,
+  body:has(.mtas-root) .ant-card {
+    display: none !important;
+  }
+
+  body:has(.mtas-root) .mtas-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: #fff;
+  }
+
+  .mtas-sheet {
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    margin: 0;
+    border: 0;
+    padding: 8mm 8mm 6mm;
+    box-shadow: none;
+  }
+
+  .mtas-card__num {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .mtas-card__answer {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

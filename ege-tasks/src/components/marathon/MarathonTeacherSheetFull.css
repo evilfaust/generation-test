@@ -1,0 +1,236 @@
+/* ===== Marathon Teacher Sheet Full (условие + ответ + решение) ===== */
+
+.mtsf-root {
+  color: #111;
+  max-width: 100%;
+}
+
+/* ── Toolbar ──────────────────────────────────────── */
+
+.mtsf-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Обёртка страниц ──────────────────────────────── */
+
+.mtsf-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Лист A4 ──────────────────────────────────────── */
+
+.mtsf-sheet {
+  width: 210mm;
+  padding: 10mm;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1.5px solid #c0c0c0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  margin: 0 auto;
+  font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", Georgia, serif;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── Заголовок (только на первой странице) ────────── */
+
+.mtsf-title {
+  font-size: 4.5mm;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 5mm;
+  padding-bottom: 2mm;
+  border-bottom: 1.5pt solid #000;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Таблица ──────────────────────────────────────── */
+
+.mtsf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 3mm;
+  line-height: 1.3;
+}
+
+.mtsf-table thead th {
+  background: #1a1a1a;
+  color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 3mm;
+  font-weight: 700;
+  padding: 1.5mm 2mm;
+  text-align: left;
+  border: 0.5pt solid #000;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.mtsf-table tbody td {
+  border: 0.5pt solid #bbb;
+  padding: 2mm;
+  vertical-align: top;
+}
+
+.mtsf-table tbody tr:nth-child(even) td {
+  background: #f8f8f8;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Ширины колонок */
+
+.mtsf-col-num {
+  width: 8mm;
+  text-align: center;
+  font-weight: 700;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 3.2mm;
+  color: #000;
+  white-space: nowrap;
+}
+
+.mtsf-col-statement {
+  width: 55%;
+}
+
+.mtsf-col-answer {
+  /* остаток */
+}
+
+/* ── Содержимое ячеек ─────────────────────────────── */
+
+.mtsf-task-img {
+  float: right;
+  max-width: 30mm;
+  max-height: 25mm;
+  object-fit: contain;
+  margin: 0 0 2mm 3mm;
+  display: block;
+}
+
+.mtsf-task-text {
+  font-style: italic;
+  font-size: 3mm;
+  line-height: 1.3;
+}
+
+.mtsf-task-text p {
+  margin: 0 0 0.5mm;
+}
+
+.mtsf-task-text .katex {
+  font-size: 0.92em;
+}
+
+.mtsf-answer {
+  font-weight: 700;
+  font-size: 3.2mm;
+  color: #000;
+  font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", Georgia, serif;
+}
+
+.mtsf-answer .katex {
+  font-size: 0.92em;
+}
+
+.mtsf-no-answer {
+  color: #aaa;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.mtsf-solution {
+  font-size: 2.8mm;
+  color: #333;
+  line-height: 1.3;
+}
+
+.mtsf-solution p {
+  margin: 0 0 0.5mm;
+}
+
+.mtsf-solution .katex {
+  font-size: 0.9em;
+}
+
+/* ═══════════════════════════════════════════════════
+   Печать
+═══════════════════════════════════════════════════ */
+
+@media print {
+  body:has(.mtsf-root) {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body:has(.mtsf-root) * {
+    visibility: hidden;
+  }
+
+  body:has(.mtsf-root) .mtsf-root,
+  body:has(.mtsf-root) .mtsf-root * {
+    visibility: visible;
+  }
+
+  body:has(.mtsf-root) .mtsf-toolbar,
+  body:has(.mtsf-root) .ant-card {
+    display: none !important;
+  }
+
+  body:has(.mtsf-root) .mtsf-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: #fff;
+  }
+
+  .mtsf-pages {
+    gap: 0;
+  }
+
+  .mtsf-sheet {
+    width: 210mm;
+    margin: 0;
+    border: 0;
+    padding: 10mm;
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .mtsf-pages .mtsf-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .mtsf-table thead th {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .mtsf-table tbody tr:nth-child(even) td {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Не разрывать строку таблицы между страницами */
+  .mtsf-table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
