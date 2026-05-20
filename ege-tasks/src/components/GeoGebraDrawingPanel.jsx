@@ -1,14 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import {
-  Button,
-  Space,
-  message,
-} from 'antd';
-import {
-  CameraOutlined,
-  ClearOutlined,
-  ScissorOutlined,
-} from '@ant-design/icons';
+import { Button, Space, message } from 'antd';
+import { CameraOutlined, ClearOutlined, ScissorOutlined } from '@ant-design/icons';
 import GeoGebraApplet from './GeoGebraApplet';
 import CropModal from './shared/CropModal';
 
@@ -16,17 +8,17 @@ import CropModal from './shared/CropModal';
  * Панель рисования чертежей в GeoGebra с экспортом в PNG.
  *
  * Не сохраняет состояние GeoGebra — только результат (PNG).
- * Используется в TaskEditModal для задач устного счёта.
+ * Drag-to-resize встроен в GeoGebraApplet.
  *
  * Props:
  *   imageDataUrl  — текущий PNG (data:image/...) или null
  *   onImageChange — callback(dataUrl | null)
- *   height        — высота GeoGebra-апплета (default: 420)
+ *   initialHeight — начальная высота апплета (default: 420)
  */
 export default function GeoGebraDrawingPanel({
   imageDataUrl = null,
   onImageChange,
-  height = 420,
+  initialHeight = 420,
 }) {
   const ggbApiRef = useRef(null);
   const [saving, setSaving] = useState(false);
@@ -85,31 +77,17 @@ export default function GeoGebraDrawingPanel({
         appName="geometry"
         readOnly={false}
         onApiReady={handleApiReady}
-        height={height}
+        height={initialHeight}
       />
 
       <Space wrap>
-        <Button
-          icon={<CameraOutlined />}
-          onClick={handleSavePng}
-          loading={saving}
-          type="primary"
-        >
+        <Button icon={<CameraOutlined />} onClick={handleSavePng} loading={saving} type="primary">
           Сохранить PNG
         </Button>
-        <Button
-          icon={<ScissorOutlined />}
-          onClick={handleOpenCrop}
-          disabled={!imageDataUrl}
-        >
+        <Button icon={<ScissorOutlined />} onClick={handleOpenCrop} disabled={!imageDataUrl}>
           Обрезать
         </Button>
-        <Button
-          icon={<ClearOutlined />}
-          onClick={handleClear}
-          disabled={!imageDataUrl}
-          danger
-        >
+        <Button icon={<ClearOutlined />} onClick={handleClear} disabled={!imageDataUrl} danger>
           Очистить
         </Button>
       </Space>

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Spin, Typography } from 'antd';
 
 const DEPLOY_SCRIPT_URL = 'https://www.geogebra.org/apps/deployggb.js';
 const DEPLOY_SCRIPT_ID = 'geogebra-deployggb-script';
+const MIN_HEIGHT = 280;
+const MAX_HEIGHT = 1200;
 let geogebraScriptPromise = null;
 
 function loadGeoGebraScript() {
@@ -30,8 +32,6 @@ function loadGeoGebraScript() {
         done();
         return;
       }
-      // Скрипт присутствует в DOM, но не загружен (возможно, ранее упал).
-      // Удаляем его, чтобы добавить заново — иначе события load/error уже не придут.
       existing.remove();
     }
 
@@ -60,15 +60,16 @@ function loadGeoGebraScript() {
 }
 
 /**
- * Переиспользуемый GeoGebra-апплет.
+ * Переиспользуемый GeoGebra-апплет с drag-to-resize.
  *
  * Props:
  *   appName       - 'geometry' | 'graphing' | 'classic' | '3d'  (default: 'geometry')
  *   readOnly      - bool  — скрывает toolbar/menu/правый клик     (default: false)
  *   initialBase64 - string — загружает состояние при монтировании (default: '')
  *   onApiReady    - (api) => void — callback с GGBApplet API      (default: null)
- *   height        - number — высота апплета в px                  (default: 520)
+ *   height        - number — начальная высота апплета в px        (default: 520)
  *   width         - number — ширина в px, 0 = 100%               (default: 0)
+ *   resizable     - bool  — показывать drag handle                (default: true)
  */
 export default function GeoGebraApplet({
   appName = 'geometry',
@@ -77,14 +78,18 @@ export default function GeoGebraApplet({
   onApiReady = null,
   height = 520,
   width = 0,
+  resizable = true,
 }) {
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [error, setError] = useState('');
   const [reloadToken, setReloadToken] = useState(0);
+  const [currentHeight, setCurrentHeight] = useState(height);
   const containerRef = useRef(null);
+  const wrapperRef = useRef(null);
+  const overlayRef = useRef(null);
   const apiRef = useRef(null);
+  const isDraggingRef = useRef(false);
 
-  // Уникальный ID контейнера на весь жизненный цикл компонента
   const containerId = useMemo(
     () => `ggb-applet-${Math.random().toString(36).slice(2)}`,
     [],
@@ -125,7 +130,6 @@ export default function GeoGebraApplet({
             });
             observer.observe(el);
 
-            // Fallback — если элемент так и не появится
             setTimeout(() => {
               observer.disconnect();
               resolve(el?.offsetWidth || 0);
@@ -136,7 +140,6 @@ export default function GeoGebraApplet({
         const measuredWidth = await waitForVisibleWidth();
         if (disposed || !containerRef.current) return;
 
-        // Очищаем предыдущий апплет если был (при смене appName/readOnly)
         if (containerRef.current) {
           containerRef.current.innerHTML = '';
         }
@@ -144,7 +147,7 @@ export default function GeoGebraApplet({
         const params = {
           appName,
           width: measuredWidth || containerRef.current?.offsetWidth || 1280,
-          height,
+          height: currentHeight,
           showToolBar: !readOnly,
           showMenuBar: !readOnly,
           showAlgebraInput: false,
@@ -156,7 +159,6 @@ export default function GeoGebraApplet({
             apiRef.current = ggbApi;
             setStatus('ready');
 
-            // Загружаем начальное состояние если есть
             if (initialBase64) {
               ggbApi.setBase64(initialBase64);
             }
@@ -181,21 +183,44 @@ export default function GeoGebraApplet({
       apiRef.current = null;
     };
   }, [containerId, reloadToken, appName, readOnly]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Примечание: initialBase64 и onApiReady намеренно не в deps —
-  // они читаются только при монтировании апплета.
+
+  // Вызываем setSize на живом апплете при изменении высоты — чертёж не теряется
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || typeof api.setSize !== 'function') return;
+    const w = wrapperRef.current?.offsetWidth || 800;
+    api.setSize(w, currentHeight);
+  }, [currentHeight]);
+
+  const handleDragStart = useCallback((e) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    const startY = e.clientY;
+    const startHeight = currentHeight;
+
+    if (overlayRef.current) overlayRef.current.style.display = 'block';
+
+    const onMove = (ev) => {
+      if (!isDraggingRef.current) return;
+      const delta = ev.clientY - startY;
+      setCurrentHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, startHeight + delta)));
+    };
+
+    const onUp = () => {
+      isDraggingRef.current = false;
+      if (overlayRef.current) overlayRef.current.style.display = 'none';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [currentHeight]);
 
   return (
     <div style={{ width: '100%' }}>
       {status === 'loading' && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '12px 0',
-            color: '#888',
-          }}
-        >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0', color: '#888' }}>
           <Spin size="small" />
           <Typography.Text type="secondary">Загрузка GeoGebra...</Typography.Text>
         </div>
@@ -216,18 +241,46 @@ export default function GeoGebraApplet({
         />
       )}
 
-      <div
-        id={containerId}
-        ref={containerRef}
-        style={{
-          width: '100%',
-          minHeight: height,
-          border: status === 'ready' ? '1px solid #f0f0f0' : 'none',
-          borderRadius: 8,
-          overflow: 'hidden',
-          display: status === 'error' ? 'none' : 'block',
-        }}
-      />
+      <div ref={wrapperRef} style={{ position: 'relative' }}>
+        {/* Прозрачный оверлей — перехватывает мышь во время drag, чтобы iframe не блокировал события */}
+        <div
+          ref={overlayRef}
+          style={{ display: 'none', position: 'absolute', inset: 0, zIndex: 10, cursor: 'ns-resize' }}
+        />
+        <div
+          id={containerId}
+          ref={containerRef}
+          style={{
+            width: '100%',
+            minHeight: currentHeight,
+            border: status === 'ready' ? '1px solid #f0f0f0' : 'none',
+            borderRadius: resizable ? '8px 8px 0 0' : 8,
+            overflow: 'hidden',
+            display: status === 'error' ? 'none' : 'block',
+          }}
+        />
+      </div>
+
+      {resizable && (
+        <div
+          onMouseDown={handleDragStart}
+          title="Потяни, чтобы изменить высоту"
+          style={{
+            height: 14,
+            background: '#f5f5f5',
+            border: '1px solid #d9d9d9',
+            borderTop: 'none',
+            borderRadius: '0 0 6px 6px',
+            cursor: 'ns-resize',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            userSelect: 'none',
+          }}
+        >
+          <div style={{ width: 36, height: 3, background: '#ccc', borderRadius: 2 }} />
+        </div>
+      )}
     </div>
   );
 }

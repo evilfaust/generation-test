@@ -19,6 +19,7 @@ import {
 } from 'antd';
 import {
   CheckCircleOutlined,
+  CloseCircleOutlined,
   CopyOutlined,
   DeleteOutlined,
   EyeOutlined,
@@ -26,12 +27,14 @@ import {
   FileTextOutlined,
   FolderOpenOutlined,
   HolderOutlined,
+  ImportOutlined,
   LoadingOutlined,
   PlusOutlined,
   ReloadOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
+import { useReferenceData } from '../contexts/ReferenceDataContext';
 import GeometryTaskEditor from './GeometryTaskEditor';
 import GeometryTaskPreview, { GeometryPreviewCard, normalizeLayout, PRINT_CELL_ASPECT_RATIO, safeParseLayout } from './GeometryTaskPreview';
 import GeometryWorksheetPrint from './GeometryWorksheetPrint';
@@ -46,6 +49,7 @@ const DIFFICULTY_LABELS = { 1: 'Базовый', 2: 'Средний', 3: 'Сло
 
 export default function GeometryTaskList() {
   const { message } = App.useApp();
+  const { topics: regularTopics, subtopics: regularSubtopics } = useReferenceData();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({});
@@ -83,6 +87,13 @@ export default function GeometryTaskList() {
   // Реф нужен чтобы не ловить stale closure в setTimeout — quickPreviewTask может меняться
   const quickPreviewTaskRef = useRef(null);
   const autosaveTimerRef = useRef(null);
+
+  // Импорт в обычные задачи
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importTopicId, setImportTopicId] = useState(null);
+  const [importSubtopicId, setImportSubtopicId] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResults, setImportResults] = useState(null);
 
   // Синхронизируем реф с актуальным quickPreviewTask чтобы автосохранение всегда видело свежий объект
   useEffect(() => {
@@ -588,6 +599,40 @@ export default function GeometryTaskList() {
     },
   ];
 
+  const importFilteredSubtopics = importTopicId
+    ? regularSubtopics.filter((s) => s.topic === importTopicId)
+    : [];
+
+  const handleImportToRegular = async () => {
+    if (!importTopicId) {
+      message.warning('Выберите тему');
+      return;
+    }
+    setImporting(true);
+    setImportResults(null);
+    try {
+      const results = await api.importGeometryTasksToRegular(selectedRowKeys, {
+        topicId: importTopicId,
+        subtopicId: importSubtopicId || undefined,
+      });
+      setImportResults(results);
+      if (results.added > 0) {
+        message.success(`Импортировано задач: ${results.added}`);
+      }
+    } catch {
+      message.error('Ошибка при импорте');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleImportModalClose = () => {
+    setImportModalOpen(false);
+    setImportTopicId(null);
+    setImportSubtopicId(null);
+    setImportResults(null);
+  };
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {/* ── Панель фильтров ────────────────────────────────────────────── */}
@@ -659,6 +704,14 @@ export default function GeometryTaskList() {
           <Button icon={<EyeOutlined />} onClick={() => openPreview()}>
             Просмотр ({selectedRowKeys.length > 0 ? `выбрано ${selectedRowKeys.length}` : `все ${tasks.length}`})
           </Button>
+          {selectedRowKeys.length > 0 && (
+            <Button
+              icon={<ImportOutlined />}
+              onClick={() => { setImportResults(null); setImportModalOpen(true); }}
+            >
+              В задачи ({selectedRowKeys.length})
+            </Button>
+          )}
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             Создать задачу
           </Button>
@@ -954,6 +1007,96 @@ export default function GeometryTaskList() {
             </div>
           </div>
         </Space>
+      </Modal>
+
+      {/* ── Модал импорта в обычные задачи ───────────────────────────── */}
+      <Modal
+        title={`Импорт в обычные задачи (${selectedRowKeys.length} шт.)`}
+        open={importModalOpen}
+        onCancel={handleImportModalClose}
+        footer={
+          importResults ? (
+            <Button onClick={handleImportModalClose}>Закрыть</Button>
+          ) : (
+            <Space>
+              <Button onClick={handleImportModalClose}>Отмена</Button>
+              <Button
+                type="primary"
+                icon={<ImportOutlined />}
+                loading={importing}
+                disabled={!importTopicId}
+                onClick={handleImportToRegular}
+              >
+                Импортировать
+              </Button>
+            </Space>
+          )
+        }
+        width={520}
+        destroyOnClose
+      >
+        {importResults ? (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <div style={{ display: 'flex', gap: 24, marginBottom: 8 }}>
+              <span style={{ color: '#52c41a' }}>
+                <CheckCircleOutlined /> Добавлено: <strong>{importResults.added}</strong>
+              </span>
+              <span style={{ color: importResults.errors > 0 ? '#ff4d4f' : '#999' }}>
+                <CloseCircleOutlined /> Ошибки: <strong>{importResults.errors}</strong>
+              </span>
+            </div>
+            {importResults.details.length > 0 && (
+              <div style={{ maxHeight: 240, overflowY: 'auto', fontSize: 12, background: '#fafafa', padding: '8px 12px', borderRadius: 4 }}>
+                {importResults.details.map((d, i) => (
+                  <div
+                    key={i}
+                    style={{ color: d.status === 'added' ? '#52c41a' : '#ff4d4f', padding: '2px 0' }}
+                  >
+                    {d.status === 'added' ? '+ ' : '! '}{d.message}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Space>
+        ) : (
+          <Space direction="vertical" style={{ width: '100%' }} size={16}>
+            <div>
+              <div style={{ marginBottom: 6, fontWeight: 500 }}>
+                Тема <span style={{ color: '#ff4d4f' }}>*</span>
+              </div>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Выберите тему из обычных задач"
+                value={importTopicId}
+                onChange={(v) => { setImportTopicId(v); setImportSubtopicId(null); }}
+                showSearch
+                optionFilterProp="label"
+                options={regularTopics.map((t) => ({
+                  value: t.id,
+                  label: t.ege_number ? `№${t.ege_number} ${t.title}` : t.title,
+                }))}
+              />
+            </div>
+            <div>
+              <div style={{ marginBottom: 6, fontWeight: 500 }}>Подтема (необязательно)</div>
+              <Select
+                style={{ width: '100%' }}
+                placeholder="Выберите подтему"
+                value={importSubtopicId}
+                onChange={setImportSubtopicId}
+                allowClear
+                showSearch
+                optionFilterProp="label"
+                disabled={!importTopicId}
+                options={importFilteredSubtopics.map((s) => ({ value: s.id, label: s.name }))}
+              />
+            </div>
+            <div style={{ color: '#888', fontSize: 12 }}>
+              Копируются: условие, ответ, решение, сложность, источник, год, код, название, чертёж (как изображение).
+              Темы и теги — не копируются автоматически.
+            </div>
+          </Space>
+        )}
       </Modal>
     </Space>
   );

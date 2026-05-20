@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip } from 'antd';
 import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
@@ -370,6 +370,20 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
     img.setCropModalOpen(false);
   };
 
+  // ESC закрывает модал только если фокус НЕ внутри GeoGebra-апплета (iframe)
+  const handleEscClose = useCallback(() => onClose(), [onClose]);
+  useEffect(() => {
+    if (!visible) return;
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      const active = document.activeElement;
+      if (active && active.tagName === 'IFRAME') return;
+      handleEscClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [visible, handleEscClose]);
+
   return (
     <Modal
       title={
@@ -386,7 +400,13 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
       }
       open={visible}
       onCancel={onClose}
-      width={800}
+      keyboard={false}
+      width="100vw"
+      style={{ top: 0, paddingBottom: 0, maxWidth: '100vw', margin: 0 }}
+      styles={{
+        content: { borderRadius: 0 },
+        body: { maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', padding: '16px 24px' },
+      }}
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           {!isCreateMode ? (

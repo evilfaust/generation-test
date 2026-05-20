@@ -1768,6 +1768,51 @@ export const api = {
     }
   },
 
+  // Импорт геометрических задач в обычные (tasks).
+  // Возвращает { added, errors, details[] }.
+  async importGeometryTasksToRegular(ids, { topicId, subtopicId } = {}) {
+    const results = { added: 0, errors: 0, details: [] };
+    for (const id of ids) {
+      try {
+        const geo = await pb.collection('geometry_tasks').getOne(id);
+
+        const formData = new FormData();
+        const TEXT_FIELDS = ['statement_md', 'answer', 'solution_md', 'title', 'source', 'year', 'difficulty'];
+        for (const f of TEXT_FIELDS) {
+          if (geo[f] != null && geo[f] !== '') formData.append(f, String(geo[f]));
+        }
+        if (geo.code) formData.append('code', geo.code);
+        if (topicId) formData.append('topic', topicId);
+        if (subtopicId) formData.append('subtopic', subtopicId);
+        formData.append('has_image', 'false');
+
+        // Копируем чертёж как image задачи
+        const imgFileName = geo.drawing_image || geo.geogebra_image_base64;
+        if (imgFileName && !String(imgFileName).startsWith('data:image/')) {
+          const fileUrl = `${PB_BASE_URL}/api/files/geometry_tasks/${geo.id}/${imgFileName}`;
+          try {
+            const resp = await fetch(fileUrl);
+            if (resp.ok) {
+              const blob = await resp.blob();
+              formData.append('image', new File([blob], imgFileName, { type: blob.type || 'image/png' }));
+              formData.set('has_image', 'true');
+            }
+          } catch {
+            // продолжаем без изображения
+          }
+        }
+
+        await pb.collection('tasks').create(formData);
+        results.added++;
+        results.details.push({ status: 'added', message: `${geo.code || id} — импортирована` });
+      } catch (e) {
+        results.errors++;
+        results.details.push({ status: 'error', message: `${id}: ${e?.message || 'неизвестная ошибка'}` });
+      }
+    }
+    return results;
+  },
+
   async createGeometryPrintTest(data) {
     try {
       return await pb.collection('geometry_print_tests').create(data);
