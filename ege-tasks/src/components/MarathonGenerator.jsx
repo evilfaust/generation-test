@@ -4,7 +4,7 @@ import {
   Modal, Empty, Spin, message, Popconfirm, Typography, Switch,
 } from 'antd';
 import {
-  PlusOutlined, DeleteOutlined, SaveOutlined, FolderOpenOutlined,
+  PlusOutlined, DeleteOutlined, SaveOutlined, FolderOpenOutlined, CheckCircleOutlined,
   PrinterOutlined, ArrowUpOutlined, ArrowDownOutlined, ReloadOutlined,
   TrophyOutlined, UserOutlined, OrderedListOutlined, FileTextOutlined,
   DashboardOutlined,
@@ -896,8 +896,8 @@ export default function MarathonGenerator() {
             <span className="m-chip-num">{students.length}</span> учеников
           </span>
           {savedId && (
-            <span className="m-chip" style={{ fontFamily: 'monospace', fontSize: 11 }}>
-              #{savedId.slice(-6)}
+            <span className="m-chip is-saved">
+              <CheckCircleOutlined /> Сохранён
             </span>
           )}
         </div>

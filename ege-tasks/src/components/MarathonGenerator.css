@@ -758,67 +758,85 @@
 .marathon-tracker-v2.is-large       { --cell-h: 64px; --cell-w: 64px; }
 
 /* ================================================================
-   3-panel layout: [Names] | [Tasks scroll] | [Scores]
+   Единый скролл-контейнер: строки с sticky-колонками имени и счёта.
    ================================================================ */
 
-.tg-panel-wrap {
+/* Внешний контейнер — единственный скролл */
+.tg-wrap {
   border: 1px solid var(--ink-200, #d8e0ec);
   border-top: none;
   border-radius: 0 0 12px 12px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow: auto;
+  max-height: 72vh;
 }
 
-/* ── Sticky header row ── */
-.tg-panel-head {
+/* Каждая строка — flex с выровненными ячейками */
+.tg-row {
   display: flex;
   align-items: stretch;
-  border-bottom: 2px solid var(--ink-200, #d8e0ec);
-  background: white;
-  flex-shrink: 0;
+  border-bottom: 1px solid var(--ink-100, #eef2f8);
+  transition: background 0.12s;
+  /* min-width гарантирует, что строка не сжимается уже контента */
+  min-width: max-content;
 }
 
-.tg-ph-name,
-.tg-ph-score {
+.tg-row:hover { background: #f9fbff; }
+
+.tg-row.tg-row--leader {
+  background: linear-gradient(90deg, #fff8db 0%, white 60%);
+}
+
+/* ── Заголовок — sticky сверху ── */
+.tg-head-row {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: white;
+  border-bottom: 2px solid var(--ink-200, #d8e0ec);
+}
+
+/* Угловые ячейки заголовка — sticky и сверху и сбоку */
+.tg-head-name {
+  box-sizing: border-box;
+  width: 220px;
+  flex-shrink: 0;
   height: 36px;
   display: flex;
   align-items: center;
+  padding-left: 14px;
   font-size: 11.5px;
   font-weight: 600;
-  flex-shrink: 0;
-}
-
-.tg-ph-name {
-  width: 220px;
-  padding-left: 14px;
   color: var(--ink-700, #2c3a55);
   border-right: 1px solid var(--ink-200, #d8e0ec);
+  background: white;
+  position: sticky;
+  left: 0;
+  z-index: 12;
 }
 
-.tg-ph-score {
+.tg-head-score {
+  box-sizing: border-box;
   width: 96px;
+  flex-shrink: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
   padding-right: 14px;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--ink-500, #5b6b86);
   border-left: 1px solid var(--ink-100, #eef2f8);
+  background: white;
+  position: sticky;
+  right: 0;
+  z-index: 12;
 }
 
-/* Task number headers — overflow:hidden, scrolled by JS */
-.tg-ph-tasks {
-  flex: 1;
-  overflow: hidden;
-  min-width: 0;
-}
-
-.tg-ph-tasks-inner {
-  display: flex;
-  height: 36px;
-}
-
-.tg-ph-tasks-inner .head-task {
-  flex: 1 1 var(--cell-w);
-  min-width: var(--cell-w);
+/* Номера задач в заголовке */
+.tg-head-task {
+  box-sizing: border-box;
+  flex: 0 0 var(--cell-w);
   height: 36px;
   display: inline-flex;
   align-items: center;
@@ -831,58 +849,14 @@
   gap: 1px;
 }
 
-.tg-ph-tasks-inner .head-task.is-popular {
+.tg-head-task.is-popular {
   color: var(--brand, #4f56e3);
   background: var(--brand-50, #eef0ff);
 }
 
-.tg-ph-tasks-inner .diff-lbl {
+.tg-head-task .diff-lbl {
   font-size: 9px;
   opacity: 0.7;
-}
-
-/* ── Body ── */
-.tg-panel-body {
-  display: flex;
-  align-items: stretch;
-  max-height: 72vh;
-  overflow-y: auto;
-}
-
-/* Left: names column */
-.tg-panel-names {
-  width: 220px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--ink-200, #d8e0ec);
-  background: white;
-}
-
-/* Middle: task cells — only this panel scrolls horizontally */
-.tg-panel-tasks {
-  flex: 1;
-  overflow-x: auto;
-  min-width: 0;
-}
-
-/* Right: score column */
-.tg-panel-scores {
-  width: 96px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--ink-100, #eef2f8);
-  background: white;
-}
-
-/* Task body row */
-.tg-task-row {
-  display: flex;
-  border-bottom: 1px solid var(--ink-100, #eef2f8);
-  transition: background 0.12s;
-}
-
-.tg-task-row:hover { background: #f9fbff; }
-
-.tg-task-row.is-leader {
-  background: linear-gradient(90deg, #fff8db 0%, white 60%);
 }
 
 /* Empty state */
@@ -1016,10 +990,9 @@
   white-space: nowrap;
 }
 
-/* Обёртка ячейки — растягивается, чтобы заполнить ширину */
+/* Обёртка ячейки — фиксированная ширина, без роста */
 .tg-cell-wrap {
-  flex: 1 1 var(--cell-w);
-  min-width: var(--cell-w);
+  flex: 0 0 var(--cell-w);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1054,18 +1027,24 @@
 }
 
 
-/* Name cell — left panel, no sticky needed */
+/* Name cell — sticky left */
 .tg-name {
+  box-sizing: border-box;
   padding: 6px 14px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 3px;
+  width: 220px;
+  flex-shrink: 0;
   height: var(--cell-h);
-  border-bottom: 1px solid var(--ink-100, #eef2f8);
   background: white;
+  border-right: 1px solid var(--ink-200, #d8e0ec);
   overflow: hidden;
   transition: background 0.12s;
+  position: sticky;
+  left: 0;
+  z-index: 5;
 }
 
 .tg-name.is-leader {
@@ -1267,17 +1246,23 @@
 .tg-cell .quick .qbtn.ok   { background: rgba(20,168,90,.95); }
 .tg-cell .quick .qbtn.fail { background: rgba(226,61,78,.95); }
 
-/* Score cell — right panel, no sticky needed */
+/* Score cell — sticky right */
 .tg-score {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   justify-content: center;
   padding: 0 14px;
   gap: 3px;
+  width: 96px;
+  flex-shrink: 0;
   height: var(--cell-h);
-  border-bottom: 1px solid var(--ink-100, #eef2f8);
   background: white;
+  border-left: 1px solid var(--ink-100, #eef2f8);
+  position: sticky;
+  right: 0;
+  z-index: 5;
 }
 
 .tg-score .total {

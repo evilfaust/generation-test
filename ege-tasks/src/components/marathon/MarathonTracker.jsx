@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Popconfirm } from 'antd';
 
 /* ================================================================
@@ -167,15 +167,6 @@ export default function MarathonTracker({
     localStorage.getItem('marathon.tracker.sort') || 'score'
   );
 
-  // Refs для синхронизации горизонтального скролла заголовка с телом
-  const bodyTasksRef = useRef(null);
-  const headTasksRef = useRef(null);
-
-  const onBodyScroll = useCallback(() => {
-    if (headTasksRef.current && bodyTasksRef.current) {
-      headTasksRef.current.scrollLeft = bodyTasksRef.current.scrollLeft;
-    }
-  }, []);
 
   const setDensityPersist = (v) => { setDensity(v); localStorage.setItem('marathon.tracker.density', v); };
   const setSortPersist    = (v) => { setSortKey(v); localStorage.setItem('marathon.tracker.sort', v); };
@@ -359,116 +350,93 @@ export default function MarathonTracker({
       )}
 
       {/* ================================================================
-          3-panel layout: [Names 220px] | [Tasks flex scroll] | [Score 96px]
+          Единый скролл-контейнер: строки с sticky-колонками имени и счёта.
+          Выравнивание гарантировано — каждая строка единый flex-элемент.
           ================================================================ */}
-      <div className="tg-panel-wrap">
+      <div className="tg-wrap">
 
-        {/* ── STICKY HEADER ROW ── */}
-        <div className="tg-panel-head">
-          <div className="tg-ph-name">Ученик</div>
-          {/* Task headers — overflow hidden, scrolled via JS in sync with body */}
-          <div className="tg-ph-tasks" ref={headTasksRef}>
-            <div className="tg-ph-tasks-inner">
-              {tasks.map((task, idx) => (
-                <div
-                  key={idx}
-                  className={`head-task${popularTasks.has(idx) ? ' is-popular' : ''}`}
-                  title={task.code}
-                >
-                  <span>{idx + 1}</span>
-                  {task.difficulty && <span className="diff-lbl">{DIFF_LABEL[task.difficulty]}</span>}
-                </div>
-              ))}
+        {/* ── ЗАГОЛОВОК — sticky top ── */}
+        <div className="tg-row tg-head-row">
+          <div className="tg-head-name">Ученик</div>
+          {tasks.map((task, idx) => (
+            <div
+              key={idx}
+              className={`tg-head-task${popularTasks.has(idx) ? ' is-popular' : ''}`}
+              title={task.code}
+            >
+              <span>{idx + 1}</span>
+              {task.difficulty && <span className="diff-lbl">{DIFF_LABEL[task.difficulty]}</span>}
             </div>
-          </div>
-          <div className="tg-ph-score">Счёт</div>
+          ))}
+          <div className="tg-head-score">Счёт</div>
         </div>
 
-        {/* ── BODY ── */}
-        <div className="tg-panel-body">
+        {/* ── СТРОКИ УЧЕНИКОВ ── */}
+        {displayStudents.map((student, rowIdx) => {
+          const issuedCount = getIssuedCount(student, trackingData);
+          const handCards = getHandCards(student, tasks.length, trackingData);
+          const total = calcTotalScore(student, trackingData);
+          const isLeader = rowIdx === 0 && sortKey === 'score' && total > 0;
+          const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
+          return (
+            <div key={student} className={`tg-row${isLeader ? ' tg-row--leader' : ''}`}>
 
-          {/* Left: names */}
-          <div className="tg-panel-names">
-            {displayStudents.map((student, rowIdx) => {
-              const issuedCount = getIssuedCount(student, trackingData);
-              const handCards = getHandCards(student, tasks.length, trackingData);
-              const total = calcTotalScore(student, trackingData);
-              const isLeader = rowIdx === 0 && sortKey === 'score' && total > 0;
-              return (
-                <div key={student} className={`tg-name${isLeader ? ' is-leader' : ''}`}>
-                  <div className="name">
-                    {isLeader && <span className="medal">🥇</span>}
-                    {rowIdx === 1 && sortKey === 'score' && total > 0 && <span className="medal">🥈</span>}
-                    {rowIdx === 2 && sortKey === 'score' && total > 0 && <span className="medal">🥉</span>}
-                    <span>{student}</span>
+              {/* Имя — sticky left */}
+              <div className={`tg-name${isLeader ? ' is-leader' : ''}`}>
+                <div className="name">
+                  {isLeader && <span className="medal">🥇</span>}
+                  {rowIdx === 1 && sortKey === 'score' && total > 0 && <span className="medal">🥈</span>}
+                  {rowIdx === 2 && sortKey === 'score' && total > 0 && <span className="medal">🥉</span>}
+                  <span>{student}</span>
+                </div>
+                <div className="hand">
+                  <span>🃏</span>
+                  <span className={`cards${handCards.length === 0 ? ' cards-empty' : ''}`}>
+                    {handCards.length > 0 ? handCards.join(', ') : '—'}
+                  </span>
+                  <button
+                    className="issue"
+                    onClick={() => handleIssueNext(student)}
+                    disabled={issuedCount >= tasks.length}
+                    title={issuedCount < tasks.length ? `Выдать карточку №${issuedCount + 1}` : 'Все выданы'}
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Ячейки задач */}
+              {tasks.map((_, taskIdx) => {
+                const data = (trackingData[student] || {})[String(taskIdx)];
+                const isInHand = taskIdx < issuedCount && !data?.solved && !data?.failed;
+                const isFocused = focus?.row === rowIdx && focus?.col === taskIdx;
+                return (
+                  <div
+                    key={taskIdx}
+                    className={isFocused ? 'tg-cell-wrap is-focused' : 'tg-cell-wrap'}
+                    onClick={() => setFocus({ row: rowIdx, col: taskIdx })}
+                  >
+                    <TgCell
+                      data={data}
+                      isInHand={isInHand}
+                      onSuccess={() => handleAttempt(student, taskIdx, true)}
+                      onFail={() => handleAttempt(student, taskIdx, false)}
+                      onReset={() => handleReset(student, taskIdx)}
+                    />
                   </div>
-                  <div className="hand">
-                    <span>🃏</span>
-                    <span className={`cards${handCards.length === 0 ? ' cards-empty' : ''}`}>
-                      {handCards.length > 0 ? handCards.join(', ') : '—'}
-                    </span>
-                    <button
-                      className="issue"
-                      onClick={() => handleIssueNext(student)}
-                      disabled={issuedCount >= tasks.length}
-                      title={issuedCount < tasks.length ? `Выдать карточку №${issuedCount + 1}` : 'Все выданы'}
-                    >+</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
 
-          {/* Middle: task cells — horizontal scroll */}
-          <div className="tg-panel-tasks" ref={bodyTasksRef} onScroll={onBodyScroll}>
-            {displayStudents.map((student, rowIdx) => {
-              const issuedCount = getIssuedCount(student, trackingData);
-              const total = calcTotalScore(student, trackingData);
-              const isLeader = rowIdx === 0 && sortKey === 'score' && total > 0;
-              return (
-                <div key={student} className={`tg-task-row${isLeader ? ' is-leader' : ''}`}>
-                  {tasks.map((_, taskIdx) => {
-                    const data = (trackingData[student] || {})[String(taskIdx)];
-                    const isInHand = taskIdx < issuedCount && !data?.solved && !data?.failed;
-                    const isFocused = focus?.row === rowIdx && focus?.col === taskIdx;
-                    return (
-                      <div
-                        key={taskIdx}
-                        className={isFocused ? 'tg-cell-wrap is-focused' : 'tg-cell-wrap'}
-                        onClick={() => setFocus({ row: rowIdx, col: taskIdx })}
-                      >
-                        <TgCell
-                          data={data}
-                          isInHand={isInHand}
-                          onSuccess={() => handleAttempt(student, taskIdx, true)}
-                          onFail={() => handleAttempt(student, taskIdx, false)}
-                          onReset={() => handleReset(student, taskIdx)}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+              {/* Счёт — sticky right */}
+              <div className="tg-score">
+                <span className="total">{total}</span>
+                <span className="max">/ {maxScore}</span>
+                <div className="bar"><span style={{ width: `${pct}%` }} /></div>
+              </div>
 
-          {/* Right: scores */}
-          <div className="tg-panel-scores">
-            {displayStudents.map((student) => {
-              const total = calcTotalScore(student, trackingData);
-              const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
-              return (
-                <div key={student} className="tg-score">
-                  <span className="total">{total}</span>
-                  <span className="max">/ {maxScore}</span>
-                  <div className="bar"><span style={{ width: `${pct}%` }} /></div>
-                </div>
-              );
-            })}
-          </div>
+            </div>
+          );
+        })}
 
-        </div>{/* end tg-panel-body */}
-      </div>{/* end tg-panel-wrap */}
+      </div>{/* end tg-wrap */}
 
       {/* ---- Legend ---- */}
       <div className="tracker-legend">
