@@ -1,5 +1,5 @@
-import { Affix } from 'antd';
-import { CheckCircleFilled } from '@ant-design/icons';
+import { Affix, Button } from 'antd';
+import { CheckCircleFilled, TableOutlined } from '@ant-design/icons';
 import ActionButtons from '../ActionButtons';
 
 export default function ResultActionBar({
@@ -15,6 +15,7 @@ export default function ResultActionBar({
   onExportPDF,
   onExportMD,
   onReset,
+  onOpenWorksheet,
   worksheetActions,
 }) {
   if (!variants || variants.length === 0) return null;
@@ -62,21 +63,28 @@ export default function ResultActionBar({
           </div>
         </div>
 
-        <ActionButtons
-          hasVariants={true}
-          loading={false}
-          onOpenLoad={onOpenLoad}
-          onSave={onSave}
-          onPrint={onPrint}
-          onExportPDF={onExportPDF}
-          onExportMD={onExportMD}
-          onReset={onReset}
-          pdfMethod={worksheetActions.pdfMethod}
-          setPdfMethod={worksheetActions.setPdfMethod}
-          puppeteerAvailable={worksheetActions.puppeteerAvailable}
-          exporting={worksheetActions.exporting}
-          saving={worksheetActions.saving}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
+          {onOpenWorksheet && (
+            <Button icon={<TableOutlined />} onClick={onOpenWorksheet}>
+              Рабочий лист
+            </Button>
+          )}
+          <ActionButtons
+            hasVariants={true}
+            loading={false}
+            onOpenLoad={onOpenLoad}
+            onSave={onSave}
+            onPrint={onPrint}
+            onExportPDF={onExportPDF}
+            onExportMD={onExportMD}
+            onReset={onReset}
+            pdfMethod={worksheetActions.pdfMethod}
+            setPdfMethod={worksheetActions.setPdfMethod}
+            puppeteerAvailable={worksheetActions.puppeteerAvailable}
+            exporting={worksheetActions.exporting}
+            saving={worksheetActions.saving}
+          />
+        </div>
       </div>
     </Affix>
   );

@@ -1,5 +1,4 @@
 import PrintableWorksheet from '../../PrintableWorksheet';
-import WorksheetGridPrint from '../WorksheetGridPrint';
 import VariantRenderer from '../VariantRenderer';
 import AnswersPage from '../AnswersPage';
 
@@ -7,22 +6,19 @@ export default function WorksheetPreview({
   printRef,
   variants,
   outputMode,
-  workTitle,
   // sheet
-  sheetFormat,
-  columns,
-  fontSize,
-  compactMode,
   hideTaskPrefixes,
+  variantLabel,
+  fontSize,
+  columns,
+  compactMode,
   showStudentInfo,
   showAnswersInline,
   showAnswersPage,
   solutionSpace,
-  variantLabel,
   cryptogramEnabled,
   cryptogramPhrase,
   dragDropHandlers,
-  taskEditing,
   // cards
   cardFormat,
   showCardAnswers,
@@ -32,94 +28,41 @@ export default function WorksheetPreview({
   tags,
   subtopics,
   setVariants,
+  taskEditing,
 }) {
   if (!variants || variants.length === 0) return null;
 
-  const renderVariant = (variant, variantIndex) => (
-    <VariantRenderer
-      key={variant.number}
-      variant={variant}
-      variantIndex={variantIndex}
-      compactMode={compactMode}
-      fontSize={fontSize}
-      columns={columns}
-      showStudentInfo={showStudentInfo}
-      showAnswersInline={showAnswersInline}
-      solutionSpace={solutionSpace}
-      variantLabel={variantLabel}
-      hideTaskPrefixes={hideTaskPrefixes}
-      dragDropHandlers={dragDropHandlers}
-      onEditTask={taskEditing.handleEditTask}
-      onReplaceTask={taskEditing.handleReplaceTask}
-      cryptogramEnabled={cryptogramEnabled}
-      cryptogramPhrase={cryptogramPhrase}
-    />
-  );
-
   if (outputMode === 'sheet') {
-    const pageClass = `sheet-page sheet-page-${sheetFormat.toLowerCase()}`;
-    const pageContents = [];
-
-    if (compactMode && columns > 1) {
-      for (let i = 0; i < variants.length; i += columns) {
-        const pageVariants = variants.slice(i, i + columns);
-        pageContents.push({
-          key: `page-${i}`,
-          content: (
-            <div
-              className="compact-variants-grid"
-              style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, columnGap: '10px' }}
-            >
-              {pageVariants.map((variant, idx) => renderVariant(variant, i + idx))}
-            </div>
-          ),
-        });
-      }
-    } else {
-      variants.forEach((variant, index) => {
-        pageContents.push({
-          key: `variant-${variant.number}`,
-          content: renderVariant(variant, index),
-        });
-      });
-    }
-
-    if (showAnswersPage) {
-      pageContents.push({
-        key: 'answers',
-        content: (
-          <AnswersPage
-            variants={variants}
+    return (
+      <div ref={printRef}>
+        {variants.map((variant, idx) => (
+          <VariantRenderer
+            key={variant.number || idx}
+            variant={variant}
+            variantIndex={idx}
+            compactMode={compactMode}
+            fontSize={fontSize}
+            columns={columns}
+            showStudentInfo={showStudentInfo}
+            showAnswersInline={showAnswersInline}
+            solutionSpace={solutionSpace}
             variantLabel={variantLabel}
-            show={true}
+            hideTaskPrefixes={hideTaskPrefixes}
+            dragDropHandlers={dragDropHandlers}
+            onEditTask={taskEditing.handleEditTask}
+            onReplaceTask={taskEditing.handleReplaceTask}
             cryptogramEnabled={cryptogramEnabled}
             cryptogramPhrase={cryptogramPhrase}
           />
-        ),
-      });
-    }
-
-    const total = pageContents.length;
-
-    return (
-      <>
-        <WorksheetGridPrint
-          pages={variants.map(v => ({
-            title: workTitle || 'Лист задач',
-            label: `${variantLabel} ${v.number}`,
-            tasks: v.tasks,
-          }))}
-          hideTaskPrefixes={hideTaskPrefixes}
+        ))}
+        <AnswersPage
+          variants={variants}
+          variantLabel={variantLabel}
+          show={showAnswersPage}
+          cryptogramEnabled={cryptogramEnabled}
+          cryptogramPhrase={cryptogramPhrase}
         />
-        <div ref={printRef} className="sheet-pages-preview">
-          {pageContents.map(({ key, content }, pageIdx) => (
-            <div key={key} className={pageClass}>
-              {content}
-              <div className="sheet-page-label no-print">{pageIdx + 1} / {total}</div>
-            </div>
-          ))}
-        </div>
-      </>
+      </div>
     );
   }
 

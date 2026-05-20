@@ -1,342 +1,408 @@
-/* ── Настроечная карточка ────────────────────────────────────────────────── */
-.wgp-settings-card .ant-card-body {
-  padding-bottom: 0;
-}
-.wgp-setting-label {
-  font-size: 13px;
-  color: #555;
-  white-space: nowrap;
-}
+/* ===== Worksheet Grid Print ===== */
 
-/* ── Печатный блок скрыт на экране ───────────────────────────────────────── */
 .wgp-root {
-  display: none;
+  --ink: #151515;
+  --paper: #ffffff;
+  --grid-color: #c4cedf;
+  --border: #a8b8cc;
 }
 
-/* ── Базовые стили страницы (для экранного превью если понадобится) ────────── */
+/* ── Карточка настроек ────────────────────────────── */
+
+.wgp-settings-card .ant-card-body {
+  padding-bottom: 8px;
+}
+
+/* ── Листы — превью на экране ─────────────────────── */
+
+.wgp-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 16px;
+  background: #dcdcdc;
+}
+
+/* ── Страница — A4 на экране ──────────────────────── */
+
 .wgp-page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 5mm;
   box-sizing: border-box;
-  font-family: 'Times New Roman', Times, serif;
-  color: #000;
+  background: var(--paper);
+  border: 1.5px solid #c0c0c0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  font-family: KaTeX_Main, 'Latin Modern Roman', Georgia, serif;
+  font-size: 10pt;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
-/* ── Печать ──────────────────────────────────────────────────────────────── */
+/* ── Шапка ────────────────────────────────────────── */
+
+.wgp-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 4mm;
+  margin-bottom: 1.5mm;
+}
+
+.wgp-header-left {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4mm;
+  flex-shrink: 0;
+}
+
+.wgp-work-title {
+  font-size: 11pt;
+  font-weight: 700;
+}
+
+.wgp-variant-label {
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+.wgp-student-info {
+  display: flex;
+  flex-direction: row;
+  gap: 6mm;
+  align-items: baseline;
+  flex-shrink: 0;
+}
+
+.wgp-info-item {
+  font-size: 9pt;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1mm;
+}
+
+.wgp-info-line {
+  display: inline-block;
+  width: 40mm;
+  border-bottom: 0.3mm solid var(--ink);
+  vertical-align: baseline;
+  line-height: 1;
+}
+
+.wgp-info-line--short {
+  width: 22mm;
+}
+
+/* ── Разделитель ──────────────────────────────────── */
+
+.wgp-ruler {
+  width: 100%;
+  border-top: 0.4mm solid var(--ink);
+  margin-bottom: 2mm;
+}
+
+/* ── Задания ──────────────────────────────────────── */
+
+.wgp-tasks {
+  width: 100%;
+}
+
+.wgp-tasks-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 6mm;
+  align-items: start;
+}
+
+.wgp-col {
+  min-width: 0;
+}
+
+/* ── Одна задача ──────────────────────────────────── */
+
+.wgp-task {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 1.5mm;
+}
+
+.wgp-task-statement {
+  display: block;
+  margin-bottom: 1mm;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+/* Чертёж — поверх клетки в правом верхнем углу */
+
+.wgp-grid-drawing {
+  position: absolute;
+  top: 2mm;
+  right: 2mm;
+  z-index: 1;
+  background: var(--paper);
+  padding: 1mm;
+  border-radius: 0.8mm;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.wgp-grid-drawing-img {
+  width: auto;
+  max-width: 45mm;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.wgp-task-num {
+  font-weight: 700;
+  margin-right: 1.5mm;
+}
+
+.wgp-task-text {
+  display: inline;
+}
+
+.wgp-task-text p {
+  display: inline;
+  margin: 0;
+  padding: 0;
+}
+
+.wgp-task-text .katex-display {
+  display: block;
+  margin: 1mm 0;
+}
+
+/* ── Режим «задача поверх клетки» ─────────────────── */
+
+.wgp-task--overlay {
+  position: relative;
+}
+
+.wgp-overlay-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+}
+
+.wgp-overlay-grid .wgp-grid-area {
+  height: 100% !important;
+}
+
+.wgp-overlay-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Клетчатое поле ───────────────────────────────── */
+/* div'ы с mm-позициями = нативные векторы в PDF при любом DPI */
+
+.wgp-grid-area {
+  width: 100%;
+  border: 0.3mm solid var(--border);
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.wgp-h-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 0.2pt solid var(--grid-color);
+  pointer-events: none;
+}
+
+.wgp-v-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 0.2pt solid var(--grid-color);
+  pointer-events: none;
+}
+
+/* ── Лист ответов учителя ─────────────────────────── */
+
+.wgp-key-page {
+  width: 210mm;
+  padding: 10mm;
+  box-sizing: border-box;
+  background: var(--paper);
+  border: 1.5px solid #c0c0c0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  font-family: KaTeX_Main, 'Latin Modern Roman', Georgia, serif;
+  font-size: 9pt;
+  color: var(--ink);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.wgp-key-title {
+  font-size: 11pt;
+  font-weight: 700;
+  margin-bottom: 3mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 0.5mm solid var(--ink);
+}
+
+.wgp-key-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80mm, 1fr));
+  gap: 4mm 6mm;
+  align-items: start;
+}
+
+.wgp-key-variant {
+  min-width: 0;
+}
+
+.wgp-key-variant-label {
+  display: flex;
+  align-items: baseline;
+  gap: 3mm;
+  margin-bottom: 1.5mm;
+}
+
+.wgp-key-work-title {
+  font-weight: 700;
+  font-size: 9pt;
+}
+
+.wgp-key-variant-badge {
+  font-size: 8.5pt;
+  font-weight: 600;
+  border: 0.4mm solid #555;
+  padding: 0 1.5mm;
+  line-height: 1.5;
+}
+
+.wgp-key-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: key-item;
+}
+
+.wgp-key-item {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  padding: 0.8mm 0;
+  border-bottom: 0.2mm solid #ddd;
+  counter-increment: key-item;
+  font-size: 8.5pt;
+  line-height: 1.3;
+}
+
+.wgp-key-item::before {
+  content: counter(key-item) '.';
+  font-weight: 700;
+  flex-shrink: 0;
+  min-width: 5mm;
+  color: #333;
+}
+
+.wgp-key-answer {
+  flex-shrink: 0;
+  min-width: 18mm;
+  max-width: 30mm;
+  font-weight: 700;
+  color: #c0392b;
+  background: #fff5f5;
+  border: 0.3mm solid #f5c6c6;
+  padding: 0.3mm 1.5mm;
+  border-radius: 0.5mm;
+  text-align: center;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.wgp-key-no-answer {
+  color: #aaa;
+  font-weight: 400;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   Печать — scoped паттерн из геометрии / марафона
+═══════════════════════════════════════════════════ */
+
 @media print {
-  /* Scoped: скрываем тело страницы, показываем только наш блок */
   body:has(.wgp-root) {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body:has(.wgp-root) * {
     visibility: hidden;
   }
 
-  .wgp-root {
-    display: block !important;
+  body:has(.wgp-root) .wgp-root,
+  body:has(.wgp-root) .wgp-root * {
     visibility: visible;
+  }
+
+  body:has(.wgp-root) .wgp-settings-card,
+  body:has(.wgp-root) .ant-card {
+    display: none !important;
+  }
+
+  body:has(.wgp-root) .wgp-root {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
-  }
-
-  .wgp-root * {
-    visibility: visible;
-  }
-
-  /* Настроечная карточка при печати не нужна */
-  .wgp-settings-card {
-    display: none !important;
-  }
-
-  /* ── Страница ─────────────────────────────────────────────────────────── */
-  .wgp-page {
-    width: 100%;
-    box-sizing: border-box;
-    font-family: 'Times New Roman', Times, serif;
-    font-size: 10pt;
-    color: #000;
+    padding: 0;
+    margin: 0;
     background: #fff;
+  }
+
+  .wgp-pages {
+    display: block;
+    gap: 0;
+    padding: 0;
+    background: none;
+  }
+
+  .wgp-page {
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    margin: 0;
+    border: 0;
+    padding: 5mm;
+    box-shadow: none;
   }
 
   .wgp-page-break {
     break-before: page;
+    page-break-before: always;
   }
 
-  /* ── Шапка ────────────────────────────────────────────────────────────── */
-  .wgp-header {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 4mm;
-    margin-bottom: 1.5mm;
-  }
-
-  .wgp-header-left {
-    display: flex;
-    flex-direction: row;
-    align-items: baseline;
-    gap: 4mm;
-    flex-shrink: 0;
-  }
-
-  .wgp-work-title {
-    font-size: 11pt;
-    font-weight: 700;
-  }
-
-  .wgp-variant-label {
-    font-size: 10pt;
-    font-weight: 600;
-  }
-
-  .wgp-student-info {
-    display: flex;
-    flex-direction: row;
-    gap: 6mm;
-    align-items: baseline;
-    flex-shrink: 0;
-  }
-
-  .wgp-info-item {
-    font-size: 9pt;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: baseline;
-    gap: 1mm;
-  }
-
-  .wgp-info-line {
-    display: inline-block;
-    width: 40mm;
-    border-bottom: 0.3mm solid #000;
-    vertical-align: baseline;
-    line-height: 1;
-  }
-
-  .wgp-info-line--short {
-    width: 22mm;
-  }
-
-  /* ── Разделитель ──────────────────────────────────────────────────────── */
-  .wgp-ruler {
-    width: 100%;
-    border-top: 0.4mm solid #000;
-    margin-bottom: 2mm;
-  }
-
-  /* ── Задания: 1 или 2 колонки ─────────────────────────────────────────── */
-  .wgp-tasks {
-    width: 100%;
-  }
-
-  .wgp-tasks-2col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 6mm;
-    align-items: start;
-  }
-
-  .wgp-col {
-    min-width: 0;
-  }
-
-  /* ── Одна задача ──────────────────────────────────────────────────────── */
-  .wgp-task {
-    break-inside: avoid;
-    margin-bottom: 1.5mm;
-  }
-
-  /* Блочный контейнер — нужен для работы float */
-  .wgp-task-statement {
-    display: block;
-    margin-bottom: 1mm;
-    line-height: 1.35;
-    overflow: hidden; /* clearfix для float */
-  }
-
-  /* Картинка плавает справа, текст обтекает слева */
-  .wgp-task-image {
-    float: right;
-    max-width: 38mm;
-    max-height: 28mm;
-    width: auto;
-    height: auto;
-    margin: 0 0 1.5mm 3mm;
-    object-fit: contain;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .wgp-task-num {
-    font-weight: 700;
-    margin-right: 1.5mm;
-  }
-
-  /* Текст задачи — инлайн, чтобы номер и условие были на одной строке */
-  .wgp-task-text {
-    display: inline;
-  }
-
-  .wgp-task-text p {
-    display: inline;
-    margin: 0;
-    padding: 0;
-  }
-
-  /* Блочные формулы остаются на своей строке */
-  .wgp-task-text .katex-display {
-    display: block;
-    margin: 1mm 0;
-  }
-
-  /* ── Лист ответов учителя ────────────────────────────────────────────── */
   .wgp-key-page {
+    width: 210mm;
+    margin: 0;
+    border: 0;
+    padding: 5mm;
+    box-shadow: none;
     break-before: page;
-    width: 100%;
-    box-sizing: border-box;
-    font-family: 'Times New Roman', Times, serif;
-    font-size: 9pt;
-    color: #000;
-    background: #fff;
-  }
-
-  .wgp-key-title {
-    font-size: 11pt;
-    font-weight: 700;
-    margin-bottom: 3mm;
-    padding-bottom: 1.5mm;
-    border-bottom: 0.5mm solid #000;
-  }
-
-  .wgp-key-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(80mm, 1fr));
-    gap: 4mm 6mm;
-    align-items: start;
-  }
-
-  .wgp-key-variant {
-    min-width: 0;
-  }
-
-  .wgp-key-variant-label {
-    display: flex;
-    align-items: baseline;
-    gap: 3mm;
-    margin-bottom: 1.5mm;
-  }
-
-  .wgp-key-work-title {
-    font-weight: 700;
-    font-size: 9pt;
-  }
-
-  .wgp-key-variant-badge {
-    font-size: 8.5pt;
-    font-weight: 600;
-    border: 0.4mm solid #555;
-    padding: 0 1.5mm;
-    line-height: 1.5;
-  }
-
-  .wgp-key-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .wgp-key-item {
-    display: flex;
-    align-items: baseline;
-    gap: 2mm;
-    padding: 0.8mm 0;
-    border-bottom: 0.2mm solid #ddd;
-    counter-increment: key-item;
-    font-size: 8.5pt;
-    line-height: 1.3;
-  }
-
-  .wgp-key-item::before {
-    content: counter(key-item) '.';
-    font-weight: 700;
-    flex-shrink: 0;
-    min-width: 5mm;
-    color: #333;
-  }
-
-  .wgp-key-list {
-    counter-reset: key-item;
-  }
-
-  .wgp-key-answer {
-    flex-shrink: 0;
-    min-width: 18mm;
-    max-width: 30mm;
-    font-weight: 700;
-    color: #c0392b;
-    background: #fff5f5;
-    border: 0.3mm solid #f5c6c6;
-    padding: 0.3mm 1.5mm;
-    border-radius: 0.5mm;
-    text-align: center;
-  }
-
-  .wgp-key-no-answer {
-    color: #aaa;
-    font-weight: 400;
-  }
-
-  .wgp-key-stmt {
-    flex: 1;
-    min-width: 0;
-    color: #555;
-    font-size: 7.5pt;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .wgp-key-stmt p {
-    margin: 0;
-    padding: 0;
-  }
-
-  /* ── Режим «задача поверх клетки» ────────────────────────────────────── */
-
-  /* Контейнер занимает высоту текста + распорки (поле для решения) */
-  .wgp-task--overlay {
-    position: relative;
-  }
-
-  /* Сетка растянута на весь контейнер через absolute */
-  .wgp-overlay-grid {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 0;
-  }
-
-  .wgp-overlay-grid .wgp-grid-area {
-    height: 100% !important;
-  }
-
-  /* Текст условия + распорка — поверх сетки */
-  .wgp-overlay-content {
-    position: relative;
-    z-index: 1;
-  }
-
-  /* ── Клетчатое поле ───────────────────────────────────────────────────── */
-  .wgp-grid-area {
-    width: 100%;
-    border: 0.3mm solid #a8b8cc;
-    box-sizing: border-box;
-    overflow: hidden;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .wgp-grid-area svg {
-    display: block;
+    page-break-before: always;
   }
 }

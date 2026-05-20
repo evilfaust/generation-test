@@ -61,7 +61,7 @@ const ActionButtons = ({
   ];
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+    <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'center' }}>
 
       {/* Основное действие */}
       {onGenerate && (

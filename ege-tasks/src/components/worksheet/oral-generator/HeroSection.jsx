@@ -33,6 +33,7 @@ export default function HeroSection({
   selectedTopic,
   distributionsActive,
   onSubtopicChange,
+  filtersSlot,
 }) {
   const variantsCount = Form.useWatch('variantsCount', form) || 0;
   const tasksPerVariant = Form.useWatch('tasksPerVariant', form) || 0;
@@ -129,30 +130,28 @@ export default function HeroSection({
         </Col>
       </Row>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 12,
-          flexWrap: 'wrap',
-          marginBottom: 20,
-        }}
-      >
+      {filtersSlot && (
+        <div style={{ marginTop: 12 }}>
+          {filtersSlot}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
         <Form.Item
           name="variantsCount"
           label="Вариантов"
-          style={{ marginBottom: 0, flex: '0 0 130px' }}
+          style={{ marginBottom: 0, flex: '0 0 110px' }}
         >
           <InputNumber min={1} max={10} size="large" style={{ width: '100%' }} />
         </Form.Item>
 
-        <div style={{ fontSize: 22, color: '#bfbfbf', paddingBottom: 6 }}>×</div>
+        <div style={{ fontSize: 20, color: '#bfbfbf', paddingBottom: 7 }}>×</div>
 
         <Form.Item
           name="tasksPerVariant"
           label="Задач в варианте"
           tooltip={distributionsActive ? 'Автоматически рассчитывается из распределения' : ''}
-          style={{ marginBottom: 0, flex: '0 0 170px' }}
+          style={{ marginBottom: 0, flex: '0 0 150px' }}
         >
           <InputNumber
             min={1}
@@ -163,44 +162,47 @@ export default function HeroSection({
           />
         </Form.Item>
 
-        <div style={{ fontSize: 22, color: '#bfbfbf', paddingBottom: 6 }}>=</div>
+        <div style={{ fontSize: 20, color: '#bfbfbf', paddingBottom: 7 }}>=</div>
 
         <div
           style={{
-            padding: '8px 16px',
+            padding: '7px 14px',
             background: '#f6ffed',
             border: '1px solid #b7eb8f',
             borderRadius: 8,
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: 600,
             color: '#389e0d',
-            minHeight: 40,
+            height: 40,
             display: 'flex',
             alignItems: 'center',
+            whiteSpace: 'nowrap',
           }}
         >
-          {total} задач всего
+          {total} задач
         </div>
+
+        <div style={{ width: 1, height: 32, background: '#e8e8e8', flexShrink: 0 }} />
+
+        <Form.Item
+          name="variantsMode"
+          label="Режим"
+          style={{ marginBottom: 0, flex: '1 1 240px' }}
+        >
+          <Segmented options={VARIANTS_MODE_OPTIONS} style={{ width: '100%' }} />
+        </Form.Item>
+
+        <Button
+          type="primary"
+          htmlType="submit"
+          icon={<ThunderboltOutlined />}
+          loading={loading}
+          size="large"
+          style={{ height: 40, fontWeight: 600, flexShrink: 0 }}
+        >
+          Сгенерировать
+        </Button>
       </div>
-
-      <Form.Item
-        name="variantsMode"
-        label="Режим вариантов"
-        style={{ marginBottom: 20 }}
-      >
-        <Segmented options={VARIANTS_MODE_OPTIONS} block />
-      </Form.Item>
-
-      <Button
-        type="primary"
-        htmlType="submit"
-        icon={<ThunderboltOutlined />}
-        loading={loading}
-        size="large"
-        style={{ minWidth: 260, height: 48, fontSize: 16, fontWeight: 600 }}
-      >
-        Сгенерировать
-      </Button>
     </div>
   );
 }

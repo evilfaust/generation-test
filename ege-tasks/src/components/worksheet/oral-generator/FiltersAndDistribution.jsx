@@ -239,7 +239,7 @@ export default function FiltersAndDistribution({
 
   return (
     <Collapse
-      defaultActiveKey={['filters-and-dist']}
+      defaultActiveKey={[]}
       items={[
         {
           key: 'filters-and-dist',
@@ -251,7 +251,7 @@ export default function FiltersAndDistribution({
           children: <Tabs items={tabs} />,
         },
       ]}
-      style={{ marginBottom: 16, background: '#fafafa' }}
+      style={{ background: '#fafafa' }}
     />
   );
 }

@@ -10,6 +10,7 @@ import FiltersAndDistribution from './worksheet/oral-generator/FiltersAndDistrib
 import AppearanceSection from './worksheet/oral-generator/AppearanceSection';
 import ResultActionBar from './worksheet/oral-generator/ResultActionBar';
 import WorksheetPreview from './worksheet/oral-generator/WorksheetPreview';
+import WorksheetGridPrint from './worksheet/WorksheetGridPrint';
 import {
   useWorksheetGeneration,
   useTaskDragDrop,
@@ -65,6 +66,7 @@ const TaskSheetGenerator = () => {
   const [savedWorks, setSavedWorks] = useState([]);
   const [loadingWorks, setLoadingWorks] = useState(false);
   const [currentWork, setCurrentWork] = useState(null);
+  const [worksheetOpen, setWorksheetOpen] = useState(false);
 
   const printRef = useRef();
   const worksheetActions = useWorksheetActions();
@@ -260,6 +262,20 @@ const TaskSheetGenerator = () => {
 
   const workTitle = form.getFieldValue('workTitle') || 'Лист задач';
 
+  if (worksheetOpen) {
+    return (
+      <WorksheetGridPrint
+        pages={variants.map(v => ({
+          title: workTitle,
+          label: `${variantLabel} ${v.number}`,
+          tasks: v.tasks,
+        }))}
+        hideTaskPrefixes={hideTaskPrefixes}
+        onBack={() => setWorksheetOpen(false)}
+      />
+    );
+  }
+
   return (
     <div className="task-worksheet-container">
       <div className="no-print">
@@ -294,19 +310,20 @@ const TaskSheetGenerator = () => {
             selectedTopic={selectedTopic}
             distributionsActive={distributionsActive}
             onSubtopicChange={setSelectedSubtopic}
-          />
-
-          <FiltersAndDistribution
-            form={form}
-            sources={sources}
-            years={years}
-            availableTags={availableTags}
-            loadingTags={loadingTags}
-            selectedTopic={selectedTopic}
-            tagDistribution={tagDistribution}
-            difficultyDistribution={difficultyDistribution}
-            progressiveDifficulty={progressiveDifficulty}
-            setProgressiveDifficulty={setProgressiveDifficulty}
+            filtersSlot={
+              <FiltersAndDistribution
+                form={form}
+                sources={sources}
+                years={years}
+                availableTags={availableTags}
+                loadingTags={loadingTags}
+                selectedTopic={selectedTopic}
+                tagDistribution={tagDistribution}
+                difficultyDistribution={difficultyDistribution}
+                progressiveDifficulty={progressiveDifficulty}
+                setProgressiveDifficulty={setProgressiveDifficulty}
+              />
+            }
           />
 
           <AppearanceSection
@@ -364,6 +381,7 @@ const TaskSheetGenerator = () => {
           )}
           onExportMD={handleExportMD}
           onReset={handleReset}
+          onOpenWorksheet={() => setWorksheetOpen(true)}
           worksheetActions={worksheetActions}
         />
       </div>
