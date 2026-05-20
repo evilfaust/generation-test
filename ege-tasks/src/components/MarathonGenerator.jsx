@@ -19,7 +19,8 @@ import MarathonTeacherSheetFull from './marathon/MarathonTeacherSheetFull';
 import MarathonRatingPrint from './marathon/MarathonRatingPrint';
 import MarathonWorksheetPrint from './marathon/MarathonWorksheetPrint';
 import MarathonTracker from './marathon/MarathonTracker';
-import LessonSidebar from './marathon/LessonSidebar';
+import StatusStrip from './marathon/StatusStrip';
+import QueueStrip from './marathon/QueueStrip';
 import QueueBoard from './marathon/QueueBoard';
 import MathRenderer from '../shared/components/MathRenderer';
 import './MarathonGenerator.css';
@@ -701,71 +702,75 @@ export default function MarathonGenerator() {
   );
 
   const trackerContent = (
-    <div className="lesson-hud">
-      {/* Левая колонка: тулбар + грид/очередь */}
-      <div style={{ minWidth: 0 }}>
-        {/* Тулбар урока */}
-        <div className="mg-lesson-toolbar">
-          {/* Grid / Queue toggle */}
-          <div className="seg">
-            <button
-              className={trackerMode === 'grid' ? 'is-active' : ''}
-              onClick={() => setTrackerMode('grid')}
-            >
-              📊 Сетка
-            </button>
-            <button
-              className={trackerMode === 'queue' ? 'is-active' : ''}
-              onClick={() => setTrackerMode('queue')}
-            >
-              📋 По задачам
-            </button>
-          </div>
-
-          {savedId && (
-            <button
-              className="btn is-primary"
-              onClick={() => {
-                const base = import.meta.env.VITE_STUDENT_URL || `${window.location.origin}/student`;
-                window.open(`${base}/marathon-live/${savedId}`, '_blank');
-              }}
-            >
-              <DashboardOutlined /> Live-дашборд
-            </button>
-          )}
-
-          <button className="btn" onClick={handleInitTracking}>
-            <ReloadOutlined /> Сброс трекера
+    <div className="lesson-content">
+      {/* Тулбар урока */}
+      <div className="mg-lesson-toolbar">
+        <div className="seg">
+          <button
+            className={trackerMode === 'grid' ? 'is-active' : ''}
+            onClick={() => setTrackerMode('grid')}
+          >
+            📊 Сетка
+          </button>
+          <button
+            className={trackerMode === 'queue' ? 'is-active' : ''}
+            onClick={() => setTrackerMode('queue')}
+          >
+            📋 По задачам
           </button>
         </div>
 
-        {trackerMode === 'grid' ? (
-          <MarathonTracker
-            tasks={tasks}
-            students={students}
-            trackingData={trackingData}
-            setTrackingData={setTrackingData}
-            onSaveTracking={savedId ? saveTracking : null}
-          />
-        ) : (
-          <QueueBoard
-            tasks={tasks}
-            students={students}
-            trackingData={trackingData}
-            setTrackingData={setTrackingData}
-            onSaveTracking={savedId ? saveTracking : null}
-          />
+        {savedId && (
+          <button
+            className="btn is-primary"
+            onClick={() => {
+              const base = import.meta.env.VITE_STUDENT_URL || `${window.location.origin}/student`;
+              window.open(`${base}/marathon-live/${savedId}`, '_blank');
+            }}
+          >
+            <DashboardOutlined /> Live-дашборд
+          </button>
         )}
+
+        <button className="btn" onClick={handleInitTracking}>
+          <ReloadOutlined /> Сброс трекера
+        </button>
       </div>
 
-      {/* Правая колонка: сайдбар */}
-      <LessonSidebar
+      {/* KPI + лидеры */}
+      <StatusStrip
+        students={students}
+        tasks={tasks}
+        trackingData={trackingData}
+      />
+
+      {/* Очередь к учителю */}
+      <QueueStrip
         students={students}
         tasks={tasks}
         trackingData={trackingData}
         setTrackingData={setTrackingData}
         onSaveTracking={savedId ? saveTracking : null}
       />
+
+      {/* Сетка / По задачам */}
+      {trackerMode === 'grid' ? (
+        <MarathonTracker
+          tasks={tasks}
+          students={students}
+          trackingData={trackingData}
+          setTrackingData={setTrackingData}
+          onSaveTracking={savedId ? saveTracking : null}
+        />
+      ) : (
+        <QueueBoard
+          tasks={tasks}
+          students={students}
+          trackingData={trackingData}
+          setTrackingData={setTrackingData}
+          onSaveTracking={savedId ? saveTracking : null}
+        />
+      )}
     </div>
   );
 

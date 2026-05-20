@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Popconfirm } from 'antd';
 
 /* ================================================================
@@ -237,7 +237,7 @@ export default function MarathonTracker({
 
   /* ---- Derived data ---- */
 
-  const displayStudents = (() => {
+  const displayStudents = useMemo(() => {
     const arr = [...students];
     if (sortKey === 'score') {
       arr.sort((a, b) => calcTotalScore(b, trackingData) - calcTotalScore(a, trackingData));
@@ -251,63 +251,32 @@ export default function MarathonTracker({
       });
     }
     return arr;
-  })();
+  }, [students, sortKey, trackingData, tasks]);
 
-  const popularTasks = getPopularTasks(students, tasks, trackingData);
+  const popularTasks = useMemo(
+    () => getPopularTasks(students, tasks, trackingData),
+    [students, tasks, trackingData]
+  );
   const maxScore = tasks.length * 3;
 
-  /* ---- Keyboard shortcuts ---- */
-
-  const [focus, setFocus] = useState(null);
-
-  const moveFocus = useCallback((dRow, dCol) => {
-    setFocus(prev => {
-      const row = prev ? Math.max(0, Math.min(displayStudents.length - 1, prev.row + dRow)) : 0;
-      const col = prev ? Math.max(0, Math.min(tasks.length - 1, prev.col + dCol)) : 0;
-      return { row, col };
-    });
-  }, [displayStudents.length, tasks.length]);
-
-  useEffect(() => {
-    const handler = (e) => {
-      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-      if (document.querySelector('.ant-popconfirm, .ant-modal-wrap:not(.ant-modal-wrap-hidden)')) return;
-      const cur = focus;
-      switch (e.key) {
-        case 'ArrowRight': e.preventDefault(); moveFocus(0, 1); break;
-        case 'ArrowLeft':  e.preventDefault(); moveFocus(0, -1); break;
-        case 'ArrowDown':  e.preventDefault(); moveFocus(1, 0); break;
-        case 'ArrowUp':    e.preventDefault(); moveFocus(-1, 0); break;
-        case 'j': case 'J': moveFocus(1, 0); break;
-        case 'k': case 'K': moveFocus(-1, 0); break;
-        case 'Escape': setFocus(null); break;
-        case 'Enter': case '1':
-          if (cur) { const name = displayStudents[cur.row]; if (name) handleAttempt(name, cur.col, true); }
-          break;
-        case 'Backspace': case '0':
-          if (cur) { e.preventDefault(); const name = displayStudents[cur.row]; if (name) handleAttempt(name, cur.col, false); }
-          break;
-        case 'r': case 'R':
-          if (cur) { const name = displayStudents[cur.row]; if (name) handleReset(name, cur.col); }
-          break;
-        case 'h': case 'H':
-          if (cur) { const name = displayStudents[cur.row]; if (name) handleIssueNext(name); }
-          break;
-        default: break;
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [focus, moveFocus, handleAttempt, handleReset, handleIssueNext, displayStudents]);
+  /* Ранжирование для медалей в столбце имён */
+  const rankingMap = useMemo(() => {
+    const sorted = [...students]
+      .map(name => ({ name, score: calcTotalScore(name, trackingData) }))
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, 'ru'));
+    const map = {};
+    sorted.forEach((item, idx) => { map[item.name] = { rank: idx + 1, score: item.score }; });
+    return map;
+  }, [students, trackingData]);
 
   if (!students.length || !tasks.length) {
     return <div className="tg-empty">Добавьте учеников и задачи в разделе «Содержимое»</div>;
   }
 
   return (
-    <div className={`marathon-tracker-v2 is-${density}`}>
+    <div className={`tracker is-${density}`}>
       {/* ---- Toolbar ---- */}
-      <div className="tracker-toolbar">
+      <div className="tracker__toolbar">
         <div className="seg">
           {DENSITY_OPTIONS.map(opt => (
             <button key={opt.key} className={density === opt.key ? 'is-active' : ''} onClick={() => setDensityPersist(opt.key)}>
@@ -331,23 +300,7 @@ export default function MarathonTracker({
           <span><span className="legend-chip" style={{ background: '#e89a14' }} />+1</span>
           <span><span className="legend-chip" style={{ background: '#d8e0ec' }} />0</span>
         </div>
-        <button
-          className={`btn-kbd${focus !== null ? ' is-active' : ''}`}
-          onClick={() => focus !== null ? setFocus(null) : setFocus({ row: 0, col: 0 })}
-          title={focus !== null ? 'Выйти из режима клавиатуры (Esc)' : 'Включить клавиатурное управление'}
-        >
-          ⌨{focus !== null ? ` ${displayStudents[focus.row]?.split(' ')[0]} · #${focus.col + 1}` : ' Клавиатура'}
-        </button>
       </div>
-
-      {/* KB hint bar */}
-      {focus !== null && (
-        <div className="tg-kb-bar">
-          {[['←↑→↓','навигация'],['Enter','✓ решено'],['0','✗ неудача'],['R','сбросить'],['H','выдать'],['Esc','выход']].map(([key, desc]) => (
-            <span key={key} className="tg-kb-item"><span className="tg-kk">{key}</span><span>{desc}</span></span>
-          ))}
-        </div>
-      )}
 
       {/* ================================================================
           Единый скролл-контейнер: строки с sticky-колонками имени и счёта.
@@ -375,27 +328,37 @@ export default function MarathonTracker({
         {displayStudents.map((student, rowIdx) => {
           const issuedCount = getIssuedCount(student, trackingData);
           const handCards = getHandCards(student, tasks.length, trackingData);
-          const total = calcTotalScore(student, trackingData);
-          const isLeader = rowIdx === 0 && sortKey === 'score' && total > 0;
+          const rankInfo = rankingMap[student];
+          const total = rankInfo?.score ?? 0;
+          const rank = rankInfo?.rank ?? 0;
+          const isLeader = rank === 1 && total > 0;
           const pct = maxScore > 0 ? Math.round((total / maxScore) * 100) : 0;
+
+          let rankCls = '';
+          if (total > 0) {
+            if (rank === 1) rankCls = ' is-gold';
+            else if (rank === 2) rankCls = ' is-silver';
+            else if (rank === 3) rankCls = ' is-bronze';
+          }
+
           return (
             <div key={student} className={`tg-row${isLeader ? ' tg-row--leader' : ''}`}>
 
               {/* Имя — sticky left */}
-              <div className={`tg-name${isLeader ? ' is-leader' : ''}`}>
-                <div className="name">
-                  {isLeader && <span className="medal">🥇</span>}
-                  {rowIdx === 1 && sortKey === 'score' && total > 0 && <span className="medal">🥈</span>}
-                  {rowIdx === 2 && sortKey === 'score' && total > 0 && <span className="medal">🥉</span>}
-                  <span>{student}</span>
+              <div className="tg-name">
+                <div className="tg-name__top">
+                  <span className={`tg-name__rank${rankCls}`}>{total > 0 ? rank : '—'}</span>
+                  <span className="tg-name__txt">{student}</span>
                 </div>
-                <div className="hand">
-                  <span>🃏</span>
-                  <span className={`cards${handCards.length === 0 ? ' cards-empty' : ''}`}>
-                    {handCards.length > 0 ? handCards.join(', ') : '—'}
+                <div className="tg-name__bottom">
+                  <span className="tg-name__cards">
+                    <span className="label">🃏</span>
+                    <span className={`nums${handCards.length === 0 ? ' empty' : ''}`}>
+                      {handCards.length > 0 ? handCards.join(', ') : 'нет'}
+                    </span>
                   </span>
                   <button
-                    className="issue"
+                    className="tg-name__issue"
                     onClick={() => handleIssueNext(student)}
                     disabled={issuedCount >= tasks.length}
                     title={issuedCount < tasks.length ? `Выдать карточку №${issuedCount + 1}` : 'Все выданы'}
@@ -407,13 +370,8 @@ export default function MarathonTracker({
               {tasks.map((_, taskIdx) => {
                 const data = (trackingData[student] || {})[String(taskIdx)];
                 const isInHand = taskIdx < issuedCount && !data?.solved && !data?.failed;
-                const isFocused = focus?.row === rowIdx && focus?.col === taskIdx;
                 return (
-                  <div
-                    key={taskIdx}
-                    className={isFocused ? 'tg-cell-wrap is-focused' : 'tg-cell-wrap'}
-                    onClick={() => setFocus({ row: rowIdx, col: taskIdx })}
-                  >
+                  <div key={taskIdx} className="tg-cell-wrap">
                     <TgCell
                       data={data}
                       isInHand={isInHand}
@@ -427,8 +385,10 @@ export default function MarathonTracker({
 
               {/* Счёт — sticky right */}
               <div className="tg-score">
-                <span className="total">{total}</span>
-                <span className="max">/ {maxScore}</span>
+                <span className="total">
+                  {total}
+                  <span className="max">/ {maxScore}</span>
+                </span>
                 <div className="bar"><span style={{ width: `${pct}%` }} /></div>
               </div>
 
