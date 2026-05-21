@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip } from 'antd';
-import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
@@ -8,6 +8,9 @@ import { generateTaskCode } from '../utils/taskCodeGenerator';
 import { dataUrlToFile } from '../utils/cropImage';
 import { api } from '../services/pocketbase';
 import { useImageUpload } from '../hooks';
+import { parseMatchingTask } from '../utils/parseMatchingTask';
+
+const DEFINE_API_BASE = import.meta.env.VITE_DEFINE_API_URL?.replace('/define', '') || 'https://l.oipav.ru';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -39,6 +42,8 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
 
   const img = useImageUpload('url');
   const [imageDeleted, setImageDeleted] = useState(false);
+  const [convertingTable, setConvertingTable] = useState(false);
+  const statementTextAreaRef = useRef(null);
 
   const isCreateMode = !task;
 
@@ -310,6 +315,71 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
       setDeleting(false);
     }
   };
+
+  // Вспомогательная: достаёт выделенный текст (или весь) из textarea
+  const getSourceText = useCallback(() => {
+    const el = statementTextAreaRef.current?.resizableTextArea?.textArea;
+    const fullValue = form.getFieldValue('statement_md') || '';
+    const selStart = el?.selectionStart ?? 0;
+    const selEnd = el?.selectionEnd ?? 0;
+    const hasSelection = el && selStart !== selEnd;
+    return {
+      fullValue,
+      selStart,
+      selEnd,
+      hasSelection,
+      sourceText: hasSelection ? fullValue.slice(selStart, selEnd) : fullValue,
+    };
+  }, [form]);
+
+  // Применяет результат конвертации в поле
+  const applyConversionResult = useCallback((result, { fullValue, selStart, selEnd, hasSelection }) => {
+    const newValue = hasSelection
+      ? fullValue.slice(0, selStart) + result + fullValue.slice(selEnd)
+      : result;
+    form.setFieldValue('statement_md', newValue);
+    setPreviewStatement(newValue);
+  }, [form]);
+
+  // Кнопка 1: эвристика
+  const handleConvertHeuristic = useCallback(() => {
+    const ctx = getSourceText();
+    if (!ctx.sourceText.trim()) return;
+    const result = parseMatchingTask(ctx.sourceText);
+    if (result) {
+      applyConversionResult(result, ctx);
+      message.success('Таблица построена');
+    } else {
+      message.warning('Не удалось распознать структуру — попробуйте кнопку «AI»');
+    }
+  }, [getSourceText, applyConversionResult, message]);
+
+  // Кнопка 2: LLM
+  const handleConvertAI = useCallback(async () => {
+    const ctx = getSourceText();
+    if (!ctx.sourceText.trim()) return;
+    setConvertingTable(true);
+    try {
+      const resp = await fetch(`${DEFINE_API_BASE}/parse-matching`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: ctx.sourceText }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const result = data.markdown || '';
+      if (!result) {
+        message.warning('AI не смог распознать структуру задачи.');
+        return;
+      }
+      applyConversionResult(result, ctx);
+      message.success('Таблица построена через AI');
+    } catch {
+      message.error('Ошибка при обращении к AI. Проверьте подключение.');
+    } finally {
+      setConvertingTable(false);
+    }
+  }, [getSourceText, applyConversionResult, message]);
 
   const handleCopyToGeometry = async () => {
     setCopyingToGeo(true);
@@ -711,16 +781,46 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         {/* Текст задания */}
         <Form.Item
           name="statement_md"
-          label="Текст задания (поддерживает LaTeX: $x^2$)"
+          label={
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              Текст задания (поддерживает LaTeX: $x^2$)
+              <Tooltip title="Быстрое преобразование алгоритмом — мгновенно, без сети">
+                <Button
+                  size="small"
+                  icon={<TableOutlined />}
+                  onClick={handleConvertHeuristic}
+                  style={{ fontWeight: 400 }}
+                >
+                  → Таблица
+                </Button>
+              </Tooltip>
+              <Tooltip title="Преобразование через AI — медленнее, но справляется с нестандартными форматами">
+                <Button
+                  size="small"
+                  icon={<TableOutlined />}
+                  loading={convertingTable}
+                  onClick={handleConvertAI}
+                  style={{ fontWeight: 400 }}
+                >
+                  → Таблица (AI)
+                </Button>
+              </Tooltip>
+            </span>
+          }
           rules={[{ required: isCreateMode, message: 'Введите текст задания' }]}
         >
-          <TextArea rows={4} placeholder="Введите текст задания..." onChange={(e) => setPreviewStatement(e.target.value)} />
+          <TextArea
+            ref={statementTextAreaRef}
+            rows={4}
+            placeholder="Введите текст задания..."
+            onChange={(e) => setPreviewStatement(e.target.value)}
+          />
         </Form.Item>
 
         {previewStatement && (
           <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4, border: '1px solid #d9d9d9' }}>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 8, fontWeight: 'bold' }}>Предпросмотр задания:</div>
-            <MathRenderer text={previewStatement} />
+            <MathRenderer text={previewStatement} answerBoxes />
           </div>
         )}
 

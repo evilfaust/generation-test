@@ -42,8 +42,9 @@ const rehypeKatexOptions = {
  * - Markdown разметку (заголовки, списки, таблицы, жирный текст и т.д.)
  * - Inline формулы $...$
  * - Блочные формулы $$...$$
+ * - answerBoxes=true: пустые ячейки таблицы рендерятся как поля для записи ответа
  */
-const MathRenderer = ({ text, content, inline = true }) => {
+const MathRenderer = ({ text, content, inline = true, answerBoxes = false }) => {
   const sourceText = text ?? content;
   if (!sourceText) return null;
 
@@ -70,6 +71,48 @@ const MathRenderer = ({ text, content, inline = true }) => {
       <thead {...props} style={{ backgroundColor: '#f5f5f5' }}>
         {children}
       </thead>
+    ),
+    td: ({ children, ...props }) => {
+      const isEmpty = answerBoxes && (
+        !children ||
+        (Array.isArray(children) && children.every(
+          c => c == null || (typeof c === 'string' && !c.trim())
+        ))
+      );
+      if (isEmpty) {
+        return (
+          <td {...props} style={{
+            border: '1px solid #bbb',
+            padding: '2px 4px',
+            minWidth: '2.8em',
+            height: '2.2em',
+            verticalAlign: 'middle',
+          }}>
+            <span style={{
+              display: 'block',
+              minWidth: '2.8em',
+              height: '1.6em',
+              border: '1.5px solid #555',
+              borderRadius: 2,
+            }} />
+          </td>
+        );
+      }
+      return (
+        <td {...props} style={{ border: '1px solid #ddd', padding: '4px 8px' }}>
+          {children}
+        </td>
+      );
+    },
+    th: ({ children, ...props }) => (
+      <th {...props} style={{
+        border: '1px solid #ddd',
+        padding: '6px 8px',
+        backgroundColor: '#f5f5f5',
+        fontWeight: 600,
+      }}>
+        {children}
+      </th>
     ),
   };
 

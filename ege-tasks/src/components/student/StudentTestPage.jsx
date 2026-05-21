@@ -290,7 +290,7 @@ const StudentTestPage = ({ studentSession }) => {
           >
             <div className="task-number">Задача {idx + 1}</div>
             <div className="task-statement">
-              <MathRenderer text={task.statement_md} />
+              <MathRenderer text={task.statement_md} answerBoxes />
               {(task.image_url || task.image) && (
                 <img
                   src={task.image_url || `${PB_URL}/api/files/tasks/${task.id}/${task.image}`}

@@ -83,7 +83,7 @@ const VariantRenderer = ({
                 <div className="compact-answer-box"></div>
                 <div className="compact-task-content">
                   <span className="compact-task-number">{taskIndex + 1}.</span>
-                  <MathRenderer text={applyTextFilter(task.statement_md)} />
+                  <MathRenderer text={applyTextFilter(task.statement_md)} answerBoxes />
                 </div>
                 {/* Кнопки управления (только на экране) */}
                 <div className="no-print compact-controls">
