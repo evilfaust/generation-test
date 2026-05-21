@@ -13,15 +13,17 @@ const TEXT_SIZE_CFG = {
   l: { statement: '4.5mm', badge: '4.5mm' },
 };
 
-// Сколько линий клетки рендерить per layout (лишние клипуются overflow:hidden)
-const GRID_LINES_BY_LAYOUT = {
-  '1a4': { h: 55, v: 42 },
-  '2a5': { h: 15, v: 30 },
-  '2a4': { h: 28, v: 42 },
-  '3a4': { h: 18, v: 42 },
-  '4a4': { h: 13, v: 42 },
-  '5a4': { h: 10, v: 42 },
-};
+// Вычисляет число линий клетки по фактическому кол-ву задач на листе.
+// Лишние линии безопасно клипуются overflow:hidden.
+// PAGE_H — высота контентной области: A4=289mm, A5=200mm
+// v-линии фиксированы по ширине страницы
+function calcGridLines(actualTaskCount, isA4) {
+  const pageH = isA4 ? 289 : 200;
+  const pageW = isA4 ? 202 : 138;
+  const h = Math.ceil(pageH / (Math.max(actualTaskCount, 1) * 5)) + 4;
+  const v = Math.ceil(pageW / 5) + 2;
+  return { h, v };
+}
 
 // Варианты раскладки: id, метка, кол-во задач, формат печати
 const LAYOUT_OPTIONS = [
@@ -46,7 +48,7 @@ const DRAWING_SIZE_CFG = {
 
 // ── Одна задача ───────────────────────────────────────────────────────────────
 
-function WorksheetTask({ task, index, showDrawing, drawingSize, layoutKey, textSize }) {
+function WorksheetTask({ task, index, showDrawing, drawingSize, layoutKey, textSize, sheetTasksCount, isA4 }) {
   const imageUrl = api.getGeometryImageUrl(task);
   const hasSvg   = task.drawing_view === 'svg' && !!task.drawing_svg;
   const hasImage = !!imageUrl && !hasSvg;
@@ -57,7 +59,8 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, layoutKey, textS
   const imgStyle     = { maxHeight: maxH };
 
   const tcfg  = TEXT_SIZE_CFG[textSize] ?? TEXT_SIZE_CFG.s;
-  const lines = GRID_LINES_BY_LAYOUT[layoutKey] ?? GRID_LINES_BY_LAYOUT['2a5'];
+  // Считаем по фактическому числу задач на листе — последний лист может быть неполным
+  const lines = calcGridLines(sheetTasksCount, isA4);
 
   return (
     <div className="geo-worksheet-task">
@@ -161,6 +164,8 @@ function WorksheetSheet({
             drawingSize={drawingSize}
             layoutKey={layoutKey}
             textSize={textSize}
+            sheetTasksCount={sheetTasks.length}
+            isA4={isA4}
           />
         </>
       ))}
