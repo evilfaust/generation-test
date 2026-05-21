@@ -103,6 +103,13 @@ export function AuthProvider({ children }) {
       localStorage.removeItem(REMEMBER_KEY);
     }
     sessionStorage.setItem(SESSION_MARKER, '1');
+
+    // Обновляем last_login — fire-and-forget. Используем updateRule
+    // "self или superadmin", залогиненный учитель обновляет себя.
+    pb.collection('teachers')
+      .update(res.record.id, { last_login: new Date().toISOString() })
+      .catch((err) => console.debug('[auth] last_login update failed:', err?.message));
+
     return res.record;
   }, []);
 

@@ -18,6 +18,7 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined,
   CrownOutlined, EyeOutlined, UserOutlined,
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { api } from '../../services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ALL_SECTIONS } from '../../contexts/AuthContext';
@@ -190,6 +191,24 @@ export default function UserManager() {
           </Space>
         );
       },
+    },
+    {
+      title: 'Последний вход',
+      dataIndex: 'last_login',
+      key: 'last_login',
+      width: 140,
+      render: (v) => {
+        if (!v) return <Text type="secondary" style={{ fontSize: 12 }}>— никогда —</Text>;
+        const d = dayjs(v);
+        const isToday = d.isSame(dayjs(), 'day');
+        return (
+          <div>
+            <div style={{ fontSize: 13 }}>{isToday ? 'сегодня' : d.format('DD.MM.YYYY')}</div>
+            <Text type="secondary" style={{ fontSize: 11 }}>{d.format('HH:mm')}</Text>
+          </div>
+        );
+      },
+      sorter: (a, b) => (a.last_login || '').localeCompare(b.last_login || ''),
     },
     {
       title: 'Действия',
