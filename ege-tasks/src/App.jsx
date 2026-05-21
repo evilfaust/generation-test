@@ -76,6 +76,7 @@ import LoginPage from './components/auth/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import UserMenu from './components/auth/UserMenu';
 import UserManager from './components/auth/UserManager';
+import AuditLogPage from './components/auth/AuditLogPage';
 import { useVersionSync } from './shared/version/useVersionSync';
 import 'katex/dist/katex.min.css';
 import './theme/tokens.css';
@@ -152,6 +153,7 @@ export const R = {
   EXCALIDRAW:          '/app/lab/excalidraw',
   // Администрирование
   ADMIN_USERS:         '/app/admin/users',
+  ADMIN_AUDIT:         '/app/admin/audit',
 };
 
 // Вспомогательная функция для построения конкретного URL из шаблона с параметрами
@@ -226,7 +228,8 @@ const ROUTE_META = [
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
   { re: /^\/app\/lab\/excalidraw/,         menuKey: 'excalidraw',       menuGroup: 'lab', title: 'Excalidraw', noMargin: true },
-  { re: /^\/app\/admin\/users/,            menuKey: 'admin-users',      title: 'Управление пользователями' },
+  { re: /^\/app\/admin\/users/,            menuKey: 'admin-users',      menuGroup: 'admin-group', title: 'Управление пользователями' },
+  { re: /^\/app\/admin\/audit/,            menuKey: 'admin-audit',      menuGroup: 'admin-group', title: 'Журнал действий' },
 ];
 
 function getRouteMeta(pathname) {
@@ -284,6 +287,7 @@ const MENU_KEY_PATH = {
   'theory-categories':      R.THEORY_CATEGORIES,
   excalidraw:               R.EXCALIDRAW,
   'admin-users':            R.ADMIN_USERS,
+  'admin-audit':            R.ADMIN_AUDIT,
 };
 
 // ── Метаданные групп меню (для хлебных крошек) ──────────────────────────────
@@ -297,6 +301,7 @@ const GROUP_META = {
   arith:                { label: 'Устный счёт' },
   theory:               { label: 'Теория',        path: R.THEORY },
   lab:                  { label: 'Лаборатория' },
+  'admin-group':        { label: 'Администрирование' },
 };
 
 // Явные родители для страниц без menuGroup
@@ -623,7 +628,13 @@ function AppLayout() {
         { key: 'excalidraw', icon: <EditOutlined />, label: 'Excalidraw' },
       ],
     },
-    { key: 'admin-users', icon: <TeamOutlined />, label: 'Пользователи', section: 'admin' },
+    {
+      key: 'admin-group', icon: <KeyOutlined />, label: 'Администрирование', section: 'admin',
+      children: [
+        { key: 'admin-users', icon: <TeamOutlined />, label: 'Пользователи' },
+        { key: 'admin-audit', icon: <FileSearchOutlined />, label: 'Журнал действий' },
+      ],
+    },
   ];
 
   // Фильтрация меню по доступным секциям. Свойство `section` удаляем из объекта,
@@ -836,6 +847,7 @@ function App() {
             <Route element={<ProtectedRoute requireSuperAdmin />}>
               <Route element={<AppLayout />}>
                 <Route path={R.ADMIN_USERS} element={<UserManager />} />
+                <Route path={R.ADMIN_AUDIT} element={<AuditLogPage />} />
               </Route>
             </Route>
 

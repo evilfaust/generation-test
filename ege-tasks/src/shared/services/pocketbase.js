@@ -8,7 +8,53 @@ const pb = new PocketBase(PB_BASE_URL);
 // Отключаем автоматическое обновление токена для анонимного доступа
 pb.autoCancellation(false);
 
+// ── Audit log (журнал значимых действий) ─────────────────────────────────────
+// Пишется в коллекцию audit_log. Только superadmin может читать (правила в миграции).
+// Любой залогиненный учитель может писать.
+//
+// Вызов из API-методов — fire-and-forget: ошибки журналирования НЕ блокируют
+// основную операцию (журнал — служебный, важнее чтобы пользователь смог удалить).
+function _logAudit(action, collectionName, recordId, summary) {
+  try {
+    const teacher = pb.authStore.model;
+    if (!teacher || teacher.collectionName !== 'teachers') return;
+
+    pb.collection('audit_log').create({
+      teacher_id: teacher.id,
+      teacher_name: teacher.name || teacher.username || '?',
+      action,
+      collection_name: collectionName,
+      record_id: recordId || '',
+      record_summary: (summary || '').slice(0, 500),
+    }).catch((err) => {
+      // Не шумим в консоль — журнал не критичен.
+      if (err?.status && err.status !== 404) {
+        console.debug('[audit] log failed:', err?.message);
+      }
+    });
+  } catch (e) {
+    // Пустой catch — журналирование не должно ронять приложение.
+  }
+}
+
 export const api = {
+  // Прямой экспорт хелпера для случаев, когда нужно залогировать кастомное
+  // действие из компонента (редко; обычно логируется автоматически).
+  logAudit: _logAudit,
+
+  // ── Audit log: чтение (только superadmin) ───────────────────────────────
+  async getAuditLog({ page = 1, perPage = 50, filter = '' } = {}) {
+    try {
+      return await pb.collection('audit_log').getList(page, perPage, {
+        sort: '-created',
+        filter,
+      });
+    } catch (error) {
+      console.error('Error fetching audit log:', error);
+      throw error;
+    }
+  },
+
   // Получить все темы (опционально фильтр по exam_type)
   async getTopics(examType = null) {
     try {
@@ -384,7 +430,9 @@ export const api = {
   // Создать задачу
   async createTask(data) {
     try {
-      return await pb.collection('tasks').create(data);
+      const rec = await pb.collection('tasks').create(data);
+      _logAudit('create', 'tasks', rec.id, rec.code || rec.statement_md?.slice(0, 80));
+      return rec;
     } catch (error) {
       console.error('Error creating task:', error);
       throw error;
@@ -394,7 +442,9 @@ export const api = {
   // Обновить задачу
   async updateTask(id, data) {
     try {
-      return await pb.collection('tasks').update(id, data);
+      const rec = await pb.collection('tasks').update(id, data);
+      _logAudit('update', 'tasks', rec.id, rec.code || rec.statement_md?.slice(0, 80));
+      return rec;
     } catch (error) {
       console.error('Error updating task:', error);
       throw error;
@@ -404,7 +454,15 @@ export const api = {
   // Удалить задачу
   async deleteTask(id) {
     try {
-      return await pb.collection('tasks').delete(id);
+      // Заранее получаем code для журнала (после delete уже не достанем).
+      let summary = id;
+      try {
+        const t = await pb.collection('tasks').getOne(id, { fields: 'id,code' });
+        summary = t.code || id;
+      } catch (_) {}
+      const res = await pb.collection('tasks').delete(id);
+      _logAudit('delete', 'tasks', id, summary);
+      return res;
     } catch (error) {
       console.error('Error deleting task:', error);
       throw error;
@@ -678,7 +736,9 @@ export const api = {
   // Создать работу
   async createWork(data) {
     try {
-      return await pb.collection('works').create(data);
+      const rec = await pb.collection('works').create(data);
+      _logAudit('create', 'works', rec.id, rec.title);
+      return rec;
     } catch (error) {
       console.error('Error creating work:', error);
       throw error;
@@ -743,7 +803,14 @@ export const api = {
   // Удалить работу
   async deleteWork(id) {
     try {
-      return await pb.collection('works').delete(id);
+      let summary = id;
+      try {
+        const w = await pb.collection('works').getOne(id, { fields: 'id,title' });
+        summary = w.title || id;
+      } catch (_) {}
+      const res = await pb.collection('works').delete(id);
+      _logAudit('delete', 'works', id, summary);
+      return res;
     } catch (error) {
       console.error('Error deleting work:', error);
       throw error;
@@ -925,7 +992,9 @@ export const api = {
   // Создать статью теории
   async createTheoryArticle(data) {
     try {
-      return await pb.collection('theory_articles').create(data);
+      const rec = await pb.collection('theory_articles').create(data);
+      _logAudit('create', 'theory_articles', rec.id, rec.title);
+      return rec;
     } catch (error) {
       console.error('Error creating theory article:', error);
       throw error;
@@ -945,7 +1014,14 @@ export const api = {
   // Удалить статью теории
   async deleteTheoryArticle(id) {
     try {
-      return await pb.collection('theory_articles').delete(id);
+      let summary = id;
+      try {
+        const a = await pb.collection('theory_articles').getOne(id, { fields: 'id,title' });
+        summary = a.title || id;
+      } catch (_) {}
+      const res = await pb.collection('theory_articles').delete(id);
+      _logAudit('delete', 'theory_articles', id, summary);
+      return res;
     } catch (error) {
       console.error('Error deleting theory article:', error);
       throw error;
@@ -1456,7 +1532,9 @@ export const api = {
         password: data.password,
         passwordConfirm: data.password,
       };
-      return await pb.collection('teachers').create(payload);
+      const rec = await pb.collection('teachers').create(payload);
+      _logAudit('create', 'teachers', rec.id, `${rec.username} (${rec.role})`);
+      return rec;
     } catch (error) {
       console.error('Error creating teacher:', error);
       throw error;
@@ -1474,7 +1552,10 @@ export const api = {
         payload.password = data.password;
         payload.passwordConfirm = data.password;
       }
-      return await pb.collection('teachers').update(id, payload);
+      const rec = await pb.collection('teachers').update(id, payload);
+      const summary = `${rec.username} (${rec.role})${data.password ? ' [password changed]' : ''}`;
+      _logAudit('update', 'teachers', rec.id, summary);
+      return rec;
     } catch (error) {
       console.error('Error updating teacher:', error);
       throw error;
@@ -1483,7 +1564,14 @@ export const api = {
 
   async deleteTeacher(id) {
     try {
-      return await pb.collection('teachers').delete(id);
+      let summary = id;
+      try {
+        const t = await pb.collection('teachers').getOne(id, { fields: 'id,username,role' });
+        summary = `${t.username} (${t.role})`;
+      } catch (_) {}
+      const res = await pb.collection('teachers').delete(id);
+      _logAudit('delete', 'teachers', id, summary);
+      return res;
     } catch (error) {
       console.error('Error deleting teacher:', error);
       throw error;
@@ -1762,7 +1850,9 @@ export const api = {
     try {
       // PocketBase SDK автоматически создаёт FormData, если data содержит File/Blob.
       // drawing_image передаётся как File-объект из редактора.
-      return await pb.collection('geometry_tasks').create(data);
+      const rec = await pb.collection('geometry_tasks').create(data);
+      _logAudit('create', 'geometry_tasks', rec.id, rec.code || rec.title);
+      return rec;
     } catch (error) {
       console.error('Error creating geometry task:', error);
       throw error;
@@ -1827,7 +1917,14 @@ export const api = {
 
   async deleteGeometryTask(id) {
     try {
-      return await pb.collection('geometry_tasks').delete(id);
+      let summary = id;
+      try {
+        const t = await pb.collection('geometry_tasks').getOne(id, { fields: 'id,code,title' });
+        summary = t.code || t.title || id;
+      } catch (_) {}
+      const res = await pb.collection('geometry_tasks').delete(id);
+      _logAudit('delete', 'geometry_tasks', id, summary);
+      return res;
     } catch (error) {
       console.error('Error deleting geometry task:', error);
       throw error;
@@ -1952,7 +2049,9 @@ export const api = {
 
   async createTdfSet(data) {
     try {
-      return await pb.collection('tdf_sets').create(data);
+      const rec = await pb.collection('tdf_sets').create(data);
+      _logAudit('create', 'tdf_sets', rec.id, rec.title);
+      return rec;
     } catch (error) {
       console.error('Error creating tdf_set:', error);
       throw error;
@@ -1970,7 +2069,14 @@ export const api = {
 
   async deleteTdfSet(id) {
     try {
-      return await pb.collection('tdf_sets').delete(id);
+      let summary = id;
+      try {
+        const s = await pb.collection('tdf_sets').getOne(id, { fields: 'id,title' });
+        summary = s.title || id;
+      } catch (_) {}
+      const res = await pb.collection('tdf_sets').delete(id);
+      _logAudit('delete', 'tdf_sets', id, summary);
+      return res;
     } catch (error) {
       console.error('Error deleting tdf_set:', error);
       throw error;
@@ -2547,7 +2653,9 @@ export const api = {
 
   async createMCTest(data) {
     try {
-      return await pb.collection('mc_tests').create(data);
+      const rec = await pb.collection('mc_tests').create(data);
+      _logAudit('create', 'mc_tests', rec.id, rec.title);
+      return rec;
     } catch (error) {
       console.error('Error creating mc_test:', error);
       throw error;
@@ -2565,7 +2673,14 @@ export const api = {
 
   async deleteMCTest(id) {
     try {
-      return await pb.collection('mc_tests').delete(id);
+      let summary = id;
+      try {
+        const m = await pb.collection('mc_tests').getOne(id, { fields: 'id,title' });
+        summary = m.title || id;
+      } catch (_) {}
+      const res = await pb.collection('mc_tests').delete(id);
+      _logAudit('delete', 'mc_tests', id, summary);
+      return res;
     } catch (error) {
       console.error('Error deleting mc_test:', error);
       throw error;
