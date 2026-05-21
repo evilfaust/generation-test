@@ -241,6 +241,14 @@ export function GeometryPreviewCard({
         ref={stageRef}
         className={`geometry-preview-stage ${editable ? 'is-editing' : ''}`}
       >
+        {/* Клетка 5 мм — div-линии с физическими mm/pt-единицами → нативные векторы в PDF */}
+        {Array.from({ length: 15 }, (_, i) => (
+          <div key={`gh-${i}`} className="geo-preview-h-line" style={{ top: `${(i + 1) * 5}mm` }} />
+        ))}
+        {Array.from({ length: 15 }, (_, i) => (
+          <div key={`gv-${i}`} className="geo-preview-v-line" style={{ left: `${(i + 1) * 5}mm` }} />
+        ))}
+
         <div
           className={`geometry-preview-layer geometry-preview-layer-image ${editable ? 'editable' : ''}`}
           style={toLayerStyle(layout.image, 1)}

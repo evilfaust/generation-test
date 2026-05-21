@@ -177,6 +177,29 @@
   height: 100%;
   min-height: 360px;
   isolation: isolate;
+  overflow: hidden;
+}
+
+/* Линии клетки 5 мм — нативные PDF-векторы при печати */
+
+.geo-preview-h-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 0.2pt solid #e1e3e8;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.geo-preview-v-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 0.2pt solid #e1e3e8;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .geometry-preview-grid.a5 .geometry-preview-stage {
@@ -457,8 +480,10 @@
   }
 
   body:has(.geometry-preview-root) .geometry-preview-root {
-    position: static;
-    width: 148mm;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
     padding: 0;
     margin: 0;
     background: #fff;

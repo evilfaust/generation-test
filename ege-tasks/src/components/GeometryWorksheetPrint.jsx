@@ -13,6 +13,16 @@ const TEXT_SIZE_CFG = {
   l: { statement: '4.5mm', badge: '4.5mm' },
 };
 
+// Сколько линий клетки рендерить per layout (лишние клипуются overflow:hidden)
+const GRID_LINES_BY_LAYOUT = {
+  '1a4': { h: 55, v: 42 },
+  '2a5': { h: 15, v: 30 },
+  '2a4': { h: 28, v: 42 },
+  '3a4': { h: 18, v: 42 },
+  '4a4': { h: 13, v: 42 },
+  '5a4': { h: 10, v: 42 },
+};
+
 // Варианты раскладки: id, метка, кол-во задач, формат печати
 const LAYOUT_OPTIONS = [
   { value: '1a4', label: '1 / A4', count: 1, isA4: true  },
@@ -41,12 +51,13 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, layoutKey, textS
   const hasSvg   = task.drawing_view === 'svg' && !!task.drawing_svg;
   const hasImage = !!imageUrl && !hasSvg;
 
-  const dcfg = DRAWING_SIZE_CFG[drawingSize] ?? DRAWING_SIZE_CFG.m;
-  const maxH = dcfg.h[layoutKey] ?? dcfg.h['2a5'];
+  const dcfg  = DRAWING_SIZE_CFG[drawingSize] ?? DRAWING_SIZE_CFG.m;
+  const maxH  = dcfg.h[layoutKey] ?? dcfg.h['2a5'];
   const drawingStyle = { maxWidth: dcfg.w, maxHeight: maxH };
-  const imgStyle    = { maxHeight: maxH };
+  const imgStyle     = { maxHeight: maxH };
 
-  const tcfg = TEXT_SIZE_CFG[textSize] ?? TEXT_SIZE_CFG.s;
+  const tcfg  = TEXT_SIZE_CFG[textSize] ?? TEXT_SIZE_CFG.s;
+  const lines = GRID_LINES_BY_LAYOUT[layoutKey] ?? GRID_LINES_BY_LAYOUT['2a5'];
 
   return (
     <div className="geo-worksheet-task">
@@ -62,20 +73,14 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, layoutKey, textS
       </div>
 
       <div className="geo-worksheet-task-body">
+        {/* Клетка: div-линии с физическими mm/pt-единицами → нативные векторы в PDF */}
         <div className="geo-worksheet-task-grid">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" className="geo-worksheet-grid-svg">
-            <defs>
-              <pattern
-                id={`geo-grid-${index}`}
-                x="0" y="0"
-                width="18.898" height="18.898"
-                patternUnits="userSpaceOnUse"
-              >
-                <path d="M 18.898 0 L 0 0 0 18.898" fill="none" stroke="#c4cedf" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill={`url(#geo-grid-${index})`} />
-          </svg>
+          {Array.from({ length: lines.h }, (_, i) => (
+            <div key={`h-${i}`} className="geo-worksheet-h-line" style={{ top: `${(i + 1) * 5}mm` }} />
+          ))}
+          {Array.from({ length: lines.v }, (_, i) => (
+            <div key={`v-${i}`} className="geo-worksheet-v-line" style={{ left: `${(i + 1) * 5}mm` }} />
+          ))}
         </div>
 
         {showDrawing && hasSvg && (

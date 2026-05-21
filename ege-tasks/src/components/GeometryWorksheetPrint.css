@@ -234,12 +234,26 @@
   border-radius: 1mm;
 }
 
-.geo-worksheet-grid-svg {
-  display: block;
+/* Линии клетки — нативные HTML-элементы с физическими единицами.
+   mm для позиций → точный шаг 5 мм при печати.
+   pt для толщины → стабильная hairline-линия на любом dpi. */
+
+.geo-worksheet-h-line {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 0.2pt solid #e1e3e8;
+  pointer-events: none;
+}
+
+.geo-worksheet-v-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 0.2pt solid #e1e3e8;
+  pointer-events: none;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -270,8 +284,10 @@
   }
 
   body:has(.geo-worksheet-root) .geo-worksheet-root {
-    position: static;
-    width: 148mm;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
     padding: 0;
     margin: 0;
     background: #fff;
@@ -344,11 +360,4 @@
     print-color-adjust: exact;
   }
 
-  .geo-worksheet-grid-svg {
-    display: block;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-  }
 }
