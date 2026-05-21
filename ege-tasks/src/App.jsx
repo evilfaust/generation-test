@@ -71,7 +71,7 @@ import EgeScoreCalculator from './components/EgeScoreCalculator';
 import MCTestGenerator from './components/MCTestGenerator';
 import { api } from './services/pocketbase';
 import { ReferenceDataProvider, useReferenceData } from './contexts/ReferenceDataContext';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './components/auth/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import UserMenu from './components/auth/UserMenu';
@@ -519,11 +519,16 @@ function AppLayout() {
     setMobileDrawerOpen(false);
   };
 
-  const menuItems = [
-    { key: 'tasks',  icon: <FileTextOutlined />,  label: 'Все задачи' },
-    { key: 'stats',  icon: <PieChartOutlined />,   label: 'Аналитика' },
+  const { hasSection } = useAuth();
+
+  // Полный список пунктов меню с маркировкой секции.
+  // section: ключ из ALL_SECTIONS (см. contexts/AuthContext). Если пользователь
+  // не имеет доступа к этой секции — пункт скрывается из меню.
+  const allMenuItems = [
+    { key: 'tasks',  icon: <FileTextOutlined />,  label: 'Все задачи', section: 'tasks' },
+    { key: 'stats',  icon: <PieChartOutlined />,   label: 'Аналитика',  section: 'tasks' },
     {
-      key: 'worksheets-group', icon: <AppstoreOutlined />, label: 'Рабочие листы',
+      key: 'worksheets-group', icon: <AppstoreOutlined />, label: 'Рабочие листы', section: 'worksheets',
       children: [
         { key: 'generator',       icon: <FileSearchOutlined />, label: 'Генератор' },
         { key: 'ege-variant',     icon: <FileAddOutlined />,    label: 'Варианты ЕГЭ' },
@@ -533,7 +538,7 @@ function AppLayout() {
       ],
     },
     {
-      key: 'gamification-group', icon: <BulbOutlined />, label: 'Геймификация',
+      key: 'gamification-group', icon: <BulbOutlined />, label: 'Геймификация', section: 'gamification',
       children: [
         { key: 'qr-worksheet',    icon: <QrcodeOutlined />,    label: 'QR-листы' },
         { key: 'pixel-art',       icon: <PictureOutlined />,   label: 'Пиксель-арт' },
@@ -544,26 +549,26 @@ function AppLayout() {
         { key: 'crossword',       icon: <AppstoreOutlined />,  label: 'Кроссворды' },
       ],
     },
-    { key: 'work-manager', icon: <SolutionOutlined />, label: 'Мои работы' },
-    { key: 'work-editor',  icon: <EditOutlined />,     label: 'Редактор работ' },
+    { key: 'work-manager', icon: <SolutionOutlined />, label: 'Мои работы', section: 'works' },
+    { key: 'work-editor',  icon: <EditOutlined />,     label: 'Редактор работ', section: 'works' },
     {
-      key: 'students-group', icon: <TeamOutlined />, label: 'Ученики',
+      key: 'students-group', icon: <TeamOutlined />, label: 'Ученики', section: 'students',
       children: [
         { key: 'students',      icon: <BarChartOutlined />,  label: 'Прогресс' },
         { key: 'heatmap',       icon: <HeatMapOutlined />,   label: 'Тепловая карта' },
         { key: 'achievements',  icon: <TrophyOutlined />,    label: 'Достижения' },
       ],
     },
-    { key: 'import', icon: <UploadOutlined />, label: 'Импорт задач' },
+    { key: 'import', icon: <UploadOutlined />, label: 'Импорт задач', section: 'import' },
     {
-      key: 'geometry', icon: <CompassOutlined />, label: 'Геометрия',
+      key: 'geometry', icon: <CompassOutlined />, label: 'Геометрия', section: 'geometry',
       children: [
         { key: 'geometry-tasks',   icon: <UnorderedListOutlined />, label: 'Задачи' },
         { key: 'geometry-topics',  icon: <FolderOutlined />,        label: 'Темы и подтемы' },
       ],
     },
     {
-      key: 'tdf-group', icon: <FormOutlined />, label: 'ТДФ',
+      key: 'tdf-group', icon: <FormOutlined />, label: 'ТДФ', section: 'tdf',
       children: [
         { key: 'tdf',           icon: <UnorderedListOutlined />, label: 'Наборы' },
         { key: 'tdf-flashcards', icon: <CreditCardOutlined />,  label: 'Карточки' },
@@ -571,7 +576,7 @@ function AppLayout() {
       ],
     },
     {
-      key: 'trig', icon: <RadarChartOutlined />, label: 'Тригонометрия',
+      key: 'trig', icon: <RadarChartOutlined />, label: 'Тригонометрия', section: 'trig',
       children: [
         { key: 'trig-mixed',              icon: <FunctionOutlined />,    label: 'Смешанная работа' },
         { key: 'unit-circle',             icon: <RadarChartOutlined />,  label: 'Единичная окружность' },
@@ -587,7 +592,7 @@ function AppLayout() {
       ],
     },
     {
-      key: 'arith', icon: <CalculatorOutlined />, label: 'Устный счёт',
+      key: 'arith', icon: <CalculatorOutlined />, label: 'Устный счёт', section: 'arith',
       children: [
         { key: 'oral-counting', icon: <CalculatorOutlined />, label: 'Арифметика' },
         { key: 'log-exp',       icon: <FunctionOutlined />,  label: 'Степени и логарифмы' },
@@ -599,7 +604,7 @@ function AppLayout() {
       ],
     },
     {
-      key: 'theory', icon: <BookOutlined />, label: 'Теория',
+      key: 'theory', icon: <BookOutlined />, label: 'Теория', section: 'theory',
       children: [
         { key: 'theory-browser',    icon: <ReadOutlined />,    label: 'Библиотека' },
         { key: 'theory-editor',     icon: <EditOutlined />,    label: 'Редактор' },
@@ -608,12 +613,18 @@ function AppLayout() {
       ],
     },
     {
-      key: 'lab', icon: <EditOutlined />, label: 'Лаборатория',
+      key: 'lab', icon: <EditOutlined />, label: 'Лаборатория', section: 'lab',
       children: [
         { key: 'excalidraw', icon: <EditOutlined />, label: 'Excalidraw' },
       ],
     },
   ];
+
+  // Фильтрация меню по доступным секциям. Свойство `section` удаляем из объекта,
+  // чтобы оно не попало в DOM (Ant Design ругается на неизвестные пропсы).
+  const menuItems = allMenuItems
+    .filter((item) => !item.section || hasSection(item.section))
+    .map(({ section: _section, ...rest }) => rest);
 
   const menuEl = (
     <Menu
