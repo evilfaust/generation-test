@@ -1,5 +1,58 @@
 # Changelog — История изменений
 
+## [3.9.29] - 2026-05-21
+
+### Система авторизации учителей с ролями и секциями
+
+**Новые коллекции PocketBase** (миграции `1779000000`, `1779000001`):
+- `teachers` (auth) — учителя с ролями (`superadmin`/`editor`/`viewer`) и
+  `allowed_sections` (json-массив доступных разделов)
+- `audit_log` (base) — журнал значимых действий (create/update/delete для
+  tasks, works, geometry_tasks, tdf_sets, theory_articles, mc_tests, teachers)
+- Самостоятельная регистрация запрещена — пользователей создаёт суперадмин
+- Первый суперадмин: `evilfaust` (создан автоматически миграцией)
+
+**AuthContext + связанные компоненты:**
+- `AuthContext` / `useAuth()` — `teacher`, `role`, `hasSection`, `canEdit`,
+  `canDelete`, `isSuperAdmin`, `login`, `logout`. Очистка чужих токенов
+  (студенческих) при инициализации.
+- `LoginPage` (`/login`) — username + password + "Запомнить меня".
+  Без флага токен очищается при закрытии последней вкладки.
+- `ProtectedRoute` — поддерживает `requireSuperAdmin`, `requireEdit`,
+  `requireSection`. Все `/app/*` маршруты теперь под защитой.
+- `UserMenu` в шапке — имя, роль, кнопка "Выйти".
+- `<CanEdit>`, `<CanDelete>`, `<SuperAdminOnly>` — обёртки для условного
+  рендера UI-элементов.
+
+**Управление пользователями** (`/app/admin/users`, только superadmin):
+- Таблица учителей с ролями и набором секций
+- Создание/редактирование (username, name, password, role, секции)
+- Удаление с подтверждением (нельзя удалить себя)
+
+**Журнал действий** (`/app/admin/audit`, только superadmin):
+- Таблица с фильтрами по действию, коллекции, учителю, диапазону дат
+- Запись fire-and-forget из мутирующих API-методов через `_logAudit()`
+- Иммутабельный лог (нельзя редактировать или удалять записи через UI)
+
+**Фильтрация меню по правам:**
+- Каждый верхний пункт меню маркирован `section` (одна из `ALL_SECTIONS`)
+- Пункты, на которые у пользователя нет доступа, скрываются
+- Поддержка `editOnly: true` — пункт виден только editor/superadmin
+- superadmin всегда видит все секции (hasSection всегда true)
+
+**Viewer-режим:**
+- Маршруты-редакторы (`work-editor`, `import`, `achievements`,
+  `geometry/topics`, `tdf/sets/:id/edit|variants`, `theory/articles/new|edit`,
+  `theory/categories`) под `requireEdit` — viewer попадает на `/app/tasks`
+- Кнопки create/edit/delete скрыты в TaskList, TaskFilters, TaskCard,
+  WorkManager, TheoryBrowser, TheoryArticleView, GeometryTaskList,
+  TDFManager, MCTestGenerator, catalog/* tabs, worksheet/ActionButtons
+  (кнопка "Сохранить" в большинстве генераторов)
+
+**Защита API:** UI-only (по согласованию). Все правила коллекций PocketBase
+для `tasks`/`works`/etc. остались публичными — viewer теоретически может
+обойти UI через DevTools, но это не угроза для приватной платформы.
+
 ## [3.9.28] - 2026-05-20
 
 ### Марафон: рабочий лист ученика и листы учителя
