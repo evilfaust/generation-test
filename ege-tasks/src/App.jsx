@@ -75,6 +75,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './components/auth/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import UserMenu from './components/auth/UserMenu';
+import UserManager from './components/auth/UserManager';
 import { useVersionSync } from './shared/version/useVersionSync';
 import 'katex/dist/katex.min.css';
 import './theme/tokens.css';
@@ -149,6 +150,8 @@ export const R = {
   THEORY_CATEGORIES:   '/app/theory/categories',
   // Лаборатория
   EXCALIDRAW:          '/app/lab/excalidraw',
+  // Администрирование
+  ADMIN_USERS:         '/app/admin/users',
 };
 
 // Вспомогательная функция для построения конкретного URL из шаблона с параметрами
@@ -223,6 +226,7 @@ const ROUTE_META = [
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
   { re: /^\/app\/lab\/excalidraw/,         menuKey: 'excalidraw',       menuGroup: 'lab', title: 'Excalidraw', noMargin: true },
+  { re: /^\/app\/admin\/users/,            menuKey: 'admin-users',      title: 'Управление пользователями' },
 ];
 
 function getRouteMeta(pathname) {
@@ -279,6 +283,7 @@ const MENU_KEY_PATH = {
   'theory-print':           R.THEORY_PRINT,
   'theory-categories':      R.THEORY_CATEGORIES,
   excalidraw:               R.EXCALIDRAW,
+  'admin-users':            R.ADMIN_USERS,
 };
 
 // ── Метаданные групп меню (для хлебных крошек) ──────────────────────────────
@@ -618,6 +623,7 @@ function AppLayout() {
         { key: 'excalidraw', icon: <EditOutlined />, label: 'Excalidraw' },
       ],
     },
+    { key: 'admin-users', icon: <TeamOutlined />, label: 'Пользователи', section: 'admin' },
   ];
 
   // Фильтрация меню по доступным секциям. Свойство `section` удаляем из объекта,
@@ -824,6 +830,13 @@ function App() {
                 </Suspense>
               } />
             </Route>
+            </Route>
+
+            {/* Администрирование — только superadmin */}
+            <Route element={<ProtectedRoute requireSuperAdmin />}>
+              <Route element={<AppLayout />}>
+                <Route path={R.ADMIN_USERS} element={<UserManager />} />
+              </Route>
             </Route>
 
             {/* Fallback: любой /app/* который не совпал → задачи (тоже под защитой) */}

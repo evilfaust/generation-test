@@ -1424,6 +1424,72 @@ export const api = {
     return pb.authStore.isValid && pb.authStore.model?.collectionName === 'students';
   },
 
+  // ── Teachers (auth collection, только для superadmin) ─────────────────────
+  async getTeachers() {
+    try {
+      return await pb.collection('teachers').getFullList({
+        sort: 'role,username',
+      });
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+      throw error;
+    }
+  },
+
+  async getTeacher(id) {
+    try {
+      return await pb.collection('teachers').getOne(id);
+    } catch (error) {
+      console.error('Error fetching teacher:', error);
+      throw error;
+    }
+  },
+
+  // data: { username, name, password, role, allowed_sections }
+  async createTeacher(data) {
+    try {
+      const payload = {
+        username: data.username,
+        name: data.name,
+        role: data.role,
+        allowed_sections: data.allowed_sections || [],
+        password: data.password,
+        passwordConfirm: data.password,
+      };
+      return await pb.collection('teachers').create(payload);
+    } catch (error) {
+      console.error('Error creating teacher:', error);
+      throw error;
+    }
+  },
+
+  // data: { name, role, allowed_sections, password? (опционально для смены) }
+  async updateTeacher(id, data) {
+    try {
+      const payload = {};
+      if (data.name !== undefined) payload.name = data.name;
+      if (data.role !== undefined) payload.role = data.role;
+      if (data.allowed_sections !== undefined) payload.allowed_sections = data.allowed_sections;
+      if (data.password) {
+        payload.password = data.password;
+        payload.passwordConfirm = data.password;
+      }
+      return await pb.collection('teachers').update(id, payload);
+    } catch (error) {
+      console.error('Error updating teacher:', error);
+      throw error;
+    }
+  },
+
+  async deleteTeacher(id) {
+    try {
+      return await pb.collection('teachers').delete(id);
+    } catch (error) {
+      console.error('Error deleting teacher:', error);
+      throw error;
+    }
+  },
+
   async getAttemptsByStudent(sessionId, studentId) {
     try {
       return await pb.collection('attempts').getFullList({
