@@ -71,6 +71,10 @@ import EgeScoreCalculator from './components/EgeScoreCalculator';
 import MCTestGenerator from './components/MCTestGenerator';
 import { api } from './services/pocketbase';
 import { ReferenceDataProvider, useReferenceData } from './contexts/ReferenceDataContext';
+import { AuthProvider } from './contexts/AuthContext';
+import LoginPage from './components/auth/LoginPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import UserMenu from './components/auth/UserMenu';
 import { useVersionSync } from './shared/version/useVersionSync';
 import 'katex/dist/katex.min.css';
 import './theme/tokens.css';
@@ -685,6 +689,7 @@ function AppLayout() {
               {title}
             </span>
           )}
+          <UserMenu compact={!isDesktop} />
         </Header>
 
         <Content style={{
@@ -712,13 +717,18 @@ function App() {
   return (
     <ConfigProvider theme={hybridTheme}>
       <BrowserRouter>
+        <AuthProvider>
         <ReferenceDataProvider>
           <Routes>
+            {/* Страница входа — не требует авторизации */}
+            <Route path="/login" element={<LoginPage />} />
+
             {/* Редирект с корня */}
             <Route path="/" element={<Navigate to={R.TASKS} replace />} />
             <Route path="/app" element={<Navigate to={R.TASKS} replace />} />
 
-            {/* Все учительские страницы через AppLayout */}
+            {/* Все учительские страницы — за защитой авторизации */}
+            <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               {/* Задачи */}
               <Route path={R.TASKS}   element={<TasksPage />} />
@@ -803,11 +813,15 @@ function App() {
                 </Suspense>
               } />
             </Route>
+            </Route>
 
-            {/* Fallback: любой /app/* который не совпал → задачи */}
-            <Route path="/app/*" element={<Navigate to={R.TASKS} replace />} />
+            {/* Fallback: любой /app/* который не совпал → задачи (тоже под защитой) */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/app/*" element={<Navigate to={R.TASKS} replace />} />
+            </Route>
           </Routes>
         </ReferenceDataProvider>
+        </AuthProvider>
       </BrowserRouter>
     </ConfigProvider>
   );
