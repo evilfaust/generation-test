@@ -11,6 +11,7 @@ import {
   CheckOutlined,
   RocketOutlined,
 } from '@ant-design/icons';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * Компонент кнопок действий для генераторов.
@@ -35,6 +36,7 @@ const ActionButtons = ({
   saveLabel = 'Сохранить',
   loadLabel = 'Открыть сохранённую',
 }) => {
+  const { canEdit } = useAuth();
   const pdfMenuItems = [
     {
       key: 'puppeteer',
@@ -93,8 +95,8 @@ const ActionButtons = ({
         <>
           <Divider type="vertical" style={{ height: 28, margin: '0 2px', borderColor: '#d9d9d9' }} />
 
-          {/* Сохранить */}
-          {onSave && (
+          {/* Сохранить (только для editor+) */}
+          {canEdit && onSave && (
             <Tooltip title={saveLabel}>
               <Button icon={<SaveOutlined />} onClick={onSave} loading={saving}>
                 Сохранить

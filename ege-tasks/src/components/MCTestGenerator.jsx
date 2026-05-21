@@ -9,6 +9,7 @@ import {
   AppstoreAddOutlined, ReloadOutlined, ShareAltOutlined, BarChartOutlined,
 } from '@ant-design/icons';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { useAuth } from '../contexts/AuthContext';
 import { api } from '../services/pocketbase';
 import { useMCTest } from '../hooks/useMCTest';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
@@ -45,6 +46,7 @@ const { TextArea } = Input;
 const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
   const { message, modal } = App.useApp();
   const { topics, subtopics, tags } = useReferenceData();
+  const { canEdit, canDelete } = useAuth();
 
   const [mode, setMode] = useState('list'); // 'list' | 'edit'
   const [list, setList] = useState([]);
@@ -151,7 +153,7 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
       <div style={{ padding: 16 }}>
         <Card
           title="Тесты с выбором ответа"
-          extra={<Button type="primary" icon={<PlusOutlined />} onClick={startNew}>Создать тест</Button>}
+          extra={canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={startNew}>Создать тест</Button>}
         >
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
             <Button icon={<ReloadOutlined />} size="small" onClick={loadList}>Обновить</Button>
@@ -222,16 +224,20 @@ const MCTestGenerator = ({ initialMcTestId = null } = {}) => {
                         >
                           Печать
                         </Button>
-                        <Button icon={<EditOutlined />} onClick={() => isGenerator ? setEditingTrigId(t.id) : openTest(t.id)}>
-                          Редактировать
-                        </Button>
-                        <Popconfirm
-                          title={`Удалить «${t.title}»?`}
-                          onConfirm={() => handleDelete(t.id, t.title)}
-                          okText="Да" cancelText="Нет" okType="danger"
-                        >
-                          <Button danger icon={<DeleteOutlined />} />
-                        </Popconfirm>
+                        {canEdit && (
+                          <Button icon={<EditOutlined />} onClick={() => isGenerator ? setEditingTrigId(t.id) : openTest(t.id)}>
+                            Редактировать
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Popconfirm
+                            title={`Удалить «${t.title}»?`}
+                            onConfirm={() => handleDelete(t.id, t.title)}
+                            okText="Да" cancelText="Нет" okType="danger"
+                          >
+                            <Button danger icon={<DeleteOutlined />} />
+                          </Popconfirm>
+                        )}
                       </Space>
                     </div>
 

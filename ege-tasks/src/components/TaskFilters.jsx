@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Form, Select, Button, Space, Row, Col, Radio, Statistic, Badge, Input, Tag } from 'antd';
 import { FilterOutlined, ClearOutlined, SearchOutlined, SortAscendingOutlined, PlusOutlined } from '@ant-design/icons';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Option } = Select;
 
@@ -29,6 +30,7 @@ const TaskFilters = ({
   initialFilters = null,
   initialFiltersToken = 0,
 }) => {
+  const { canEdit } = useAuth();
   const [form] = Form.useForm();
   const [filters, setFilters] = useState({});
   const [selectedTopic, setSelectedTopic] = useState(null);
@@ -147,9 +149,11 @@ const TaskFilters = ({
       title={<Space><FilterOutlined /><span>Фильтры</span></Space>}
       extra={
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={onCreateTask}>
-            Создать задачу
-          </Button>
+          {canEdit && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={onCreateTask}>
+              Создать задачу
+            </Button>
+          )}
           <Statistic value={totalCount} suffix="задач" valueStyle={{ fontSize: 18 }} />
         </Space>
       }

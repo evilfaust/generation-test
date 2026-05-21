@@ -529,7 +529,7 @@ function AppLayout() {
     setMobileDrawerOpen(false);
   };
 
-  const { hasSection } = useAuth();
+  const { hasSection, canEdit } = useAuth();
 
   // Полный список пунктов меню с маркировкой секции.
   // section: ключ из ALL_SECTIONS (см. contexts/AuthContext). Если пользователь
@@ -560,21 +560,21 @@ function AppLayout() {
       ],
     },
     { key: 'work-manager', icon: <SolutionOutlined />, label: 'Мои работы', section: 'works' },
-    { key: 'work-editor',  icon: <EditOutlined />,     label: 'Редактор работ', section: 'works' },
+    { key: 'work-editor',  icon: <EditOutlined />,     label: 'Редактор работ', section: 'works', editOnly: true },
     {
       key: 'students-group', icon: <TeamOutlined />, label: 'Ученики', section: 'students',
       children: [
         { key: 'students',      icon: <BarChartOutlined />,  label: 'Прогресс' },
         { key: 'heatmap',       icon: <HeatMapOutlined />,   label: 'Тепловая карта' },
-        { key: 'achievements',  icon: <TrophyOutlined />,    label: 'Достижения' },
+        { key: 'achievements',  icon: <TrophyOutlined />,    label: 'Достижения', editOnly: true },
       ],
     },
-    { key: 'import', icon: <UploadOutlined />, label: 'Импорт задач', section: 'import' },
+    { key: 'import', icon: <UploadOutlined />, label: 'Импорт задач', section: 'import', editOnly: true },
     {
       key: 'geometry', icon: <CompassOutlined />, label: 'Геометрия', section: 'geometry',
       children: [
         { key: 'geometry-tasks',   icon: <UnorderedListOutlined />, label: 'Задачи' },
-        { key: 'geometry-topics',  icon: <FolderOutlined />,        label: 'Темы и подтемы' },
+        { key: 'geometry-topics',  icon: <FolderOutlined />,        label: 'Темы и подтемы', editOnly: true },
       ],
     },
     {
@@ -617,9 +617,9 @@ function AppLayout() {
       key: 'theory', icon: <BookOutlined />, label: 'Теория', section: 'theory',
       children: [
         { key: 'theory-browser',    icon: <ReadOutlined />,    label: 'Библиотека' },
-        { key: 'theory-editor',     icon: <EditOutlined />,    label: 'Редактор' },
+        { key: 'theory-editor',     icon: <EditOutlined />,    label: 'Редактор', editOnly: true },
         { key: 'theory-print',      icon: <SnippetsOutlined />, label: 'Конспекты' },
-        { key: 'theory-categories', icon: <FolderOutlined />,  label: 'Категории' },
+        { key: 'theory-categories', icon: <FolderOutlined />,  label: 'Категории', editOnly: true },
       ],
     },
     {
@@ -637,11 +637,22 @@ function AppLayout() {
     },
   ];
 
-  // Фильтрация меню по доступным секциям. Свойство `section` удаляем из объекта,
-  // чтобы оно не попало в DOM (Ant Design ругается на неизвестные пропсы).
-  const menuItems = allMenuItems
-    .filter((item) => !item.section || hasSection(item.section))
-    .map(({ section: _section, ...rest }) => rest);
+  // Фильтрация меню по доступным секциям + правам на редактирование.
+  // editOnly: true → пункт виден только editor/superadmin (не viewer).
+  // Свойства `section`/`editOnly` удаляем из объекта, чтобы они не попали
+  // в DOM (Ant Design ругается на неизвестные пропсы).
+  const filterMenuItem = (item) => {
+    if (item.section && !hasSection(item.section)) return null;
+    if (item.editOnly && !canEdit) return null;
+    const { section: _s, editOnly: _e, children, ...rest } = item;
+    if (children) {
+      const filteredChildren = children.map(filterMenuItem).filter(Boolean);
+      if (filteredChildren.length === 0) return null;
+      return { ...rest, children: filteredChildren };
+    }
+    return rest;
+  };
+  const menuItems = allMenuItems.map(filterMenuItem).filter(Boolean);
 
   const menuEl = (
     <Menu
@@ -780,27 +791,19 @@ function App() {
               <Route path={R.MARATHON}       element={<MarathonGenerator />} />
               <Route path={R.CROSSWORD}     element={<CrosswordGenerator />} />
 
-              {/* Работы */}
+              {/* Работы — список */}
               <Route path={R.WORKS}       element={<WorksPage />} />
-              <Route path={R.WORK_EDITOR} element={<WorkEditorRoute />} />
 
-              {/* Ученики */}
+              {/* Ученики (viewer тоже видит) */}
               <Route path={R.STUDENTS}         element={<StudentsPage />} />
               <Route path={R.STUDENTS_HEATMAP} element={<ErrorHeatmap />} />
-              <Route path={R.ACHIEVEMENTS}     element={<AchievementManager />} />
               <Route path={R.STUDENT_DETAIL}   element={<StudentDetailRoute />} />
 
-              {/* Импорт */}
-              <Route path={R.IMPORT} element={<TaskImporter />} />
-
-              {/* Геометрия */}
+              {/* Геометрия — список (viewer тоже видит) */}
               <Route path={R.GEOMETRY_TASKS}   element={<GeometryTaskList />} />
-              <Route path={R.GEOMETRY_TOPICS}  element={<GeometryTopicManager />} />
 
-              {/* ТДФ */}
+              {/* ТДФ — viewer тоже видит */}
               <Route path={R.TDF}          element={<TDFPage />} />
-              <Route path={R.TDF_EDITOR}   element={<TDFEditorRoute />} />
-              <Route path={R.TDF_VARIANTS} element={<TDFVariantsRoute />} />
               <Route path={R.TDF_FLASHCARDS} element={<TDFFlashcardsRoute />} />
               <Route path={R.FORMULA_SHEET}  element={<FormulaSheetGenerator />} />
 
@@ -826,13 +829,10 @@ function App() {
               <Route path={R.FRACTIONS_ORAL} element={<OralFractionsGenerator />} />
               <Route path={R.ORAL_MIXED} element={<OralMixedGenerator />} />
 
-              {/* Теория */}
+              {/* Теория — просмотр (viewer тоже) */}
               <Route path={R.THEORY}            element={<TheoryPage />} />
-              <Route path={R.THEORY_NEW}        element={<TheoryEditorRoute />} />
-              <Route path={R.THEORY_EDIT}       element={<TheoryEditorRoute />} />
               <Route path={R.THEORY_VIEW}       element={<TheoryArticleRoute />} />
               <Route path={R.THEORY_PRINT}      element={<TheoryPrintRoute />} />
-              <Route path={R.THEORY_CATEGORIES} element={<TheoryCategoryManager />} />
 
               {/* Лаборатория */}
               <Route path={R.EXCALIDRAW} element={
@@ -841,6 +841,21 @@ function App() {
                 </Suspense>
               } />
             </Route>
+            </Route>
+
+            {/* Маршруты ТОЛЬКО для editor/superadmin — viewer редиректится на /app/tasks */}
+            <Route element={<ProtectedRoute requireEdit />}>
+              <Route element={<AppLayout />}>
+                <Route path={R.WORK_EDITOR}      element={<WorkEditorRoute />} />
+                <Route path={R.IMPORT}           element={<TaskImporter />} />
+                <Route path={R.ACHIEVEMENTS}     element={<AchievementManager />} />
+                <Route path={R.GEOMETRY_TOPICS}  element={<GeometryTopicManager />} />
+                <Route path={R.TDF_EDITOR}       element={<TDFEditorRoute />} />
+                <Route path={R.TDF_VARIANTS}     element={<TDFVariantsRoute />} />
+                <Route path={R.THEORY_NEW}       element={<TheoryEditorRoute />} />
+                <Route path={R.THEORY_EDIT}      element={<TheoryEditorRoute />} />
+                <Route path={R.THEORY_CATEGORIES} element={<TheoryCategoryManager />} />
+              </Route>
             </Route>
 
             {/* Администрирование — только superadmin */}

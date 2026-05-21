@@ -8,6 +8,7 @@ import {
   UnorderedListOutlined, CreditCardOutlined,
 } from '@ant-design/icons';
 import { api } from '../../services/pocketbase';
+import { useAuth } from '../../contexts/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -22,6 +23,7 @@ const TYPE_LABELS = {
 };
 
 export default function TDFManager({ onOpenEditor, onOpenVariants, onOpenFlashcards }) {
+  const { canEdit, canDelete } = useAuth();
   const [sets, setSets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -113,22 +115,26 @@ export default function TDFManager({ onOpenEditor, onOpenVariants, onOpenFlashca
       width: 310,
       render: (_, record) => (
         <Space>
-          <Tooltip title="Редактировать конспект">
-            <Button
-              icon={<FileTextOutlined />}
-              onClick={() => onOpenEditor(record.id)}
-            >
-              Конспект
-            </Button>
-          </Tooltip>
-          <Tooltip title="Варианты опросников">
-            <Button
-              icon={<UnorderedListOutlined />}
-              onClick={() => onOpenVariants(record.id)}
-            >
-              Варианты
-            </Button>
-          </Tooltip>
+          {canEdit && (
+            <Tooltip title="Редактировать конспект">
+              <Button
+                icon={<FileTextOutlined />}
+                onClick={() => onOpenEditor(record.id)}
+              >
+                Конспект
+              </Button>
+            </Tooltip>
+          )}
+          {canEdit && (
+            <Tooltip title="Варианты опросников">
+              <Button
+                icon={<UnorderedListOutlined />}
+                onClick={() => onOpenVariants(record.id)}
+              >
+                Варианты
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip title="Карточки-флипы для самопроверки">
             <Button
               icon={<CreditCardOutlined />}
@@ -137,17 +143,19 @@ export default function TDFManager({ onOpenEditor, onOpenVariants, onOpenFlashca
               Карточки
             </Button>
           </Tooltip>
-          <Button icon={<EditOutlined />} onClick={() => openEdit(record)} />
-          <Popconfirm
-            title="Удалить этот ТДФ?"
-            description="Все пункты и варианты будут удалены."
-            onConfirm={() => handleDelete(record.id)}
-            okText="Удалить"
-            cancelText="Отмена"
-            okButtonProps={{ danger: true }}
-          >
-            <Button icon={<DeleteOutlined />} danger />
-          </Popconfirm>
+          {canEdit && <Button icon={<EditOutlined />} onClick={() => openEdit(record)} />}
+          {canDelete && (
+            <Popconfirm
+              title="Удалить этот ТДФ?"
+              description="Все пункты и варианты будут удалены."
+              onConfirm={() => handleDelete(record.id)}
+              okText="Удалить"
+              cancelText="Отмена"
+              okButtonProps={{ danger: true }}
+            >
+              <Button icon={<DeleteOutlined />} danger />
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -157,9 +165,11 @@ export default function TDFManager({ onOpenEditor, onOpenVariants, onOpenFlashca
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={3} style={{ margin: 0 }}>ТДФ — Теоремы, Определения, Формулы</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Новый ТДФ
-        </Button>
+        {canEdit && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Новый ТДФ
+          </Button>
+        )}
       </div>
 
       <Table

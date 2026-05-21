@@ -6,9 +6,11 @@ import {
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { useAuth } from '../contexts/AuthContext';
 import './theory/TheoryBrowser.css';
 
 export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateArticle }) {
+  const { canEdit, canDelete } = useAuth();
   const { message } = App.useApp();
   const { theoryCategories: categories } = useReferenceData();
   const [articles, setArticles] = useState([]);
@@ -122,15 +124,17 @@ export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateAr
             allowClear
           />
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          size="large"
-          className="theory-create-btn"
-          onClick={onCreateArticle}
-        >
-          Новая статья
-        </Button>
+        {canEdit && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            size="large"
+            className="theory-create-btn"
+            onClick={onCreateArticle}
+          >
+            Новая статья
+          </Button>
+        )}
       </div>
 
       {/* Category pills */}
@@ -170,7 +174,7 @@ export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateAr
           <div className="theory-browser-empty-text">
             {articles.length === 0 ? 'Нет статей. Создайте первую!' : 'Ничего не найдено'}
           </div>
-          {articles.length === 0 && (
+          {articles.length === 0 && canEdit && (
             <Button type="primary" icon={<PlusOutlined />} onClick={onCreateArticle}>
               Создать статью
             </Button>
@@ -222,28 +226,32 @@ export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateAr
                         onClick={(e) => { e.stopPropagation(); onViewArticle?.(article.id); }}
                       />
                     </Tooltip>
-                    <Tooltip title="Редактировать">
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={(e) => { e.stopPropagation(); onEditArticle?.(article.id); }}
-                      />
-                    </Tooltip>
-                    <Popconfirm
-                      title="Удалить статью?"
-                      onConfirm={() => handleDelete(article.id)}
-                      okText="Да"
-                      cancelText="Нет"
-                    >
-                      <Button
-                        type="text"
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </Popconfirm>
+                    {canEdit && (
+                      <Tooltip title="Редактировать">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<EditOutlined />}
+                          onClick={(e) => { e.stopPropagation(); onEditArticle?.(article.id); }}
+                        />
+                      </Tooltip>
+                    )}
+                    {canDelete && (
+                      <Popconfirm
+                        title="Удалить статью?"
+                        onConfirm={() => handleDelete(article.id)}
+                        okText="Да"
+                        cancelText="Нет"
+                      >
+                        <Button
+                          type="text"
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </Popconfirm>
+                    )}
                   </div>
                 </div>
               </div>

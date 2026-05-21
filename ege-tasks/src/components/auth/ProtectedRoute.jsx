@@ -17,8 +17,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-export default function ProtectedRoute({ requireSuperAdmin = false, requireSection = null }) {
-  const { isAuthenticated, isSuperAdmin, hasSection } = useAuth();
+export default function ProtectedRoute({
+  requireSuperAdmin = false,
+  requireSection = null,
+  requireEdit = false,
+}) {
+  const { isAuthenticated, isSuperAdmin, hasSection, canEdit } = useAuth();
   const location = useLocation();
 
   if (!isAuthenticated) {
@@ -26,6 +30,10 @@ export default function ProtectedRoute({ requireSuperAdmin = false, requireSecti
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {
+    return <Navigate to="/app/tasks" replace />;
+  }
+
+  if (requireEdit && !canEdit) {
     return <Navigate to="/app/tasks" replace />;
   }
 

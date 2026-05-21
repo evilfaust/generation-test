@@ -12,12 +12,14 @@ import html2pdf from 'html2pdf.js';
 import 'katex/dist/katex.min.css';
 import './theory/themes.css';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { useAuth } from '../contexts/AuthContext';
 import './theory/TheoryGeoGebraEmbed.css';
 import './theory/TheoryArticleView.css';
 
 export default function TheoryArticleView({ articleId, onBack, onEdit }) {
   const { message } = App.useApp();
   const { theoryCategories: categories } = useReferenceData();
+  const { canEdit } = useAuth();
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentTheme, setCurrentTheme] = useState('classic');
@@ -236,9 +238,11 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
           />
         </div>
         <div className="theory-article-toolbar-right">
-          <Tooltip title="Редактировать">
-            <Button type="text" icon={<EditOutlined />} onClick={() => onEdit?.(articleId)} />
-          </Tooltip>
+          {canEdit && (
+            <Tooltip title="Редактировать">
+              <Button type="text" icon={<EditOutlined />} onClick={() => onEdit?.(articleId)} />
+            </Tooltip>
+          )}
           <Tooltip title="Печать">
             <Button type="text" icon={<PrinterOutlined />} onClick={handlePrint} />
           </Tooltip>
@@ -349,9 +353,11 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
 
       {/* Floating actions */}
       <div className="theory-floating-actions no-print">
-        <Tooltip title="Редактировать" placement="left">
-          <Button shape="circle" icon={<EditOutlined />} onClick={() => onEdit?.(articleId)} />
-        </Tooltip>
+        {canEdit && (
+          <Tooltip title="Редактировать" placement="left">
+            <Button shape="circle" icon={<EditOutlined />} onClick={() => onEdit?.(articleId)} />
+          </Tooltip>
+        )}
         <Tooltip title="Печать" placement="left">
           <Button shape="circle" icon={<PrinterOutlined />} onClick={handlePrint} />
         </Tooltip>

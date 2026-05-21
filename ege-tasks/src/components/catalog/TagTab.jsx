@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Card, Table, Space, Button, Modal, Form, Input, Tag, Tooltip, App } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SwapOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/pocketbase';
 
 export default function TagTab({ tagRows, tasksSnapshot, onOpenTasks, onMerge, onReload }) {
   const { reloadData } = useReferenceData();
+  const { canEdit, canDelete } = useAuth();
   const { message } = App.useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -76,7 +78,7 @@ export default function TagTab({ tagRows, tasksSnapshot, onOpenTasks, onMerge, o
     <>
       <Card
         title="Теги"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>Добавить тег</Button>}
+        extra={canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>Добавить тег</Button>}
       >
         <Table
           size="small"
@@ -107,9 +109,9 @@ export default function TagTab({ tagRows, tasksSnapshot, onOpenTasks, onMerge, o
                   <Tooltip title="Открыть задачи">
                     <Button size="small" icon={<FolderOpenOutlined />} onClick={() => onOpenTasks({ tags: [record.key] })} />
                   </Tooltip>
-                  <Button size="small" icon={<EditOutlined />} onClick={() => openModal(record.raw)} />
-                  <Button size="small" icon={<SwapOutlined />} onClick={() => onMerge('tag', record.raw)} />
-                  <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(record.raw)} />
+                  {canEdit && <Button size="small" icon={<EditOutlined />} onClick={() => openModal(record.raw)} />}
+                  {canEdit && <Button size="small" icon={<SwapOutlined />} onClick={() => onMerge('tag', record.raw)} />}
+                  {canDelete && <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(record.raw)} />}
                 </Space>
               ),
             },

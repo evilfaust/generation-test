@@ -11,11 +11,13 @@ import {
 import MathRenderer from './MathRenderer';
 import TaskEditModal from './TaskEditModal';
 import { api } from '../services/pocketbase';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Text, Paragraph } = Typography;
 const { Option } = Select;
 
 const TaskCard = ({ task, allTags, allSources, allYears, allSubtopics, allTopics, onUpdate, selected = false, onSelect }) => {
+  const { canEdit } = useAuth();
   const { message } = App.useApp();
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [changingDifficulty, setChangingDifficulty] = useState(false);
@@ -142,6 +144,7 @@ const TaskCard = ({ task, allTags, allSources, allYears, allSubtopics, allTopics
                   variant="borderless"
                   popupMatchSelectWidth={140}
                   suffixIcon={null}
+                  disabled={!canEdit}
                 >
                   <Option value="1">
                     <Space size={4}>
@@ -176,21 +179,25 @@ const TaskCard = ({ task, allTags, allSources, allYears, allSubtopics, allTopics
                 </Select>
               }
             />
-            <Button
-              type="text"
-              size="small"
-              icon={<CopyOutlined />}
-              loading={duplicating}
-              onClick={(e) => { e.stopPropagation(); handleDuplicate(); }}
-              title="Создать дубликат"
-            />
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => setEditModalVisible(true)}
-              title="Редактировать задачу"
-            />
+            {canEdit && (
+              <Button
+                type="text"
+                size="small"
+                icon={<CopyOutlined />}
+                loading={duplicating}
+                onClick={(e) => { e.stopPropagation(); handleDuplicate(); }}
+                title="Создать дубликат"
+              />
+            )}
+            {canEdit && (
+              <Button
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => setEditModalVisible(true)}
+                title="Редактировать задачу"
+              />
+            )}
           </Space>
         }
       >

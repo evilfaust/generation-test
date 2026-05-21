@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Card, Table, Space, Button, Modal, Input, Tooltip, App } from 'antd';
 import { DeleteOutlined, EditOutlined, SwapOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/pocketbase';
 
 export default function SourceTab({ sourceRows, tasksSnapshot, onOpenTasks, onMerge, onReload }) {
   const { reloadData } = useReferenceData();
+  const { canEdit, canDelete } = useAuth();
   const { message } = App.useApp();
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameFrom, setRenameFrom] = useState(null);
@@ -92,9 +94,9 @@ export default function SourceTab({ sourceRows, tasksSnapshot, onOpenTasks, onMe
                   <Tooltip title="Открыть задачи">
                     <Button size="small" icon={<FolderOpenOutlined />} onClick={() => onOpenTasks({ source: record.source })} />
                   </Tooltip>
-                  <Button size="small" icon={<EditOutlined />} onClick={() => openRename(record.source)} />
-                  <Button size="small" icon={<SwapOutlined />} onClick={() => onMerge('source', record.source)} />
-                  <Button size="small" danger icon={<DeleteOutlined />} onClick={() => clear(record.source)} />
+                  {canEdit && <Button size="small" icon={<EditOutlined />} onClick={() => openRename(record.source)} />}
+                  {canEdit && <Button size="small" icon={<SwapOutlined />} onClick={() => onMerge('source', record.source)} />}
+                  {canDelete && <Button size="small" danger icon={<DeleteOutlined />} onClick={() => clear(record.source)} />}
                 </Space>
               ),
             },

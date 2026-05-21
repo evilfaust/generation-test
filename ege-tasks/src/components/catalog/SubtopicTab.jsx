@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Card, Table, Space, Button, Modal, Form, Input, InputNumber, Select, Tooltip, App } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, SwapOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../services/pocketbase';
 
 export default function SubtopicTab({ subtopicRows, tasksSnapshot, onOpenTasks, onMerge, onReload }) {
   const { topics, reloadData } = useReferenceData();
+  const { canEdit, canDelete } = useAuth();
   const { message } = App.useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -77,7 +79,7 @@ export default function SubtopicTab({ subtopicRows, tasksSnapshot, onOpenTasks, 
     <>
       <Card
         title="Подтемы"
-        extra={<Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>Добавить подтему</Button>}
+        extra={canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>Добавить подтему</Button>}
       >
         <Table
           size="small"
@@ -105,9 +107,9 @@ export default function SubtopicTab({ subtopicRows, tasksSnapshot, onOpenTasks, 
                   <Tooltip title="Открыть задачи">
                     <Button size="small" icon={<FolderOpenOutlined />} onClick={() => onOpenTasks({ subtopic: record.key, topic: record.topicId })} />
                   </Tooltip>
-                  <Button size="small" icon={<EditOutlined />} onClick={() => openModal(record.raw)} />
-                  <Button size="small" icon={<SwapOutlined />} onClick={() => onMerge('subtopic', record.raw)} />
-                  <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(record.raw)} />
+                  {canEdit && <Button size="small" icon={<EditOutlined />} onClick={() => openModal(record.raw)} />}
+                  {canEdit && <Button size="small" icon={<SwapOutlined />} onClick={() => onMerge('subtopic', record.raw)} />}
+                  {canDelete && <Button size="small" danger icon={<DeleteOutlined />} onClick={() => remove(record.raw)} />}
                 </Space>
               ),
             },

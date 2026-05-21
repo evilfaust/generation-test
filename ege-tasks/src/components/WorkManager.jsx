@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { useAuth } from '../contexts/AuthContext';
 import SessionPanel from './worksheet/SessionPanel';
 import TeacherResultsDashboard from './worksheet/TeacherResultsDashboard';
 import MathRenderer from './MathRenderer';
@@ -19,6 +20,7 @@ const { Option } = Select;
 const WorkManager = ({ onEditWork, onEditMCTest }) => {
   const { message, modal } = App.useApp();
   const { topics } = useReferenceData();
+  const { canEdit, canDelete } = useAuth();
 
   const [activeTab, setActiveTab] = useState('works');
   const [mcTests, setMcTests] = useState([]);
@@ -522,7 +524,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                         onClick={() => toggleExpanded(work.id)}
                       />
                     </Tooltip>
-                    {onEditWork && (
+                    {canEdit && onEditWork && (
                       <Tooltip title="Редактировать">
                         <Button
                           type="text"
@@ -532,23 +534,27 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                         />
                       </Tooltip>
                     )}
-                    <Tooltip title={work.archived ? 'Вернуть из архива' : 'В архив'}>
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<InboxOutlined />}
-                        onClick={e => handleArchiveToggle(e, work)}
-                      />
-                    </Tooltip>
-                    <Tooltip title="Удалить">
-                      <Button
-                        type="text"
-                        size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={e => handleDelete(e, work.id, work.title)}
-                      />
-                    </Tooltip>
+                    {canEdit && (
+                      <Tooltip title={work.archived ? 'Вернуть из архива' : 'В архив'}>
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<InboxOutlined />}
+                          onClick={e => handleArchiveToggle(e, work)}
+                        />
+                      </Tooltip>
+                    )}
+                    {canDelete && (
+                      <Tooltip title="Удалить">
+                        <Button
+                          type="text"
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={e => handleDelete(e, work.id, work.title)}
+                        />
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
 
@@ -647,14 +653,16 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                   </div>
                 </div>
                 <div className="wm-work-card-actions" onClick={e => e.stopPropagation()}>
-                  {onEditMCTest && (
+                  {canEdit && onEditMCTest && (
                     <Tooltip title="Открыть в редакторе">
                       <Button type="text" size="small" icon={<EditOutlined />} onClick={() => onEditMCTest(mc.id)} />
                     </Tooltip>
                   )}
-                  <Tooltip title="Удалить">
-                    <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={e => handleDeleteMcTest(e, mc.id, mc.title)} />
-                  </Tooltip>
+                  {canDelete && (
+                    <Tooltip title="Удалить">
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={e => handleDeleteMcTest(e, mc.id, mc.title)} />
+                    </Tooltip>
+                  )}
                 </div>
               </div>
               {isExpanded && (

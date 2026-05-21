@@ -15,6 +15,7 @@ import TaskCard from './TaskCard';
 import TaskEditModal from './TaskEditModal';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const { Text, Title } = Typography;
 
@@ -24,6 +25,7 @@ const TaskList = ({
   onOpenWorkEditor = null,
 }) => {
   const { topics, tags, years, sources, subtopics, loading: initialLoading } = useReferenceData();
+  const { canEdit, canDelete } = useAuth();
   const { message } = App.useApp();
   const [tasks, setTasks] = useState([]);
   const [totalTasks, setTotalTasks] = useState(0);
@@ -397,31 +399,37 @@ const TaskList = ({
             )}
           </Space>
 
-          {/* Правая часть — действия (только при выборе) */}
+          {/* Правая часть — действия (только при выборе; viewer не видит мутаций) */}
           {selCount > 0 && (
             <Space>
-              <Button
-                icon={<PlusOutlined />}
-                onClick={() => setCreateWorkModal(true)}
-              >
-                Создать работу
-              </Button>
-              <Button
-                icon={<SettingOutlined />}
-                onClick={() => setDrawerOpen(true)}
-              >
-                Изменить атрибуты
-              </Button>
-              <Tooltip title={`Удалить ${selCount} задач(и)`}>
+              {canEdit && (
                 <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={handleBulkDelete}
-                  loading={bulkLoading}
+                  icon={<PlusOutlined />}
+                  onClick={() => setCreateWorkModal(true)}
                 >
-                  Удалить
+                  Создать работу
                 </Button>
-              </Tooltip>
+              )}
+              {canEdit && (
+                <Button
+                  icon={<SettingOutlined />}
+                  onClick={() => setDrawerOpen(true)}
+                >
+                  Изменить атрибуты
+                </Button>
+              )}
+              {canDelete && (
+                <Tooltip title={`Удалить ${selCount} задач(и)`}>
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={handleBulkDelete}
+                    loading={bulkLoading}
+                  >
+                    Удалить
+                  </Button>
+                </Tooltip>
+              )}
             </Space>
           )}
         </div>

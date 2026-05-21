@@ -35,6 +35,7 @@ import {
 } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { useAuth } from '../contexts/AuthContext';
 import GeometryTaskEditor from './GeometryTaskEditor';
 import GeometryTaskPreview, { GeometryPreviewCard, normalizeLayout, PRINT_CELL_ASPECT_RATIO, safeParseLayout } from './GeometryTaskPreview';
 import GeometryWorksheetPrint from './GeometryWorksheetPrint';
@@ -50,6 +51,7 @@ const DIFFICULTY_LABELS = { 1: 'Базовый', 2: 'Средний', 3: 'Сло
 export default function GeometryTaskList() {
   const { message } = App.useApp();
   const { topics: regularTopics, subtopics: regularSubtopics } = useReferenceData();
+  const { canEdit, canDelete } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({});
@@ -548,16 +550,18 @@ export default function GeometryTaskList() {
       align: 'right',
       render: (_, record) => (
         <Space size={4}>
-          <Tooltip title="Редактировать">
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              size="small"
-              loading={editorLoadingId === record.id}
-              disabled={editorLoadingId !== null && editorLoadingId !== record.id}
-              onClick={() => openEdit(record)}
-            />
-          </Tooltip>
+          {canEdit && (
+            <Tooltip title="Редактировать">
+              <Button
+                type="text"
+                icon={<EditOutlined />}
+                size="small"
+                loading={editorLoadingId === record.id}
+                disabled={editorLoadingId !== null && editorLoadingId !== record.id}
+                onClick={() => openEdit(record)}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="Просмотр">
             <Button
               type="text"
@@ -567,33 +571,37 @@ export default function GeometryTaskList() {
               onClick={() => openQuickPreview(record)}
             />
           </Tooltip>
-          <Tooltip title="Дублировать">
-            <Button
-              type="text"
-              icon={<CopyOutlined />}
-              size="small"
-              loading={duplicatingId === record.id}
-              disabled={duplicatingId !== null && duplicatingId !== record.id}
-              onClick={() => handleDuplicate(record.id)}
-            />
-          </Tooltip>
-          <Popconfirm
-            title="Удалить задачу?"
-            description="Это действие необратимо."
-            okText="Удалить"
-            cancelText="Отмена"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(record.id)}
-          >
-            <Tooltip title="Удалить">
+          {canEdit && (
+            <Tooltip title="Дублировать">
               <Button
                 type="text"
-                icon={<DeleteOutlined />}
+                icon={<CopyOutlined />}
                 size="small"
-                danger
+                loading={duplicatingId === record.id}
+                disabled={duplicatingId !== null && duplicatingId !== record.id}
+                onClick={() => handleDuplicate(record.id)}
               />
             </Tooltip>
-          </Popconfirm>
+          )}
+          {canDelete && (
+            <Popconfirm
+              title="Удалить задачу?"
+              description="Это действие необратимо."
+              okText="Удалить"
+              cancelText="Отмена"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(record.id)}
+            >
+              <Tooltip title="Удалить">
+                <Button
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  size="small"
+                  danger
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -704,7 +712,7 @@ export default function GeometryTaskList() {
           <Button icon={<EyeOutlined />} onClick={() => openPreview()}>
             Просмотр ({selectedRowKeys.length > 0 ? `выбрано ${selectedRowKeys.length}` : `все ${tasks.length}`})
           </Button>
-          {selectedRowKeys.length > 0 && (
+          {canEdit && selectedRowKeys.length > 0 && (
             <Button
               icon={<ImportOutlined />}
               onClick={() => { setImportResults(null); setImportModalOpen(true); }}
@@ -712,9 +720,11 @@ export default function GeometryTaskList() {
               В задачи ({selectedRowKeys.length})
             </Button>
           )}
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            Создать задачу
-          </Button>
+          {canEdit && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              Создать задачу
+            </Button>
+          )}
         </Space>
       </div>
 
@@ -783,16 +793,18 @@ export default function GeometryTaskList() {
                   )}
                   extra={(
                     <Space size={4}>
-                      <Tooltip title="Редактировать">
-                        <Button
-                          type="text"
-                          icon={<EditOutlined />}
-                          size="small"
-                          loading={editorLoadingId === record.id}
-                          disabled={editorLoadingId !== null && editorLoadingId !== record.id}
-                          onClick={() => openEdit(record)}
-                        />
-                      </Tooltip>
+                      {canEdit && (
+                        <Tooltip title="Редактировать">
+                          <Button
+                            type="text"
+                            icon={<EditOutlined />}
+                            size="small"
+                            loading={editorLoadingId === record.id}
+                            disabled={editorLoadingId !== null && editorLoadingId !== record.id}
+                            onClick={() => openEdit(record)}
+                          />
+                        </Tooltip>
+                      )}
                       <Tooltip title="Просмотр">
                         <Button
                           type="text"
@@ -802,16 +814,19 @@ export default function GeometryTaskList() {
                           onClick={() => openQuickPreview(record)}
                         />
                       </Tooltip>
-                      <Tooltip title="Дублировать">
-                        <Button
-                          type="text"
-                          icon={<CopyOutlined />}
-                          size="small"
-                          loading={duplicatingId === record.id}
-                          disabled={duplicatingId !== null && duplicatingId !== record.id}
-                          onClick={() => handleDuplicate(record.id)}
-                        />
-                      </Tooltip>
+                      {canEdit && (
+                        <Tooltip title="Дублировать">
+                          <Button
+                            type="text"
+                            icon={<CopyOutlined />}
+                            size="small"
+                            loading={duplicatingId === record.id}
+                            disabled={duplicatingId !== null && duplicatingId !== record.id}
+                            onClick={() => handleDuplicate(record.id)}
+                          />
+                        </Tooltip>
+                      )}
+                      {canDelete && (
                       <Popconfirm
                         title="Удалить задачу?"
                         description="Это действие необратимо."
@@ -829,6 +844,7 @@ export default function GeometryTaskList() {
                           />
                         </Tooltip>
                       </Popconfirm>
+                      )}
                     </Space>
                   )}
                 >
