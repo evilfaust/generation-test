@@ -1,11 +1,17 @@
 /**
  * UserMenu — блок текущего пользователя в шапке.
- * Показывает имя + dropdown с действиями (выйти).
+ * Показывает аватарку + имя + dropdown с действиями (мой профиль, выйти).
  */
+import { useState } from 'react';
 import { Dropdown, Avatar, Space, Typography } from 'antd';
-import { UserOutlined, LogoutOutlined, CrownOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
+import {
+  UserOutlined, LogoutOutlined, CrownOutlined, EditOutlined, EyeOutlined,
+  IdcardOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../services/pocketbase';
+import ProfileModal from './ProfileModal';
 
 const { Text } = Typography;
 
@@ -18,10 +24,12 @@ const ROLE_META = {
 export default function UserMenu({ compact = false }) {
   const { teacher, role, logout } = useAuth();
   const navigate = useNavigate();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   if (!teacher) return null;
 
   const meta = ROLE_META[role] || ROLE_META.viewer;
+  const avatarUrl = api.getTeacherAvatarUrl(teacher, 'small');
 
   const items = [
     {
@@ -33,6 +41,13 @@ export default function UserMenu({ compact = false }) {
         </Space>
       ),
       disabled: true,
+    },
+    { type: 'divider' },
+    {
+      key: 'profile',
+      label: 'Мой профиль',
+      icon: <IdcardOutlined />,
+      onClick: () => setProfileOpen(true),
     },
     { type: 'divider' },
     {
@@ -48,15 +63,23 @@ export default function UserMenu({ compact = false }) {
   ];
 
   return (
-    <Dropdown menu={{ items }} trigger={['click']} placement="bottomRight">
-      <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>
-        <Avatar size="small" icon={<UserOutlined />} style={{ background: meta.color }} />
-        {!compact && (
-          <Text style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {teacher.name || teacher.username}
-          </Text>
-        )}
-      </Space>
-    </Dropdown>
+    <>
+      <Dropdown menu={{ items }} trigger={['click']} placement="bottomRight">
+        <Space style={{ cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>
+          <Avatar
+            size="small"
+            src={avatarUrl}
+            icon={!avatarUrl ? <UserOutlined /> : null}
+            style={!avatarUrl ? { background: meta.color } : undefined}
+          />
+          {!compact && (
+            <Text style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {teacher.name || teacher.username}
+            </Text>
+          )}
+        </Space>
+      </Dropdown>
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+    </>
   );
 }

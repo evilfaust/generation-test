@@ -1541,25 +1541,60 @@ export const api = {
     }
   },
 
-  // data: { name, role, allowed_sections, password? (опционально для смены) }
+  // data: { name, role, allowed_sections, password?, avatar? (File или null для удаления) }
+  // Если есть avatar (File) — отправляем как FormData, PB SDK сделает это автоматически.
   async updateTeacher(id, data) {
     try {
-      const payload = {};
-      if (data.name !== undefined) payload.name = data.name;
-      if (data.role !== undefined) payload.role = data.role;
-      if (data.allowed_sections !== undefined) payload.allowed_sections = data.allowed_sections;
-      if (data.password) {
-        payload.password = data.password;
-        payload.passwordConfirm = data.password;
+      const hasFile = data.avatar instanceof File || data.avatar === null;
+
+      let payload;
+      if (hasFile) {
+        // FormData для загрузки файла
+        payload = new FormData();
+        if (data.name !== undefined) payload.append('name', data.name);
+        if (data.role !== undefined) payload.append('role', data.role);
+        if (data.allowed_sections !== undefined) {
+          payload.append('allowed_sections', JSON.stringify(data.allowed_sections));
+        }
+        if (data.password) {
+          payload.append('password', data.password);
+          payload.append('passwordConfirm', data.password);
+        }
+        if (data.avatar instanceof File) {
+          payload.append('avatar', data.avatar);
+        } else if (data.avatar === null) {
+          // Удалить аватар
+          payload.append('avatar', '');
+        }
+      } else {
+        payload = {};
+        if (data.name !== undefined) payload.name = data.name;
+        if (data.role !== undefined) payload.role = data.role;
+        if (data.allowed_sections !== undefined) payload.allowed_sections = data.allowed_sections;
+        if (data.password) {
+          payload.password = data.password;
+          payload.passwordConfirm = data.password;
+        }
       }
+
       const rec = await pb.collection('teachers').update(id, payload);
-      const summary = `${rec.username} (${rec.role})${data.password ? ' [password changed]' : ''}`;
+      const summary = `${rec.username} (${rec.role})${data.password ? ' [password changed]' : ''}${hasFile ? ' [avatar updated]' : ''}`;
       _logAudit('update', 'teachers', rec.id, summary);
       return rec;
     } catch (error) {
       console.error('Error updating teacher:', error);
       throw error;
     }
+  },
+
+  // Возвращает URL аватарки учителя (или null если нет).
+  // size: 'small' (64x64) | 'medium' (120x120) | null (оригинал)
+  getTeacherAvatarUrl(teacher, size = null) {
+    if (!teacher || !teacher.avatar) return null;
+    const base = pb.files.getUrl(teacher, teacher.avatar);
+    if (size === 'small') return `${base}?thumb=64x64`;
+    if (size === 'medium') return `${base}?thumb=120x120`;
+    return base;
   },
 
   async deleteTeacher(id) {

@@ -12,11 +12,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Tag, Modal, Form, Input, Select, Checkbox,
-  Popconfirm, message, Typography, Card, Empty,
+  Popconfirm, message, Typography, Card, Empty, Avatar, Upload,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined,
-  CrownOutlined, EyeOutlined, UserOutlined,
+  CrownOutlined, EyeOutlined, UserOutlined, UploadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { api } from '../../services/pocketbase';
@@ -59,6 +59,9 @@ export default function UserManager() {
   const [editingTeacher, setEditingTeacher] = useState(null); // null = create mode
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);       // File | null | undefined
+  const [avatarPreview, setAvatarPreview] = useState(null); // dataURL
+  const [removeAvatar, setRemoveAvatar] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -76,6 +79,12 @@ export default function UserManager() {
     load();
   }, []);
 
+  const resetAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setRemoveAvatar(false);
+  };
+
   const openCreate = () => {
     setEditingTeacher(null);
     form.resetFields();
@@ -83,6 +92,7 @@ export default function UserManager() {
       role: 'editor',
       allowed_sections: ['tasks', 'worksheets', 'works'],
     });
+    resetAvatar();
     setModalOpen(true);
   };
 
@@ -95,7 +105,25 @@ export default function UserManager() {
       allowed_sections: Array.isArray(record.allowed_sections) ? record.allowed_sections : [],
       password: '',
     });
+    resetAvatar();
     setModalOpen(true);
+  };
+
+  const handleAvatarBeforeUpload = (file) => {
+    if (!file.type.startsWith('image/')) {
+      message.error('Только изображения');
+      return Upload.LIST_IGNORE;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      message.error('Размер до 2 МБ');
+      return Upload.LIST_IGNORE;
+    }
+    setAvatarFile(file);
+    setRemoveAvatar(false);
+    const reader = new FileReader();
+    reader.onload = (e) => setAvatarPreview(e.target.result);
+    reader.readAsDataURL(file);
+    return false;
   };
 
   const handleSubmit = async (values) => {
@@ -108,6 +136,8 @@ export default function UserManager() {
           allowed_sections: values.role === 'superadmin' ? [] : (values.allowed_sections || []),
         };
         if (values.password) payload.password = values.password;
+        if (avatarFile) payload.avatar = avatarFile;
+        else if (removeAvatar) payload.avatar = null;
         await api.updateTeacher(editingTeacher.id, payload);
         message.success('Учитель обновлён');
       } else {
@@ -149,15 +179,23 @@ export default function UserManager() {
       title: 'Пользователь',
       dataIndex: 'username',
       key: 'username',
-      render: (username, record) => (
-        <Space>
-          <UserOutlined />
-          <div>
-            <div style={{ fontWeight: 500 }}>{record.name}</div>
-            <Text type="secondary" style={{ fontSize: 12 }}>@{username}</Text>
-          </div>
-        </Space>
-      ),
+      render: (username, record) => {
+        const avatarUrl = api.getTeacherAvatarUrl(record, 'small');
+        return (
+          <Space>
+            <Avatar
+              size="default"
+              src={avatarUrl}
+              icon={!avatarUrl ? <UserOutlined /> : null}
+              style={!avatarUrl ? { background: '#bfbfbf' } : undefined}
+            />
+            <div>
+              <div style={{ fontWeight: 500 }}>{record.name}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>@{username}</Text>
+            </div>
+          </Space>
+        );
+      },
     },
     {
       title: 'Роль',
@@ -279,6 +317,45 @@ export default function UserManager() {
         width={640}
         destroyOnClose
       >
+        {editingTeacher && (() => {
+          const currentUrl = api.getTeacherAvatarUrl(editingTeacher, 'medium');
+          const displayUrl = avatarPreview || (removeAvatar ? null : currentUrl);
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+              <Avatar
+                size={64}
+                src={displayUrl}
+                icon={!displayUrl ? <UserOutlined /> : null}
+                style={!displayUrl ? { background: '#bfbfbf' } : undefined}
+              />
+              <Space direction="vertical" size={4}>
+                <Space>
+                  <Upload
+                    accept="image/*"
+                    showUploadList={false}
+                    beforeUpload={handleAvatarBeforeUpload}
+                  >
+                    <Button size="small" icon={<UploadOutlined />}>
+                      {displayUrl ? 'Заменить аватарку' : 'Загрузить аватарку'}
+                    </Button>
+                  </Upload>
+                  {displayUrl && !removeAvatar && (
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => { setAvatarFile(null); setAvatarPreview(null); setRemoveAvatar(true); }}
+                    >
+                      Удалить
+                    </Button>
+                  )}
+                </Space>
+                <Text type="secondary" style={{ fontSize: 11 }}>JPG / PNG / WebP / SVG, до 2 МБ</Text>
+              </Space>
+            </div>
+          );
+        })()}
+
         <Form
           form={form}
           layout="vertical"

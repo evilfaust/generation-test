@@ -19,6 +19,8 @@ ege-tasks/.env.*.local
 ARCHITECTURE.md
 BACKUP_GUIDE.md
 CLAUDE.MD
+CLAUDE.md
+AGENTS.md
 DATABASE_SAFETY.md
 PDF_EXPORT_UPGRADE.md
 QUICK_START.md
@@ -27,6 +29,14 @@ SCHEMA_GEOMETRY.md
 SDAMGIA_TABLE_PARSING.md
 START_GUIDE.md
 TEST_AND_COMMIT.md
+plan.md
+
+# ── Claude memory & internal notes (per-project) ──────────────────────────────
+memory/
+
+# ── Nested CLAUDE.md (per subdir) ─────────────────────────────────────────────
+ege-tasks/CLAUDE.md
+pocketbase/CLAUDE.md
 
 # ── Deployment & infrastructure (internal) ───────────────────────────────────
 raspberry/
@@ -44,7 +54,13 @@ ege-tasks/delete-*.js
 ege-tasks/fix-*.js
 ege-tasks/link-*.js
 ege-tasks/migrate-*.js
+ege-tasks/seed-*.js
+ege-tasks/update-*.js
+ege-tasks/add-*.js
 migrate_task_images_to_pb.js
+seed-achievements.js
+add-meme-achievements.js
+fix_tasks.py
 
 # ── PocketBase runtime data ───────────────────────────────────────────────────
 pocketbase/pb_data/
@@ -53,6 +69,8 @@ task-image-cache/
 
 # ── Archive ───────────────────────────────────────────────────────────────────
 _archive/
+_claude_context_backup_*/
+.clone/
 
 # ── IDE & editors ─────────────────────────────────────────────────────────────
 .vscode/
