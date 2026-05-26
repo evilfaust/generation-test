@@ -91,6 +91,8 @@ export default function TaskImporter() {
   const [sdamgiaTags, setSdamgiaTags] = useState('');
   const [sdamgiaLoading, setSdamgiaLoading] = useState(false);
   const [sdamgiaError, setSdamgiaError] = useState('');
+  // Часть ЕГЭ — 1 (default) или 2; селектор балла появляется только для части 2
+  const [sdamgiaExamPart, setSdamgiaExamPart] = useState(1);
 
   const {
     parsedData,
@@ -296,6 +298,7 @@ export default function TaskImporter() {
         difficulty: sdamgiaDifficulty,
         tagsStr: sdamgiaTags,
         sourceType: sdamgiaSourceType,
+        examPart: sdamgiaExamPart,
       });
       // Устанавливаем тему и подтему напрямую (перезаписываем автоматический маппинг)
       if (sdamgiaTopicId) {
@@ -459,6 +462,34 @@ export default function TaskImporter() {
                 </div>
 
                 <Card size="small" title="Метаданные задач" style={{ marginBottom: 16 }}>
+                  {/* Часть ЕГЭ — определяет, нужно ли парсить критерии и max_score */}
+                  <Row gutter={[16, 12]} style={{ marginBottom: 12 }}>
+                    <Col span={12}>
+                      <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>Часть экзамена</div>
+                      <Select
+                        style={{ width: '100%' }}
+                        value={sdamgiaExamPart}
+                        onChange={setSdamgiaExamPart}
+                        options={[
+                          { value: 1, label: 'Часть 1 (краткий ответ)' },
+                          { value: 2, label: 'Часть 2 (развёрнутое решение)' },
+                        ]}
+                      />
+                    </Col>
+                    {sdamgiaExamPart === 2 && (
+                      <Col span={12}>
+                        <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>
+                          Подсказка
+                        </div>
+                        <Alert
+                          type="info"
+                          showIcon
+                          message="Критерии и макс. балл будут извлечены автоматически"
+                          style={{ padding: '4px 12px', fontSize: 12 }}
+                        />
+                      </Col>
+                    )}
+                  </Row>
                   <Row gutter={[16, 12]}>
                     <Col span={12}>
                       <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>
@@ -737,7 +768,25 @@ export default function TaskImporter() {
                         >
                           {DIFFICULTY_LABELS[task.difficulty] || `Сложность ${task.difficulty}`}
                         </Tag>
-                        {task.imageUrl && <Tag color="cyan">Изображение</Tag>}
+                        {task.exam_part === 2 && (
+                          <Tag color="purple">Часть 2</Tag>
+                        )}
+                        {task.max_score != null && (
+                          <Tag color="gold">{task.max_score} б.</Tag>
+                        )}
+                        {(() => {
+                          const totalImgs = (task.condition_images?.length || 0)
+                            + (task.solution_images?.length || 0)
+                            + (task.criteria_images?.length || 0);
+                          if (totalImgs > 0) {
+                            return <Tag color="cyan">📷 {totalImgs}</Tag>;
+                          }
+                          if (task.imageUrl) return <Tag color="cyan">Изображение</Tag>;
+                          return null;
+                        })()}
+                        {task.latex_needs_review && (
+                          <Tag color="warning">⚠ Проверить LaTeX</Tag>
+                        )}
                       </div>
                       <div style={{ fontSize: 13, marginBottom: 4 }}>
                         <MathRenderer text={task.statement_md} />

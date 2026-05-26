@@ -505,16 +505,21 @@ export function parseSdamgiaResult(problems, metadata = {}) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
+  // examPart переопределяется учителем в форме (1 или 2); по умолчанию 1
+  const examPart = Number(metadata.examPart) || 1;
+
   const tasks = problems.map((problem, index) => {
     const rawStatement = normalizeSdamgiaText(problem.condition);
     const rawAnswer = normalizeSdamgiaText(problem.answer);
     const rawSolution = normalizeSdamgiaText(problem.solution || '');
+    const rawCriteria = normalizeSdamgiaText(problem.criteria_md || '');
 
     // Конвертируем в LaTeX только если пришёл "старый" текст без готовой разметки
     const statement = shouldConvertLegacyMath(rawStatement) ? convertToLatex(rawStatement) : rawStatement;
     const answer = shouldConvertLegacyMath(rawAnswer) ? convertToLatex(rawAnswer) : rawAnswer;
-    // Решение: LaTeX-формулы уже вставлены сервером как $...$, конвертация не нужна
+    // Решение и критерии: LaTeX-формулы уже вставлены сервером как $...$, конвертация не нужна
     const solution = rawSolution;
+    const criteria = rawCriteria;
 
     const task = {
       number: index + 1,
@@ -525,10 +530,23 @@ export function parseSdamgiaResult(problems, metadata = {}) {
       tags: [...globalTags],
       imageUrl: '',
       sdamgiaId: problem.id || '',
+      // Поля части 2 (могут быть пустыми для части 1)
+      sdamgia_url: problem.sdamgia_url || '',
+      exam_part: examPart,
+      criteria_md: criteria,
+      max_score: problem.max_score ?? null,
+      latex_needs_review: !!problem.latex_needs_review,
+      // Структурированные картинки по ролям {url, file_id, order, role}
+      condition_images: Array.isArray(problem.condition_images) ? problem.condition_images : [],
+      solution_images: Array.isArray(problem.solution_images) ? problem.solution_images : [],
+      criteria_images: Array.isArray(problem.criteria_images) ? problem.criteria_images : [],
     };
 
-    // Первое изображение условия
-    if (problem.images && problem.images.length > 0) {
+    // Первое изображение условия — для backward-compat поля imageUrl (часть 1)
+    if (task.condition_images.length > 0) {
+      task.imageUrl = task.condition_images[0].url || '';
+    } else if (problem.images && problem.images.length > 0) {
+      // Старый формат (плоский массив URL) — fallback
       task.imageUrl = problem.images[0];
     }
 

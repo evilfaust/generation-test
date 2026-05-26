@@ -303,13 +303,27 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
         const task = tasksToImport[i];
         setImportProgress({ current: i + 1, total });
 
-        // Проверяем дубликат
+        // Дедуп №1: по sdamgia_id (надёжнее, чем по тексту — устойчив к мелким правкам)
+        if (task.sdamgiaId) {
+          const existing = await api.findTaskBySdamgiaId(task.sdamgiaId);
+          if (existing) {
+            results.skipped++;
+            results.details.push({
+              status: 'skipped',
+              number: task.number,
+              message: `#${task.number}: пропущено (sdamgia_id=${task.sdamgiaId} уже в базе)`,
+            });
+            continue;
+          }
+        }
+
+        // Дедуп №2: по тексту условия
         if (existingStatements.has(task.statement_md.trim())) {
           results.skipped++;
           results.details.push({
             status: 'skipped',
             number: task.number,
-            message: `#${task.number}: пропущено (дубликат)`,
+            message: `#${task.number}: пропущено (дубликат по тексту)`,
           });
           continue;
         }
@@ -352,6 +366,13 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
           year: parsedData.metadata.year || null,
           has_image: Boolean(task.imageUrl || imageFile),
           image_url: imageFile ? '' : (task.imageUrl || ''),
+          // Поля для ЕГЭ часть 2 (sdamgia). Пустые значения безопасны для части 1.
+          sdamgia_id: task.sdamgiaId || '',
+          sdamgia_url: task.sdamgia_url || '',
+          exam_part: task.exam_part || 1,
+          criteria_md: task.criteria_md || '',
+          max_score: task.max_score ?? undefined, // undefined → поле не отправится (PB не любит null в number)
+          latex_needs_review: !!task.latex_needs_review,
         };
 
         if (importSubtopicId) {
@@ -378,13 +399,40 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
             payload = formData;
           }
 
-          await api.createTask(payload);
+          const createdTask = await api.createTask(payload);
           results.added++;
+
+          // Загрузка картинок задачи в коллекцию task_images по ролям.
+          // Делаем это после createTask (нужен id записи); провал по картинкам
+          // не откатывает создание задачи — просто warning в логе.
+          const imageRoles = [
+            ['condition', task.condition_images || []],
+            ['solution', task.solution_images || []],
+            ['criteria', task.criteria_images || []],
+          ];
+          let uploadedCount = 0;
+          let failedCount = 0;
+          for (const [role, imgs] of imageRoles) {
+            for (const img of imgs) {
+              const rec = await api.uploadTaskImageFromUrl({
+                task: createdTask.id,
+                role,
+                order: img.order,
+                url: img.url,
+                sdamgia_file_id: img.file_id,
+              });
+              if (rec) uploadedCount++; else failedCount++;
+            }
+          }
+
+          let detailMsg = `#${task.number}: добавлено с кодом ${code}`;
+          if (uploadedCount) detailMsg += `, картинок: ${uploadedCount}`;
+          if (failedCount) detailMsg += ` (не загружено: ${failedCount})`;
           results.details.push({
             status: 'added',
             number: task.number,
             code,
-            message: `#${task.number}: добавлено с кодом ${code}`,
+            message: detailMsg,
           });
           // Добавляем в set чтобы не было дублей внутри одного файла
           existingStatements.add(task.statement_md.trim());

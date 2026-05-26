@@ -511,6 +511,140 @@ export const api = {
     return '';
   },
 
+  // ============ ИЗОБРАЖЕНИЯ ЗАДАЧ (task_images, для ЕГЭ часть 2) ============
+
+  /**
+   * Получить все картинки задачи, сгруппированные по ролям и упорядоченные.
+   * Возвращает { condition: [rec, ...], solution: [...], criteria: [...] }.
+   */
+  async getTaskImages(taskId) {
+    if (!taskId) return { condition: [], solution: [], criteria: [] };
+    try {
+      const items = await pb.collection('task_images').getFullList({
+        filter: `task = "${taskId}"`,
+        sort: 'role,order',
+      });
+      const grouped = { condition: [], solution: [], criteria: [] };
+      for (const it of items) {
+        const role = it.role || 'condition';
+        if (!grouped[role]) grouped[role] = [];
+        grouped[role].push(it);
+      }
+      return grouped;
+    } catch (error) {
+      console.error('Error fetching task_images:', error);
+      return { condition: [], solution: [], criteria: [] };
+    }
+  },
+
+  /**
+   * URL файла из task_images record. role/order игнорируются — берём `file` напрямую.
+   */
+  getTaskImageRecordUrl(record) {
+    if (!record || !record.file) return '';
+    return pb.files.getUrl(record, record.file);
+  },
+
+  /**
+   * Поиск задачи по sdamgia_id — для идемпотентности импорта.
+   * Возвращает запись или null.
+   */
+  async findTaskBySdamgiaId(sdamgiaId) {
+    if (!sdamgiaId) return null;
+    try {
+      const safe = String(sdamgiaId).replace(/"/g, '');
+      const items = await pb.collection('tasks').getList(1, 1, {
+        filter: `sdamgia_id = "${safe}"`,
+      });
+      return items.items[0] || null;
+    } catch (error) {
+      console.error('Error finding task by sdamgia_id:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Создать запись task_images. `fileBlob` — File или Blob с изображением.
+   * Поля null/undefined опускаются (PB не принимает null в text/url).
+   */
+  async createTaskImage({ task, role, order, fileBlob, fileName, sdamgia_file_id, original_url, width, height }) {
+    if (!task) throw new Error('createTaskImage: task обязателен');
+    const fd = new FormData();
+    fd.append('task', task);
+    fd.append('role', role || 'condition');
+    if (order != null) fd.append('order', String(order));
+    if (fileBlob) {
+      const name = fileName || `img_${role}_${order || 1}.png`;
+      const file = fileBlob instanceof File ? fileBlob : new File([fileBlob], name, { type: fileBlob.type || 'image/png' });
+      fd.append('file', file);
+    }
+    if (sdamgia_file_id) fd.append('sdamgia_file_id', String(sdamgia_file_id));
+    if (original_url) fd.append('original_url', original_url);
+    if (width != null) fd.append('width', String(width));
+    if (height != null) fd.append('height', String(height));
+    try {
+      return await pb.collection('task_images').create(fd);
+    } catch (error) {
+      console.error('Error creating task_image:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Удалить запись task_images. Каскад не нужен — это лист дерева.
+   */
+  async deleteTaskImage(id) {
+    try {
+      return await pb.collection('task_images').delete(id);
+    } catch (error) {
+      console.error('Error deleting task_image:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Скачать картинку с внешнего URL и залить в task_images.
+   * Возвращает созданную запись или null при ошибке.
+   * Идемпотентность по sdamgia_file_id — если запись для этой (task, file_id) уже
+   * существует, она НЕ создаётся повторно (возвращается существующая).
+   */
+  async uploadTaskImageFromUrl({ task, role, order, url, sdamgia_file_id }) {
+    if (!task || !url) return null;
+    try {
+      // Дедуп: ищем существующую запись на ту же задачу и тот же file_id
+      if (sdamgia_file_id) {
+        const safe = String(sdamgia_file_id).replace(/"/g, '');
+        const found = await pb.collection('task_images').getList(1, 1, {
+          filter: `task = "${task}" && sdamgia_file_id = "${safe}"`,
+        });
+        if (found.items[0]) return found.items[0];
+      }
+
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      // Имя файла из URL (?id=145381 → 145381.png)
+      const idMatch = String(url).match(/[?&]id=(\d+)/);
+      const ext = (blob.type || '').includes('svg') ? 'svg'
+                 : (blob.type || '').includes('jpeg') ? 'jpg'
+                 : 'png';
+      const fileName = `${sdamgia_file_id || idMatch?.[1] || `img_${role}_${order}`}.${ext}`;
+
+      return await this.createTaskImage({
+        task,
+        role,
+        order,
+        fileBlob: blob,
+        fileName,
+        sdamgia_file_id,
+        original_url: url,
+      });
+    } catch (error) {
+      console.error(`Error uploading image from ${url}:`, error);
+      return null;
+    }
+  },
+
   // ============ КАРТОЧКИ ============
 
   // Создать карточку
