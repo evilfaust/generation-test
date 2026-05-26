@@ -611,11 +611,13 @@ export const api = {
   async uploadTaskImageFromUrl({ task, role, order, url, sdamgia_file_id }) {
     if (!task || !url) return null;
     try {
-      // Дедуп: ищем существующую запись на ту же задачу и тот же file_id
-      if (sdamgia_file_id) {
-        const safe = String(sdamgia_file_id).replace(/"/g, '');
+      // Дедуп по (task, role, order): защита от повторного импорта той же задачи.
+      // Не дедупим по file_id — одна и та же картинка sdamgia может встретиться
+      // в задаче на разных позициях (напр., чертёж и в условии, и в решении,
+      // или один чертёж дважды в длинном решении).
+      if (order != null) {
         const found = await pb.collection('task_images').getList(1, 1, {
-          filter: `task = "${task}" && sdamgia_file_id = "${safe}"`,
+          filter: `task = "${task}" && role = "${role}" && order = ${order}`,
         });
         if (found.items[0]) return found.items[0];
       }
