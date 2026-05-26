@@ -49,6 +49,29 @@ const FORMAT_TAG = {
 
 const SDAMGIA_SOURCE_OPTIONS = Object.entries(SDAMGIA_SOURCE_LABELS).map(([value, label]) => ({ value, label }));
 
+// Маппинг типа источника sdamgia → exam_type коллекции topics.
+// У базового и профильного ЕГЭ независимые нумерации заданий — поэтому
+// темы из разных экзаменов могут иметь одинаковый ege_number.
+const SDAMGIA_TO_EXAM_TYPE = {
+  ege_base: 'ege_base',
+  ege_prof: 'ege_profile',
+  oge:      'other',
+  vpr5:     'vpr',
+  vpr6:     'vpr',
+  vpr7:     'vpr',
+  vpr8:     'vpr',
+};
+
+const EXAM_TYPE_OPTIONS = [
+  { value: 'ege_base',    label: 'ЕГЭ базовый' },
+  { value: 'ege_profile', label: 'ЕГЭ профильный' },
+  { value: 'mordkovich',  label: 'Мордкович' },
+  { value: 'oral',        label: 'Устный счёт' },
+  { value: 'vpr',         label: 'ВПР' },
+  { value: 'trig',        label: 'Тригонометрия' },
+  { value: 'other',       label: 'Прочее' },
+];
+
 export default function TaskImporter() {
   const { message } = App.useApp();
   const { topics: ctxTopics, tags, subtopics: ctxSubtopics, reloadData } = useReferenceData();
@@ -73,6 +96,12 @@ export default function TaskImporter() {
   const [showNewTopic, setShowNewTopic] = useState(false);
   const [newTopicTitle, setNewTopicTitle] = useState('');
   const [newTopicNumber, setNewTopicNumber] = useState(null);
+  // Тип экзамена для создаваемой темы: ege_base/ege_profile/oge/vpr/other.
+  // У ege_base и ege_profile независимая нумерация — поэтому дубли проверяем
+  // по паре (exam_type, ege_number), а не только по ege_number.
+  const [newTopicExamType, setNewTopicExamType] = useState('ege_base');
+  // Для ege_profile — часть экзамена (1 = краткий ответ, 2 = развёрнутое решение).
+  const [newTopicExamPart, setNewTopicExamPart] = useState(1);
   const [creatingTopic, setCreatingTopic] = useState(false);
 
   // Состояние создания подтемы
@@ -177,9 +206,16 @@ export default function TaskImporter() {
       return;
     }
 
-    const existingByNumber = localTopics.find(t => String(t.ege_number) === String(newTopicNumber));
+    // Дубль ищем по паре (exam_type, ege_number) — у разных экзаменов
+    // независимая нумерация. Темы без exam_type считаем легаси-базовыми.
+    const examTypeForCheck = newTopicExamType || 'ege_base';
+    const existingByNumber = localTopics.find(t =>
+      String(t.ege_number) === String(newTopicNumber) &&
+      (t.exam_type || 'ege_base') === examTypeForCheck
+    );
     if (existingByNumber) {
-      message.warning(`Тема с номером ${newTopicNumber} уже существует: "${existingByNumber.title}"`);
+      const typeLabel = EXAM_TYPE_OPTIONS.find(o => o.value === examTypeForCheck)?.label || examTypeForCheck;
+      message.warning(`Тема с номером ${newTopicNumber} уже существует в "${typeLabel}": "${existingByNumber.title}"`);
       return;
     }
 
@@ -191,11 +227,17 @@ export default function TaskImporter() {
 
     setCreatingTopic(true);
     try {
-      const newTopic = await api.createTopic({
+      const topicData = {
         title: trimmedTitle,
         ege_number: Number(newTopicNumber),
         order: Number(newTopicNumber),
-      });
+        exam_type: examTypeForCheck,
+      };
+      // exam_part имеет смысл только для профильного ЕГЭ
+      if (examTypeForCheck === 'ege_profile' && newTopicExamPart) {
+        topicData.exam_part = Number(newTopicExamPart);
+      }
+      const newTopic = await api.createTopic(topicData);
       setLocalTopics(prev => [...prev, newTopic]);
       message.success(`Тема "${trimmedTitle}" создана`);
       setNewTopicTitle('');
@@ -550,7 +592,13 @@ export default function TaskImporter() {
                         />
                         <Button
                           icon={<PlusOutlined />}
-                          onClick={() => setShowNewTopic(true)}
+                          onClick={() => {
+                            // Preselect типа экзамена из контекста sdamgia-формы или превью.
+                            const ctxType = SDAMGIA_TO_EXAM_TYPE[sdamgiaSourceType] || 'ege_base';
+                            setNewTopicExamType(ctxType);
+                            setNewTopicExamPart(sdamgiaExamPart || 1);
+                            setShowNewTopic(true);
+                          }}
                           title="Создать тему"
                         />
                       </Space.Compact>
@@ -716,7 +764,13 @@ export default function TaskImporter() {
                 />
                 <Button
                   icon={<PlusOutlined />}
-                  onClick={() => setShowNewTopic(true)}
+                  onClick={() => {
+                            // Preselect типа экзамена из контекста sdamgia-формы или превью.
+                            const ctxType = SDAMGIA_TO_EXAM_TYPE[sdamgiaSourceType] || 'ege_base';
+                            setNewTopicExamType(ctxType);
+                            setNewTopicExamPart(sdamgiaExamPart || 1);
+                            setShowNewTopic(true);
+                          }}
                   title="Создать тему"
                 />
               </Space.Compact>
@@ -1008,6 +1062,33 @@ export default function TaskImporter() {
         okText="Создать"
         cancelText="Отмена"
       >
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 4, fontWeight: 500 }}>Тип экзамена</div>
+          <Select
+            style={{ width: '100%' }}
+            value={newTopicExamType}
+            onChange={setNewTopicExamType}
+            options={EXAM_TYPE_OPTIONS}
+          />
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+            У базового и профильного ЕГЭ независимая нумерация — № 17 может
+            существовать в обоих как разные темы.
+          </div>
+        </div>
+        {newTopicExamType === 'ege_profile' && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ marginBottom: 4, fontWeight: 500 }}>Часть экзамена</div>
+            <Select
+              style={{ width: '100%' }}
+              value={newTopicExamPart}
+              onChange={setNewTopicExamPart}
+              options={[
+                { value: 1, label: 'Часть 1 (краткий ответ, № 1–12)' },
+                { value: 2, label: 'Часть 2 (развёрнутое решение, № 13–19)' },
+              ]}
+            />
+          </div>
+        )}
         <div style={{ marginBottom: 16 }}>
           <div style={{ marginBottom: 4, fontWeight: 500 }}>Название темы</div>
           <Input
