@@ -13,6 +13,14 @@ try {
 }
 import cors from 'cors';
 import * as cheerio from 'cheerio';
+import { fixLatex } from './latex-fixer.js';
+// KaTeX — серверный рендер для валидации формул (latex_needs_review)
+let katex = null;
+try {
+  katex = (await import('katex')).default;
+} catch {
+  console.warn('[pdf-service] katex недоступен, валидация формул отключена');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -267,7 +275,33 @@ function cleanLatexFormula(text) {
   // Убираем множественные пробелы
   text = text.replace(/\s+/g, ' ').trim();
 
+  // Финальная нормализация под KaTeX (см. latex-fixer.js):
+  // \angleABC → \angle{ABC}, 90 г → 90^{\circ}, log a 2 → \log_{a} 2, 0,5 → 0{,}5 и т.п.
+  text = fixLatex(text);
+
   return text;
+}
+
+/**
+ * Проверка валидности LaTeX-формулы через KaTeX (для latex_needs_review).
+ * Возвращает true если рендерится без ошибок.
+ */
+function validateLatex(formula) {
+  if (!katex) return true; // если KaTeX не подгружен — считаем валидным
+  try {
+    katex.renderToString(formula, { throwOnError: true, strict: false });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Извлечь sdamgia file_id из URL вида /get_file?id=145381 или /get_file?id=145381&...
+ */
+function extractSdamgiaFileId(url) {
+  const m = String(url || '').match(/[?&]id=(\d+)/);
+  return m ? m[1] : '';
 }
 
 /**
@@ -283,6 +317,9 @@ function tableToMarkdown($, tableEl) {
       let cellText = $(this).text().trim();
       // Убираем переносы строк внутри ячейки
       cellText = cellText.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+      // Артефакты типографики sdamgia (как в processCondition):
+      cellText = cellText.replace(/­/g, ''); // soft hyphen
+      cellText = cellText.replace(/​/g, ''); // zero-width space
       cells.push(cellText);
     });
     if (cells.length > 0) {
@@ -347,10 +384,13 @@ function listToMarkdown($, listEl, ordered = true) {
  * Обработка условия задачи — извлечение текста, формул, таблиц и изображений
  * Порт process_condition из par.py + поддержка таблиц
  */
-function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL) {
-  if (!conditionEl) return { text: '', images: [] };
+function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL, role = 'condition') {
+  if (!conditionEl) return { text: '', images: [], formulas: [] };
 
+  // images — массив объектов { url, file_id, original_url } в порядке появления
   const images = [];
+  // formulas — все LaTeX-формулы из этого блока, для валидации через KaTeX
+  const formulas = [];
   let formulaIndex = 0;
   let imgIndex = 0;
   let tableIndex = 0;
@@ -368,6 +408,7 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL) {
       const altText = $(this).attr('alt') || '';
       if (altText) {
         const cleanedLatex = cleanLatexFormula(altText);
+        formulas.push(cleanedLatex);
         const marker = `___FORMULA_${formulaIndex}___`;
         formulaReplacements[marker] = `$${cleanedLatex}$`;
         formulaIndex++;
@@ -452,6 +493,7 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL) {
       const altText = $(this).attr('alt') || '';
       if (altText) {
         const cleanedLatex = cleanLatexFormula(altText);
+        formulas.push(cleanedLatex);
         const marker = `___FORMULA_${formulaIndex}___`;
         formulaReplacements[marker] = `$${cleanedLatex}$`;
         formulaIndex++;
@@ -465,9 +507,15 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL) {
       if (!fullUrl.startsWith('http')) {
         fullUrl = new URL(imgUrl, baseUrl).href;
       }
-      images.push(fullUrl);
+      const fileId = extractSdamgiaFileId(fullUrl);
+      const order = imgIndex + 1;
+      // Структурированно: фронт будет качать и заливать в task_images по role+order.
+      images.push({ url: fullUrl, file_id: fileId, order, role });
       const marker = `___IMAGE_${imgIndex}___`;
-      // Изображение всегда на отдельной строке
+      // В md оставляем ![image](url) — для backward-compat со старым фронтом
+      // (рендерер части 1). Часть 2 на фронте дополнительно постпроцессит markdown,
+      // подменяя ![image](внешний url) на ссылку на локальный файл task_images
+      // по original_url или file_id.
       imageReplacements[marker] = `\n![image](${fullUrl})\n`;
       imgIndex++;
       $(this).replaceWith(marker);
@@ -497,12 +545,12 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL) {
     text = text.replace(marker, ` ${latex} `);
   }
 
-  // Заменяем маркеры изображений на markdown
+  // Заменяем маркеры изображений на плейсхолдеры
   for (const [marker, imgMarkdown] of Object.entries(imageReplacements)) {
     text = text.replace(marker, imgMarkdown);
   }
 
-  return { text: text.trim(), images };
+  return { text: text.trim(), images, formulas };
 }
 
 /**
@@ -511,23 +559,48 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL) {
  */
 function parseProblemFromDiv($, probDiv, baseUrl) {
   try {
-    const problem = { id: '', condition: '', answer: '', images: [] };
+    const problem = {
+      id: '',
+      sdamgia_url: '',
+      condition: '',
+      answer: '',
+      solution: '',
+      criteria_md: '',
+      max_score: null,
+      condition_images: [],
+      solution_images: [],
+      criteria_images: [],
+      latex_needs_review: false,
+      // BACKWARD-COMPAT: старые поля для уже подключённого фронта (импорт части 1)
+      images: [],
+      solution_images_legacy: [],
+    };
 
-    // ID задачи
+    // Все формулы со всех блоков — для финальной валидации флага needs_review
+    const allFormulas = [];
+
+    // ID задачи + ссылка на «Решу ЕГЭ»
     const probNums = $(probDiv).find('.prob_nums');
     if (probNums.length) {
       const link = probNums.find('a');
       if (link.length) {
         problem.id = link.text().trim();
+        let href = link.attr('href') || '';
+        if (href) {
+          if (!href.startsWith('http')) href = new URL(href, baseUrl).href;
+          problem.sdamgia_url = href;
+        }
       }
     }
 
     // Условие задачи
     const pbody = $(probDiv).find('.pbody');
     if (pbody.length) {
-      const { text, images } = processCondition($, pbody.get(0), baseUrl);
+      const { text, images, formulas } = processCondition($, pbody.get(0), baseUrl, 'condition');
       problem.condition = text;
-      problem.images = images;
+      problem.condition_images = images;
+      problem.images = images.map(img => img.url); // backward-compat (старый фронт)
+      allFormulas.push(...formulas);
     }
 
     // Ответ
@@ -538,14 +611,16 @@ function parseProblemFromDiv($, probDiv, baseUrl) {
       problem.answer = answerText;
     }
 
-    // Решение (опционально — присутствует в ВПР и некоторых ЕГЭ задачах)
+    // Решение (опционально — присутствует в ВПР и некоторых ЕГЭ задачах + всегда в части 2)
     const solutionDiv = $(probDiv).find('.solution');
     if (solutionDiv.length) {
       // Клонируем, чтобы не трогать оригинал
       const $sol = $(solutionDiv).clone();
-      // Убираем блок критериев внутри решения (если попал)
+      // ВАЖНО: критерии вынимаем ДО processCondition, чтобы не попали в решение,
+      // но не удаляем — парсим отдельным проходом дальше из исходного solutionDiv.
       $sol.find('.prob_crits').remove();
-      const { text: solRaw, images: solImages } = processCondition($, $sol.get(0), baseUrl);
+      const { text: solRaw, images: solImages, formulas: solFormulas } =
+        processCondition($, $sol.get(0), baseUrl, 'solution');
       // Убираем «Решение.» в начале (с возможными мягкими переносами, уже удалены processCondition)
       let solText = solRaw.replace(/^Решение\.?\s*/i, '').trim();
 
@@ -564,6 +639,51 @@ function parseProblemFromDiv($, probDiv, baseUrl) {
       if (solText) {
         problem.solution = solText;
         problem.solution_images = solImages;
+        problem.solution_images_legacy = solImages.map(img => img.url);
+        allFormulas.push(...solFormulas);
+      }
+    }
+
+    // Критерии оценивания (часть 2): div.prob_crits на уровне .prob_maindiv
+    // (НЕ внутри .solution — у sdamgia это соседний блок).
+    // Содержит <b>Критерии проверки:</b> + <div class="pbody"> с таблицей.
+    const critsDiv = $(probDiv).find('.prob_crits').first();
+    if (critsDiv.length) {
+      const { text: critText, images: critImages, formulas: critFormulas } =
+        processCondition($, critsDiv.get(0), baseUrl, 'criteria');
+      if (critText) {
+        // Убираем «Критерии проверки.» в начале (если осталось от <b>)
+        let cleanCrit = critText.replace(/^Кри[­терии]+\s*проверки\.?\s*:?\s*/i, '').trim();
+        problem.criteria_md = cleanCrit;
+        problem.criteria_images = critImages;
+        allFormulas.push(...critFormulas);
+
+        // max_score: ищем явное «Максимальный балл»;
+        // если нет — берём максимум из правой колонки таблицы баллов.
+        const maxBallMatch = cleanCrit.match(/Максимальный\s+балл\s*[|:]?\s*(\d+)/i);
+        if (maxBallMatch) {
+          problem.max_score = parseInt(maxBallMatch[1], 10);
+        } else {
+          // Md-таблица после tableToMarkdown имеет формат | колонка | число |.
+          // Берём все числа из ячеек правой колонки (после второй `|`).
+          const lines = cleanCrit.split('\n');
+          const scoreCandidates = [];
+          for (const line of lines) {
+            const m = line.match(/\|\s*(\d+)\s*\|\s*$/);
+            if (m) scoreCandidates.push(parseInt(m[1], 10));
+          }
+          if (scoreCandidates.length) {
+            problem.max_score = Math.max(...scoreCandidates);
+          }
+        }
+      }
+    }
+
+    // Валидация всех формул задачи — флаг latex_needs_review
+    for (const f of allFormulas) {
+      if (!validateLatex(f)) {
+        problem.latex_needs_review = true;
+        break;
       }
     }
 
@@ -602,6 +722,11 @@ app.post('/parse-sdamgia', async (req, res) => {
     let fetchUrl = url;
     if (!fetchUrl.includes('print=true')) {
       fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'print=true';
+    }
+    // crit=true — sdamgia по умолчанию скрывает критерии оценивания (часть 2).
+    // Безопасно для части 1 — там блока .prob_crits просто нет.
+    if (!fetchUrl.includes('crit=true')) {
+      fetchUrl += '&crit=true';
     }
 
     console.log(`[Sdamgia] Загрузка: ${fetchUrl}`);
