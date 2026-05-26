@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip } from 'antd';
+import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse } from 'antd';
 import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
+import TaskStatementRenderer from './TaskStatementRenderer';
 import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
 import { generateTaskCode } from '../utils/taskCodeGenerator';
@@ -44,6 +45,10 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   const [imageDeleted, setImageDeleted] = useState(false);
   const [convertingTable, setConvertingTable] = useState(false);
   const statementTextAreaRef = useRef(null);
+
+  // Картинки задачи из коллекции task_images, сгруппированы по ролям.
+  // Используются для подмены ![image](внешний_url) на локальный в превью.
+  const [taskImages, setTaskImages] = useState({ condition: [], solution: [], criteria: [] });
 
   const isCreateMode = !task;
 
@@ -119,6 +124,12 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         if (task.topic) {
           setFilteredSubtopics(allSubtopics.filter(st => st.topic === task.topic));
         }
+        // Подгружаем картинки task_images для подмены URL'ов в md-предпросмотре.
+        // Используем sdamgia_id как индикатор — у обычных задач (часть 1) этого
+        // обычно нет, и запрос вернёт пустые группы.
+        api.getTaskImages(task.id).then(setTaskImages).catch(() => {
+          setTaskImages({ condition: [], solution: [], criteria: [] });
+        });
         form.setFieldsValue({
           topic: task.topic || undefined,
           subtopic: task.subtopic || undefined,
@@ -144,6 +155,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         img.setUploadPreviewUrl('');
         setImageDeleted(false);
       } else {
+        setTaskImages({ condition: [], solution: [], criteria: [] });
         form.resetFields();
         setGeneratedCode('');
         setPreviewStatement('');
@@ -457,7 +469,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   return (
     <Modal
       title={
-        <Space>
+        <Space wrap>
           {isCreateMode ? <PlusOutlined /> : <EditOutlined />}
           <span>
             {isCreateMode
@@ -466,6 +478,22 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             }
           </span>
           {isCreateMode && generatingCode && <Spin size="small" />}
+          {/* Бейджи и ссылки для задач из «Решу ЕГЭ» (часть 2) */}
+          {task?.exam_part === 2 && <Tag color="purple">Часть 2</Tag>}
+          {task?.max_score != null && <Tag color="gold">{task.max_score} б.</Tag>}
+          {task?.latex_needs_review && <Tag color="warning">⚠ Проверить LaTeX</Tag>}
+          {task?.sdamgia_url && (
+            <Button
+              type="link"
+              size="small"
+              icon={<ExportOutlined />}
+              href={task.sdamgia_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Решу ЕГЭ (id {task.sdamgia_id})
+            </Button>
+          )}
         </Space>
       }
       open={visible}
@@ -820,7 +848,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         {previewStatement && (
           <div style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 4, border: '1px solid #d9d9d9' }}>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 8, fontWeight: 'bold' }}>Предпросмотр задания:</div>
-            <MathRenderer text={previewStatement} answerBoxes />
+            <TaskStatementRenderer text={previewStatement} images={taskImages.condition} answerBoxes />
           </div>
         )}
 
@@ -844,8 +872,33 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         {previewSolution && (
           <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 4, border: '1px solid #b7eb8f' }}>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 8, fontWeight: 'bold' }}>Предпросмотр решения:</div>
-            <MathRenderer text={previewSolution} />
+            <TaskStatementRenderer text={previewSolution} images={taskImages.solution} />
           </div>
+        )}
+
+        {/* Критерии оценивания + max_score — только для задач части 2 */}
+        {(task?.criteria_md || task?.exam_part === 2) && (
+          <Collapse
+            ghost
+            style={{ marginBottom: 16 }}
+            items={[{
+              key: 'criteria',
+              label: (
+                <Space>
+                  <strong>Критерии оценивания</strong>
+                  {task?.max_score != null && <Tag color="gold">{task.max_score} б.</Tag>}
+                  {task?.exam_part === 2 && <Tag color="purple">Часть 2</Tag>}
+                </Space>
+              ),
+              children: task?.criteria_md ? (
+                <div style={{ padding: 12, background: '#fffbe6', borderRadius: 4, border: '1px solid #ffe58f' }}>
+                  <TaskStatementRenderer text={task.criteria_md} images={taskImages.criteria} />
+                </div>
+              ) : (
+                <Alert type="info" message="Критерии не загружены" />
+              ),
+            }]}
+          />
         )}
 
         {/* Подсказка по LaTeX */}
