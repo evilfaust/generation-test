@@ -110,8 +110,45 @@ export default function TaskImporter() {
     selectAll,
     deselectAll,
     handleImport,
+    applyLatexFix,
     reset,
   } = useTaskImport({ topics: localTopics, tags, subtopics: localSubtopics });
+
+  // LLM-fix состояние: per-index loading flag
+  const [llmFixLoading, setLlmFixLoading] = useState({});
+
+  // Вызвать LLM-fix для задачи по индексу: исправляет statement/solution/criteria
+  // через /latex-fix endpoint на pdf-service. Дёргается только по клику учителя
+  // для задач с latex_needs_review=true.
+  const handleLlmFix = async (taskIndex) => {
+    const task = parsedData?.tasks?.[taskIndex];
+    if (!task) return;
+    setLlmFixLoading(prev => ({ ...prev, [taskIndex]: true }));
+    try {
+      const fields = ['statement_md', 'solution_md', 'criteria_md'];
+      const updates = {};
+      for (const field of fields) {
+        if (!task[field]) continue;
+        const resp = await fetch(`${PDF_SERVICE_URL}/latex-fix`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: task[field], role: field.replace('_md', '') }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(`${field}: ${err.error || resp.status}`);
+        }
+        const data = await resp.json();
+        if (data.text) updates[field] = data.text;
+      }
+      applyLatexFix(taskIndex, updates);
+      message.success(`Задача #${task.number}: LaTeX исправлен`);
+    } catch (e) {
+      message.error(`Ошибка LLM-fix: ${e.message}`);
+    } finally {
+      setLlmFixLoading(prev => ({ ...prev, [taskIndex]: false }));
+    }
+  };
 
   // Подтемы для выбранной темы (шаг 2 — предпросмотр)
   const filteredSubtopics = useMemo(() => {
@@ -785,7 +822,18 @@ export default function TaskImporter() {
                           return null;
                         })()}
                         {task.latex_needs_review && (
-                          <Tag color="warning">⚠ Проверить LaTeX</Tag>
+                          <>
+                            <Tag color="warning">⚠ Проверить LaTeX</Tag>
+                            <Button
+                              size="small"
+                              type="link"
+                              loading={!!llmFixLoading[index]}
+                              onClick={() => handleLlmFix(index)}
+                              style={{ padding: 0, marginLeft: 4 }}
+                            >
+                              🤖 LLM-fix
+                            </Button>
+                          </>
                         )}
                       </div>
                       <div style={{ fontSize: 13, marginBottom: 4 }}>

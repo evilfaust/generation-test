@@ -827,6 +827,120 @@ app.post('/fetch-image', async (req, res) => {
 });
 
 /**
+ * POST /latex-fix
+ * Нормализация LaTeX-формул через LLM. Дёргается вручную учителем для задач
+ * с latex_needs_review=true в предпросмотре импорта. Не вызывается автоматически.
+ *
+ * Принимает:
+ *   { text: string, role?: 'condition'|'solution'|'criteria' }
+ *
+ * Возвращает:
+ *   { text: string, cached: bool }                — успех, исправленный markdown
+ *   { error: string }                              — провал
+ *
+ * Конфиг (env):
+ *   TIMEWEB_AI_URL     — endpoint AI gateway (OpenAI-compatible /chat/completions)
+ *   TIMEWEB_AI_KEY     — Bearer-токен
+ *   TIMEWEB_AI_MODEL   — модель (default: deepseek-chat)
+ *
+ * Кэш — in-memory, ключ sha256(text). Сбрасывается при рестарте сервиса.
+ */
+import crypto from 'node:crypto';
+const latexFixCache = new Map();
+const MAX_CACHE_SIZE = 500;
+
+const LATEX_FIX_SYSTEM_PROMPT = `Ты конвертируешь математические формулы в LaTeX, совместимый с KaTeX-рендерером.
+
+ПРАВИЛА:
+- Аргументы команд (\\sin, \\cos, \\sqrt, \\log, \\frac, \\angle, \\widehat и т.п.) — ВСЕГДА в {фигурных}, не (круглых).
+- Многосимвольные индексы/степени — в {фигурных}: x^{12}, a_{ij}, S_{ABC}.
+- Десятичная запятая → {,}: 0{,}5.
+- Градусы → ^{\\circ}: 30^{\\circ}.
+- Русские нотации: \\tg → \\operatorname{tg}, \\ctg → \\operatorname{ctg}, \\arctg → \\operatorname{arctg}.
+- Команды БЕЗ \\: sin → \\sin, cos → \\cos.
+- Никаких $...$ обёрток в формулах — обёртка задаётся снаружи.
+- НЕ менять смысл формулы. Только синтаксис.
+
+ВХОД: текст задачи или решения с формулами в $...$.
+ВЫХОД: тот же текст, но все формулы внутри $...$ заменены на валидный KaTeX.
+Ничего, кроме исправленного текста. Никаких пояснений, комментариев, преамбул.`;
+
+app.post('/latex-fix', async (req, res) => {
+  const { text, role } = req.body || {};
+
+  if (!text || typeof text !== 'string') {
+    return res.status(400).json({ error: 'Поле text обязательно (string)' });
+  }
+  if (text.length > 20000) {
+    return res.status(400).json({ error: 'text слишком длинный (>20000 символов)' });
+  }
+
+  const aiUrl = process.env.TIMEWEB_AI_URL;
+  const aiKey = process.env.TIMEWEB_AI_KEY;
+  const aiModel = process.env.TIMEWEB_AI_MODEL || 'deepseek-chat';
+  if (!aiUrl || !aiKey) {
+    return res.status(503).json({
+      error: 'LLM endpoint не настроен на сервере (TIMEWEB_AI_URL / TIMEWEB_AI_KEY)',
+    });
+  }
+
+  // Кэш по sha256(text)
+  const cacheKey = crypto.createHash('sha256').update(text).digest('hex');
+  if (latexFixCache.has(cacheKey)) {
+    return res.json({ text: latexFixCache.get(cacheKey), cached: true });
+  }
+
+  try {
+    const llmReq = {
+      model: aiModel,
+      temperature: 0.2,
+      max_tokens: Math.min(4000, Math.ceil(text.length * 1.5)),
+      messages: [
+        { role: 'system', content: LATEX_FIX_SYSTEM_PROMPT },
+        { role: 'user', content: text },
+      ],
+    };
+
+    const resp = await fetch(aiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${aiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(llmReq),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error('[latex-fix] upstream:', resp.status, body.slice(0, 200));
+      return res.status(502).json({
+        error: `AI gateway HTTP ${resp.status}`,
+        details: body.slice(0, 300),
+      });
+    }
+
+    const data = await resp.json();
+    const fixed = data?.choices?.[0]?.message?.content?.trim();
+    if (!fixed) {
+      return res.status(502).json({ error: 'AI gateway вернул пустой ответ', upstream: data });
+    }
+
+    // LRU-чистка кэша: если перебрали лимит, удаляем самый старый.
+    if (latexFixCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = latexFixCache.keys().next().value;
+      latexFixCache.delete(firstKey);
+    }
+    latexFixCache.set(cacheKey, fixed);
+
+    console.log(`[latex-fix] role=${role || '?'} len_in=${text.length} len_out=${fixed.length}`);
+    res.json({ text: fixed, cached: false });
+  } catch (error) {
+    console.error('[latex-fix] error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /health
  * Health check
  */

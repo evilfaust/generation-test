@@ -459,6 +459,28 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
   }, [parsedData, topicId, subtopicId, selectedTasks, topics, existingSubtopics, fetchImageAsFile]);
 
   /**
+   * Применить LLM-исправление LaTeX для задачи по индексу.
+   * Принимает объект с полями { statement_md?, solution_md?, criteria_md? } —
+   * любое подмножество. Сбрасывает latex_needs_review на этой задаче.
+   */
+  const applyLatexFix = useCallback((index, fixedFields) => {
+    setParsedData(prev => {
+      if (!prev || !prev.tasks[index]) return prev;
+      const newTasks = prev.tasks.map((t, i) => {
+        if (i !== index) return t;
+        return {
+          ...t,
+          ...(fixedFields.statement_md !== undefined ? { statement_md: fixedFields.statement_md } : {}),
+          ...(fixedFields.solution_md !== undefined ? { solution_md: fixedFields.solution_md } : {}),
+          ...(fixedFields.criteria_md !== undefined ? { criteria_md: fixedFields.criteria_md } : {}),
+          latex_needs_review: false,
+        };
+      });
+      return { ...prev, tasks: newTasks };
+    });
+  }, []);
+
+  /**
    * Сброс состояния для нового импорта.
    */
   const reset = useCallback(() => {
@@ -492,6 +514,7 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
     selectAll,
     deselectAll,
     handleImport,
+    applyLatexFix,
     reset,
   };
 }
