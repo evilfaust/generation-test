@@ -1,0 +1,737 @@
+/**
+ * PDF Generation Service using Puppeteer
+ * Standalone Node.js service for high-quality PDF generation
+ */
+
+import express from 'express';
+// Поддержка puppeteer-core (VPS с системным Chromium) и puppeteer (локально)
+let puppeteer;
+try {
+  puppeteer = (await import('puppeteer')).default;
+} catch {
+  puppeteer = (await import('puppeteer-core')).default;
+}
+import cors from 'cors';
+import * as cheerio from 'cheerio';
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+
+// Глобальная переменная для браузера (переиспользование)
+let browser = null;
+
+/**
+ * Получить или создать браузер
+ */
+async function getBrowser() {
+  if (browser && browser.connected) {
+    return browser;
+  }
+
+  console.log('[PDF] Запуск Chromium...');
+  const launchOptions = {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--disable-gpu',
+    ],
+  };
+
+  // На VPS используем системный Chromium через env
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    console.log(`[PDF] Используется системный Chromium: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
+  }
+
+  browser = await puppeteer.launch(launchOptions);
+
+  browser.on('disconnected', () => {
+    console.log('[PDF] Браузер отключен');
+    browser = null;
+  });
+
+  return browser;
+}
+
+/**
+ * POST /generate
+ * Генерация PDF из HTML
+ */
+app.post('/generate', async (req, res) => {
+  const startTime = Date.now();
+  let page = null;
+
+  try {
+    const { html, filename = 'document.pdf', options = {} } = req.body;
+
+    if (!html) {
+      return res.status(400).json({ error: 'HTML content is required' });
+    }
+
+    console.log(`[PDF] Генерация: ${filename}`);
+
+    // Получаем браузер
+    const browserInstance = await getBrowser();
+
+    // Создаём новую страницу
+    page = await browserInstance.newPage();
+
+    // Устанавливаем viewport
+    await page.setViewport({
+      width: 1200,
+      height: 1600,
+      deviceScaleFactor: 2,
+    });
+
+    // Загружаем HTML
+    await page.setContent(html, {
+      waitUntil: ['load', 'networkidle0'],
+      timeout: 30000,
+    });
+
+    // Ждём загрузки шрифтов
+    await page.evaluateHandle('document.fonts.ready');
+
+    // Небольшая задержка для KaTeX (новый синтаксис)
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Генерируем PDF
+    const pdf = await page.pdf({
+      format: options.format || 'A4',
+      landscape: options.landscape || false,
+      printBackground: true,
+      preferCSSPageSize: options.preferCSSPageSize || false,
+      margin: {
+        top: options.marginTop || '7mm',
+        bottom: options.marginBottom || '7mm',
+        left: options.marginLeft || '7mm',
+        right: options.marginRight || '7mm',
+      },
+      displayHeaderFooter: false,
+    });
+
+    // Закрываем страницу
+    await page.close();
+
+    const duration = Date.now() - startTime;
+    console.log(`[PDF] Готово: ${filename} (${pdf.length} bytes, ${duration}ms)`);
+
+    // Отправляем PDF
+    // Кодируем имя файла для поддержки кириллицы
+    const encodedFilename = encodeURIComponent(filename);
+
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename*=UTF-8''${encodedFilename}`,
+      'Content-Length': pdf.length,
+    });
+    res.end(pdf, 'binary');
+
+  } catch (error) {
+    console.error('[PDF] Ошибка:', error);
+
+    // Закрываем страницу при ошибке
+    if (page) {
+      try {
+        await page.close();
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    res.status(500).json({
+      error: 'PDF generation failed',
+      message: error.message,
+    });
+  }
+});
+
+// ============================================================
+// SDAMGIA PARSER — порт логики из par.py
+// ============================================================
+
+const SDAMGIA_BASE_URL = 'https://mathb-ege.sdamgia.ru';
+const NEWLINE_MARKER = '___BR___';
+
+/**
+ * Очистка LaTeX формул от русских слов (alt-текст из SVG формул sdamgia)
+ * Порт clean_latex_formula из par.py
+ */
+function cleanLatexFormula(text) {
+  // Убираем точки в конце
+  text = text.replace(/\.+$/, '');
+
+  // Словарные замены русских слов на LaTeX команды
+  const replacements = [
+    // Тригонометрия (обрабатываем ДО греческих букв!)
+    ['тан\u00ADгенс', '\\tan'],
+    ['тангенс', '\\tan'],
+    ['ко\u00ADтан\u00ADгенс', '\\cot'],
+    ['котангенс', '\\cot'],
+    ['ко\u00ADси\u00ADнус', '\\cos'],
+    ['косинус', '\\cos'],
+    ['си\u00ADнус', '\\sin'],
+    ['синус', '\\sin'],
+
+    // Греческие буквы
+    ['альфа', '\\alpha'],
+    ['аль\u00ADфа', '\\alpha'],
+    ['бета', '\\beta'],
+    ['бе\u00ADта', '\\beta'],
+    ['гамма', '\\gamma'],
+    ['гам\u00ADма', '\\gamma'],
+    ['дельта', '\\delta'],
+    ['дель\u00ADта', '\\delta'],
+    ['пи', '\\pi'],
+
+    // Скобки и знаки
+    ['левая круг\u00ADлая скоб\u00ADка', '('],
+    ['пра\u00ADвая круг\u00ADлая скоб\u00ADка', ')'],
+    ['плюс', '+'],
+    ['минус', '-'],
+    ['умно\u00ADжить на', '\\cdot'],
+    ['де\u00ADлить на', '/'],
+
+    // Степени
+    ['в квад\u00ADра\u00ADте', '^{2}'],
+    ['в кубе', '^{3}'],
+    ['в сте\u00ADпе\u00ADни', '^'],
+
+    // Логарифмы
+    ['ло\u00ADга\u00ADрифм по ос\u00ADно\u00ADва\u00ADнию', '\\log'],
+    ['на\u00ADту\u00ADраль\u00ADный ло\u00ADга\u00ADрифм', '\\ln'],
+
+    // Системы
+    ['си\u00ADсте\u00ADма вы\u00ADра\u00ADже\u00ADний', ''],
+    ['новая стро\u00ADка', ''],
+    ['конец си\u00ADсте\u00ADмы', ''],
+
+    // Неравенства
+    ['рав\u00ADно\u00ADсиль\u00ADно', '\\Leftrightarrow'],
+    ['боль\u00ADше или равно', '\\geq'],
+    ['мень\u00ADше или равно', '\\leq'],
+    ['боль\u00ADше', '>'],
+    ['мень\u00ADше', '<'],
+
+    // Специальные слова
+    ['ра\u00ADду\u00ADсов', ''], // убираем "радусов" (артефакт парсинга углов)
+    ['радусов', ''],
+  ];
+
+  for (const [old, rep] of replacements) {
+    text = text.replaceAll(old, rep);
+  }
+
+  // Корни N-ой степени: ко­рень N сте­пе­ни из: на­ча­ло ар­гу­мен­та: X конец ар­гу­мен­та
+  text = text.replace(
+    /ко\u00ADрень\s+(\d+)\s+сте\u00ADпе\u00ADни\s+из:\s*на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:\s*(.*?)\s*конец ар\u00ADгу\u00ADмен\u00ADта/g,
+    (_, n, arg) => `\\sqrt[${n}]{${arg.trim()}}`
+  );
+
+  // Корни с аргументами: ко­рень из: на­ча­ло ар­гу­мен­та: X конец ар­гу­мен­та
+  text = text.replace(
+    /ко\u00ADрень из:\s*на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:\s*(.*?)\s*конец ар\u00ADгу\u00ADмен\u00ADта/g,
+    (_, arg) => `\\sqrt{${arg.trim()}}`
+  );
+
+  // LaTeX sqrt с аргументами: \sqrt: на­ча­ло ар­гу­мен­та: X конец ар­гу­мен­та
+  text = text.replace(
+    /\\sqrt:\s*на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:\s*(.*?)\s*конец ар\u00ADгу\u00ADмен\u00ADта/g,
+    (_, arg) => `\\sqrt{${arg.trim()}}`
+  );
+
+  // Простой корень без аргументов
+  text = text.replaceAll('ко\u00ADрень из', '\\sqrt');
+
+  // Убираем оставшиеся маркеры аргументов
+  text = text.replaceAll('на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:', '');
+  text = text.replaceAll('конец ар\u00ADгу\u00ADмен\u00ADта', '');
+
+  // Обработка дробей (рекурсивно, от внутренних к внешним)
+  for (let i = 0; i < 10; i++) {
+    const fractionRegex = /дробь:\s*чис\u00ADли\u00ADтель:\s*(.*?)\s*,\s*зна\u00ADме\u00ADна\u00ADтель:\s*(.*?)\s*конец дроби/;
+    const match = text.match(fractionRegex);
+    if (!match) break;
+    const numerator = match[1].trim();
+    const denominator = match[2].trim();
+    text = text.slice(0, match.index) + `\\frac{${numerator}}{${denominator}}` + text.slice(match.index + match[0].length);
+  }
+
+  // Убираем множественные пробелы
+  text = text.replace(/\s+/g, ' ').trim();
+
+  return text;
+}
+
+/**
+ * Конвертирует HTML таблицу в Markdown таблицу
+ */
+function tableToMarkdown($, tableEl) {
+  const rows = [];
+
+  $(tableEl).find('tr').each(function () {
+    const cells = [];
+    $(this).find('th, td').each(function () {
+      // Получаем текст ячейки (может содержать формулы через img alt)
+      let cellText = $(this).text().trim();
+      // Убираем переносы строк внутри ячейки
+      cellText = cellText.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+      cells.push(cellText);
+    });
+    if (cells.length > 0) {
+      rows.push(cells);
+    }
+  });
+
+  if (rows.length === 0) return '';
+
+  // Формируем markdown таблицу
+  const lines = [];
+
+  // Первая строка (заголовки)
+  if (rows.length > 0) {
+    lines.push('| ' + rows[0].join(' | ') + ' |');
+    // Разделитель
+    lines.push('| ' + rows[0].map(() => '---').join(' | ') + ' |');
+  }
+
+  // Остальные строки (данные)
+  for (let i = 1; i < rows.length; i++) {
+    lines.push('| ' + rows[i].join(' | ') + ' |');
+  }
+
+  return '\n\n' + lines.join('\n') + '\n\n';
+}
+
+/**
+ * Конвертирует HTML список (ol/ul) в Markdown список
+ * Обрабатывает только прямые дочерние li (> li), игнорируя вложенные списки
+ */
+function listToMarkdown($, listEl, ordered = true) {
+  const items = [];
+  let index = 1;
+
+  $(listEl).children('li').each(function () {
+    // Клонируем элемент для обработки
+    const $li = $(this).clone();
+
+    // Удаляем вложенные списки (если есть)
+    $li.find('ol, ul').remove();
+
+    let itemText = $li.text().trim();
+    // Убираем лишние пробелы
+    itemText = itemText.replace(/\s+/g, ' ');
+
+    if (itemText) {
+      if (ordered) {
+        items.push(`${index}) ${itemText}`);
+        index++;
+      } else {
+        items.push(`- ${itemText}`);
+      }
+    }
+  });
+
+  if (items.length === 0) return '';
+  return '\n\n' + items.join('\n') + '\n\n';
+}
+
+/**
+ * Обработка условия задачи — извлечение текста, формул, таблиц и изображений
+ * Порт process_condition из par.py + поддержка таблиц
+ */
+function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL) {
+  if (!conditionEl) return { text: '', images: [] };
+
+  const images = [];
+  let formulaIndex = 0;
+  let imgIndex = 0;
+  let tableIndex = 0;
+  const formulaReplacements = {};
+  const imageReplacements = {};
+  const tableReplacements = {};
+
+  // Клонируем элемент чтобы не менять оригинал
+  const $el = $(conditionEl).clone();
+
+  // Сначала обрабатываем формулы внутри таблиц (чтобы alt-текст попал в ячейки)
+  $el.find('table img').each(function () {
+    const imgUrl = $(this).attr('src') || '';
+    if (imgUrl.includes('formula') || imgUrl.includes('/formula/')) {
+      const altText = $(this).attr('alt') || '';
+      if (altText) {
+        const cleanedLatex = cleanLatexFormula(altText);
+        const marker = `___FORMULA_${formulaIndex}___`;
+        formulaReplacements[marker] = `$${cleanedLatex}$`;
+        formulaIndex++;
+        $(this).replaceWith(marker);
+      } else {
+        $(this).remove();
+      }
+    }
+  });
+
+  // Обрабатываем таблицы — конвертируем в markdown
+  $el.find('table').each(function () {
+    const markdownTable = tableToMarkdown($, this);
+    if (markdownTable) {
+      const marker = `___TABLE_${tableIndex}___`;
+      tableReplacements[marker] = markdownTable;
+      tableIndex++;
+      $(this).replaceWith(marker);
+    } else {
+      $(this).remove();
+    }
+  });
+
+  // Обрабатываем "фейковые" списки в параграфах (специфика sdamgia)
+  // Обычно <p class="left_margin">1) ...</p>
+  $el.find('p').each(function () {
+    const $p = $(this);
+    let text = $p.text().trim();
+
+    // Проверяем, похоже ли это на элемент списка "1) ..." или "a) ..." или "- ..."
+    // Мы хотим убедиться, что он начинается с новой строки
+    if (/^\d+\)/.test(text) || /^[a-zа-я]\)/.test(text) || /^-\s/.test(text)) {
+      $p.prepend(NEWLINE_MARKER);
+    } else {
+      // Обычный параграф - двойной перенос для разделения
+      $p.prepend(NEWLINE_MARKER + NEWLINE_MARKER);
+    }
+  });
+
+  // Обрабатываем нумерованные списки (ol)
+  $el.find('ol').each(function () {
+    let index = 1;
+    const $ol = $(this);
+
+    // Добавляем маркеры переноса
+    $ol.before(NEWLINE_MARKER + NEWLINE_MARKER);
+
+    $ol.children('li').each(function () {
+      const $li = $(this);
+      // Добавляем маркер и конвертируем в формат 1. для markdown
+      $li.prepend(`${NEWLINE_MARKER}${index}. `);
+      index++;
+    });
+
+    $ol.after(NEWLINE_MARKER + NEWLINE_MARKER);
+  });
+
+  // Обрабатываем маркированные списки (ul)
+  $el.find('ul').each(function () {
+    const $ul = $(this);
+
+    $ul.before(NEWLINE_MARKER + NEWLINE_MARKER);
+
+    $ul.children('li').each(function () {
+      const $li = $(this);
+      $li.prepend(`${NEWLINE_MARKER}- `);
+    });
+
+    $ul.after(NEWLINE_MARKER + NEWLINE_MARKER);
+  });
+
+  // Обрабатываем изображения (формулы и картинки вне таблиц)
+  $el.find('img').each(function () {
+    const imgUrl = $(this).attr('src') || '';
+    if (!imgUrl) {
+      $(this).remove();
+      return;
+    }
+
+    if (imgUrl.includes('formula') || imgUrl.includes('/formula/')) {
+      // SVG формула — берём alt-текст
+      const altText = $(this).attr('alt') || '';
+      if (altText) {
+        const cleanedLatex = cleanLatexFormula(altText);
+        const marker = `___FORMULA_${formulaIndex}___`;
+        formulaReplacements[marker] = `$${cleanedLatex}$`;
+        formulaIndex++;
+        $(this).replaceWith(marker);
+      } else {
+        $(this).remove();
+      }
+    } else {
+      // Обычное изображение (чертёж и т.п.)
+      let fullUrl = imgUrl;
+      if (!fullUrl.startsWith('http')) {
+        fullUrl = new URL(imgUrl, baseUrl).href;
+      }
+      images.push(fullUrl);
+      const marker = `___IMAGE_${imgIndex}___`;
+      // Изображение всегда на отдельной строке
+      imageReplacements[marker] = `\n![image](${fullUrl})\n`;
+      imgIndex++;
+      $(this).replaceWith(marker);
+    }
+  });
+
+  // Получаем текст с маркерами и чистим пробелы (схлопываем множественные пробелы)
+  let text = $el.text().replace(/\s+/g, ' ').trim();
+
+  // Восстанавливаем переносы строк из маркеров
+  text = text.replaceAll(NEWLINE_MARKER, '\n');
+
+  // Убираем артефакты типографики SDAMGIA
+  text = text.replace(/\u00AD/g, ''); // soft hyphen
+  text = text.replace(/\u200B/g, ''); // zero-width space
+
+  // Чистим множественные переносы (больше 2)
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  // Заменяем маркеры таблиц на markdown
+  for (const [marker, mdTable] of Object.entries(tableReplacements)) {
+    text = text.replace(marker, mdTable);
+  }
+
+  // Заменяем маркеры формул на LaTeX
+  for (const [marker, latex] of Object.entries(formulaReplacements)) {
+    text = text.replace(marker, ` ${latex} `);
+  }
+
+  // Заменяем маркеры изображений на markdown
+  for (const [marker, imgMarkdown] of Object.entries(imageReplacements)) {
+    text = text.replace(marker, imgMarkdown);
+  }
+
+  return { text: text.trim(), images };
+}
+
+/**
+ * Извлечение данных задачи из div.prob_maindiv
+ * Порт parse_problem_from_div из par.py
+ */
+function parseProblemFromDiv($, probDiv, baseUrl) {
+  try {
+    const problem = { id: '', condition: '', answer: '', images: [] };
+
+    // ID задачи
+    const probNums = $(probDiv).find('.prob_nums');
+    if (probNums.length) {
+      const link = probNums.find('a');
+      if (link.length) {
+        problem.id = link.text().trim();
+      }
+    }
+
+    // Условие задачи
+    const pbody = $(probDiv).find('.pbody');
+    if (pbody.length) {
+      const { text, images } = processCondition($, pbody.get(0), baseUrl);
+      problem.condition = text;
+      problem.images = images;
+    }
+
+    // Ответ
+    const answerDiv = $(probDiv).find('.answer');
+    if (answerDiv.length) {
+      let answerText = answerDiv.text().trim();
+      answerText = answerText.replace(/^Ответ:\s*/i, '').replace(/^ответ:\s*/i, '').trim();
+      problem.answer = answerText;
+    }
+
+    // Решение (опционально — присутствует в ВПР и некоторых ЕГЭ задачах)
+    const solutionDiv = $(probDiv).find('.solution');
+    if (solutionDiv.length) {
+      // Клонируем, чтобы не трогать оригинал
+      const $sol = $(solutionDiv).clone();
+      // Убираем блок критериев внутри решения (если попал)
+      $sol.find('.prob_crits').remove();
+      const { text: solRaw, images: solImages } = processCondition($, $sol.get(0), baseUrl);
+      // Убираем «Решение.» в начале (с возможными мягкими переносами, уже удалены processCondition)
+      let solText = solRaw.replace(/^Решение\.?\s*/i, '').trim();
+
+      // Если ответ ещё не найден (нет отдельного .answer div), извлекаем из конца решения.
+      // ВПР-шаблон: «Ответ: 28°.» или «Ответ: 28°» в конце текста.
+      if (!problem.answer) {
+        const answerInSol = solText.match(/\s*Ответ:?\s*(.+?)\s*\.?\s*$/i);
+        if (answerInSol) {
+          // Убираем завершающую точку (если есть)
+          problem.answer = answerInSol[1].trim().replace(/\.$/, '').trim();
+        }
+      }
+
+      // Убираем встроенный «Ответ: X» в конце решения
+      solText = solText.replace(/\s*Ответ:?\s*.+$/i, '').trim();
+      if (solText) {
+        problem.solution = solText;
+        problem.solution_images = solImages;
+      }
+    }
+
+    // Проверяем что есть условие (ответ опционален — он может быть внутри решения)
+    if (!problem.condition) {
+      return null;
+    }
+
+    return problem;
+  } catch (e) {
+    console.error('[Sdamgia] Ошибка парсинга задачи:', e.message);
+    return null;
+  }
+}
+
+/**
+ * POST /parse-sdamgia
+ * Парсинг задач с sdamgia.ru
+ */
+app.post('/parse-sdamgia', async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    const { url } = req.body;
+
+    if (!url) {
+      return res.status(400).json({ error: 'URL обязателен' });
+    }
+
+    // Валидация URL
+    if (!url.includes('sdamgia.ru')) {
+      return res.status(400).json({ error: 'URL должен быть с сайта sdamgia.ru' });
+    }
+
+    // Добавляем print=true если нет
+    let fetchUrl = url;
+    if (!fetchUrl.includes('print=true')) {
+      fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'print=true';
+    }
+
+    console.log(`[Sdamgia] Загрузка: ${fetchUrl}`);
+
+    // Загружаем страницу
+    const response = await fetch(fetchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({
+        error: `Ошибка загрузки: HTTP ${response.status}`,
+      });
+    }
+
+    const html = await response.text();
+
+    // Парсим HTML через cheerio
+    const $ = cheerio.load(html);
+    const baseUrl = (() => { try { const u = new URL(fetchUrl); return u.origin; } catch(e) { return SDAMGIA_BASE_URL; } })();
+    const probDivs = $('.prob_maindiv');
+
+    console.log(`[Sdamgia] Найдено задач на странице: ${probDivs.length}`);
+
+    const problems = [];
+    probDivs.each(function () {
+      const problem = parseProblemFromDiv($, this, baseUrl);
+      if (problem) {
+        problems.push(problem);
+      }
+    });
+
+    const duration = Date.now() - startTime;
+    console.log(`[Sdamgia] Распарсено: ${problems.length} задач за ${duration}ms`);
+
+    res.json({
+      problems,
+      count: problems.length,
+      totalOnPage: probDivs.length,
+    });
+
+  } catch (error) {
+    console.error('[Sdamgia] Ошибка:', error.message);
+    res.status(500).json({
+      error: 'Ошибка парсинга',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /fetch-image
+ * Прокси-загрузка картинки (для импорта задач без CORS-зависимости в браузере)
+ */
+app.post('/fetch-image', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'URL обязателен' });
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      return res.status(400).json({ error: 'Некорректный URL' });
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: 'Поддерживаются только http/https URL' });
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',
+        Referer: `${parsed.protocol}//${parsed.host}/`,
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ error: `Ошибка загрузки изображения: HTTP ${response.status}` });
+    }
+
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(buffer);
+  } catch (error) {
+    console.error('[ImageProxy] Ошибка:', error.message);
+    return res.status(500).json({ error: 'Ошибка прокси-загрузки изображения', message: error.message });
+  }
+});
+
+/**
+ * GET /health
+ * Health check
+ */
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'puppeteer-pdf',
+    puppeteer: 'installed',
+    browser: browser?.connected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+/**
+ * Shutdown handler
+ */
+process.on('SIGINT', async () => {
+  console.log('\n[PDF] Завершение работы...');
+
+  if (browser) {
+    await browser.close();
+  }
+
+  process.exit(0);
+});
+
+/**
+ * Запуск сервера
+ */
+app.listen(PORT, () => {
+  console.log(`[PDF] Сервис запущен на http://localhost:${PORT}`);
+  console.log(`[PDF] Health check: http://localhost:${PORT}/health`);
+});
