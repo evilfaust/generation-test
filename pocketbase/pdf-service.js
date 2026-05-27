@@ -608,6 +608,12 @@ function parseProblemFromDiv($, probDiv, baseUrl) {
     if (answerDiv.length) {
       let answerText = answerDiv.text().trim();
       answerText = answerText.replace(/^Ответ:\s*/i, '').replace(/^ответ:\s*/i, '').trim();
+      // На массовой странице (?category_id=...) для задач части 2 .answer
+      // иногда содержит только маркер пункта без значения («б)», «а)»).
+      // Считаем такой ответ мусорным — попробуем достать из решения ниже.
+      if (/^[абвгде]\)\s*$/i.test(answerText) || answerText.length < 2) {
+        answerText = '';
+      }
       problem.answer = answerText;
     }
 
@@ -624,18 +630,46 @@ function parseProblemFromDiv($, probDiv, baseUrl) {
       // Убираем «Решение.» в начале (с возможными мягкими переносами, уже удалены processCondition)
       let solText = solRaw.replace(/^Решение\.?\s*/i, '').trim();
 
-      // Если ответ ещё не найден (нет отдельного .answer div), извлекаем из конца решения.
-      // ВПР-шаблон: «Ответ: 28°.» или «Ответ: 28°» в конце текста.
+      // Если ответ ещё не найден (нет .answer div или там мусор типа «б)»),
+      // извлекаем из решения. Sdamgia ставит «Ответ: N.» в первом решении ДО
+      // блока «Приведём другое решение…». Для части 2 ищем первое вхождение.
       if (!problem.answer) {
-        const answerInSol = solText.match(/\s*Ответ:?\s*(.+?)\s*\.?\s*$/i);
-        if (answerInSol) {
-          // Убираем завершающую точку (если есть)
-          problem.answer = answerInSol[1].trim().replace(/\.$/, '').trim();
+        // Сначала пробуем найти «Ответ: …» где значение не «а)/б)/в)» одиночное
+        const allAnswers = [...solText.matchAll(/Ответ:?\s*([^.\n]+?)\s*\.?(?=\s*(?:Прив[её]д[её]м|\n\n|$))/gi)];
+        for (const m of allAnswers) {
+          const candidate = m[1].trim().replace(/\.$/, '').trim();
+          if (candidate && candidate.length > 1 && !/^[абвгде]\)\s*$/i.test(candidate)) {
+            problem.answer = candidate;
+            break;
+          }
+        }
+        // Fallback — последний шанс, простой паттерн как было раньше
+        if (!problem.answer) {
+          const answerInSol = solText.match(/\s*Ответ:?\s*(.+?)\s*\.?\s*$/i);
+          if (answerInSol) {
+            problem.answer = answerInSol[1].trim().replace(/\.$/, '').trim();
+          }
         }
       }
 
-      // Убираем встроенный «Ответ: X» в конце решения
-      solText = solText.replace(/\s*Ответ:?\s*.+$/i, '').trim();
+      // Sdamgia вставляет альтернативные решения в тот же .solution как обычные
+      // параграфы: «Приведём другое решение пункта а).» / «Приведём ещё одно
+      // решение пункта б).» Превращаем эти параграфы в markdown-подзаголовки,
+      // чтобы они визуально отделялись и не выглядели как часть основного текста.
+      solText = solText.replace(
+        /Прив[её]д[её]м\s+(?:ещё\s+одно|другое|еще\s+одно|еще\s+один)\s+решение\s+пунк[та]+\s*([абвгде])\)\.?/gi,
+        '\n\n---\n\n### Другое решение пункта $1)\n\n'
+      );
+
+      // Убираем встроенный «Ответ: X.» в начале (он повторяется в самом конце
+      // основного решения), но НЕ трогаем ответы внутри альтернатив (после ---).
+      // Берём только первое появление до первого ---.
+      const sepIdx = solText.indexOf('\n---\n');
+      const beforeSep = sepIdx >= 0 ? solText.slice(0, sepIdx) : solText;
+      const afterSep = sepIdx >= 0 ? solText.slice(sepIdx) : '';
+      const cleanedMain = beforeSep.replace(/\s*Ответ:?\s*[^\n]+\.?\s*$/i, '').trim();
+      solText = (cleanedMain + (afterSep ? '\n' + afterSep : '')).trim();
+
       if (solText) {
         problem.solution = solText;
         problem.solution_images = solImages;
