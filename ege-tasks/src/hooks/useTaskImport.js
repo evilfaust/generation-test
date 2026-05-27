@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { api } from '../services/pocketbase';
+import pb, { api } from '../services/pocketbase';
 import { parseMarkdownFile, parseSdamgiaResult, getRandomTagColor } from '../utils/markdownTaskParser';
 
 const getPdfServiceUrl = () => {
@@ -414,14 +414,36 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
           let failedCount = 0;
           for (const [role, imgs] of imageRoles) {
             for (const img of imgs) {
-              const rec = await api.uploadTaskImageFromUrl({
-                task: createdTask.id,
-                role,
-                order: img.order,
-                url: img.url,
-                sdamgia_file_id: img.file_id,
-              });
-              if (rec) uploadedCount++; else failedCount++;
+              try {
+                // Дедуп по (task, role, order): защита от повторного импорта.
+                if (img.order != null) {
+                  const found = await pb.collection('task_images').getList(1, 1, {
+                    filter: `task = "${createdTask.id}" && role = "${role}" && order = ${img.order}`,
+                  }).catch(() => ({ items: [] }));
+                  if (found.items?.[0]) { uploadedCount++; continue; }
+                }
+                // sdamgia блокирует прямые fetch из браузера (DDoS-guard, CORS),
+                // поэтому качаем через серверный прокси /fetch-image — он
+                // подставит правильный User-Agent + Referer.
+                const fileObj = await fetchImageAsFile(
+                  img.url,
+                  img.file_id || `${role}_${img.order || 1}`
+                );
+                if (!fileObj) throw new Error('пустой ответ от прокси');
+                const rec = await api.createTaskImage({
+                  task: createdTask.id,
+                  role,
+                  order: img.order,
+                  fileBlob: fileObj,
+                  fileName: fileObj.name,
+                  sdamgia_file_id: img.file_id,
+                  original_url: img.url,
+                });
+                if (rec) uploadedCount++; else failedCount++;
+              } catch (e) {
+                console.warn(`[import] img ${img.url}: ${e.message}`);
+                failedCount++;
+              }
             }
           }
 
