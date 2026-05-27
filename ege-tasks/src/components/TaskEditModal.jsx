@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse } from 'antd';
-import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import TaskStatementRenderer from './TaskStatementRenderer';
+import RefreshFromSdamgiaModal from './RefreshFromSdamgiaModal';
 import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
 import { generateTaskCode } from '../utils/taskCodeGenerator';
@@ -12,6 +13,19 @@ import { useImageUpload } from '../hooks';
 import { parseMatchingTask } from '../utils/parseMatchingTask';
 
 const DEFINE_API_BASE = import.meta.env.VITE_DEFINE_API_URL?.replace('/define', '') || 'https://l.oipav.ru';
+
+// URL pdf-service (та же логика, что в TaskImporter): VITE override или
+// production-домен через window.location.hostname, fallback на localhost:3001.
+const PDF_SERVICE_URL = (() => {
+  const envUrl = import.meta.env.VITE_PDF_SERVICE_URL;
+  if (envUrl) return envUrl;
+  if (typeof window !== 'undefined' && window.location?.hostname) {
+    if (window.location.hostname.includes('localhost')) return 'http://localhost:3001';
+    // Прод через nginx proxy /pdf на тот же домен
+    return `${window.location.protocol}//${window.location.hostname}/pdf`;
+  }
+  return 'http://localhost:3001';
+})();
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -49,6 +63,63 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   // Картинки задачи из коллекции task_images, сгруппированы по ролям.
   // Используются для подмены ![image](внешний_url) на локальный в превью.
   const [taskImages, setTaskImages] = useState({ condition: [], solution: [], criteria: [] });
+
+  // LLM-fix состояние: loading + локальный override critериев (поле не в форме,
+  // а в task — после fix храним новую версию здесь, при handleSave передаём в API).
+  const [latexFixLoading, setLatexFixLoading] = useState(false);
+  const [criteriaOverride, setCriteriaOverride] = useState(null);
+  // Модал «Перепарсить с Решу ЕГЭ» (Уровень 2)
+  const [refreshModalOpen, setRefreshModalOpen] = useState(false);
+  // Сбрасываем criteriaOverride при смене task
+  useEffect(() => {
+    if (visible) setCriteriaOverride(null);
+  }, [visible, task?.id]);
+
+  /**
+   * Прогнать текущие statement/solution/criteria через /latex-fix и
+   * автоматически подставить результат в форму. Сохранение делает учитель
+   * обычной кнопкой Save — это даёт ему возможность вручную доправить или
+   * откатить.
+   */
+  const handleLatexFix = async () => {
+    setLatexFixLoading(true);
+    try {
+      const values = form.getFieldsValue();
+      const fields = [
+        ['statement_md', values.statement_md, (v) => { form.setFieldValue('statement_md', v); setPreviewStatement(v); }],
+        ['solution_md',  values.solution_md,  (v) => { form.setFieldValue('solution_md', v);  setPreviewSolution(v); }],
+        ['criteria_md',  criteriaOverride ?? task?.criteria_md, (v) => setCriteriaOverride(v)],
+      ];
+      let changedCount = 0;
+      for (const [field, text, setter] of fields) {
+        if (!text || !String(text).trim()) continue;
+        const role = field.replace('_md', '');
+        const resp = await fetch(`${PDF_SERVICE_URL}/latex-fix`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, role }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(`${field}: ${err.error || resp.status}`);
+        }
+        const data = await resp.json();
+        if (data.text && data.text !== text) {
+          setter(data.text);
+          changedCount++;
+        }
+      }
+      if (changedCount === 0) {
+        message.info('LLM не нашёл что исправить — поля уже корректны');
+      } else {
+        message.success(`Поля обновлены (${changedCount}). Не забудь «Сохранить».`);
+      }
+    } catch (e) {
+      message.error(`Ошибка LLM-fix: ${e.message}`);
+    } finally {
+      setLatexFixLoading(false);
+    }
+  };
 
   const isCreateMode = !task;
 
@@ -274,6 +345,19 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         tags: values.tags || [],
       };
 
+      // Critерии не в форме — переносим из override, если был LLM-fix.
+      if (criteriaOverride != null && criteriaOverride !== task?.criteria_md) {
+        taskData.criteria_md = criteriaOverride;
+      }
+      // Если хоть одно поле было исправлено LLM, сбрасываем флаг needs_review.
+      const latexChanged =
+        (criteriaOverride != null && criteriaOverride !== task?.criteria_md) ||
+        (task && values.statement_md !== task.statement_md) ||
+        (task && values.solution_md !== task.solution_md);
+      if (task?.latex_needs_review && latexChanged) {
+        taskData.latex_needs_review = false;
+      }
+
       if (imageDeleted) {
         // Явное удаление изображения пользователем
         taskData.image = null;
@@ -467,6 +551,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   }, [visible, handleEscClose]);
 
   return (
+    <>
     <Modal
       title={
         <Space wrap>
@@ -492,6 +577,31 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
               rel="noopener noreferrer"
             >
               Решу ЕГЭ (id {task.sdamgia_id})
+            </Button>
+          )}
+          {/* Кнопка LLM-fix LaTeX — для уже сохранённых задач.
+              Берёт текущее из формы, прогоняет через /latex-fix, подставляет
+              результат в форму. Учитель сохраняет обычной кнопкой Save. */}
+          {!isCreateMode && (
+            <Button
+              size="small"
+              type="default"
+              loading={latexFixLoading}
+              onClick={handleLatexFix}
+              title="Прогнать текст задачи через LLM, чтобы починить разметку LaTeX"
+            >
+              🤖 Починить LaTeX
+            </Button>
+          )}
+          {!isCreateMode && task?.sdamgia_url && (
+            <Button
+              size="small"
+              type="default"
+              icon={<ReloadOutlined />}
+              onClick={() => setRefreshModalOpen(true)}
+              title="Перепарсить задачу с sdamgia актуальным парсером + LLM"
+            >
+              Перепарсить с Решу ЕГЭ
             </Button>
           )}
         </Space>
@@ -876,30 +986,39 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
           </div>
         )}
 
-        {/* Критерии оценивания + max_score — только для задач части 2 */}
-        {(task?.criteria_md || task?.exam_part === 2) && (
-          <Collapse
-            ghost
-            style={{ marginBottom: 16 }}
-            items={[{
-              key: 'criteria',
-              label: (
-                <Space>
-                  <strong>Критерии оценивания</strong>
-                  {task?.max_score != null && <Tag color="gold">{task.max_score} б.</Tag>}
-                  {task?.exam_part === 2 && <Tag color="purple">Часть 2</Tag>}
-                </Space>
-              ),
-              children: task?.criteria_md ? (
-                <div style={{ padding: 12, background: '#fffbe6', borderRadius: 4, border: '1px solid #ffe58f' }}>
-                  <TaskStatementRenderer text={task.criteria_md} images={taskImages.criteria} />
-                </div>
-              ) : (
-                <Alert type="info" message="Критерии не загружены" />
-              ),
-            }]}
-          />
-        )}
+        {/* Критерии оценивания + max_score — только для задач части 2.
+            После LLM-fix используем criteriaOverride, до сохранения task
+            не меняется, но превью обновлено. */}
+        {(() => {
+          const currentCriteria = criteriaOverride ?? task?.criteria_md;
+          if (!currentCriteria && task?.exam_part !== 2) return null;
+          return (
+            <Collapse
+              ghost
+              style={{ marginBottom: 16 }}
+              items={[{
+                key: 'criteria',
+                label: (
+                  <Space>
+                    <strong>Критерии оценивания</strong>
+                    {task?.max_score != null && <Tag color="gold">{task.max_score} б.</Tag>}
+                    {task?.exam_part === 2 && <Tag color="purple">Часть 2</Tag>}
+                    {criteriaOverride != null && criteriaOverride !== task?.criteria_md && (
+                      <Tag color="processing">⚡ Изменено LLM — сохрани</Tag>
+                    )}
+                  </Space>
+                ),
+                children: currentCriteria ? (
+                  <div style={{ padding: 12, background: '#fffbe6', borderRadius: 4, border: '1px solid #ffe58f' }}>
+                    <TaskStatementRenderer text={currentCriteria} images={taskImages.criteria} />
+                  </div>
+                ) : (
+                  <Alert type="info" message="Критерии не загружены" />
+                ),
+              }]}
+            />
+          );
+        })()}
 
         {/* Подсказка по LaTeX */}
         <div style={{ fontSize: 12, color: '#666', background: '#fff7e6', padding: 8, borderRadius: 4, border: '1px solid #ffd591' }}>
@@ -921,6 +1040,18 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         messageApi={message}
       />
     </Modal>
+
+    {/* Модал «Перепарсить с Решу ЕГЭ» — вне основного Modal чтобы избежать
+        конфликтов z-index и focus-trap. */}
+    {task && task.sdamgia_url && (
+      <RefreshFromSdamgiaModal
+        task={task}
+        open={refreshModalOpen}
+        onClose={() => setRefreshModalOpen(false)}
+        onApplied={() => { onClose?.(); }}
+      />
+    )}
+    </>
   );
 };
 
