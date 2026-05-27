@@ -176,6 +176,12 @@ function cleanLatexFormula(text) {
   // Убираем точки в конце
   text = text.replace(/\.+$/, '');
 
+  // Нормализация невидимых символов сразу — упрощает все последующие регулярки
+  // (не нужно ставить ? в каждом паттерне).
+  text = text.replace(/­/g, ''); // soft hyphen
+  text = text.replace(/​/g, ''); // zero-width space
+  text = text.replace(/ /g, ' '); // nbsp → обычный пробел
+
   // Словарные замены русских слов на LaTeX команды
   const replacements = [
     // Тригонометрия (обрабатываем ДО греческих букв!)
@@ -197,7 +203,9 @@ function cleanLatexFormula(text) {
     ['гам\u00ADма', '\\gamma'],
     ['дельта', '\\delta'],
     ['дель\u00ADта', '\\delta'],
-    ['пи', '\\pi'],
+    // 'пи' / 'Пи' обрабатываются отдельно через regex с границами слов,
+    // потому что эта подстрока встречается внутри множества других слов
+    // (правая, приведём, верхняя и т.п.) и replaceAll бы их испортил.
 
     // Скобки и знаки
     ['левая круг\u00ADлая скоб\u00ADка', '('],
@@ -231,25 +239,59 @@ function cleanLatexFormula(text) {
     // Специальные слова
     ['ра\u00ADду\u00ADсов', ''], // убираем "радусов" (артефакт парсинга углов)
     ['радусов', ''],
+
+    // Квадратные и фигурные скобки (alt MathML без soft-hyphens — новые задачи)
+    ['леваяквадратнаяскобка', '\\left['],
+    ['праваяквадратнаяскобка', '\\right]'],
+    ['левая квадратная скобка', '\\left['],
+    ['правая квадратная скобка', '\\right]'],
+    ['леваяфигурнаяскобка', '\\left\\{'],
+    ['праваяфигурнаяскобка', '\\right\\}'],
+    ['левая фигурная скобка', '\\left\\{'],
+    ['правая фигурная скобка', '\\right\\}'],
+
+    // Множества и отношения (тригонометрия, теория чисел)
+    ['не принадлежит', '\\notin'],
+    ['принадлежит', '\\in'],
+    ['множество целых чисел', '\\mathbb{Z}'],
+    ['множество натуральных чисел', '\\mathbb{N}'],
+    ['множество рациональных чисел', '\\mathbb{Q}'],
+    ['множество действительных чисел', '\\mathbb{R}'],
+
+    // ± / ∓ (часто в тригонометрии)
+    ['плюс минус', '\\pm'],
+    ['плюс-минус', '\\pm'],
+    ['минус плюс', '\\mp'],
+    ['минус-плюс', '\\mp'],
+
+    // Бесконечность
+    ['бесконечность', '\\infty'],
   ];
 
+  // text уже нормализован (без soft-hyphens) выше — нормализуем и ключи словаря,
+  // чтобы старые записи с  продолжали работать.
   for (const [old, rep] of replacements) {
-    text = text.replaceAll(old, rep);
+    const normalizedKey = old.replace(/­/g, '').replace(/​/g, '');
+    text = text.replaceAll(normalizedKey, rep);
   }
 
-  // Корни N-ой степени: ко­рень N сте­пе­ни из: на­ча­ло ар­гу­мен­та: X конец ар­гу­мен­та
+  // Короткие слова — отдельно через regex с не-буквенными границами,
+  // чтобы не задеть подстроки внутри обычных слов («пи» в «правая», «приведём»).
+  text = text.replace(/(?<![а-яА-Я])(?:пи|Пи)(?![а-яА-Я])/g, '\\pi');
+
+  // Корни N-ой степени: корень N степени из: начало аргумента: X конец аргумента
   text = text.replace(
     /ко\u00ADрень\s+(\d+)\s+сте\u00ADпе\u00ADни\s+из:\s*на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:\s*(.*?)\s*конец ар\u00ADгу\u00ADмен\u00ADта/g,
     (_, n, arg) => `\\sqrt[${n}]{${arg.trim()}}`
   );
 
-  // Корни с аргументами: ко­рень из: на­ча­ло ар­гу­мен­та: X конец ар­гу­мен­та
+  // Корни с аргументами: корень из: начало аргумента: X конец аргумента
   text = text.replace(
     /ко\u00ADрень из:\s*на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:\s*(.*?)\s*конец ар\u00ADгу\u00ADмен\u00ADта/g,
     (_, arg) => `\\sqrt{${arg.trim()}}`
   );
 
-  // LaTeX sqrt с аргументами: \sqrt: на­ча­ло ар­гу­мен­та: X конец ар­гу­мен­та
+  // LaTeX sqrt с аргументами: \sqrt: начало аргумента: X конец аргумента
   text = text.replace(
     /\\sqrt:\s*на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:\s*(.*?)\s*конец ар\u00ADгу\u00ADмен\u00ADта/g,
     (_, arg) => `\\sqrt{${arg.trim()}}`
@@ -264,13 +306,54 @@ function cleanLatexFormula(text) {
 
   // Обработка дробей (рекурсивно, от внутренних к внешним)
   for (let i = 0; i < 10; i++) {
-    const fractionRegex = /дробь:\s*чис\u00ADли\u00ADтель:\s*(.*?)\s*,\s*зна\u00ADме\u00ADна\u00ADтель:\s*(.*?)\s*конец дроби/;
+    const fractionRegex = /дробь:\s*чис(?:\u00AD)?ли(?:\u00AD)?тель:\s*(.*?)\s*,?\s*зна(?:\u00AD)?ме(?:\u00AD)?на(?:\u00AD)?тель:\s*(.*?)\s*конец дроби/;
     const match = text.match(fractionRegex);
     if (!match) break;
     const numerator = match[1].trim();
     const denominator = match[2].trim();
     text = text.slice(0, match.index) + `\\frac{${numerator}}{${denominator}}` + text.slice(match.index + match[0].length);
   }
+
+  // ─── Новые шаблоны alt MathML без soft-hyphens (актуальные задачи sdamgia) ───
+
+  // «дробная часть : числитель : A, знаменатель : B» → \frac{A}{B}
+  for (let i = 0; i < 10; i++) {
+    const m = text.match(
+      /дробная\s+часть\s*:?\s*числитель\s*:?\s*([^,;]+?)\s*,\s*знаменатель\s*:?\s*([^.,;]+?)(?=[\s,.;]|$)/i
+    );
+    if (!m) break;
+    text = text.slice(0, m.index) + `\\frac{${m[1].trim()}}{${m[2].trim()}}` + text.slice(m.index + m[0].length);
+  }
+
+  // «целая часть : N» → _{N} (alt MathML подстрочного индекса для log/lg/ln).
+  // Берём одно число или одну букву как индекс. Опциональная завершающая
+  // запятая поглощается — alt вида «log целая часть : 2, дробная часть : ...»
+  // должен превратиться в «\log_{2} \frac{...}», без лишней «,» посередине.
+  text = text.replace(
+    /целая\s+часть\s*:?\s*(\d+|[A-Za-zА-Яа-я])\s*,?(?=\s*(?:дробная|\\frac|$|[^,]))/gi,
+    '_{$1}'
+  );
+  // Простой fallback на случай если контекст не подошёл lookahead'у
+  text = text.replace(/целая\s+часть\s*:?\s*(\d+|[A-Za-zА-Яа-я])/gi, '_{$1}');
+
+  // «совокупность выражений X1, X2 ... конец совокупности» → квадратная скобка.
+  text = text.replace(
+    /совокупность\s+выражений\s+(.+?)\s+конец\s+совокупности/gi,
+    (_, content) => {
+      const lines = content.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+      return `\\left[\\begin{array}{l} ${lines.join(' \\\\ ')} \\end{array}\\right.`;
+    }
+  );
+
+  // «система выражений X1, X2 ... конец системы» → \begin{cases} (старый словарь
+  // просто убирал эти слова в '', получалась каша без структуры).
+  text = text.replace(
+    /система\s+выражений\s+(.+?)\s+конец\s+системы/gi,
+    (_, content) => {
+      const lines = content.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+      return `\\begin{cases} ${lines.join(' \\\\ ')} \\end{cases}`;
+    }
+  );
 
   // Убираем множественные пробелы
   text = text.replace(/\s+/g, ' ').trim();
@@ -480,7 +563,10 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL, role = 'co
     $ul.after(NEWLINE_MARKER + NEWLINE_MARKER);
   });
 
-  // Обрабатываем изображения (формулы и картинки вне таблиц)
+  // Обрабатываем изображения (формулы и картинки вне таблиц).
+  // Для формул держим Set дедупа: sdamgia на одну формулу может вставить
+  // несколько <img class="tex"> с идентичным alt — оставляем только первое.
+  const seenFormulaAlts = new Set();
   $el.find('img').each(function () {
     const imgUrl = $(this).attr('src') || '';
     if (!imgUrl) {
@@ -492,6 +578,15 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL, role = 'co
       // SVG формула — берём alt-текст
       const altText = $(this).attr('alt') || '';
       if (altText) {
+        // Ключ дедупа — нормализованный alt без невидимых символов и
+        // схлопнутыми пробелами. Идентичные формулы пропускаем.
+        const dedupKey = altText.replace(/[­​\s]+/g, ' ').trim();
+        if (dedupKey && seenFormulaAlts.has(dedupKey)) {
+          $(this).remove();
+          return;
+        }
+        if (dedupKey) seenFormulaAlts.add(dedupKey);
+
         const cleanedLatex = cleanLatexFormula(altText);
         formulas.push(cleanedLatex);
         const marker = `___FORMULA_${formulaIndex}___`;
@@ -549,6 +644,11 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL, role = 'co
   for (const [marker, imgMarkdown] of Object.entries(imageReplacements)) {
     text = text.replace(marker, imgMarkdown);
   }
+
+  // Дедупликация подряд идущих одинаковых $...$ блоков: sdamgia иногда
+  // вставляет 5 копий одной формулы (для retina/печати/мобильного рендера).
+  // Заменяем `$X$ $X$ $X$` → `$X$`. Сравниваем content внутри $.$ (trim'нутый).
+  text = text.replace(/(\$([^$]+)\$)((?:\s*\$\2\$)+)/g, '$1');
 
   return { text: text.trim(), images, formulas };
 }
@@ -687,7 +787,7 @@ function parseProblemFromDiv($, probDiv, baseUrl) {
         processCondition($, critsDiv.get(0), baseUrl, 'criteria');
       if (critText) {
         // Убираем «Критерии проверки.» в начале (если осталось от <b>)
-        let cleanCrit = critText.replace(/^Кри[­терии]+\s*проверки\.?\s*:?\s*/i, '').trim();
+        let cleanCrit = critText.replace(/^Кри[терии]+\s*проверки\.?\s*:?\s*/i, '').trim();
         problem.criteria_md = cleanCrit;
         problem.criteria_images = critImages;
         allFormulas.push(...critFormulas);
