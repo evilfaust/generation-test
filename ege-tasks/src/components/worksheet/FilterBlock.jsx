@@ -134,10 +134,10 @@ const FilterBlock = ({
                 <Tag color="#ff4d4f">3</Tag> Повышенный
               </Option>
               <Option value="4">
-                <Tag color="#722ed1">4</Tag> Высокий
+                <Tag color="#a8071a">4</Tag> Высокий
               </Option>
               <Option value="5">
-                <Tag color="#13c2c2">5</Tag> Олимпиадный
+                <Tag color="#722ed1">5</Tag> Олимпиадный
               </Option>
             </Select>
           </Form.Item>

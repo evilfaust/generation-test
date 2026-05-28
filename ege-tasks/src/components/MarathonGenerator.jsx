@@ -26,8 +26,8 @@ import MathRenderer from '../shared/components/MathRenderer';
 import './MarathonGenerator.css';
 
 const { Text } = Typography;
-const DIFFICULTY_COLOR = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f' };
-const DIFFICULTY_LABEL = { 1: 'Лёгкая', 2: 'Средняя', 3: 'Сложная' };
+const DIFFICULTY_COLOR = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f', 4: '#a8071a', 5: '#722ed1' };
+const DIFFICULTY_LABEL = { 1: 'Лёгкая', 2: 'Средняя', 3: 'Сложная', 4: 'Высокая', 5: 'Олимпиадная' };
 
 // Есть ли реальный прогресс в trackingData
 function hasProgress(trackingData) {

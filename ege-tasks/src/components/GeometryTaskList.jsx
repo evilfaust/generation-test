@@ -45,8 +45,8 @@ import './GeometryTaskPreview.css';
 
 const { Text } = Typography;
 
-const DIFFICULTY_COLORS = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f' };
-const DIFFICULTY_LABELS = { 1: 'Базовый', 2: 'Средний', 3: 'Сложный' };
+const DIFFICULTY_COLORS = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f', 4: '#a8071a', 5: '#722ed1' };
+const DIFFICULTY_LABELS = { 1: 'Базовый', 2: 'Средний', 3: 'Повышенный', 4: 'Высокий', 5: 'Олимпиадный' };
 
 export default function GeometryTaskList() {
   const { message } = App.useApp();
@@ -674,7 +674,9 @@ export default function GeometryTaskList() {
             options={[
               { value: '1', label: '1 — Базовый' },
               { value: '2', label: '2 — Средний' },
-              { value: '3', label: '3 — Сложный' },
+              { value: '3', label: '3 — Повышенный' },
+              { value: '4', label: '4 — Высокий' },
+              { value: '5', label: '5 — Олимпиадный' },
             ]}
           />
           <Button

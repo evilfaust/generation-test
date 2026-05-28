@@ -37,7 +37,7 @@ const TaskFilters = ({
   const [selectedExamType, setSelectedExamType] = useState(null);
 
   const getDifficultyColor = (difficulty) => {
-    const colors = { '1': '#52c41a', '2': '#1890ff', '3': '#fa8c16', '4': '#f5222d', '5': '#722ed1' };
+    const colors = { '1': '#52c41a', '2': '#faad14', '3': '#ff4d4f', '4': '#a8071a', '5': '#722ed1' };
     return colors[difficulty] || '#d9d9d9';
   };
 

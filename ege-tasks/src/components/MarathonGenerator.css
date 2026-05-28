@@ -1618,9 +1618,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.marathon-generator .qcard.easy { border-color: #b9e9c9; color: #0e7c40; background: #e9f8ef; }
-.marathon-generator .qcard.med  { border-color: #f4d99a; color: #8c5b07; background: #fdf3df; }
-.marathon-generator .qcard.hard { border-color: #f4b9c0; color: #aa2533; background: #fde6e8; }
+.marathon-generator .qcard.easy  { border-color: #b9e9c9; color: #0e7c40; background: #e9f8ef; }
+.marathon-generator .qcard.med   { border-color: #f4d99a; color: #8c5b07; background: #fdf3df; }
+.marathon-generator .qcard.hard  { border-color: #f4b9c0; color: #aa2533; background: #fde6e8; }
+.marathon-generator .qcard.vhard { border-color: #e3a0a4; color: #5c0a16; background: #f7dadd; }
+.marathon-generator .qcard.expert{ border-color: #d3b6f0; color: #4b1791; background: #efe4fb; }
 
 .btn-accept {
   width: 26px;
@@ -2336,9 +2338,11 @@
   color: var(--ink-700, #2c3a55);
 }
 
-.q-chip .qcard.easy { border-color: #b9e9c9; color: #0e7c40; background: #e9f8ef; }
-.q-chip .qcard.med  { border-color: #f4d99a; color: #8c5b07; background: #fdf3df; }
-.q-chip .qcard.hard { border-color: #f4b9c0; color: #aa2533; background: #fde6e8; }
+.q-chip .qcard.easy  { border-color: #b9e9c9; color: #0e7c40; background: #e9f8ef; }
+.q-chip .qcard.med   { border-color: #f4d99a; color: #8c5b07; background: #fdf3df; }
+.q-chip .qcard.hard  { border-color: #f4b9c0; color: #aa2533; background: #fde6e8; }
+.q-chip .qcard.vhard { border-color: #e3a0a4; color: #5c0a16; background: #f7dadd; }
+.q-chip .qcard.expert{ border-color: #d3b6f0; color: #4b1791; background: #efe4fb; }
 
 .q-chip .accept {
   width: 20px;

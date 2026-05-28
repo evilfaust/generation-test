@@ -10,8 +10,8 @@ function calcTaskScore(data) {
   return 0;
 }
 
-const DIFF_CLASS = { 1: 'easy', 2: 'med', 3: 'hard' };
-const DIFF_LABEL = { 1: 'Лёгкая', 2: 'Средняя', 3: 'Сложная' };
+const DIFF_CLASS = { 1: 'easy', 2: 'med', 3: 'hard', 4: 'vhard', 5: 'expert' };
+const DIFF_LABEL = { 1: 'Лёгкая', 2: 'Средняя', 3: 'Сложная', 4: 'Высокая', 5: 'Олимпиадная' };
 
 /* Для каждой задачи — список учеников, у которых она «на руках» и не завершена */
 function buildQueueMap(students, tasks, trackingData) {

@@ -211,8 +211,8 @@ const formatDuration = (seconds) => {
   return `${m} мин`;
 };
 
-const difficultyLabels = { 1: 'Базовый', 2: 'Средний', 3: 'Сложный' };
-const difficultyColors = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f' };
+const difficultyLabels = { 1: 'Базовый', 2: 'Средний', 3: 'Повышенный', 4: 'Высокий', 5: 'Олимпиадный' };
+const difficultyColors = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f', 4: '#a8071a', 5: '#722ed1' };
 
 const normalizeUnlockedIds = (value) => {
   if (!value) return [];

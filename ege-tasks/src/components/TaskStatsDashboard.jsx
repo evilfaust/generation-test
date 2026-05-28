@@ -25,9 +25,9 @@ const UNSET_DIFFICULTY = '__unset__';
 const DIFFICULTY_COLORS = {
   '1': { bg: '#52c41a', label: 'Базовый' },
   '2': { bg: '#faad14', label: 'Средний' },
-  '3': { bg: '#ff4d4f', label: 'Сложный' },
-  '4': { bg: '#722ed1', label: 'Олимпиадный' },
-  '5': { bg: '#13c2c2', label: 'Экспертный' },
+  '3': { bg: '#ff4d4f', label: 'Повышенный' },
+  '4': { bg: '#a8071a', label: 'Высокий' },
+  '5': { bg: '#722ed1', label: 'Олимпиадный' },
   [UNSET_DIFFICULTY]: { bg: '#d9d9d9', label: 'Не указана' },
 };
 

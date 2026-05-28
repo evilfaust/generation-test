@@ -1,7 +1,7 @@
 import MathRenderer from '../../shared/components/MathRenderer';
 import { api } from '../../shared/services/pocketbase';
 
-const DIFFICULTY_COLOR = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f' };
+const DIFFICULTY_COLOR = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f', 4: '#a8071a', 5: '#722ed1' };
 
 function MarathonCard({ task, idx, title, showLogo }) {
   const diff = task.difficulty || 1;

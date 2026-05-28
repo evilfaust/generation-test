@@ -24,7 +24,7 @@ function calcTotalScore(name, trackingData, taskCount) {
   return total;
 }
 
-const DIFF_CLASS = { 1: 'easy', 2: 'med', 3: 'hard' };
+const DIFF_CLASS = { 1: 'easy', 2: 'med', 3: 'hard', 4: 'vhard', 5: 'expert' };
 
 /* ================================================================
    LessonSidebar
