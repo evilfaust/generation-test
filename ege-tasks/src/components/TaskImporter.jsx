@@ -126,6 +126,7 @@ export default function TaskImporter() {
   const {
     parsedData,
     selectedTasks,
+    llmTasks,
     topicId,
     subtopicId,
     importing,
@@ -138,6 +139,10 @@ export default function TaskImporter() {
     toggleTask,
     selectAll,
     deselectAll,
+    toggleLlmTask,
+    selectAllLlm,
+    selectAllLlmNeedsReview,
+    deselectAllLlm,
     handleImport,
     applyLatexFix,
     reset,
@@ -813,15 +818,31 @@ export default function TaskImporter() {
         <Card
           size="small"
           title={
-            <Space>
+            <Space wrap>
               <span>Задачи для импорта</span>
               <Tag color="blue">{selectedTasks.size} из {parsedData.tasks.length}</Tag>
+              {llmTasks.size > 0 && (
+                <Tag color="purple">🤖 LLM: {llmTasks.size}</Tag>
+              )}
             </Space>
           }
           extra={
-            <Space>
+            <Space wrap>
               <Button size="small" onClick={selectAll}>Выбрать все</Button>
               <Button size="small" onClick={deselectAll}>Снять выбор</Button>
+              <Button
+                size="small"
+                onClick={selectAllLlmNeedsReview}
+                title="Отметить 🤖 для всех выбранных задач с пометкой «Проверить LaTeX»"
+              >
+                🤖 для проблемных
+              </Button>
+              <Button size="small" onClick={selectAllLlm} title="Отметить 🤖 для всех выбранных">
+                🤖 для всех
+              </Button>
+              {llmTasks.size > 0 && (
+                <Button size="small" onClick={deselectAllLlm}>Снять 🤖</Button>
+              )}
             </Space>
           }
         >
@@ -845,6 +866,17 @@ export default function TaskImporter() {
                       onChange={() => toggleTask(index)}
                       style={{ marginTop: 3 }}
                     />
+                    <Checkbox
+                      checked={llmTasks.has(index)}
+                      disabled={!selectedTasks.has(index)}
+                      onChange={() => toggleLlmTask(index)}
+                      style={{ marginTop: 3 }}
+                      title="Прогнать через LLM (/latex-fix) при импорте"
+                    >
+                      <span style={{ fontSize: 12, color: llmTasks.has(index) ? '#722ed1' : '#999' }}>
+                        🤖
+                      </span>
+                    </Checkbox>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ marginBottom: 4 }}>
                         <Text strong>#{task.number}</Text>
@@ -925,6 +957,7 @@ export default function TaskImporter() {
             disabled={hasErrors || !topicId || selectedTasks.size === 0}
           >
             Импортировать {selectedTasks.size} задач
+            {llmTasks.size > 0 && ` (🤖 LLM для ${llmTasks.size})`}
           </Button>
         </div>
       </div>

@@ -21,6 +21,10 @@ const PDF_SERVICE_URL = getPdfServiceUrl();
 export function useTaskImport({ topics = [], tags: existingTags = [], subtopics: existingSubtopics = [] } = {}) {
   const [parsedData, setParsedData] = useState(null);
   const [selectedTasks, setSelectedTasks] = useState(new Set());
+  // Индексы задач, которые во время импорта нужно дополнительно прогнать
+  // через LLM (/latex-fix) — учитель отмечает галочкой «🤖» в превью.
+  // По умолчанию пусто: импорт без LLM работает как раньше.
+  const [llmTasks, setLlmTasks] = useState(new Set());
   const [topicId, setTopicId] = useState(null);
   const [subtopicId, setSubtopicId] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -159,6 +163,34 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
     setSelectedTasks(new Set());
   }, []);
 
+  /** Переключает «прогнать через LLM» для задачи. */
+  const toggleLlmTask = useCallback((index) => {
+    setLlmTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index); else next.add(index);
+      return next;
+    });
+  }, []);
+
+  /** Отметить LLM для всех выбранных задач, у которых latex_needs_review. */
+  const selectAllLlmNeedsReview = useCallback(() => {
+    if (!parsedData) return;
+    const set = new Set();
+    parsedData.tasks.forEach((task, i) => {
+      if (selectedTasks.has(i) && task.latex_needs_review) set.add(i);
+    });
+    setLlmTasks(set);
+  }, [parsedData, selectedTasks]);
+
+  /** Отметить LLM для всех выбранных задач. */
+  const selectAllLlm = useCallback(() => {
+    setLlmTasks(new Set(selectedTasks));
+  }, [selectedTasks]);
+
+  const deselectAllLlm = useCallback(() => {
+    setLlmTasks(new Set());
+  }, []);
+
   const fetchImageAsFile = useCallback(async (imageUrl, fileBaseName) => {
     if (!imageUrl) return null;
 
@@ -258,6 +290,31 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
     const total = selectedTasks.size;
     setImportProgress({ current: 0, total });
 
+    // Хелпер: прогон одной задачи через LLM (/latex-fix) перед записью в БД.
+    // Возвращает новый объект задачи с правленными полями. Любая ошибка LLM —
+    // не блокирует импорт, задача уходит в БД с оригинальным текстом + warning.
+    const runLlmFixOnTask = async (task) => {
+      const fields = ['statement_md', 'solution_md', 'criteria_md'];
+      const fixed = { ...task };
+      for (const field of fields) {
+        if (!task[field]) continue;
+        try {
+          const resp = await fetch(`${PDF_SERVICE_URL}/latex-fix`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: task[field], role: field.replace('_md', '') }),
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          if (data.text) fixed[field] = data.text;
+        } catch (e) {
+          console.warn(`[import] LLM-fix ${field} #${task.number}: ${e.message}`);
+        }
+      }
+      fixed.latex_needs_review = false;
+      return fixed;
+    };
+
     const results = { added: 0, skipped: 0, errors: 0, details: [] };
 
     try {
@@ -296,12 +353,20 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
         importSubtopicId = await getOrCreateSubtopic(parsedData.metadata.subtopic, topicId);
       }
 
-      // 4. Импортируем задачи
-      const tasksToImport = parsedData.tasks.filter((_, i) => selectedTasks.has(i));
+      // 4. Импортируем задачи. Сохраняем оригинальный индекс — он нужен для
+      // сверки с llmTasks (галочка «🤖» ставится на исходных индексах).
+      const tasksToImport = parsedData.tasks
+        .map((task, originalIndex) => ({ task, originalIndex }))
+        .filter(({ originalIndex }) => selectedTasks.has(originalIndex));
 
       for (let i = 0; i < tasksToImport.length; i++) {
-        const task = tasksToImport[i];
+        let { task, originalIndex } = tasksToImport[i];
         setImportProgress({ current: i + 1, total });
+
+        // Если задача отмечена для LLM-фикса — прогоняем перед сохранением.
+        if (llmTasks.has(originalIndex)) {
+          task = await runLlmFixOnTask(task);
+        }
 
         // Дедуп №1: по sdamgia_id (надёжнее, чем по тексту — устойчив к мелким правкам)
         if (task.sdamgiaId) {
@@ -478,7 +543,7 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
     setImportResults(results);
     setImporting(false);
     return results;
-  }, [parsedData, topicId, subtopicId, selectedTasks, topics, existingSubtopics, fetchImageAsFile]);
+  }, [parsedData, topicId, subtopicId, selectedTasks, llmTasks, topics, existingSubtopics, fetchImageAsFile]);
 
   /**
    * Применить LLM-исправление LaTeX для задачи по индексу.
@@ -508,6 +573,7 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
   const reset = useCallback(() => {
     setParsedData(null);
     setSelectedTasks(new Set());
+    setLlmTasks(new Set());
     setTopicId(null);
     setSubtopicId(null);
     setImporting(false);
@@ -519,6 +585,7 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
     // Состояние
     parsedData,
     selectedTasks,
+    llmTasks,
     topicId,
     subtopicId,
     importing,
@@ -535,6 +602,10 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
     toggleTask,
     selectAll,
     deselectAll,
+    toggleLlmTask,
+    selectAllLlm,
+    selectAllLlmNeedsReview,
+    deselectAllLlm,
     handleImport,
     applyLatexFix,
     reset,

@@ -176,11 +176,15 @@ function cleanLatexFormula(text) {
   // Убираем точки в конце
   text = text.replace(/\.+$/, '');
 
-  // Нормализация невидимых символов сразу — упрощает все последующие регулярки
-  // (не нужно ставить ? в каждом паттерне).
+  // Нормализация невидимых символов и Unicode-математики сразу —
+  // упрощает все последующие регулярки (не нужно ставить ? в каждом паттерне).
   text = text.replace(/­/g, ''); // soft hyphen
   text = text.replace(/​/g, ''); // zero-width space
   text = text.replace(/ /g, ' '); // nbsp → обычный пробел
+  // Unicode-символы √ и ∛/∜ → LaTeX (sdamgia иногда ставит их вместо слова «корень из»)
+  text = text.replace(/√/g, '\\sqrt ');  // √ → \sqrt
+  text = text.replace(/∛/g, '\\sqrt[3]'); // ∛ → \sqrt[3]
+  text = text.replace(/∜/g, '\\sqrt[4]'); // ∜ → \sqrt[4]
 
   // Словарные замены русских слов на LaTeX команды
   const replacements = [
@@ -269,7 +273,25 @@ function cleanLatexFormula(text) {
   ];
 
   // text уже нормализован (без soft-hyphens) выше — нормализуем и ключи словаря,
-  // чтобы старые записи с  продолжали работать.
+  // чтобы старые записи продолжали работать.
+  //
+  // ВАЖНО: новый формат alt MathML sdamgia слепляет слова без пробелов
+  // («кореньиз», «леваякруглаяскобка», «началоаргумента», ...). Поэтому
+  // ПЕРЕД основным циклом делаем pass-1: для каждой многословной записи
+  // словаря пробуем concat-вариант (все пробелы вырезаны). Это покрывает
+  // десятки фраз разом, без ручного дублирования каждой строки.
+  for (const [old, rep] of replacements) {
+    const normalizedKey = old.replace(/­/g, '').replace(/​/g, '');
+    if (/\s/.test(normalizedKey)) {
+      const concatKey = normalizedKey.replace(/\s+/g, '');
+      // concat-форма должна быть достаточно длинной чтобы не задеть
+      // случайные подстроки (например 'минусплюс' = 9 символов).
+      if (concatKey.length >= 8) {
+        text = text.replaceAll(concatKey, rep);
+      }
+    }
+  }
+
   for (const [old, rep] of replacements) {
     const normalizedKey = old.replace(/­/g, '').replace(/​/g, '');
     text = text.replaceAll(normalizedKey, rep);
@@ -297,16 +319,42 @@ function cleanLatexFormula(text) {
     (_, arg) => `\\sqrt{${arg.trim()}}`
   );
 
+  // ─── Те же шаблоны для alt MathML без пробелов (новый формат sdamgia) ───
+  // Пример: «(2 sin x + кореньиз : началоаргумента : 3 конецаргумента)»
+
+  // Корни N-ой степени: кореньN степени из : началоаргумента : X конецаргумента
+  text = text.replace(
+    /корень\s*(\d+)\s*степени\s+из\s*:?\s*началоаргумента\s*:?\s*(.*?)\s*конецаргумента/gi,
+    (_, n, arg) => `\\sqrt[${n}]{${arg.trim()}}`
+  );
+
+  // Корни с аргументом: кореньиз : началоаргумента : X конецаргумента
+  text = text.replace(
+    /корень\s*из\s*:?\s*началоаргумента\s*:?\s*(.*?)\s*конецаргумента/gi,
+    (_, arg) => `\\sqrt{${arg.trim()}}`
+  );
+
+  // LaTeX sqrt: \\sqrt или \\sqrt[N] + :началоаргумента: X конецаргумента
+  text = text.replace(
+    /\\sqrt((?:\[\d+\])?)\s*:?\s*началоаргумента\s*:?\s*(.*?)\s*конецаргумента/gi,
+    (_, degree, arg) => `\\sqrt${degree}{${arg.trim()}}`
+  );
+
   // Простой корень без аргументов
   text = text.replaceAll('ко\u00ADрень из', '\\sqrt');
+  text = text.replace(/корень\s*из(?![а-яА-Я])/gi, '\\sqrt');
 
-  // Убираем оставшиеся маркеры аргументов
+  // Убираем оставшиеся маркеры аргументов (старый и новый форматы)
   text = text.replaceAll('на\u00ADча\u00ADло ар\u00ADгу\u00ADмен\u00ADта:', '');
   text = text.replaceAll('конец ар\u00ADгу\u00ADмен\u00ADта', '');
+  text = text.replace(/началоаргумента\s*:?/gi, '');
+  text = text.replace(/конецаргумента/gi, '');
 
-  // Обработка дробей (рекурсивно, от внутренних к внешним)
+  // Обработка дробей (рекурсивно, от внутренних к внешним).
+  // Терпимо к: пробелам вокруг ':', концевому 'конецдроби'/'конец дроби'.
+  // Soft-hyphens срезаны в начале функции, поэтому их в regex нет.
   for (let i = 0; i < 10; i++) {
-    const fractionRegex = /дробь:\s*чис(?:\u00AD)?ли(?:\u00AD)?тель:\s*(.*?)\s*,?\s*зна(?:\u00AD)?ме(?:\u00AD)?на(?:\u00AD)?тель:\s*(.*?)\s*конец дроби/;
+    const fractionRegex = /дробь\s*:\s*числитель\s*:\s*(.*?)\s*,?\s*знаменатель\s*:\s*(.*?)\s*конец\s*дроби/i;
     const match = text.match(fractionRegex);
     if (!match) break;
     const numerator = match[1].trim();
@@ -985,19 +1033,75 @@ const MAX_CACHE_SIZE = 500;
 
 const LATEX_FIX_SYSTEM_PROMPT = `Ты конвертируешь математические формулы в LaTeX, совместимый с KaTeX-рендерером.
 
-ПРАВИЛА:
+ПРАВИЛА СИНТАКСИСА:
 - Аргументы команд (\\sin, \\cos, \\sqrt, \\log, \\frac, \\angle, \\widehat и т.п.) — ВСЕГДА в {фигурных}, не (круглых).
 - Многосимвольные индексы/степени — в {фигурных}: x^{12}, a_{ij}, S_{ABC}.
 - Десятичная запятая → {,}: 0{,}5.
 - Градусы → ^{\\circ}: 30^{\\circ}.
 - Русские нотации: \\tg → \\operatorname{tg}, \\ctg → \\operatorname{ctg}, \\arctg → \\operatorname{arctg}.
 - Команды БЕЗ \\: sin → \\sin, cos → \\cos.
-- Никаких $...$ обёрток в формулах — обёртка задаётся снаружи.
 - НЕ менять смысл формулы. Только синтаксис.
 
-ВХОД: текст задачи или решения с формулами в $...$.
-ВЫХОД: тот же текст, но все формулы внутри $...$ заменены на валидный KaTeX.
-Ничего, кроме исправленного текста. Никаких пояснений, комментариев, преамбул.`;
+🚨 ОБЁРТКИ ФОРМУЛ — КРИТИЧЕСКИ ВАЖНО:
+- Используй ТОЛЬКО долларовые обёртки: \`$...$\` для inline и \`$$...$$\` для блочных формул.
+- НИКОГДА не используй \`\\(...\\)\` или \`\\[...\\]\` — KaTeX-рендерер в markdown ИХ НЕ ВИДИТ.
+- Если во входе есть \`\\(...\\)\` — замени на \`$...$\`.
+- Если во входе есть \`\\[...\\]\` — замени на \`$$...$$\`.
+- Если формула уже обёрнута в \`$...$\` — оставь так, не меняй на \`\\(...\\)\`.
+
+ВХОД: markdown-текст задачи/решения с формулами (могут быть в $...$, в \\(...\\), в \\[...\\] или вообще без обёрток).
+ВЫХОД: тот же markdown, но ВСЕ формулы обёрнуты ИСКЛЮЧИТЕЛЬНО в $...$ или $$...$$ и сами формулы — валидный KaTeX.
+Ничего, кроме исправленного текста. Никаких пояснений, комментариев, преамбул, тройных бэктиков.`;
+
+/**
+ * Safety net: если модель всё-таки вернула \\(...\\) или \\[...\\] — конвертируем.
+ * Аккуратно: НЕ трогаем экранированные скобки внутри уже корректных $...$ блоков.
+ * Подход: проходим по тексту, пропуская содержимое $...$/$$...$$ как есть.
+ */
+function normalizeLatexDelimiters(text) {
+  if (!text || typeof text !== 'string') return text;
+  let out = '';
+  let i = 0;
+  while (i < text.length) {
+    // Пропускаем уже корректные $$...$$ блоки
+    if (text.startsWith('$$', i)) {
+      const end = text.indexOf('$$', i + 2);
+      if (end === -1) { out += text.slice(i); break; }
+      out += text.slice(i, end + 2);
+      i = end + 2;
+      continue;
+    }
+    // Пропускаем корректные $...$ (но не валюту: $5 без закрывающего)
+    if (text[i] === '$' && text[i - 1] !== '\\') {
+      const end = text.indexOf('$', i + 1);
+      if (end === -1 || end - i > 500) { out += text[i]; i++; continue; }
+      out += text.slice(i, end + 1);
+      i = end + 1;
+      continue;
+    }
+    // \[...\] → $$...$$
+    if (text.startsWith('\\[', i)) {
+      const end = text.indexOf('\\]', i + 2);
+      if (end !== -1) {
+        out += '$$' + text.slice(i + 2, end) + '$$';
+        i = end + 2;
+        continue;
+      }
+    }
+    // \(...\) → $...$
+    if (text.startsWith('\\(', i)) {
+      const end = text.indexOf('\\)', i + 2);
+      if (end !== -1) {
+        out += '$' + text.slice(i + 2, end) + '$';
+        i = end + 2;
+        continue;
+      }
+    }
+    out += text[i];
+    i++;
+  }
+  return out;
+}
 
 app.post('/latex-fix', async (req, res) => {
   const { text, role } = req.body || {};
@@ -1054,10 +1158,15 @@ app.post('/latex-fix', async (req, res) => {
     }
 
     const data = await resp.json();
-    const fixed = data?.choices?.[0]?.message?.content?.trim();
-    if (!fixed) {
+    const raw = data?.choices?.[0]?.message?.content?.trim();
+    if (!raw) {
       return res.status(502).json({ error: 'AI gateway вернул пустой ответ', upstream: data });
     }
+
+    // Safety net: модель иногда игнорирует промпт и оборачивает формулы
+    // в \(...\) / \[...\]. KaTeX-плагин react-markdown их не видит — нормализуем
+    // в $...$ / $$...$$ обязательно, даже если промпт нарушен.
+    const fixed = normalizeLatexDelimiters(raw);
 
     // LRU-чистка кэша: если перебрали лимит, удаляем самый старый.
     if (latexFixCache.size >= MAX_CACHE_SIZE) {
