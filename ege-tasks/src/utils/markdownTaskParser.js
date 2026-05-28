@@ -397,6 +397,151 @@ export function parseMordkovichTasks(content, metadata) {
 }
 
 /**
+ * Парсер MD-файла в формате sdamgia (расширенный, v3.9.33+).
+ * Маркер: `format: sdamgia` в YAML-frontmatter.
+ *
+ * Структура одной задачи:
+ *   ## №<sdamgia_id> [сложность]
+ *   - sdamgia_url: ...
+ *   - exam_part: 1|2
+ *   - max_score: N
+ *   - latex_needs_review: true|false
+ *
+ *   ### Условие
+ *   ...текст с LaTeX и ![image](url)...
+ *
+ *   ### Ответ
+ *   ...
+ *
+ *   ### Решение
+ *   ...
+ *
+ *   ### Критерии
+ *   | ... | ... |
+ *
+ *   ### Картинки
+ *   **Условие:** список URL с метаданными в HTML-комментариях
+ *   **Решение:**  ...
+ *   **Критерии:** ...
+ */
+export function parseSdamgiaMd(content, metadata) {
+  const errors = [];
+  const warnings = [];
+  const globalTags = parseTags(metadata.tags);
+  const defaultDifficulty = String(metadata.difficulty || '1');
+  const defaultExamPart = Number(metadata.exam_part) || 1;
+
+  // Убираем HTML-комментарии за пределами картинок (внутри картинок они несут метаданные)
+  // Поэтому удаляем только многострочные top-level комментарии.
+  const cleaned = content.replace(/<!--[^>]*?Формат:[\s\S]*?-->/g, '');
+
+  // Разбиваем на блоки по маркеру `## №`
+  const blocks = cleaned.split(/\n(?=##\s*№)/);
+  const tasks = [];
+  let index = 0;
+
+  const parseImagesByRole = (block, label) => {
+    const re = new RegExp(`\\*\\*${label}:\\*\\*\\s*\\n([\\s\\S]*?)(?=\\n\\*\\*[А-Я]|$)`, 'i');
+    const m = block.match(re);
+    if (!m) return [];
+    const items = [];
+    for (const line of m[1].split('\n')) {
+      const lm = line.match(/^\s*-\s*(\S+)(?:\s*<!--\s*([^>]*?)\s*-->)?/);
+      if (!lm) continue;
+      const url = lm[1].trim();
+      if (!url || url === '(нет)' || !/^https?:\/\//i.test(url)) continue;
+      const metaStr = lm[2] || '';
+      const obj = { url, order: items.length + 1, role: label.toLowerCase() };
+      const fm = metaStr.match(/file_id=([^,\s]+)/);
+      if (fm) obj.file_id = fm[1];
+      const om = metaStr.match(/order=(\d+)/);
+      if (om) obj.order = parseInt(om[1], 10);
+      const rm = metaStr.match(/role=(\w+)/);
+      if (rm) obj.role = rm[1];
+      items.push(obj);
+    }
+    return items;
+  };
+
+  for (const block of blocks) {
+    const header = block.match(/^##\s*№(\S+)\s*(?:\[(\d+)\])?/);
+    if (!header) continue;
+    index++;
+    const sdamgiaId = header[1];
+    const difficulty = header[2] || defaultDifficulty;
+    const rest = block.slice(header[0].length);
+
+    // Парсим поля `- key: value` до первой секции `###`
+    const fieldsMatch = rest.match(/^([\s\S]*?)(?=\n###\s|$)/);
+    const fields = {};
+    if (fieldsMatch) {
+      for (const line of fieldsMatch[1].split('\n')) {
+        const fm = line.match(/^\s*-\s*([a-zA-Z_]+):\s*(.+?)\s*$/);
+        if (fm) fields[fm[1]] = fm[2].trim();
+      }
+    }
+
+    // Секции
+    const sections = {};
+    const sectionRe = /\n###\s+([^\n]+)\n([\s\S]*?)(?=\n###\s+|$)/g;
+    let sm;
+    while ((sm = sectionRe.exec(rest)) !== null) {
+      const name = sm[1].trim().toLowerCase();
+      sections[name] = sm[2].trim();
+    }
+
+    const stripPlaceholder = (s) => (s || '').replace(/^\(пусто\)\s*$/m, '').trim();
+    const condition = stripPlaceholder(sections['условие']);
+    const answer = stripPlaceholder(sections['ответ']);
+    const solution = stripPlaceholder(sections['решение']);
+    const criteria = stripPlaceholder(sections['критерии']);
+    const imagesBlock = sections['картинки'] || '';
+
+    const conditionImages = parseImagesByRole(imagesBlock, 'Условие');
+    const solutionImages = parseImagesByRole(imagesBlock, 'Решение');
+    const criteriaImages = parseImagesByRole(imagesBlock, 'Критерии');
+
+    const examPart = Number(fields.exam_part) || defaultExamPart;
+    const maxScore = fields.max_score ? Number(fields.max_score) : null;
+    const needsReview = /^(true|1|yes)$/i.test(fields.latex_needs_review || '');
+
+    const task = {
+      number: index,
+      difficulty,
+      statement_md: condition,
+      answer,
+      solution_md: solution,
+      tags: [...globalTags],
+      imageUrl: conditionImages[0]?.url || '',
+      sdamgiaId,
+      sdamgia_url: fields.sdamgia_url || '',
+      exam_part: examPart,
+      criteria_md: criteria,
+      max_score: maxScore,
+      latex_needs_review: needsReview,
+      condition_images: conditionImages,
+      solution_images: solutionImages,
+      criteria_images: criteriaImages,
+    };
+
+    if (!task.statement_md) {
+      errors.push(`Задание #${task.number} (sdamgia_id=${sdamgiaId}): пустое условие`);
+    }
+    if (!task.answer) {
+      warnings.push(`Задание #${task.number} (sdamgia_id=${sdamgiaId}): нет ответа`);
+    }
+
+    tasks.push(task);
+  }
+
+  if (tasks.length === 0) {
+    errors.push('Не найдено ни одной задачи. Ожидался формат `## №<id> [<difficulty>]`.');
+  }
+
+  return { tasks, errors, warnings };
+}
+
+/**
  * Главная точка входа парсинга.
  * Принимает текст markdown файла, возвращает структурированные данные.
  */
@@ -419,6 +564,29 @@ export function parseMarkdownFile(text) {
 
   if (!metadata.topic) {
     errors.push('Поле "topic" обязательно в YAML-блоке');
+  }
+
+  // 1b. Расширенный формат sdamgia — отдельная ветка
+  if ((metadata.format || '').toLowerCase() === 'sdamgia') {
+    const globalTags = parseTags(metadata.tags);
+    const sourceLabel = metadata.source || SDAMGIA_SOURCE_LABELS.ege_prof;
+    const { tasks, errors: e, warnings: w } = parseSdamgiaMd(content, metadata);
+    errors.push(...e);
+    warnings.push(...w);
+    return {
+      metadata: {
+        topic: metadata.topic || '',
+        subtopic: metadata.subtopic || '',
+        difficulty: String(metadata.difficulty || '1'),
+        source: sourceLabel,
+        year: metadata.year || new Date().getFullYear(),
+        tags: globalTags,
+      },
+      format: 'sdamgia',
+      tasks,
+      errors,
+      warnings,
+    };
   }
 
   // 2. Определяем формат
