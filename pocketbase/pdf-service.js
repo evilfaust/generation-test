@@ -652,14 +652,15 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL, role = 'co
       }
       const fileId = extractSdamgiaFileId(fullUrl);
       const order = imgIndex + 1;
-      // Структурированно: фронт будет качать и заливать в task_images по role+order.
+      // Структурированно: фронт качает и заливает в task_images по role+order.
       images.push({ url: fullUrl, file_id: fileId, order, role });
       const marker = `___IMAGE_${imgIndex}___`;
-      // В md оставляем ![image](url) — для backward-compat со старым фронтом
-      // (рендерер части 1). Часть 2 на фронте дополнительно постпроцессит markdown,
-      // подменяя ![image](внешний url) на ссылку на локальный файл task_images
-      // по original_url или file_id.
-      imageReplacements[marker] = `\n![image](${fullUrl})\n`;
+      // ИЗМЕНЕНО v3.9.33: НЕ оставляем ![image](url) в тексте условия.
+      // Картинка хранится отдельно (file-поле tasks.image + коллекция task_images);
+      // все рендереры (TaskCard, EgeVariantGenerator, PrintableWorksheet и т.п.)
+      // ожидают чистый текст + отдельный <Image>. Inline ![image] в statement_md
+      // приводил к двойному отображению (см. v3.9.31 баг). Просто удаляем маркер.
+      imageReplacements[marker] = '';
       imgIndex++;
       $(this).replaceWith(marker);
     }

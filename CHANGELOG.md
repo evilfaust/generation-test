@@ -1,5 +1,35 @@
 # Changelog — История изменений
 
+## [3.9.33] - 2026-05-28
+
+### Фикс дубликата картинок в импортированных sdamgia-задачах
+
+Symptom: после импорта задачи карточка показывала одну и ту же картинку
+дважды — один раз inline через markdown, второй раз отдельным `<Image>` под
+условием. Заметно на ЕГЭ-База и ЕГЭ-Профиль (часть 1) — везде где `processCondition`
+извлекает картинку.
+
+**Причина:** в v3.9.31 серверный `processCondition` оставлял `![image](url)`
+прямо в тексте `condition` markdown «для backward-compat». Но 34 места рендера
+условия (TaskCard, EgeVariantGenerator, PrintableWorksheet, MarathonGenerator
+и др.) исторически ожидают **чистый текст + отдельный `<Image>`** из file-поля
+`tasks.image` — этот контракт держится с самого первого markdown-парсера, где
+картинка всегда **вырезалась** из statement_md и сохранялась отдельно.
+
+**Фикс** (`pocketbase/pdf-service.js`):
+- В `processCondition` маркер `___IMAGE_N___` теперь заменяется на пустую
+  строку, а не на `\n![image](${fullUrl})\n`. Картинки остаются доступны через
+  `condition_images` массив (для `TaskEditModal` и `RefreshFromSdamgiaModal`,
+  которые используют `TaskStatementRenderer` с подменой URL).
+
+**Миграция уже импортированных задач** (`migrations_scripts/strip_inline_image.py`):
+- Безопасный скрипт с dry-run / `--apply` режимами. Перед удалением проверяет
+  что у задачи есть либо `image` file, либо запись в `task_images` с
+  role='condition' — иначе пропускает (защита от потери картинки).
+- На VPS: 3369 sdamgia-задач, 286 с inline ![image], **у всех 286 локальная
+  копия есть** (0 опасных случаев). Все 286 обновлены за один прогон.
+- Бэкап БД: `pre_image_dedup_20260528_231544.db` (27 МБ).
+
 ## [3.9.32] - 2026-05-28
 
 ### Парсер sdamgia: новый формат alt MathML + LLM на импорте
