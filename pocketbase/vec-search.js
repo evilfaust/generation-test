@@ -273,6 +273,60 @@ export function buildParallelVariants(baseIds, { count = 2, minCos = 0.85, maxCo
   return { base: baseIds.map((id) => fmt(id, null)), variants, shortage };
 }
 
+/**
+ * C4 — «работа над ошибками»: по проваленным задачам подобрать похожие для
+ * отработки (тот же навык, не клон). Сгруппировано по исходной задаче.
+ *
+ * @param {string[]} failedIds - проваленные задачи
+ * @param {object} o
+ * @param {number} [o.perTask=2]   - сколько похожих на каждую провальную
+ * @param {string[]} [o.excludeIds=[]] - дополнительно исключить (напр. уже выданные)
+ * @param {number} [o.minCos=0.70] - нижняя граница «тот же навык»
+ * @param {number} [o.maxCos=0.97] - верхняя (исключаем байт-в-байт клоны)
+ * @returns {{ groups:[{source, picks:[]}], all:[], missing:[] }}
+ */
+export function buildRemediation(failedIds, { perTask = 2, excludeIds = [], minCos = 0.70, maxCos = 0.97 } = {}) {
+  const d = getDb();
+  const getVec = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
+  const info = d.prepare('SELECT id, code, answer, topic, statement_md FROM main.tasks WHERE id = ?');
+  const knn = d.prepare(`
+    SELECT v.task_id AS task_id, v.distance AS distance, t.topic AS topic
+    FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
+    WHERE v.embedding MATCH ? AND v.k = ? ORDER BY v.distance`);
+
+  const used = new Set([...failedIds, ...excludeIds]); // не выдаём оригиналы и исключённые
+  const fmt = (id, cos) => {
+    const r = info.get(id);
+    return r ? { task_id: id, code: r.code, answer: r.answer, topic: r.topic,
+      statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 160),
+      ...(cos != null ? { cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)) } : {}) } : { task_id: id, missing: true };
+  };
+
+  const groups = [];
+  const all = [];
+  const missing = [];
+  for (const fid of failedIds) {
+    const row = getVec.get(fid);
+    const src = info.get(fid);
+    if (!row || !src) { missing.push(fid); groups.push({ source: fmt(fid, null), picks: [] }); continue; }
+    const topic = src.topic || '';
+    const cands = knn.all(row.embedding, perTask * 8 + 15)
+      .filter((r) => r.task_id !== fid && r.topic === topic)
+      .map((r) => ({ id: r.task_id, cos: 1 - r.distance }))
+      .filter((r) => r.cos >= minCos && r.cos <= maxCos && !used.has(r.id));
+    const picks = [];
+    for (const c of cands) {
+      if (picks.length >= perTask) break;
+      used.add(c.id);
+      const f = fmt(c.id, c.cos);
+      picks.push(f); all.push(f);
+    }
+    if (picks.length === 0) missing.push(fid);
+    groups.push({ source: fmt(fid, null), picks });
+  }
+  return { groups, all, missing };
+}
+
 export function vecHealth() {
   try {
     const d = getDb();

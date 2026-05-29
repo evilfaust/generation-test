@@ -9,6 +9,8 @@ import { api } from '../services/pocketbase';
 import MathRenderer from './MathRenderer';
 import './StudentDetailPage.css';
 
+const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
+
 const { Title, Text } = Typography;
 
 // ============================================
@@ -256,6 +258,10 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
   const [errorWorkTitle, setErrorWorkTitle] = useState('');
   const [errorWorkCreating, setErrorWorkCreating] = useState(false);
   const [errorWorkResult, setErrorWorkResult] = useState(null); // { work, session }
+  // C4: похожие задачи для отработки (по проваленным)
+  const [similarResult, setSimilarResult] = useState(null);
+  const [selectedSimilarIds, setSelectedSimilarIds] = useState(() => new Set());
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
 
   const historySectionRef = useRef(null);
   const highlightTimerRef = useRef(null);
@@ -420,11 +426,37 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
     setSelectedWeakTaskIds(new Set(weakTasks.map(t => t.key)));
     setErrorWorkTitle(`Работа над ошибками — ${student.name || student.username}`);
     setErrorWorkResult(null);
+    setSimilarResult(null);
+    setSelectedSimilarIds(new Set());
     setIsErrorWorkModalOpen(true);
   };
 
+  // C4: подобрать похожие задачи к выбранным проваленным (для свежей отработки)
+  const loadSimilarForWeak = async () => {
+    const ids = [...selectedWeakTaskIds];
+    if (!ids.length) return;
+    setLoadingSimilar(true);
+    try {
+      const res = await fetch(`${PDF_SERVICE_URL}/remediation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ failed_task_ids: ids, per_task: 2 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`Сервис ответил ${res.status}`);
+      const data = await res.json();
+      setSimilarResult(data);
+      setSelectedSimilarIds(new Set((data.all || []).map(t => t.task_id))); // по умолчанию все
+      if (!data.all?.length) message.info('Похожих задач для отработки не нашлось');
+    } catch (e) {
+      message.error(`Не удалось подобрать похожие: ${e.message}`);
+    } finally {
+      setLoadingSimilar(false);
+    }
+  };
+
   const handleCreateErrorWork = async () => {
-    const taskIds = [...selectedWeakTaskIds];
+    const taskIds = [...selectedWeakTaskIds, ...selectedSimilarIds];
     if (!taskIds.length) return;
     setErrorWorkCreating(true);
     try {
@@ -929,10 +961,10 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
               <Button
                 type="primary"
                 loading={errorWorkCreating}
-                disabled={selectedWeakTaskIds.size === 0}
+                disabled={selectedWeakTaskIds.size + selectedSimilarIds.size === 0}
                 onClick={handleCreateErrorWork}
               >
-                Создать ({selectedWeakTaskIds.size} задач)
+                Создать ({selectedWeakTaskIds.size + selectedSimilarIds.size} задач)
               </Button>
             </Space>
           )
@@ -1021,6 +1053,52 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
                   </label>
                 ))}
               </div>
+            </div>
+
+            {/* C4: похожие задачи для свежей отработки */}
+            <div className="sdp-ewm-field">
+              <div className="sdp-ewm-label-row">
+                <label className="sdp-ewm-label">
+                  🩹 Похожие для отработки{similarResult ? ` (${selectedSimilarIds.size} выбрано)` : ''}
+                </label>
+                <Button
+                  type="link" size="small" style={{ padding: 0 }}
+                  loading={loadingSimilar}
+                  disabled={selectedWeakTaskIds.size === 0}
+                  onClick={loadSimilarForWeak}
+                >
+                  Подобрать ({selectedWeakTaskIds.size})
+                </Button>
+              </div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>
+                Тот же тип, что проваленные, но другие задачи — для отработки навыка.
+              </div>
+              {similarResult?.groups?.map((g) => (
+                g.picks.length > 0 && (
+                  <div key={g.source.task_id} style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, color: '#999', marginBottom: 2 }}>
+                      к задаче {g.source.code || '—'}:
+                    </div>
+                    {g.picks.map((p) => (
+                      <label key={p.task_id} className="sdp-ewm-task-row">
+                        <Checkbox
+                          checked={selectedSimilarIds.has(p.task_id)}
+                          onChange={e => {
+                            setSelectedSimilarIds(prev => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(p.task_id); else next.delete(p.task_id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className="sdp-ewm-task-code">{p.code || '—'}</span>
+                        <span style={{ flex: 1, overflow: 'hidden', fontSize: 12 }}><MathRenderer text={p.statement} /></span>
+                        <Tag>{p.pct}%</Tag>
+                      </label>
+                    ))}
+                  </div>
+                )
+              ))}
             </div>
           </div>
         )}

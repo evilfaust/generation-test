@@ -16,9 +16,9 @@ import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
-let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null;
+let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1253,6 +1253,27 @@ app.post('/index-vectors', (req, res) => {
     res.json(indexVectors(vectors));
   } catch (e) {
     console.error('[index-vectors]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /remediation — «работа над ошибками» (C4): похожие к проваленным.
+ * body: { failed_task_ids: [...], per_task?, exclude_ids?, min_cos?, max_cos? }
+ */
+app.post('/remediation', (req, res) => {
+  if (!buildRemediation) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { failed_task_ids, per_task, exclude_ids, min_cos, max_cos } = req.body || {};
+  if (!Array.isArray(failed_task_ids) || failed_task_ids.length === 0) return res.status(400).json({ error: 'failed_task_ids обязателен' });
+  try {
+    res.json(buildRemediation(failed_task_ids, {
+      perTask: Math.min(Math.max(Number(per_task) || 2, 1), 5),
+      excludeIds: Array.isArray(exclude_ids) ? exclude_ids : [],
+      minCos: min_cos != null ? Number(min_cos) : 0.70,
+      maxCos: max_cos != null ? Number(max_cos) : 0.97,
+    }));
+  } catch (e) {
+    console.error('[remediation]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
