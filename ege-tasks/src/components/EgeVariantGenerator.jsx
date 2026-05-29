@@ -28,6 +28,7 @@ import MathRenderer from './MathRenderer';
 import VariantRenderer from './worksheet/VariantRenderer';
 import AnswersPage from './worksheet/AnswersPage';
 import ActionButtons from './worksheet/ActionButtons';
+import ParallelVariantsModal from './worksheet/ParallelVariantsModal';
 import SaveWorkModal from './worksheet/SaveWorkModal';
 import LoadWorkModal from './worksheet/LoadWorkModal';
 import SessionPanel from './worksheet/SessionPanel';
@@ -305,6 +306,7 @@ const EgeVariantGenerator = () => {
   // Модальные окна
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [loadModalVisible, setLoadModalVisible] = useState(false);
+  const [parallelOpen, setParallelOpen] = useState(false);
   const [savedWorks, setSavedWorks] = useState([]);
   const [loadingWorks, setLoadingWorks] = useState(false);
   const [currentWork, setCurrentWork] = useState(null);
@@ -888,7 +890,17 @@ const EgeVariantGenerator = () => {
                 Распечатать КИМ
               </Button>
             )}
+            {variants[0]?.tasks?.length > 0 && (
+              <Button onClick={() => setParallelOpen(true)}>
+                🧬 Параллельные варианты (по образцу)
+              </Button>
+            )}
           </div>
+          <ParallelVariantsModal
+            open={parallelOpen}
+            onClose={() => setParallelOpen(false)}
+            baseTasks={variants[0]?.tasks || []}
+          />
 
           {/* Область печати */}
           <div ref={printRef}>

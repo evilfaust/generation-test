@@ -9,6 +9,7 @@ import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import SessionPanel from './worksheet/SessionPanel';
+import ParallelVariantsModal from './worksheet/ParallelVariantsModal';
 import TeacherResultsDashboard from './worksheet/TeacherResultsDashboard';
 import MathRenderer from './MathRenderer';
 import { PageHeader, StatRow, Stat, FilterRow } from '../ui';
@@ -38,6 +39,21 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   const [previewLoading, setPreviewLoading] = useState({});
 
   // Filters
+  const [parallelOpen, setParallelOpen] = useState(false);
+  const [parallelBase, setParallelBase] = useState([]);
+  const openParallel = async (e, workId) => {
+    e.stopPropagation();
+    try {
+      const vars = await api.getVariantsByWork(workId);
+      const tasks = vars[0]?.expand?.tasks || [];
+      if (!tasks.length) { message.warning('В первом варианте работы нет задач'); return; }
+      setParallelBase(tasks.map(t => ({ id: t.id })));
+      setParallelOpen(true);
+    } catch (err) {
+      message.error('Не удалось загрузить работу');
+    }
+  };
+
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [topicFilter, setTopicFilter] = useState(null);
@@ -534,6 +550,15 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                         />
                       </Tooltip>
                     )}
+                    <Tooltip title="Параллельный вариант (по образцу)">
+                      <Button
+                        type="text"
+                        size="small"
+                        onClick={e => openParallel(e, work.id)}
+                      >
+                        🧬
+                      </Button>
+                    </Tooltip>
                     {canEdit && (
                       <Tooltip title={work.archived ? 'Вернуть из архива' : 'В архив'}>
                         <Button
@@ -718,6 +743,11 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
           { key: 'works', label: <span><SolutionOutlined /> Контрольные работы</span>, children: worksContent },
           { key: 'mc', label: <span><FormOutlined /> Тесты с выбором</span>, children: mcContent },
         ]}
+      />
+      <ParallelVariantsModal
+        open={parallelOpen}
+        onClose={() => setParallelOpen(false)}
+        baseTasks={parallelBase}
       />
     </div>
   );

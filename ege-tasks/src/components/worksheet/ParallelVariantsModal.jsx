@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Modal, Button, InputNumber, Space, Spin, Alert, Tag, Empty, Tooltip } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Modal, Button, InputNumber, Space, Spin, Alert, Tag, Empty, Tooltip, App } from 'antd';
+import { ReloadOutlined, SaveOutlined } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
+import { api } from '../../services/pocketbase';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
 
@@ -45,10 +47,14 @@ const TaskCell = ({ t }) => {
  * @param {Array} baseTasks - [{id, code, ...}] базовый вариант
  */
 export default function ParallelVariantsModal({ open, onClose, baseTasks = [] }) {
+  const { message } = App.useApp();
+  const { canEdit } = useAuth();
   const [count, setCount] = useState(2);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const generate = useCallback(async () => {
     const ids = baseTasks.map((t) => t.id).filter(Boolean);
@@ -63,6 +69,7 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
       });
       if (!res.ok) throw new Error(`Сервис ответил ${res.status}`);
       setResult(await res.json());
+      setSaved(false);
     } catch (e) {
       setError(e.message); setResult(null);
     } finally {
@@ -72,6 +79,23 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
 
   useEffect(() => { if (open) generate(); /* eslint-disable-next-line */ }, [open]);
 
+  const saveFamily = async () => {
+    if (!result) return;
+    setSaving(true);
+    try {
+      const label = `${result.base[0]?.code || 'образец'} +${result.variants.length} паралл.`;
+      // в семейство кладём только реально подобранные задачи (без пустых слотов)
+      const parallels = result.variants.map((v) => v.filter((t) => t && !t.missing));
+      await api.markVariantFamily(result.base.filter((t) => t && !t.missing), parallels, label);
+      setSaved(true);
+      message.success('Семейство сохранено');
+    } catch (e) {
+      message.error(`Не удалось сохранить: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const cols = result ? 1 + result.variants.length : 1;
 
   return (
@@ -80,7 +104,14 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
       onCancel={onClose}
       width={Math.min(360 * cols, 1200)}
       title="🧬 Параллельные варианты (по образцу)"
-      footer={[<Button key="close" onClick={onClose}>Закрыть</Button>]}
+      footer={[
+        canEdit && result && (
+          <Button key="save" type="primary" icon={<SaveOutlined />} loading={saving} disabled={saved} onClick={saveFamily}>
+            {saved ? 'Сохранено' : 'Сохранить как семейство'}
+          </Button>
+        ),
+        <Button key="close" onClick={onClose}>Закрыть</Button>,
+      ]}
     >
       <Alert
         type="info" showIcon style={{ marginBottom: 12 }}
