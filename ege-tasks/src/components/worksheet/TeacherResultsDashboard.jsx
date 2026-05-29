@@ -4,6 +4,7 @@ import { ReloadOutlined, SwapOutlined, CheckCircleOutlined, CloseCircleOutlined,
 import { api } from '../../services/pocketbase';
 import { shuffleArray } from '../../utils/shuffle';
 import MathRenderer from '../MathRenderer';
+import ClassRemediationModal from './ClassRemediationModal';
 import { PB_BASE_URL } from '../../services/pocketbaseUrl';
 
 const { Text } = Typography;
@@ -26,6 +27,7 @@ const TeacherResultsDashboard = ({ sessionId }) => {
   const [manualRandomAchievementId, setManualRandomAchievementId] = useState(undefined);
   const [manualUnlockedAchievementIds, setManualUnlockedAchievementIds] = useState([]);
   const [mcTestData, setMcTestData] = useState(null); // данные MC-теста для отображения текста опций
+  const [classRemOpen, setClassRemOpen] = useState(false);
 
   const normalizeAchievementId = useCallback((value) => {
     if (!value) return undefined;
@@ -665,15 +667,29 @@ const TeacherResultsDashboard = ({ sessionId }) => {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <Text strong>Попытки учеников ({attempts.length})</Text>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={loadAttempts}
-          loading={loading}
-          size="small"
-        >
-          Обновить
-        </Button>
+        <Space size={6}>
+          {attempts.length > 0 && !mcTestData && (
+            <Button size="small" onClick={() => setClassRemOpen(true)}>
+              🩹 Работа над ошибками класса
+            </Button>
+          )}
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={loadAttempts}
+            loading={loading}
+            size="small"
+          >
+            Обновить
+          </Button>
+        </Space>
       </div>
+
+      <ClassRemediationModal
+        open={classRemOpen}
+        onClose={() => setClassRemOpen(false)}
+        sessionId={sessionId}
+        attempts={attempts}
+      />
 
       {attempts.length === 0 ? (
         <Empty description="Пока нет ни одной попытки" />
