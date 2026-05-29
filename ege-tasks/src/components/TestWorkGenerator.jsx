@@ -484,6 +484,7 @@ const TestWorkGenerator = () => {
           open={parallelOpen}
           onClose={() => setParallelOpen(false)}
           baseTasks={variants[0]?.tasks || []}
+          baseTitle={form.getFieldValue('workTitle') || 'Контрольная работа'}
         />
       </div>
 

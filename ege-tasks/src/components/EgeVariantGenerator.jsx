@@ -900,6 +900,7 @@ const EgeVariantGenerator = () => {
             open={parallelOpen}
             onClose={() => setParallelOpen(false)}
             baseTasks={variants[0]?.tasks || []}
+            baseTitle="Вариант ЕГЭ"
           />
 
           {/* Область печати */}

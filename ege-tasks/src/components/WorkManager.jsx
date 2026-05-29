@@ -41,13 +41,15 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   // Filters
   const [parallelOpen, setParallelOpen] = useState(false);
   const [parallelBase, setParallelBase] = useState([]);
-  const openParallel = async (e, workId) => {
+  const [parallelWork, setParallelWork] = useState({ id: null, title: '' });
+  const openParallel = async (e, work) => {
     e.stopPropagation();
     try {
-      const vars = await api.getVariantsByWork(workId);
+      const vars = await api.getVariantsByWork(work.id);
       const tasks = vars[0]?.expand?.tasks || [];
       if (!tasks.length) { message.warning('В первом варианте работы нет задач'); return; }
       setParallelBase(tasks.map(t => ({ id: t.id })));
+      setParallelWork({ id: work.id, title: work.title || 'Работа' });
       setParallelOpen(true);
     } catch (err) {
       message.error('Не удалось загрузить работу');
@@ -554,7 +556,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                       <Button
                         type="text"
                         size="small"
-                        onClick={e => openParallel(e, work.id)}
+                        onClick={e => openParallel(e, work)}
                       >
                         🧬
                       </Button>
@@ -748,6 +750,9 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         open={parallelOpen}
         onClose={() => setParallelOpen(false)}
         baseTasks={parallelBase}
+        baseWorkId={parallelWork.id}
+        baseTitle={parallelWork.title}
+        onOpenWork={onEditWork}
       />
     </div>
   );

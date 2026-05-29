@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Modal, Button, InputNumber, Space, Spin, Alert, Tag, Empty, Tooltip, App } from 'antd';
+import { Modal, Button, InputNumber, Input, Space, Spin, Alert, Tag, Empty, Tooltip, App } from 'antd';
 import { ReloadOutlined, SaveOutlined, SwapOutlined, PlusOutlined } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
 import TaskSelectModal from '../TaskSelectModal';
@@ -55,7 +55,7 @@ const TaskCell = ({ t, onPick }) => {
  * @param {function} onClose
  * @param {Array} baseTasks - [{id, code, ...}] базовый вариант
  */
-export default function ParallelVariantsModal({ open, onClose, baseTasks = [] }) {
+export default function ParallelVariantsModal({ open, onClose, baseTasks = [], baseWorkId = null, baseTitle = '', classNumber = null, onOpenWork }) {
   const { message } = App.useApp();
   const { canEdit } = useAuth();
   const [count, setCount] = useState(2);
@@ -63,7 +63,8 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [created, setCreated] = useState(null); // [{id, role, title}] после создания работ
+  const [title, setTitle] = useState('');
   const [pickTarget, setPickTarget] = useState(null); // { vi, pos } — какую ячейку заполняем
 
   // все задачи, уже занятые в семействе (образец + все параллели) — чтобы не повторять
@@ -105,7 +106,7 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
       });
       if (!res.ok) throw new Error(`Сервис ответил ${res.status}`);
       setResult(await res.json());
-      setSaved(false);
+      setCreated(null);
     } catch (e) {
       setError(e.message); setResult(null);
     } finally {
@@ -113,20 +114,49 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
     }
   }, [baseTasks, count]);
 
-  useEffect(() => { if (open) generate(); /* eslint-disable-next-line */ }, [open]);
+  useEffect(() => {
+    if (open) { setTitle(baseTitle || 'Вариант'); setCreated(null); generate(); }
+    /* eslint-disable-next-line */
+  }, [open]);
 
-  const saveFamily = async () => {
+  // Создать работы в «Мои работы»: оригинал + дубль 1..N, связать в variant_family.
+  const createWorks = async () => {
     if (!result) return;
     setSaving(true);
     try {
-      const label = `${result.base[0]?.code || 'образец'} +${result.variants.length} паралл.`;
-      // в семейство кладём только реально подобранные задачи (без пустых слотов)
-      const parallels = result.variants.map((v) => v.filter((t) => t && !t.missing));
-      await api.markVariantFamily(result.base.filter((t) => t && !t.missing), parallels, label);
-      setSaved(true);
-      message.success('Семейство сохранено');
+      const mkVariant = (workId, ids) =>
+        api.createVariant({ work: workId, number: 1, tasks: ids, order: ids.map((id, i) => ({ taskId: id, position: i })) });
+      const works = [];
+
+      // 1) оригинал — переиспользуем исходную работу, либо создаём из образца
+      const baseIds = result.base.filter((t) => t && !t.missing).map((t) => t.task_id);
+      if (baseWorkId) {
+        works.push({ id: baseWorkId, role: 'оригинал', title: `${title} (исходная)` });
+      } else {
+        const w = await api.createWork({ title: `${title} — оригинал`, ...(classNumber ? { class: classNumber } : {}) });
+        await mkVariant(w.id, baseIds);
+        works.push({ id: w.id, role: 'оригинал', title: w.title });
+      }
+
+      // 2) параллели → дубль N
+      for (let i = 0; i < result.variants.length; i++) {
+        const ids = result.variants[i].filter((t) => t && !t.missing).map((t) => t.task_id);
+        if (!ids.length) continue;
+        const w = await api.createWork({ title: `${title} — дубль ${i + 1}`, ...(classNumber ? { class: classNumber } : {}) });
+        await mkVariant(w.id, ids);
+        works.push({ id: w.id, role: `дубль ${i + 1}`, title: w.title });
+      }
+
+      // 3) запись связи на уровне задач (variant_family)
+      try {
+        const parallels = result.variants.map((v) => v.filter((t) => t && !t.missing));
+        await api.markVariantFamily(result.base.filter((t) => t && !t.missing), parallels, title);
+      } catch (_) { /* связь некритична */ }
+
+      setCreated(works);
+      message.success(`Создано работ: ${works.length}`);
     } catch (e) {
-      message.error(`Не удалось сохранить: ${e.message}`);
+      message.error(`Не удалось создать: ${e.message}`);
     } finally {
       setSaving(false);
     }
@@ -141,20 +171,38 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
       width={Math.min(360 * cols, 1200)}
       title="🧬 Параллельные варианты (по образцу)"
       footer={[
-        canEdit && result && (
-          <Button key="save" type="primary" icon={<SaveOutlined />} loading={saving} disabled={saved} onClick={saveFamily}>
-            {saved ? 'Сохранено' : 'Сохранить как семейство'}
+        canEdit && result && !created && (
+          <Button key="save" type="primary" icon={<SaveOutlined />} loading={saving} onClick={createWorks}>
+            Создать работы в «Мои работы»
           </Button>
         ),
         <Button key="close" onClick={onClose}>Закрыть</Button>,
       ]}
     >
+      {created ? (
+        <div>
+          <Alert type="success" showIcon style={{ marginBottom: 12 }}
+            message={`Создано работ: ${created.length}. Найти их можно в разделе «Мои работы».`} />
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
+            {created.map((w) => (
+              <div key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+                <Tag color={w.role === 'оригинал' ? 'gold' : 'blue'}>{w.role}</Tag>
+                <span style={{ flex: 1 }}>{w.title}</span>
+                {onOpenWork && <Button size="small" onClick={() => { onOpenWork(w.id); onClose(); }}>Открыть</Button>}
+              </div>
+            ))}
+          </Space>
+        </div>
+      ) : (
+      <>
       <Alert
         type="info" showIcon style={{ marginBottom: 12 }}
         message="Для каждой задачи образца подбирается похожая (та же тема и тип, другие числа). Получаются параллельные варианты: подготовка → контрольная → пересдача."
       />
-      <Space style={{ marginBottom: 12 }}>
-        <span>Сколько параллельных:</span>
+      <Space style={{ marginBottom: 12, width: '100%' }} wrap>
+        <span>Название:</span>
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: 220 }} placeholder="Название работ" />
+        <span>Параллелей:</span>
         <InputNumber min={1} max={5} value={count} onChange={(v) => setCount(v || 2)} />
         <Button icon={<ReloadOutlined />} onClick={generate} loading={loading}>Подобрать</Button>
       </Space>
@@ -190,6 +238,8 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
       )}
 
       {!loading && result && result.base.length === 0 && <Empty description="Нет задач в образце" />}
+      </>
+      )}
 
       <TaskSelectModal
         visible={pickTarget !== null}
