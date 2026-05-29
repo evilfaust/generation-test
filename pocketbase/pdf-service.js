@@ -14,6 +14,14 @@ try {
 import cors from 'cors';
 import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
+// Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
+// недоступны — сервис всё равно стартует, /similar вернёт 503.
+let findSimilar = null, vecHealth = null;
+try {
+  ({ findSimilar, vecHealth } = await import('./vec-search.js'));
+} catch (e) {
+  console.warn('[pdf-service] vec-search недоступен:', e.message);
+}
 // KaTeX — серверный рендер для валидации формул (latex_needs_review)
 let katex = null;
 try {
@@ -1196,6 +1204,36 @@ app.get('/health', (req, res) => {
     browser: browser?.connected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
   });
+});
+
+/**
+ * POST /similar — похожие задачи (sqlite-vec).
+ * body: { task_id, limit?, same_topic_only?, min_cos? }
+ */
+app.post('/similar', (req, res) => {
+  if (!findSimilar) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_id, limit, same_topic_only, min_cos } = req.body || {};
+  if (!task_id) return res.status(400).json({ error: 'task_id обязателен' });
+  try {
+    const r = findSimilar({
+      taskId: task_id,
+      limit: Number(limit) || 8,
+      sameTopicOnly: same_topic_only !== false,
+      minCos: Number(min_cos) || 0,
+    });
+    res.json(r);
+  } catch (e) {
+    console.error('[similar]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /similar/health — состояние индекса
+ */
+app.get('/similar/health', (req, res) => {
+  if (!vecHealth) return res.status(503).json({ ok: false, error: 'vec-search не инициализирован' });
+  res.json(vecHealth());
 });
 
 /**

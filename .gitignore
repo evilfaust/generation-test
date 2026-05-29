@@ -30,6 +30,8 @@ SDAMGIA_TABLE_PARSING.md
 START_GUIDE.md
 TEST_AND_COMMIT.md
 plan.md
+lemma_vector_search_idea.md
+vector-benchmark/
 
 # ── Claude memory & internal notes (per-project) ──────────────────────────────
 memory/
