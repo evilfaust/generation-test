@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, Button, InputNumber, Space, Spin, Alert, Tag, Empty, Tooltip, App } from 'antd';
-import { ReloadOutlined, SaveOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SaveOutlined, SwapOutlined, PlusOutlined } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
+import TaskSelectModal from '../TaskSelectModal';
 import { api } from '../../services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -14,22 +15,30 @@ function cosColor(cos) {
   return 'gold';
 }
 
-const TaskCell = ({ t }) => {
+const TaskCell = ({ t, onPick }) => {
   if (!t || t.missing) {
     return (
-      <div style={{ padding: 8, border: '1px dashed #ffccc7', borderRadius: 6, background: '#fff2f0', color: '#cf1322', fontSize: 12 }}>
-        нет подходящей замены
+      <div style={{ padding: 8, border: '1px dashed #ffccc7', borderRadius: 6, background: '#fff2f0', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+        <span style={{ color: '#cf1322' }}>нет подходящей замены</span>
+        {onPick && <Button size="small" icon={<PlusOutlined />} onClick={onPick}>Выбрать</Button>}
       </div>
     );
   }
   return (
     <div style={{ padding: 8, border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa', fontSize: 12 }}>
-      <Space size={4} style={{ marginBottom: 4 }}>
-        <span style={{ color: '#888' }}>{t.code}</span>
-        <Tag style={{ margin: 0 }}>{t.answer || '—'}</Tag>
-        {t.cos != null && (
-          <Tooltip title={`похоже на образец, cos ${t.cos}`}>
-            <Tag color={cosColor(t.cos)} style={{ margin: 0 }}>{Math.round(t.cos * 100)}%</Tag>
+      <Space size={4} style={{ marginBottom: 4, width: '100%', justifyContent: 'space-between' }}>
+        <Space size={4}>
+          <span style={{ color: '#888' }}>{t.code}</span>
+          <Tag style={{ margin: 0 }}>{t.answer || '—'}</Tag>
+          {t.cos != null ? (
+            <Tooltip title={`похоже на образец, cos ${t.cos}`}>
+              <Tag color={cosColor(t.cos)} style={{ margin: 0 }}>{Math.round(t.cos * 100)}%</Tag>
+            </Tooltip>
+          ) : t.manual ? <Tag color="blue" style={{ margin: 0 }}>вручную</Tag> : null}
+        </Space>
+        {onPick && (
+          <Tooltip title="Заменить задачу вручную">
+            <Button size="small" type="text" icon={<SwapOutlined />} onClick={onPick} />
           </Tooltip>
         )}
       </Space>
@@ -55,6 +64,33 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [pickTarget, setPickTarget] = useState(null); // { vi, pos } — какую ячейку заполняем
+
+  // все задачи, уже занятые в семействе (образец + все параллели) — чтобы не повторять
+  const usedIds = (() => {
+    const s = new Set();
+    if (result) {
+      result.base.forEach((t) => t && !t.missing && s.add(t.task_id));
+      result.variants.forEach((v) => v.forEach((t) => t && !t.missing && s.add(t.task_id)));
+    }
+    return [...s];
+  })();
+
+  const handlePick = (task) => {
+    if (!pickTarget) return;
+    const { vi, pos } = pickTarget;
+    setResult((prev) => {
+      const variants = prev.variants.map((v) => v.slice());
+      variants[vi][pos] = {
+        task_id: task.id, code: task.code, answer: task.answer,
+        statement: (task.statement_md || '').replace(/\s+/g, ' ').slice(0, 160),
+        manual: true,
+      };
+      return { ...prev, variants };
+    });
+    setSaved(false);
+    setPickTarget(null);
+  };
 
   const generate = useCallback(async () => {
     const ids = baseTasks.map((t) => t.id).filter(Boolean);
@@ -144,7 +180,9 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
             <div key={vi}>
               <div style={{ fontWeight: 600, marginBottom: 6, textAlign: 'center', color: '#1890ff' }}>Параллель {vi + 1}</div>
               <Space direction="vertical" size={6} style={{ width: '100%' }}>
-                {variant.map((t, i) => <TaskCell key={i} t={t} />)}
+                {variant.map((t, i) => (
+                  <TaskCell key={i} t={t} onPick={() => setPickTarget({ vi, pos: i })} />
+                ))}
               </Space>
             </div>
           ))}
@@ -152,6 +190,13 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [] })
       )}
 
       {!loading && result && result.base.length === 0 && <Empty description="Нет задач в образце" />}
+
+      <TaskSelectModal
+        visible={pickTarget !== null}
+        onCancel={() => setPickTarget(null)}
+        onSelect={handlePick}
+        excludeIds={usedIds}
+      />
     </Modal>
   );
 }
