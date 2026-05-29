@@ -7,7 +7,7 @@ import { useReferenceData } from '../../contexts/ReferenceDataContext';
 import MathRenderer from '../MathRenderer';
 import TaskEditModal from '../TaskEditModal';
 
-export default function VectorDuplicatesTab({ onOpenTasks }) {
+export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
   const { message } = App.useApp();
   const { canEdit } = useAuth();
   const { topics, tags, subtopics, years, sources } = useReferenceData();
@@ -76,8 +76,18 @@ export default function VectorDuplicatesTab({ onOpenTasks }) {
     }
   };
 
-  const handleSkip = (c) => {
-    setHidden((prev) => new Set(prev).add(clusterKey(c)));
+  const handleSkip = async (c) => {
+    const key = clusterKey(c);
+    setMarkingId(key);
+    try {
+      await api.markNotDuplicate(c.members.map((m) => ({ id: m.id })), `${c.members[0]?.code || '?'} ×${c.size}`);
+      setHidden((prev) => new Set(prev).add(key));
+      message.success('Помечено «не дубли» — больше не появится в очереди');
+    } catch (e) {
+      message.error(`Не удалось пометить: ${e.message}`);
+    } finally {
+      setMarkingId(null);
+    }
   };
 
   const visible = (data?.items || []).filter((c) => !hidden.has(clusterKey(c)));
@@ -130,8 +140,8 @@ export default function VectorDuplicatesTab({ onOpenTasks }) {
                       Найти в списке
                     </Button>
                   )}
-                  <Tooltip title="Скрыть из очереди до перезагрузки (не сохраняется)">
-                    <Button size="small" icon={<EyeInvisibleOutlined />} onClick={() => handleSkip(c)}>Не дубли</Button>
+                  <Tooltip title="Пометить «не дубли» — кластер больше не появится в очереди">
+                    <Button size="small" icon={<EyeInvisibleOutlined />} loading={markingId === clusterKey(c)} onClick={() => handleSkip(c)}>Не дубли</Button>
                   </Tooltip>
                   {canEdit && (
                     <Button
@@ -150,14 +160,27 @@ export default function VectorDuplicatesTab({ onOpenTasks }) {
                   <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
                     <span style={{ flexShrink: 0, minWidth: 64, color: '#888' }}>{m.code}</span>
                     <Tag style={{ flexShrink: 0 }}>{m.answer || '—'}</Tag>
-                    {m.ref_count != null && (
-                      <Tooltip title={m.ref_count > 0 ? 'Используется в работах — удаление урежет их. Безопаснее «Пометить дублями».' : 'Нигде не используется — можно безопасно удалить.'}>
-                        <Tag color={m.ref_count > 0 ? 'volcano' : 'green'} style={{ flexShrink: 0 }}>
-                          {m.ref_count > 0 ? `в ${m.ref_count} раб.` : 'не исп.'}
-                        </Tag>
-                      </Tooltip>
-                    )}
-                    <div style={{ overflow: 'hidden', flex: 1 }}><MathRenderer text={m.statement} /></div>
+                    <div style={{ overflow: 'hidden', flex: 1 }}>
+                      <MathRenderer text={m.statement} />
+                      {/* работы, использующие задачу */}
+                      <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+                        {m.ref_count === 0 && <Tag color="green" style={{ margin: 0 }}>не используется — можно удалить</Tag>}
+                        {m.ref_count > 0 && (
+                          <Tooltip title="Используется в работах. Удалить нельзя (БД защитит) — открой работу и замени/убери там, либо «Пометить дублями».">
+                            <span style={{ color: '#cf1322', fontSize: 12 }}>в {m.ref_count} раб.:</span>
+                          </Tooltip>
+                        )}
+                        {(m.works || []).map((w) => (
+                          <Tag
+                            key={w.id} color="volcano"
+                            style={{ margin: 0, cursor: onOpenWork ? 'pointer' : 'default' }}
+                            onClick={onOpenWork ? () => onOpenWork(w.id) : undefined}
+                          >
+                            {w.title || 'без названия'} →
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
                     {canEdit && (
                       <Tooltip title="Открыть в редакторе (правка / удаление)">
                         <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEditor(m.id)} />

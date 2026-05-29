@@ -118,11 +118,11 @@ export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 2
   const d = getDb();
   const all = loadClusters().filter((c) => c.type === type);
 
-  // task_id уже размеченных дублей (в data.db через ATTACH main)
+  // task_id уже размеченных (дубли ИЛИ помечены «не дубли») — скрываем из очереди
   const reviewed = new Set(
     d.prepare(`SELECT DISTINCT m.task AS t FROM main.task_family_members m
                JOIN main.task_families f ON f.id = m.family
-               WHERE f.type = 'dedup_cluster'`).all().map((r) => r.t)
+               WHERE f.type IN ('dedup_cluster', 'reviewed_not_dup')`).all().map((r) => r.t)
   );
 
   const pending = all.filter((c) => !c.ids.some((id) => reviewed.has(id)));
@@ -131,17 +131,23 @@ export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 2
   const slice = pending.slice(start, start + perPage);
 
   const info = d.prepare('SELECT id, code, answer, statement_md, topic FROM main.tasks WHERE id = ?');
-  // сколько вариантов работ ссылаются на задачу (variants.tasks — JSON-массив id)
-  const refCount = d.prepare(`SELECT count(*) c FROM main.variants WHERE tasks LIKE ?`);
-  const refs = (id) => { try { return refCount.get(`%"${id}"%`).c; } catch { return null; } };
+  // работы, использующие задачу (variants.tasks — JSON-массив id)
+  const worksStmt = d.prepare(`
+    SELECT DISTINCT w.id AS id, w.title AS title, v.number AS variant
+    FROM main.variants v JOIN main.works w ON w.id = v.work
+    WHERE v.tasks LIKE ? LIMIT 8`);
+  const worksOf = (id) => { try { return worksStmt.all(`%"${id}"%`); } catch { return []; } };
   const items = slice.map((c) => ({
     type: c.type,
     size: c.ids.length,
     members: c.ids.map((id) => {
       const r = info.get(id);
-      return r ? { id: r.id, code: r.code, answer: r.answer, topic: r.topic,
-        ref_count: refs(id),
-        statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 240) } : { id, missing: true };
+      if (!r) return { id, missing: true };
+      const works = worksOf(id);
+      return { id: r.id, code: r.code, answer: r.answer, topic: r.topic,
+        ref_count: works.length,
+        works: works.map((w) => ({ id: w.id, title: w.title, variant: w.variant })),
+        statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 240) };
     }),
   }));
   return { total, page, perPage, totalPages: Math.ceil(total / perPage), reviewed_count: reviewed.size, items };

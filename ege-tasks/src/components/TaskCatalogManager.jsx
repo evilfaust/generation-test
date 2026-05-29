@@ -14,7 +14,7 @@ import VectorDuplicatesTab from './catalog/VectorDuplicatesTab';
 import MergeModal from './catalog/MergeModal';
 import './TaskCatalogManager.css';
 
-const TaskCatalogManager = ({ onOpenTasks, onBackToAnalytics }) => {
+const TaskCatalogManager = ({ onOpenTasks, onOpenWork, onBackToAnalytics }) => {
   const { topics, subtopics, tags, sources, years, tasksSnapshot, withAnswerCount, withSolutionCount, loading: refLoading, reloadData, reloadSnapshot } = useReferenceData();
 
   const [mergeModalOpen, setMergeModalOpen] = useState(false);
@@ -202,7 +202,7 @@ const TaskCatalogManager = ({ onOpenTasks, onBackToAnalytics }) => {
     { key: 'sources', label: 'Источники', children: <SourceTab sourceRows={sourceRows} tasksSnapshot={tasksSnapshot} onOpenTasks={handleOpenTasks} onMerge={openMerge} onReload={reloadAll} /> },
     { key: 'other', label: 'Прочее', children: <OtherTab difficultyRows={difficultyRows} yearRows={yearRows} stats={stats} onOpenTasks={handleOpenTasks} /> },
     { key: 'duplicates', label: 'Дубли', children: duplicateTasksLoading ? <Spin /> : <DuplicateTab duplicateGroups={duplicateGroups} onOpenTasks={handleOpenTasks} onMerge={openMerge} /> },
-    { key: 'vec-duplicates', label: '🔎 Похожие (вектор)', children: <VectorDuplicatesTab onOpenTasks={handleOpenTasks} /> },
+    { key: 'vec-duplicates', label: '🔎 Похожие (вектор)', children: <VectorDuplicatesTab onOpenTasks={handleOpenTasks} onOpenWork={onOpenWork} /> },
   ];
 
   const totalDuplicates =

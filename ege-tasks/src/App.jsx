@@ -360,6 +360,7 @@ function CatalogPage() {
   return (
     <TaskCatalogManager
       onOpenTasks={(filters) => navigate(R.TASKS + filtersToSearch(filters))}
+      onOpenWork={(workId) => navigate(route(R.WORK_EDITOR, { workId }))}
       onBackToAnalytics={() => navigate(R.STATS)}
     />
   );

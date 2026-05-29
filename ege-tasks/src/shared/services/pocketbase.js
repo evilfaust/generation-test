@@ -90,6 +90,21 @@ export const api = {
     return family;
   },
 
+  // Пометить кластер как «не дубли» (просмотрено) — больше не в очереди ревью.
+  async markNotDuplicate(members, label = '') {
+    const family = await pb.collection('task_families').create({
+      type: 'reviewed_not_dup',
+      label: label.slice(0, 200),
+    });
+    for (const m of members) {
+      try {
+        await pb.collection('task_family_members').create({ family: family.id, task: m.id });
+      } catch (e) { console.debug('[not-dup] member skip:', e?.message); }
+    }
+    _logAudit('create', 'task_families', family.id, `not_dup ${members.length} задач`.slice(0, 500));
+    return family;
+  },
+
   // Сохранить семейство вариантов (A4): образец + параллели.
   // base: [{id}]; parallels: [[{id, cos?}], ...] (массив вариантов).
   async markVariantFamily(base, parallels, label = '') {
