@@ -31,7 +31,10 @@ START_GUIDE.md
 TEST_AND_COMMIT.md
 plan.md
 lemma_vector_search_idea.md
-vector-benchmark/
+# vector-benchmark: трекаем скрипты (индексатор, бенчмарк), игнорим данные/модули
+vector-benchmark/data/
+vector-benchmark/node_modules/
+vector-benchmark/package-lock.json
 
 # ── Claude memory & internal notes (per-project) ──────────────────────────────
 memory/
