@@ -1,4 +1,5 @@
 // Общие настройки бенчмарка. Меняй здесь.
+import fs from 'node:fs';
 
 export const PB_URL = process.env.PB_URL || 'https://task-ege.oipav.ru';
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
@@ -6,7 +7,13 @@ export const MODEL = process.env.EMBED_MODEL || 'bge-m3';
 
 // Куда пушить векторы при index.mjs --push (pdf-service на VPS).
 export const PDF_URL = process.env.PDF_URL || 'https://task-ege.oipav.ru/pdf';
-export const INDEX_TOKEN = process.env.INDEX_TOKEN || '';
+// Токен: из env (launchd-агент) ИЛИ из локального файла .index-token (для ручных
+// запусков `npm run dedup` без ввода токена). Файл gitignored, плейнтекст.
+function readTokenFile() {
+  try { return fs.readFileSync(new URL('../.index-token', import.meta.url).pathname, 'utf8').trim(); }
+  catch { return ''; }
+}
+export const INDEX_TOKEN = process.env.INDEX_TOKEN || readTokenFile();
 
 // Сколько задач затягиваем в пул для бенчмарка (из ~11k).
 // Чем больше — тем выше шанс найти реальные дубли, но дольше эмбеддинг.

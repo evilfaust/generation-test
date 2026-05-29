@@ -7,6 +7,9 @@
     "lib": "lib"
   },
   "scripts": {
+    "index": "node index.mjs --push",
+    "dedup": "node index.mjs --push --dedup",
+    "index:full": "node index.mjs --full --push",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -218,16 +218,18 @@ async function main() {
       const pr = await pruneRemote(allIds);
       console.log(`   Прунинг на VPS: удалено ${pr.pruned}, осталось ${pr.total}`);
     } catch (e) { console.warn(`   ⚠ прунинг на VPS не удался: ${e.message}`); }
-    // Дедуп пересчитываем только если реально были новые/изменённые задачи
-    // (или явный --dedup). Полная кластеризация O(n²) дорогая — не гоняем вхолостую.
-    if (embedded > 0 || FORCE_DEDUP) {
+    // Дедуп — ТОЛЬКО по явному флагу --dedup (тяжёлая O(n²) кластеризация на
+    // 5-6 мин). Агент (--push без --dedup) её НЕ запускает; учитель гоняет сам,
+    // когда решит обновить дубли: `npm run dedup` / `node index.mjs --push --dedup`.
+    if (FORCE_DEDUP) {
       try {
+        console.log('   Считаю дедуп-кластеры (это может занять несколько минут)...');
         const clusters = computeClusters(db, taskMeta); // на Mac, VPS не грузим
         const rc = await uploadClusters(clusters);
         console.log(`   Дубли пересчитаны и залиты: ${rc.exact_dup} точных + ${rc.param_family} параметрич.`);
       } catch (e) { console.warn(`   ⚠ пересчёт дублей не удался: ${e.message}`); }
     } else {
-      console.log('   Дубли не пересчитывались (новых задач нет; форс — флаг --dedup).');
+      console.log('   Дубли НЕ пересчитывались (нужен флаг --dedup или `npm run dedup`).');
     }
   }
 
