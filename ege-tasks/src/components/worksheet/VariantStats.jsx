@@ -1,4 +1,5 @@
 import { Row, Col } from 'antd';
+import VariantSimilarityWarning from './VariantSimilarityWarning';
 
 /**
  * Блок статистики сгенерированных вариантов.
@@ -54,6 +55,7 @@ const VariantStats = ({
           </div>
         </Col>
       </Row>
+      <VariantSimilarityWarning variants={variants} />
     </div>
   );
 };

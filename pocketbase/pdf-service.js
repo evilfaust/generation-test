@@ -16,9 +16,9 @@ import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
-let findSimilar = null, vecHealth = null, getDuplicateClusters = null;
+let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1234,6 +1234,22 @@ app.post('/similar', (req, res) => {
 app.get('/similar/health', (req, res) => {
   if (!vecHealth) return res.status(503).json({ ok: false, error: 'vec-search не инициализирован' });
   res.json(vecHealth());
+});
+
+/**
+ * POST /pairs — похожие пары внутри набора задач (A2).
+ * body: { task_ids: [...], min_cos? }
+ */
+app.post('/pairs', (req, res) => {
+  if (!findPairs) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_ids, min_cos } = req.body || {};
+  if (!Array.isArray(task_ids) || task_ids.length < 2) return res.json({ pairs: [], missing: [] });
+  try {
+    res.json(findPairs(task_ids, Number(min_cos) || 0.7));
+  } catch (e) {
+    console.error('[pairs]', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 /**

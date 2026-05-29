@@ -135,6 +135,43 @@ export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 2
   return { total, page, perPage, totalPages: Math.ceil(total / perPage), reviewed_count: reviewed.size, items };
 }
 
+// --- Похожие ПАРЫ внутри набора задач (A2: предупреждение о повторах в варианте) ---
+function cosineBuf(a, b) {
+  // a,b — Buffer с Float32. Длина одинаковая.
+  const fa = new Float32Array(a.buffer, a.byteOffset, a.length / 4);
+  const fb = new Float32Array(b.buffer, b.byteOffset, b.length / 4);
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < fa.length; i++) { dot += fa[i] * fb[i]; na += fa[i] * fa[i]; nb += fb[i] * fb[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+/**
+ * Найти похожие пары среди набора задач (для одного варианта).
+ * @param {string[]} taskIds
+ * @param {number} [minCos=0.7]
+ * @returns {{pairs: Array<{a,b,cos,pct}>, missing: string[]}}
+ */
+export function findPairs(taskIds, minCos = 0.7) {
+  const d = getDb();
+  const get = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
+  const vecs = new Map();
+  const missing = [];
+  for (const id of taskIds) {
+    const r = get.get(id);
+    if (r) vecs.set(id, r.embedding); else missing.push(id);
+  }
+  const ids = [...vecs.keys()];
+  const pairs = [];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const cos = cosineBuf(vecs.get(ids[i]), vecs.get(ids[j]));
+      if (cos >= minCos) pairs.push({ a: ids[i], b: ids[j], cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)) });
+    }
+  }
+  pairs.sort((x, y) => y.cos - x.cos);
+  return { pairs, missing };
+}
+
 export function vecHealth() {
   try {
     const d = getDb();
