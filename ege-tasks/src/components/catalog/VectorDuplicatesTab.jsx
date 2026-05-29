@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Tag, Button, Space, Spin, Alert, Empty, Pagination, Segmented, Tooltip, Popconfirm, App } from 'antd';
+import { Card, Tag, Button, Space, Spin, Alert, Empty, Pagination, Segmented, Tooltip, Popconfirm, Checkbox, App } from 'antd';
 import { CheckOutlined, EyeInvisibleOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { api } from '../../services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,6 +21,54 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
   const [hidden, setHidden] = useState(new Set()); // локально скрытые (пропущенные/размеченные)
   const [editTask, setEditTask] = useState(null); // задача в редакторе
   const [editOpen, setEditOpen] = useState(false);
+  const [selected, setSelected] = useState(new Set()); // выбранные задачи (птички)
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Удалить задачи из локального состояния (без рефреша страницы).
+  // Кластеры, где осталось <2 задач, убираем из очереди.
+  const removeTasksLocally = (ids) => {
+    const idset = new Set(ids);
+    setData((prev) => {
+      if (!prev) return prev;
+      let dropped = 0;
+      const items = prev.items
+        .map((c) => {
+          const members = c.members.filter((m) => !idset.has(m.id));
+          return { ...c, members, size: members.length };
+        })
+        .filter((c) => {
+          if (c.members.length >= 2) return true;
+          dropped += 1; return false;
+        });
+      return { ...prev, items, total: Math.max(0, prev.total - dropped) };
+    });
+    setSelected((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
+  };
+
+  const toggleSelect = (id) => setSelected((prev) => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+
+  // выбрать все безопасно удаляемые (сироты, ref_count===0) на странице
+  const selectAllOrphans = () => {
+    const ids = [];
+    (data?.items || []).forEach((c) => c.members.forEach((m) => { if (m.ref_count === 0) ids.push(m.id); }));
+    setSelected(new Set(ids));
+  };
+
+  const bulkDelete = async () => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    setBulkDeleting(true);
+    const okIds = []; let failed = 0;
+    for (const id of ids) {
+      try { await api.deleteTask(id); okIds.push(id); } catch { failed += 1; }
+    }
+    removeTasksLocally(okIds);
+    setBulkDeleting(false);
+    if (okIds.length) message.success(`Удалено: ${okIds.length}${failed ? `, не удалось: ${failed} (используются в работах)` : ''}`);
+    else message.warning('Ничего не удалено — выбранные задачи используются в работах (БД не даёт удалить)');
+  };
 
   const openEditor = async (taskId) => {
     try {
@@ -41,7 +89,7 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
       await api.deleteTask(taskId);
       message.success('Задача удалена');
       setEditOpen(false);
-      load(); // обновить очередь
+      removeTasksLocally([taskId]); // без рефреша
     } catch (e) { message.error(`Не удалось удалить: ${e.message}`); }
   };
   // быстрое удаление прямо из строки (иконка 🗑)
@@ -50,7 +98,7 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
     try {
       await api.deleteTask(taskId);
       message.success('Задача удалена');
-      load();
+      removeTasksLocally([taskId]); // без рефреша
     } catch (e) {
       const used = /relation reference|required relation/i.test(e?.message || '');
       message.error(used
@@ -114,7 +162,7 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
       <Space style={{ marginBottom: 16, flexWrap: 'wrap' }}>
         <Segmented
           value={type}
-          onChange={(v) => { setType(v); setPage(1); setHidden(new Set()); }}
+          onChange={(v) => { setType(v); setPage(1); setHidden(new Set()); setSelected(new Set()); }}
           options={[
             { label: 'Точные дубли', value: 'exact_dup' },
             { label: 'Параметрические семейства', value: 'param_family' },
@@ -136,6 +184,30 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
           ? 'Кластеры почти-идентичных задач с одинаковым ответом (cos ≥ 0.93 внутри темы). «Пометить дублями» создаёт запись-семейство (dedup_cluster) — задачи НЕ удаляются, только связываются.'
           : 'Параметрические семейства: тот же тип, но разные числа/ответы — обычно это здоровое разнообразие, а не дубли.'}
       />
+
+      {/* Панель массового удаления (птички) */}
+      {canDelete && !loading && visible.length > 0 && (
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 5, display: 'flex', gap: 8, alignItems: 'center',
+          flexWrap: 'wrap', padding: '8px 12px', marginBottom: 12, borderRadius: 6,
+          background: selected.size > 0 ? '#fff1f0' : '#fafafa', border: '1px solid #f0f0f0',
+        }}>
+          <span style={{ fontSize: 13 }}>Выбрано: <b>{selected.size}</b></span>
+          <Button size="small" onClick={selectAllOrphans}>Выбрать всех «сирот» (можно удалить)</Button>
+          {selected.size > 0 && <Button size="small" onClick={() => setSelected(new Set())}>Снять</Button>}
+          <Popconfirm
+            title={`Удалить выбранные задачи (${selected.size})?`}
+            description="Используемые в работах БД удалить не даст — они будут пропущены. Сироты удалятся безвозвратно."
+            okText="Удалить" okButtonProps={{ danger: true }} cancelText="Отмена"
+            onConfirm={bulkDelete}
+            disabled={selected.size === 0}
+          >
+            <Button size="small" danger type="primary" icon={<DeleteOutlined />} loading={bulkDeleting} disabled={selected.size === 0}>
+              Удалить выбранные
+            </Button>
+          </Popconfirm>
+        </div>
+      )}
 
       {loading && <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>}
       {!loading && error && <Alert type="error" showIcon message={error} />}
@@ -175,6 +247,15 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
               <Space direction="vertical" size={6} style={{ width: '100%' }}>
                 {c.members.map((m) => (
                   <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
+                    {canDelete && (
+                      <Tooltip title={m.ref_count > 0 ? 'Используется в работах — при удалении будет пропущена' : 'Можно удалить'}>
+                        <Checkbox
+                          checked={selected.has(m.id)}
+                          onChange={() => toggleSelect(m.id)}
+                          style={{ marginTop: 2 }}
+                        />
+                      </Tooltip>
+                    )}
                     <span style={{ flexShrink: 0, minWidth: 64, color: '#888' }}>{m.code}</span>
                     <Tag style={{ flexShrink: 0 }}>{m.answer || '—'}</Tag>
                     <div style={{ overflow: 'hidden', flex: 1 }}>
@@ -234,7 +315,7 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
           total={data.total}
           pageSize={20}
           showSizeChanger={false}
-          onChange={(p) => { setPage(p); setHidden(new Set()); }}
+          onChange={(p) => { setPage(p); setHidden(new Set()); setSelected(new Set()); }}
         />
       )}
 
