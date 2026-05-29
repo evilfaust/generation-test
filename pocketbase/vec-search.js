@@ -125,7 +125,13 @@ export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 2
                WHERE f.type IN ('dedup_cluster', 'reviewed_not_dup')`).all().map((r) => r.t)
   );
 
-  const pending = all.filter((c) => !c.ids.some((id) => reviewed.has(id)));
+  // Существующие задачи (для живого скрытия удалённых из кластеров без пересчёта).
+  const existing = new Set(d.prepare('SELECT id FROM main.tasks').all().map((r) => r.id));
+
+  // Кластер актуален, если НЕ размечен и в нём осталось ≥2 ещё существующих задач.
+  const pending = all
+    .map((c) => ({ ...c, ids: c.ids.filter((id) => existing.has(id)) }))
+    .filter((c) => c.ids.length >= 2 && !c.ids.some((id) => reviewed.has(id)));
   const total = pending.length;
   const start = (page - 1) * perPage;
   const slice = pending.slice(start, start + perPage);
@@ -139,10 +145,10 @@ export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 2
   const worksOf = (id) => { try { return worksStmt.all(`%"${id}"%`); } catch { return []; } };
   const items = slice.map((c) => ({
     type: c.type,
-    size: c.ids.length,
+    size: c.ids.length, // уже только существующие
     members: c.ids.map((id) => {
       const r = info.get(id);
-      if (!r) return { id, missing: true };
+      if (!r) return { id, missing: true }; // не должно случаться (отфильтровали), но на всякий
       const works = worksOf(id);
       return { id: r.id, code: r.code, answer: r.answer, topic: r.topic,
         ref_count: works.length,
