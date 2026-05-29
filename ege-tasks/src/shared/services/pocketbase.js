@@ -55,6 +55,41 @@ export const api = {
     }
   },
 
+  // ── Векторный дедуп (B2) ─────────────────────────────────────────────────
+  // Кластеры считаются pdf-service'ом (sqlite-vec), помечаются в task_families.
+
+  // Получить дедуп-кластеры на ревью с pdf-service.
+  async getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 20 } = {}) {
+    const base = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
+    const res = await fetch(`${base}/duplicates?type=${type}&page=${page}&perPage=${perPage}`, {
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) throw new Error(`Сервис дублей ответил ${res.status}`);
+    return res.json();
+  },
+
+  // Пометить кластер как dedup_cluster: создать task_families + members.
+  // members: [{ id, similarity? }]. Задачи НЕ удаляются — только помечаются.
+  async markDedupCluster(members, label = '') {
+    const family = await pb.collection('task_families').create({
+      type: 'dedup_cluster',
+      label: label.slice(0, 200),
+    });
+    for (const m of members) {
+      try {
+        await pb.collection('task_family_members').create({
+          family: family.id,
+          task: m.id,
+          ...(m.similarity != null ? { similarity: m.similarity } : {}),
+        });
+      } catch (e) {
+        console.debug('[dedup] member skip:', e?.message);
+      }
+    }
+    _logAudit('create', 'task_families', family.id, `dedup ${members.length} задач: ${label}`.slice(0, 500));
+    return family;
+  },
+
   // Получить все темы (опционально фильтр по exam_type)
   async getTopics(examType = null) {
     try {

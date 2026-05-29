@@ -10,6 +10,7 @@ import TagTab from './catalog/TagTab';
 import SourceTab from './catalog/SourceTab';
 import OtherTab from './catalog/OtherTab';
 import DuplicateTab from './catalog/DuplicateTab';
+import VectorDuplicatesTab from './catalog/VectorDuplicatesTab';
 import MergeModal from './catalog/MergeModal';
 import './TaskCatalogManager.css';
 
@@ -201,6 +202,7 @@ const TaskCatalogManager = ({ onOpenTasks, onBackToAnalytics }) => {
     { key: 'sources', label: 'Источники', children: <SourceTab sourceRows={sourceRows} tasksSnapshot={tasksSnapshot} onOpenTasks={handleOpenTasks} onMerge={openMerge} onReload={reloadAll} /> },
     { key: 'other', label: 'Прочее', children: <OtherTab difficultyRows={difficultyRows} yearRows={yearRows} stats={stats} onOpenTasks={handleOpenTasks} /> },
     { key: 'duplicates', label: 'Дубли', children: duplicateTasksLoading ? <Spin /> : <DuplicateTab duplicateGroups={duplicateGroups} onOpenTasks={handleOpenTasks} onMerge={openMerge} /> },
+    { key: 'vec-duplicates', label: '🔎 Похожие (вектор)', children: <VectorDuplicatesTab onOpenTasks={handleOpenTasks} /> },
   ];
 
   const totalDuplicates =

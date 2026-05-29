@@ -10,11 +10,13 @@
  * cos_sim = 1 - distance (косинусная метрика vec0).
  */
 
+import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
 
 const DATA_DB = process.env.PB_DATA_DB || '/opt/pocketbase/pb_data/data.db';
 const VEC_DB = process.env.VEC_DB || '/opt/pocketbase/pdf-service/vec.db';
+const CLUSTERS_FILE = process.env.DEDUP_CLUSTERS || '/opt/pocketbase/pdf-service/dedup-clusters.json';
 
 // Калибровка процента для UI (Этап 0): несвязанные ≈ 0.55 → 0%, почти-дубль 0.95 → 100%.
 const CAL_FLOOR = 0.55;
@@ -85,6 +87,52 @@ export function findSimilar({ taskId, limit = 8, sameTopicOnly = true, minCos = 
     if (out.length >= limit) break;
   }
   return { error: null, source_topic: srcTopic, items: out };
+}
+
+// --- Дедуп-кластеры (B2): предвычисленный файл + живой JOIN к data.db ---
+let _clusters = null;
+function loadClusters() {
+  if (_clusters) return _clusters;
+  if (!fs.existsSync(CLUSTERS_FILE)) { _clusters = []; return _clusters; }
+  _clusters = JSON.parse(fs.readFileSync(CLUSTERS_FILE, 'utf8'));
+  return _clusters;
+}
+
+/**
+ * Вернуть дедуп-кластеры на ревью с пагинацией.
+ * Уже размеченные (члены состоят в dedup_cluster-семействе) скрываются.
+ * @param {object} o
+ * @param {string} [o.type='exact_dup']  - 'exact_dup' | 'param_family'
+ * @param {number} [o.page=1]
+ * @param {number} [o.perPage=20]
+ */
+export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 20 } = {}) {
+  const d = getDb();
+  const all = loadClusters().filter((c) => c.type === type);
+
+  // task_id уже размеченных дублей (в data.db через ATTACH main)
+  const reviewed = new Set(
+    d.prepare(`SELECT DISTINCT m.task AS t FROM main.task_family_members m
+               JOIN main.task_families f ON f.id = m.family
+               WHERE f.type = 'dedup_cluster'`).all().map((r) => r.t)
+  );
+
+  const pending = all.filter((c) => !c.ids.some((id) => reviewed.has(id)));
+  const total = pending.length;
+  const start = (page - 1) * perPage;
+  const slice = pending.slice(start, start + perPage);
+
+  const info = d.prepare('SELECT id, code, answer, statement_md, topic FROM main.tasks WHERE id = ?');
+  const items = slice.map((c) => ({
+    type: c.type,
+    size: c.ids.length,
+    members: c.ids.map((id) => {
+      const r = info.get(id);
+      return r ? { id: r.id, code: r.code, answer: r.answer, topic: r.topic,
+        statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 240) } : { id, missing: true };
+    }),
+  }));
+  return { total, page, perPage, totalPages: Math.ceil(total / perPage), reviewed_count: reviewed.size, items };
 }
 
 export function vecHealth() {

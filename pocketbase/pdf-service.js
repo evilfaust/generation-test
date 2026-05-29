@@ -16,9 +16,9 @@ import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
-let findSimilar = null, vecHealth = null;
+let findSimilar = null, vecHealth = null, getDuplicateClusters = null;
 try {
-  ({ findSimilar, vecHealth } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1234,6 +1234,25 @@ app.post('/similar', (req, res) => {
 app.get('/similar/health', (req, res) => {
   if (!vecHealth) return res.status(503).json({ ok: false, error: 'vec-search не инициализирован' });
   res.json(vecHealth());
+});
+
+/**
+ * GET /duplicates — дедуп-кластеры на ревью (B2).
+ * query: type (exact_dup|param_family), page, perPage
+ */
+app.get('/duplicates', (req, res) => {
+  if (!getDuplicateClusters) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  try {
+    const r = getDuplicateClusters({
+      type: req.query.type === 'param_family' ? 'param_family' : 'exact_dup',
+      page: Number(req.query.page) || 1,
+      perPage: Math.min(Number(req.query.perPage) || 20, 50),
+    });
+    res.json(r);
+  } catch (e) {
+    console.error('[duplicates]', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 /**
