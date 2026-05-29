@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Tag, Button, Space, Spin, Alert, Empty, Pagination, Segmented, Tooltip, App } from 'antd';
-import { CheckOutlined, EyeInvisibleOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
+import { Card, Tag, Button, Space, Spin, Alert, Empty, Pagination, Segmented, Tooltip, Popconfirm, App } from 'antd';
+import { CheckOutlined, EyeInvisibleOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { api } from '../../services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
@@ -9,7 +9,8 @@ import TaskEditModal from '../TaskEditModal';
 
 export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
   const { message } = App.useApp();
-  const { canEdit } = useAuth();
+  const { canEdit, canDelete } = useAuth();
+  const [deletingId, setDeletingId] = useState(null);
   const { topics, tags, subtopics, years, sources } = useReferenceData();
   const [type, setType] = useState('exact_dup');
   const [page, setPage] = useState(1);
@@ -42,6 +43,22 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
       setEditOpen(false);
       load(); // обновить очередь
     } catch (e) { message.error(`Не удалось удалить: ${e.message}`); }
+  };
+  // быстрое удаление прямо из строки (иконка 🗑)
+  const quickDelete = async (taskId) => {
+    setDeletingId(taskId);
+    try {
+      await api.deleteTask(taskId);
+      message.success('Задача удалена');
+      load();
+    } catch (e) {
+      const used = /relation reference|required relation/i.test(e?.message || '');
+      message.error(used
+        ? 'Задача используется в работах — БД не даёт удалить. Замени/убери её в работах (ссылки рядом) или «Пометить дублями».'
+        : `Не удалось удалить: ${e.message}`);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const load = useCallback(async () => {
@@ -181,11 +198,27 @@ export default function VectorDuplicatesTab({ onOpenTasks, onOpenWork }) {
                         ))}
                       </div>
                     </div>
-                    {canEdit && (
-                      <Tooltip title="Открыть в редакторе (правка / удаление)">
-                        <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEditor(m.id)} />
-                      </Tooltip>
-                    )}
+                    <Space size={0} style={{ flexShrink: 0 }}>
+                      {canEdit && (
+                        <Tooltip title="Открыть в редакторе (правка / LaTeX)">
+                          <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEditor(m.id)} />
+                        </Tooltip>
+                      )}
+                      {canDelete && (
+                        <Popconfirm
+                          title="Удалить задачу?"
+                          description={m.ref_count > 0
+                            ? `Используется в ${m.ref_count} раб. — БД, скорее всего, не даст удалить.`
+                            : 'Задача нигде не используется — удалится безвозвратно.'}
+                          okText="Удалить" okButtonProps={{ danger: true }} cancelText="Отмена"
+                          onConfirm={() => quickDelete(m.id)}
+                        >
+                          <Tooltip title="Удалить задачу">
+                            <Button size="small" type="text" danger icon={<DeleteOutlined />} loading={deletingId === m.id} />
+                          </Tooltip>
+                        </Popconfirm>
+                      )}
+                    </Space>
                   </div>
                 ))}
               </Space>
