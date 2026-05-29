@@ -214,6 +214,65 @@ export function indexVectors(rows) {
   }
 }
 
+/**
+ * A4 — построить параллельные варианты «по образцу».
+ * Для каждой задачи базового набора подбирает похожих сиблингов (та же тема,
+ * cos в полосе [minCos,maxCos] — «тот же тип, другие числа», но не байт-в-байт),
+ * и собирает `count` вариантов, где позиция i везде одного типа.
+ *
+ * @param {string[]} baseIds  - задачи базового варианта (по позициям)
+ * @param {object} o
+ * @param {number} [o.count=2]    - сколько ПАРАЛЛЕЛЬНЫХ вариантов (помимо базового)
+ * @param {number} [o.minCos=0.85]
+ * @param {number} [o.maxCos=0.995] - выше — это байт-в-байт дубль (те же числа), не нужен
+ * @returns {{ base:[], variants:[[]], shortage:[] }}
+ */
+export function buildParallelVariants(baseIds, { count = 2, minCos = 0.85, maxCos = 0.995 } = {}) {
+  const d = getDb();
+  const getVec = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
+  const info = d.prepare('SELECT id, code, answer, topic, statement_md FROM main.tasks WHERE id = ?');
+  const knn = d.prepare(`
+    SELECT v.task_id AS task_id, v.distance AS distance, t.topic AS topic
+    FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
+    WHERE v.embedding MATCH ? AND v.k = ? ORDER BY v.distance`);
+
+  const baseSet = new Set(baseIds);
+  const used = new Set(baseIds); // сиблинги не должны повторять базу и друг друга
+  const fmt = (id, cos) => {
+    const r = info.get(id);
+    return r ? { task_id: id, code: r.code, answer: r.answer,
+      statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 160),
+      ...(cos != null ? { cos: Number(cos.toFixed(4)) } : {}) } : { task_id: id, missing: true };
+  };
+
+  // пул кандидатов для каждой позиции
+  const pools = baseIds.map((id) => {
+    const row = getVec.get(id);
+    if (!row) return [];
+    const src = info.get(id);
+    const topic = src?.topic || '';
+    const rows = knn.all(row.embedding, count * 6 + 15);
+    return rows
+      .filter((r) => r.task_id !== id && r.topic === topic)
+      .map((r) => ({ id: r.task_id, cos: 1 - r.distance }))
+      .filter((r) => r.cos >= minCos && r.cos <= maxCos);
+  });
+
+  const variants = [];
+  const shortage = [];
+  for (let v = 0; v < count; v++) {
+    const variant = [];
+    for (let i = 0; i < baseIds.length; i++) {
+      const pick = pools[i].find((c) => !used.has(c.id));
+      if (pick) { used.add(pick.id); variant.push(fmt(pick.id, pick.cos)); }
+      else { variant.push({ position: i + 1, missing: true }); shortage.push({ position: i + 1, base: baseIds[i] }); }
+    }
+    variants.push(variant);
+  }
+
+  return { base: baseIds.map((id) => fmt(id, null)), variants, shortage };
+}
+
 export function vecHealth() {
   try {
     const d = getDb();

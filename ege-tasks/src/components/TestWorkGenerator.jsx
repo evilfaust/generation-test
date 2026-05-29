@@ -19,6 +19,7 @@ import LoadWorkModal from './worksheet/LoadWorkModal';
 import VariantRenderer from './worksheet/VariantRenderer';
 import AnswersPage from './worksheet/AnswersPage';
 import VariantStats from './worksheet/VariantStats';
+import ParallelVariantsModal from './worksheet/ParallelVariantsModal';
 import ActionButtons from './worksheet/ActionButtons';
 import WorksheetGridPrint from './worksheet/WorksheetGridPrint';
 import TaskReplaceModal from './TaskReplaceModal';
@@ -43,6 +44,7 @@ const TestWorkGenerator = () => {
 
   // Блоки фильтров для структуры работы
   const [workBlocks, setWorkBlocks] = useState([]);
+  const [parallelOpen, setParallelOpen] = useState(false);
 
   // Хуки
   const { variants, setVariants, loading, generateFromStructure, reset } = useWorksheetGeneration();
@@ -471,6 +473,18 @@ const TestWorkGenerator = () => {
 
         {/* Превью */}
         <VariantStats variants={variants} showAnswersPage={showAnswersPage} />
+        {variants.length > 0 && variants[0]?.tasks?.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <Button onClick={() => setParallelOpen(true)}>
+              🧬 Параллельные варианты (по образцу)
+            </Button>
+          </div>
+        )}
+        <ParallelVariantsModal
+          open={parallelOpen}
+          onClose={() => setParallelOpen(false)}
+          baseTasks={variants[0]?.tasks || []}
+        />
       </div>
 
       {/* Рабочий лист с клеткой */}

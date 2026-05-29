@@ -16,9 +16,9 @@ import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
-let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null;
+let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1253,6 +1253,26 @@ app.post('/index-vectors', (req, res) => {
     res.json(indexVectors(vectors));
   } catch (e) {
     console.error('[index-vectors]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /parallel-variants — семейство параллельных вариантов «по образцу» (A4).
+ * body: { task_ids: [...базовый набор], count?, min_cos?, max_cos? }
+ */
+app.post('/parallel-variants', (req, res) => {
+  if (!buildParallelVariants) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_ids, count, min_cos, max_cos } = req.body || {};
+  if (!Array.isArray(task_ids) || task_ids.length === 0) return res.status(400).json({ error: 'task_ids обязателен' });
+  try {
+    res.json(buildParallelVariants(task_ids, {
+      count: Math.min(Math.max(Number(count) || 2, 1), 5),
+      minCos: min_cos != null ? Number(min_cos) : 0.85,
+      maxCos: max_cos != null ? Number(max_cos) : 0.995,
+    }));
+  } catch (e) {
+    console.error('[parallel-variants]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
