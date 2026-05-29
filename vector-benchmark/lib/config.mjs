@@ -4,6 +4,10 @@ export const PB_URL = process.env.PB_URL || 'https://task-ege.oipav.ru';
 export const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 export const MODEL = process.env.EMBED_MODEL || 'bge-m3';
 
+// Куда пушить векторы при index.mjs --push (pdf-service на VPS).
+export const PDF_URL = process.env.PDF_URL || 'https://task-ege.oipav.ru/pdf';
+export const INDEX_TOKEN = process.env.INDEX_TOKEN || '';
+
 // Сколько задач затягиваем в пул для бенчмарка (из ~11k).
 // Чем больше — тем выше шанс найти реальные дубли, но дольше эмбеддинг.
 export const SAMPLE_SIZE = Number(process.env.SAMPLE_SIZE || 1500);

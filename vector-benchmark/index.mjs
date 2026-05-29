@@ -12,12 +12,25 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
-import { PB_URL, OLLAMA_URL, MODEL } from './lib/config.mjs';
+import { PB_URL, OLLAMA_URL, MODEL, PDF_URL, INDEX_TOKEN } from './lib/config.mjs';
 import { buildText } from './2-embed.mjs';
 
 const DIM = 1024;
 const VEC_DB = new URL('./data/vec.db', import.meta.url).pathname;
 const FULL = process.argv.includes('--full');
+const PUSH = process.argv.includes('--push'); // слать векторы на VPS (без scp/рестарта)
+const PUSH_BATCH = 200;
+
+async function pushVectors(rows) {
+  const res = await fetch(`${PDF_URL}/index-vectors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
+    body: JSON.stringify({ vectors: rows }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`push ${res.status}: ${await res.text()}`);
+  return res.json();
+}
 
 function textHash(s) { return crypto.createHash('sha256').update(s).digest('hex'); }
 
@@ -76,9 +89,18 @@ async function main() {
     VALUES (@task_id, @model, @dim, @text_hash, @indexed_at)
     ON CONFLICT(task_id) DO UPDATE SET model=@model, dim=@dim, text_hash=@text_hash, indexed_at=@indexed_at`);
 
-  console.log(`Индексация ${FULL ? '(ПОЛНАЯ)' : '(инкремент)'} из ${PB_URL} моделью ${MODEL}...`);
+  console.log(`Индексация ${FULL ? '(ПОЛНАЯ)' : '(инкремент)'} из ${PB_URL} моделью ${MODEL}${PUSH ? ` + PUSH → ${PDF_URL}` : ''}...`);
   const t0 = Date.now();
-  let seen = 0, embedded = 0, skipped = 0;
+  let seen = 0, embedded = 0, skipped = 0, pushed = 0;
+  let pushBuf = [];
+
+  const flushPush = async () => {
+    if (!PUSH || pushBuf.length === 0) return;
+    const r = await pushVectors(pushBuf);
+    pushed += pushBuf.length;
+    pushBuf = [];
+    return r;
+  };
 
   for await (const task of allTasks()) {
     seen++;
@@ -95,16 +117,22 @@ async function main() {
       upMeta.run({ task_id: task.id, model: MODEL, dim: DIM, text_hash: hash, indexed_at: new Date().toISOString() });
     })();
     embedded++;
+    if (PUSH) {
+      pushBuf.push({ task_id: task.id, vec, text_hash: hash, model: MODEL });
+      if (pushBuf.length >= PUSH_BATCH) await flushPush();
+    }
     if (embedded % 50 === 0) {
       const rate = embedded / ((Date.now() - t0) / 1000);
       process.stdout.write(`\r  просмотрено ${seen}, заэмбежено ${embedded}, пропущено ${skipped}  (${rate.toFixed(0)} зад/с)`);
     }
   }
+  await flushPush();
   console.log();
   const total = db.prepare('SELECT count(*) c FROM vec_tasks').get().c;
   const secs = ((Date.now() - t0) / 1000).toFixed(0);
   console.log(`✅ Готово за ${secs}с. Просмотрено ${seen}, заэмбежено ${embedded}, пропущено ${skipped}.`);
-  console.log(`   Всего векторов в vec.db: ${total}`);
+  if (PUSH) console.log(`   Отправлено на VPS: ${pushed} векторов`);
+  console.log(`   Всего векторов в локальной vec.db: ${total}`);
   console.log(`   Файл: ${VEC_DB} (${(fs.statSync(VEC_DB).size / 1024 / 1024).toFixed(1)} MB)`);
   db.close();
 }

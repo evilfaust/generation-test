@@ -23,8 +23,16 @@ const CAL_FLOOR = 0.55;
 const CAL_CEIL = 0.95;
 const toPct = (cos) => Math.max(0, Math.min(100, ((cos - CAL_FLOOR) / (CAL_CEIL - CAL_FLOOR)) * 100));
 
+const DIM = 1024;
 let db = null;
 let openError = null;
+
+// Сбросить поисковое соединение (release attach на vec.db) — чтобы после
+// записи новых векторов следующий /similar переоткрыл и увидел свежие данные.
+function invalidateDb() {
+  if (db) { try { db.close(); } catch { /* ignore */ } }
+  db = null; openError = null;
+}
 
 function getDb() {
   if (db) return db;
@@ -170,6 +178,40 @@ export function findPairs(taskIds, minCos = 0.7) {
   }
   pairs.sort((x, y) => y.cos - x.cos);
   return { pairs, missing };
+}
+
+/**
+ * Инкрементальная запись векторов в vec.db (A: /index-vectors).
+ * rows: [{ task_id, vec:[float×1024], text_hash, model? }]. Upsert по task_id.
+ * Открывает отдельное WRITABLE-соединение; поисковое инвалидируется.
+ */
+export function indexVectors(rows) {
+  invalidateDb(); // освобождаем readonly-attach на vec.db перед записью
+  const w = new Database(VEC_DB);
+  try {
+    sqliteVec.load(w);
+    w.pragma('busy_timeout = 5000');
+    w.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_tasks USING vec0(task_id TEXT, embedding FLOAT[${DIM}] distance_metric=cosine);`);
+    w.exec(`CREATE TABLE IF NOT EXISTS vec_meta (task_id TEXT PRIMARY KEY, model TEXT, dim INTEGER, text_hash TEXT, indexed_at TEXT);`);
+    const del = w.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
+    const ins = w.prepare('INSERT INTO vec_tasks(task_id, embedding) VALUES (?, ?)');
+    const meta = w.prepare(`INSERT INTO vec_meta(task_id, model, dim, text_hash, indexed_at)
+      VALUES (@task_id, @model, @dim, @text_hash, @indexed_at)
+      ON CONFLICT(task_id) DO UPDATE SET model=@model, dim=@dim, text_hash=@text_hash, indexed_at=@indexed_at`);
+    const tx = w.transaction((items) => {
+      for (const r of items) {
+        if (!Array.isArray(r.vec) || r.vec.length !== DIM) throw new Error(`bad vec dim for ${r.task_id}`);
+        del.run(r.task_id);
+        ins.run(r.task_id, Buffer.from(Float32Array.from(r.vec).buffer));
+        meta.run({ task_id: r.task_id, model: r.model || 'bge-m3', dim: DIM, text_hash: r.text_hash || '', indexed_at: new Date().toISOString() });
+      }
+    });
+    tx(rows);
+    const total = w.prepare('SELECT count(*) c FROM vec_tasks').get().c;
+    return { indexed: rows.length, total };
+  } finally {
+    w.close();
+  }
 }
 
 export function vecHealth() {

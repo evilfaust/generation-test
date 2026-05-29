@@ -16,12 +16,13 @@ import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
-let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null;
+let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
+const INDEX_TOKEN = process.env.INDEX_TOKEN || '';
 // KaTeX — серверный рендер для валидации формул (latex_needs_review)
 let katex = null;
 try {
@@ -1234,6 +1235,26 @@ app.post('/similar', (req, res) => {
 app.get('/similar/health', (req, res) => {
   if (!vecHealth) return res.status(503).json({ ok: false, error: 'vec-search не инициализирован' });
   res.json(vecHealth());
+});
+
+/**
+ * POST /index-vectors — инкрементальная заливка векторов (счёт на Mac → VPS).
+ * Защита токеном X-Index-Token (если INDEX_TOKEN задан в env).
+ * body: { vectors: [{task_id, vec, text_hash}] }
+ */
+app.post('/index-vectors', (req, res) => {
+  if (!indexVectors) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  if (INDEX_TOKEN && req.get('X-Index-Token') !== INDEX_TOKEN) {
+    return res.status(401).json({ error: 'неверный токен' });
+  }
+  const { vectors } = req.body || {};
+  if (!Array.isArray(vectors) || vectors.length === 0) return res.json({ indexed: 0 });
+  try {
+    res.json(indexVectors(vectors));
+  } catch (e) {
+    console.error('[index-vectors]', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 /**

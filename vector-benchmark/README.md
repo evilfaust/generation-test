@@ -33,6 +33,35 @@ node 3-pairs.mjs     # генерит ~90 пар на разметку → data/
 node 4-metrics.mjs   # precision/recall, лучший порог, формула калибровки %
 ```
 
+## Индексатор (продакшн) — `index.mjs`
+
+Держит `vec.db` на VPS свежим. Инкрементальный по `text_hash`.
+
+```bash
+node index.mjs            # инкремент в локальную vec.db
+node index.mjs --full     # пересчитать всё заново (~20 мин)
+node index.mjs --push     # инкремент + отправка новых векторов на VPS
+```
+
+`--push` шлёт на `POST {PDF_URL}/index-vectors` с заголовком `X-Index-Token`
+(env `INDEX_TOKEN`, должен совпадать с тем, что в systemd override pdf-service).
+
+### Авто-обновление (launchd на Mac)
+
+Агент `~/Library/LaunchAgents/com.lemma.vecindex.plist` запускает
+`node index.mjs --push` раз в 30 мин (пока Mac включён). Управление:
+
+```bash
+launchctl load   ~/Library/LaunchAgents/com.lemma.vecindex.plist   # включить
+launchctl unload ~/Library/LaunchAgents/com.lemma.vecindex.plist   # выключить
+launchctl start  com.lemma.vecindex                                # прямо сейчас
+tail -f data/vecindex.log                                          # логи
+```
+
+⚠️ Токен `INDEX_TOKEN` хранится в plist и в systemd override на VPS —
+**не коммитить**. Для дедуп-вкладки (B2) кластеры в `dedup-clusters.json`
+обновляются отдельно: `node dedup-scan.mjs` + scp файла на VPS.
+
 ## Настройка
 
 Через env-переменные (см. `lib/config.mjs`):
