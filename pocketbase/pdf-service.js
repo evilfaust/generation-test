@@ -16,9 +16,9 @@ import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
-let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null, pruneVectors = null;
+let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null, pruneVectors = null, setClusters = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1327,6 +1327,24 @@ app.post('/pairs', (req, res) => {
     res.json(findPairs(task_ids, Number(min_cos) || 0.7));
   } catch (e) {
     console.error('[pairs]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /upload-clusters — принять готовые дедуп-кластеры (посчитаны на Mac).
+ * Защита X-Index-Token. Лёгкая операция (запись файла + кэш).
+ * body: { clusters: [{type, ids}] }
+ */
+app.post('/upload-clusters', (req, res) => {
+  if (!setClusters) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  if (INDEX_TOKEN && req.get('X-Index-Token') !== INDEX_TOKEN) return res.status(401).json({ error: 'неверный токен' });
+  const { clusters } = req.body || {};
+  if (!Array.isArray(clusters)) return res.status(400).json({ error: 'clusters обязателен (массив)' });
+  try {
+    res.json(setClusters(clusters));
+  } catch (e) {
+    console.error('[upload-clusters]', e.message);
     res.status(500).json({ error: e.message });
   }
 });

@@ -19,6 +19,7 @@ const DIM = 1024;
 const VEC_DB = new URL('./data/vec.db', import.meta.url).pathname;
 const FULL = process.argv.includes('--full');
 const PUSH = process.argv.includes('--push'); // слать векторы на VPS (без scp/рестарта)
+const FORCE_DEDUP = process.argv.includes('--dedup'); // форсить пересчёт дублей даже если новых задач нет
 const PUSH_BATCH = 200;
 
 async function pushVectors(rows) {
@@ -43,6 +44,63 @@ async function pruneRemote(validIds) {
   return res.json();
 }
 
+async function uploadClusters(clusters) {
+  const body = JSON.stringify({ clusters });
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(`${PDF_URL}/upload-clusters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
+        body,
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`upload-clusters ${res.status}: ${await res.text()}`);
+      return res.json();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
+// Дедуп-кластеризация на Mac (локальная vec.db быстрая): KNN внутри темы,
+// union-find, классификация exact_dup / param_family по ответу.
+const DEDUP_THRESHOLD = 0.93, DEDUP_K = 10;
+function isDiscriminative(ans) {
+  const a = (ans || '').replace(/\s+/g, '').replace(',', '.').toLowerCase();
+  if (!a || a === 'доказать' || a === 'докажите') return false;
+  if (/^[абвгдеж)(,;.\s]+$/.test(a)) return false;
+  return true;
+}
+function computeClusters(db, meta) {
+  const ids = db.prepare('SELECT task_id FROM vec_tasks').all().map((r) => r.task_id);
+  const parent = new Map();
+  const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+  for (const id of ids) parent.set(id, id);
+  const getVec = db.prepare('SELECT embedding FROM vec_tasks WHERE task_id = ?');
+  const knn = db.prepare('SELECT task_id, distance FROM vec_tasks WHERE embedding MATCH ? AND k = ? ORDER BY distance');
+  for (const id of ids) {
+    const topic = meta.get(id)?.topic || '';
+    for (const nb of knn.all(getVec.get(id).embedding, DEDUP_K + 1)) {
+      if (nb.task_id === id || (1 - nb.distance) < DEDUP_THRESHOLD) continue;
+      if ((meta.get(nb.task_id)?.topic || '') !== topic) continue;
+      parent.set(find(id), find(nb.task_id));
+    }
+  }
+  const groups = new Map();
+  for (const id of ids) { const r = find(id); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(id); }
+  const slim = [];
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    const answers = new Set(members.map((m) => (meta.get(m)?.answer || '')).filter(Boolean));
+    const allSame = answers.size === 1 && members.every((m) => isDiscriminative(meta.get(m)?.answer));
+    slim.push({ type: allSame ? 'exact_dup' : 'param_family', ids: members });
+  }
+  return slim;
+}
+
 function textHash(s) { return crypto.createHash('sha256').update(s).digest('hex'); }
 
 async function embed(text) {
@@ -60,7 +118,7 @@ async function* allTasks() {
   let page = 1, totalPages = 1;
   do {
     const url = `${PB_URL}/api/collections/tasks/records?perPage=${perPage}&page=${page}`
-      + `&expand=topic&fields=id,statement_md,topic,expand.topic.title`;
+      + `&expand=topic&fields=id,statement_md,topic,answer,expand.topic.title`;
     const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
     if (!r.ok) throw new Error(`PB ${r.status} page ${page}`);
     const data = await r.json();
@@ -70,6 +128,8 @@ async function* allTasks() {
         id: it.id,
         statement_md: it.statement_md || '',
         topic_title: it.expand?.topic?.title || '',
+        topic: it.topic || '',
+        answer: it.answer || '',
       };
     }
     page++;
@@ -105,6 +165,7 @@ async function main() {
   let seen = 0, embedded = 0, skipped = 0, pushed = 0;
   let pushBuf = [];
   const allIds = []; // актуальные id задач (для прунинга осиротевших векторов)
+  const taskMeta = new Map(); // id → {topic, answer} для кластеризации дублей
 
   const flushPush = async () => {
     if (!PUSH || pushBuf.length === 0) return;
@@ -117,6 +178,7 @@ async function main() {
   for await (const task of allTasks()) {
     seen++;
     allIds.push(task.id);
+    taskMeta.set(task.id, { topic: task.topic, answer: task.answer });
     const text = buildText(task);
     const hash = textHash(text);
     if (!FULL) {
@@ -156,6 +218,17 @@ async function main() {
       const pr = await pruneRemote(allIds);
       console.log(`   Прунинг на VPS: удалено ${pr.pruned}, осталось ${pr.total}`);
     } catch (e) { console.warn(`   ⚠ прунинг на VPS не удался: ${e.message}`); }
+    // Дедуп пересчитываем только если реально были новые/изменённые задачи
+    // (или явный --dedup). Полная кластеризация O(n²) дорогая — не гоняем вхолостую.
+    if (embedded > 0 || FORCE_DEDUP) {
+      try {
+        const clusters = computeClusters(db, taskMeta); // на Mac, VPS не грузим
+        const rc = await uploadClusters(clusters);
+        console.log(`   Дубли пересчитаны и залиты: ${rc.exact_dup} точных + ${rc.param_family} параметрич.`);
+      } catch (e) { console.warn(`   ⚠ пересчёт дублей не удался: ${e.message}`); }
+    } else {
+      console.log('   Дубли не пересчитывались (новых задач нет; форс — флаг --dedup).');
+    }
   }
 
   const total = db.prepare('SELECT count(*) c FROM vec_tasks').get().c;

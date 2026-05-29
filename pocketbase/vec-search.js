@@ -364,6 +364,16 @@ export function pruneVectors(validIds) {
   }
 }
 
+// Принять готовые дедуп-кластеры (посчитаны на Mac) — записать файл + кэш.
+// Лёгкая операция (запись ~170KB), не грузит VPS. См. index.mjs (clustering).
+export function setClusters(clusters) {
+  if (!Array.isArray(clusters)) throw new Error('clusters must be array');
+  fs.writeFileSync(CLUSTERS_FILE, JSON.stringify(clusters));
+  _clusters = clusters;
+  const exact = clusters.filter((c) => c.type === 'exact_dup').length;
+  return { clusters: clusters.length, exact_dup: exact, param_family: clusters.length - exact };
+}
+
 export function vecHealth() {
   try {
     const d = getDb();
