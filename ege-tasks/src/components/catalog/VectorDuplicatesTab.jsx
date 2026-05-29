@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Tag, Button, Space, Spin, Alert, Empty, Pagination, Segmented, Tooltip, App } from 'antd';
-import { CheckOutlined, EyeInvisibleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckOutlined, EyeInvisibleOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
 import { api } from '../../services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReferenceData } from '../../contexts/ReferenceDataContext';
 import MathRenderer from '../MathRenderer';
+import TaskEditModal from '../TaskEditModal';
 
 export default function VectorDuplicatesTab({ onOpenTasks }) {
   const { message } = App.useApp();
   const { canEdit } = useAuth();
+  const { topics, tags, subtopics, years, sources } = useReferenceData();
   const [type, setType] = useState('exact_dup');
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
@@ -15,6 +18,31 @@ export default function VectorDuplicatesTab({ onOpenTasks }) {
   const [error, setError] = useState(null);
   const [markingId, setMarkingId] = useState(null);
   const [hidden, setHidden] = useState(new Set()); // локально скрытые (пропущенные/размеченные)
+  const [editTask, setEditTask] = useState(null); // задача в редакторе
+  const [editOpen, setEditOpen] = useState(false);
+
+  const openEditor = async (taskId) => {
+    try {
+      const t = await api.getTask(taskId);
+      setEditTask(t); setEditOpen(true);
+    } catch (e) { message.error(`Не удалось загрузить задачу: ${e.message}`); }
+  };
+  const handleSaved = async (id, taskData) => {
+    try {
+      await api.updateTask(id || editTask.id, taskData);
+      message.success('Задача сохранена');
+      setEditOpen(false);
+      load(); // обновить превью кластеров
+    } catch (e) { message.error(`Не удалось сохранить: ${e.message}`); }
+  };
+  const handleDeleted = async (taskId) => {
+    try {
+      await api.deleteTask(taskId);
+      message.success('Задача удалена');
+      setEditOpen(false);
+      load(); // обновить очередь
+    } catch (e) { message.error(`Не удалось удалить: ${e.message}`); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -122,7 +150,19 @@ export default function VectorDuplicatesTab({ onOpenTasks }) {
                   <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
                     <span style={{ flexShrink: 0, minWidth: 64, color: '#888' }}>{m.code}</span>
                     <Tag style={{ flexShrink: 0 }}>{m.answer || '—'}</Tag>
-                    <div style={{ overflow: 'hidden' }}><MathRenderer text={m.statement} /></div>
+                    {m.ref_count != null && (
+                      <Tooltip title={m.ref_count > 0 ? 'Используется в работах — удаление урежет их. Безопаснее «Пометить дублями».' : 'Нигде не используется — можно безопасно удалить.'}>
+                        <Tag color={m.ref_count > 0 ? 'volcano' : 'green'} style={{ flexShrink: 0 }}>
+                          {m.ref_count > 0 ? `в ${m.ref_count} раб.` : 'не исп.'}
+                        </Tag>
+                      </Tooltip>
+                    )}
+                    <div style={{ overflow: 'hidden', flex: 1 }}><MathRenderer text={m.statement} /></div>
+                    {canEdit && (
+                      <Tooltip title="Открыть в редакторе (правка / удаление)">
+                        <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEditor(m.id)} />
+                      </Tooltip>
+                    )}
                   </div>
                 ))}
               </Space>
@@ -141,6 +181,19 @@ export default function VectorDuplicatesTab({ onOpenTasks }) {
           onChange={(p) => { setPage(p); setHidden(new Set()); }}
         />
       )}
+
+      <TaskEditModal
+        task={editTask}
+        visible={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={handleSaved}
+        onDelete={handleDeleted}
+        allTags={tags || []}
+        allSources={sources || []}
+        allYears={years || []}
+        allSubtopics={subtopics || []}
+        allTopics={topics || []}
+      />
     </div>
   );
 }

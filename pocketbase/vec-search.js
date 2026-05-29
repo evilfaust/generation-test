@@ -131,12 +131,16 @@ export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 2
   const slice = pending.slice(start, start + perPage);
 
   const info = d.prepare('SELECT id, code, answer, statement_md, topic FROM main.tasks WHERE id = ?');
+  // сколько вариантов работ ссылаются на задачу (variants.tasks — JSON-массив id)
+  const refCount = d.prepare(`SELECT count(*) c FROM main.variants WHERE tasks LIKE ?`);
+  const refs = (id) => { try { return refCount.get(`%"${id}"%`).c; } catch { return null; } };
   const items = slice.map((c) => ({
     type: c.type,
     size: c.ids.length,
     members: c.ids.map((id) => {
       const r = info.get(id);
       return r ? { id: r.id, code: r.code, answer: r.answer, topic: r.topic,
+        ref_count: refs(id),
         statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 240) } : { id, missing: true };
     }),
   }));
@@ -325,6 +329,33 @@ export function buildRemediation(failedIds, { perTask = 2, excludeIds = [], minC
     groups.push({ source: fmt(fid, null), picks });
   }
   return { groups, all, missing };
+}
+
+/**
+ * Прунинг осиротевших векторов: удалить из vec.db записи, чьих task_id больше
+ * нет в base (актуальный список id задач из PB). Безопасно — поиск и так
+ * игнорирует осиротевшие через JOIN, это гигиена/место.
+ * @param {string[]} validIds - актуальные id задач
+ * @returns {{ pruned:number, total:number }}
+ */
+export function pruneVectors(validIds) {
+  const valid = new Set(validIds);
+  invalidateDb();
+  const w = new Database(VEC_DB);
+  try {
+    sqliteVec.load(w);
+    w.pragma('busy_timeout = 5000');
+    const all = w.prepare('SELECT task_id FROM vec_tasks').all().map((r) => r.task_id);
+    const orphans = all.filter((id) => !valid.has(id));
+    const delVec = w.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
+    const delMeta = w.prepare('DELETE FROM vec_meta WHERE task_id = ?');
+    const tx = w.transaction((ids) => { for (const id of ids) { delVec.run(id); delMeta.run(id); } });
+    tx(orphans);
+    const total = w.prepare('SELECT count(*) c FROM vec_tasks').get().c;
+    return { pruned: orphans.length, total };
+  } finally {
+    w.close();
+  }
 }
 
 export function vecHealth() {

@@ -16,9 +16,9 @@ import * as cheerio from 'cheerio';
 import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
-let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null;
+let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null, pruneVectors = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1294,6 +1294,23 @@ app.post('/parallel-variants', (req, res) => {
     }));
   } catch (e) {
     console.error('[parallel-variants]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /prune-vectors — удалить осиротевшие векторы (нет задачи в PB).
+ * Защита X-Index-Token. body: { valid_task_ids: [...] }
+ */
+app.post('/prune-vectors', (req, res) => {
+  if (!pruneVectors) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  if (INDEX_TOKEN && req.get('X-Index-Token') !== INDEX_TOKEN) return res.status(401).json({ error: 'неверный токен' });
+  const { valid_task_ids } = req.body || {};
+  if (!Array.isArray(valid_task_ids) || valid_task_ids.length === 0) return res.status(400).json({ error: 'valid_task_ids обязателен' });
+  try {
+    res.json(pruneVectors(valid_task_ids));
+  } catch (e) {
+    console.error('[prune-vectors]', e.message);
     res.status(500).json({ error: e.message });
   }
 });

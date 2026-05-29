@@ -32,6 +32,17 @@ async function pushVectors(rows) {
   return res.json();
 }
 
+async function pruneRemote(validIds) {
+  const res = await fetch(`${PDF_URL}/prune-vectors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
+    body: JSON.stringify({ valid_task_ids: validIds }),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) throw new Error(`prune ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
 function textHash(s) { return crypto.createHash('sha256').update(s).digest('hex'); }
 
 async function embed(text) {
@@ -93,6 +104,7 @@ async function main() {
   const t0 = Date.now();
   let seen = 0, embedded = 0, skipped = 0, pushed = 0;
   let pushBuf = [];
+  const allIds = []; // актуальные id задач (для прунинга осиротевших векторов)
 
   const flushPush = async () => {
     if (!PUSH || pushBuf.length === 0) return;
@@ -104,6 +116,7 @@ async function main() {
 
   for await (const task of allTasks()) {
     seen++;
+    allIds.push(task.id);
     const text = buildText(task);
     const hash = textHash(text);
     if (!FULL) {
@@ -128,6 +141,23 @@ async function main() {
   }
   await flushPush();
   console.log();
+
+  // Прунинг осиротевших векторов (задачи удалены из PB)
+  const delLocal = db.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
+  const delLocalMeta = db.prepare('DELETE FROM vec_meta WHERE task_id = ?');
+  const validSet = new Set(allIds);
+  const localOrphans = db.prepare('SELECT task_id FROM vec_tasks').all().map((r) => r.task_id).filter((id) => !validSet.has(id));
+  if (localOrphans.length) {
+    db.transaction(() => { for (const id of localOrphans) { delLocal.run(id); delLocalMeta.run(id); } })();
+    console.log(`   Прунинг локально: удалено ${localOrphans.length} осиротевших векторов`);
+  }
+  if (PUSH) {
+    try {
+      const pr = await pruneRemote(allIds);
+      console.log(`   Прунинг на VPS: удалено ${pr.pruned}, осталось ${pr.total}`);
+    } catch (e) { console.warn(`   ⚠ прунинг на VPS не удался: ${e.message}`); }
+  }
+
   const total = db.prepare('SELECT count(*) c FROM vec_tasks').get().c;
   const secs = ((Date.now() - t0) / 1000).toFixed(0);
   console.log(`✅ Готово за ${secs}с. Просмотрено ${seen}, заэмбежено ${embedded}, пропущено ${skipped}.`);
