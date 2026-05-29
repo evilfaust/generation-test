@@ -80,7 +80,8 @@ export function findSimilar({ taskId, limit = 8, sameTopicOnly = true, minCos = 
     if (sameTopicOnly && srcTopic && r.topic !== srcTopic) continue;
     const cos = 1 - r.distance;
     if (cos < minCos) continue;
-    out.push({ task_id: r.task_id, cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)), code: r.code, topic: r.topic });
+    const stmt = (r.statement_md || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    out.push({ task_id: r.task_id, cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)), code: r.code, topic: r.topic, statement: stmt });
     if (out.length >= limit) break;
   }
   return { error: null, source_topic: srcTopic, items: out };

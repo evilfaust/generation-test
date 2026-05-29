@@ -4,6 +4,7 @@ import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, 
 import MathRenderer from './MathRenderer';
 import TaskStatementRenderer from './TaskStatementRenderer';
 import RefreshFromSdamgiaModal from './RefreshFromSdamgiaModal';
+import SimilarTasksPanel from './SimilarTasksPanel';
 import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
 import { generateTaskCode } from '../utils/taskCodeGenerator';
@@ -1019,6 +1020,19 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             />
           );
         })()}
+
+        {/* Похожие задачи (sqlite-vec) — только для сохранённых задач */}
+        {!isCreateMode && task?.id && (
+          <Collapse
+            ghost
+            style={{ marginBottom: 16 }}
+            items={[{
+              key: 'similar',
+              label: <strong>🔎 Похожие задачи</strong>,
+              children: <SimilarTasksPanel taskId={task.id} />,
+            }]}
+          />
+        )}
 
         {/* Подсказка по LaTeX */}
         <div style={{ fontSize: 12, color: '#666', background: '#fff7e6', padding: 8, borderRadius: 4, border: '1px solid #ffd591' }}>
