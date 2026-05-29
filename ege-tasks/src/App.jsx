@@ -84,6 +84,10 @@ import './App.css';
 
 const { Header, Content, Sider } = Layout;
 
+// Версия приложения (впекается при сборке из package.json через vite define)
+/* global __APP_VERSION__ */
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
+
 // ── Route path constants ────────────────────────────────────────────────────
 export const R = {
   TASKS:               '/app/tasks',
@@ -669,11 +673,16 @@ function AppLayout() {
 
   const logo = (
     <div style={{
-      height: 64, display: 'flex', alignItems: 'center',
-      justifyContent: 'center', padding: '10px 16px', flexShrink: 0,
+      minHeight: 64, display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '8px 16px 6px', flexShrink: 0, gap: 2,
     }}>
       <img src="/lemma-logo-new.png" alt="Lemma"
         style={{ height: 38, width: 'auto', borderRadius: 6 }} />
+      {APP_VERSION && (
+        <span style={{ fontSize: 10, lineHeight: 1, color: '#bfbfbf', letterSpacing: 0.2 }}>
+          v{APP_VERSION}
+        </span>
+      )}
     </div>
   );
 
