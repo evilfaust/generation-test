@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Alert, Tag, Tooltip } from 'antd';
+import { Alert, Tag, Tooltip, Button } from 'antd';
+import { DownOutlined, UpOutlined } from '@ant-design/icons';
 
 const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
 const WARN_COS = 0.78; // порог «возможный повтор» внутри варианта
@@ -19,6 +20,7 @@ function pctColor(pct) {
  */
 export default function VariantSimilarityWarning({ variants = [] }) {
   const [results, setResults] = useState([]); // [{ variantIdx, pairs:[{a,b,cos,pct}] }]
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,13 +60,30 @@ export default function VariantSimilarityWarning({ variants = [] }) {
     return `№${idx + 1} (${code})`;
   };
 
+  const totalPairs = results.reduce((s, r) => s + r.pairs.length, 0);
+
   return (
     <Alert
       type="warning"
       showIcon
       style={{ marginTop: 12 }}
-      message="Возможные повторы внутри вариантов"
-      description={
+      message={
+        <span
+          onClick={() => setExpanded((v) => !v)}
+          style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          Возможные повторы внутри вариантов ({totalPairs})
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0, height: 'auto' }}
+            icon={expanded ? <UpOutlined /> : <DownOutlined />}
+          >
+            {expanded ? 'скрыть' : 'показать'}
+          </Button>
+        </span>
+      }
+      description={expanded ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {results.map(({ variantIdx, pairs }) => (
             <div key={variantIdx}>
@@ -79,7 +98,7 @@ export default function VariantSimilarityWarning({ variants = [] }) {
             </div>
           ))}
         </div>
-      }
+      ) : null}
     />
   );
 }

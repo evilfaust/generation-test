@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Form, App } from 'antd';
 import TaskReplaceModal from './TaskReplaceModal';
 import TaskEditModal from './TaskEditModal';
@@ -9,6 +10,7 @@ import HeroSection from './worksheet/oral-generator/HeroSection';
 import FiltersAndDistribution from './worksheet/oral-generator/FiltersAndDistribution';
 import AppearanceSection from './worksheet/oral-generator/AppearanceSection';
 import ResultActionBar from './worksheet/oral-generator/ResultActionBar';
+import WorksheetVectorTools from './worksheet/oral-generator/WorksheetVectorTools';
 import WorksheetPreview from './worksheet/oral-generator/WorksheetPreview';
 import WorksheetGridPrint from './worksheet/WorksheetGridPrint';
 import {
@@ -33,6 +35,7 @@ const DIFFICULTY_OPTIONS = [
 
 const TaskSheetGenerator = () => {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const { topics, tags, years, sources, subtopics } = useReferenceData();
   const [form] = Form.useForm();
   const worksheetGen = useWorksheetGeneration();
@@ -383,6 +386,13 @@ const TaskSheetGenerator = () => {
           onReset={handleReset}
           onOpenWorksheet={() => setWorksheetOpen(true)}
           worksheetActions={worksheetActions}
+        />
+
+        <WorksheetVectorTools
+          variants={variants}
+          setVariants={setVariants}
+          workTitle={workTitle}
+          onOpenWork={(id) => navigate(`/app/works/${id}/edit`)}
         />
       </div>
 
