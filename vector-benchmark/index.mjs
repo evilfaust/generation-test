@@ -1,37 +1,41 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  Индексатор векторного поиска Lemma
+//
 //  Что делает: берёт задачи из PocketBase → считает эмбеддинги (bge-m3 через
 //  Ollama на этом Mac) → сохраняет в локальную data/vec.db → (опц.) заливает
-//  на VPS, чтобы заработал поиск «Похожие», «Параллельные варианты» и т.п.
+//  на VPS, где работает поиск «Похожие», «Параллельные варианты» и т.п.
+//  Инкрементальный: эмбеддит только задачи, у которых изменился text_hash.
 //
-//  Запуск (см. также README.md):
+//  Запуск (см. README.md):
 //    node index.mjs                 инкремент локально, без отправки на VPS
 //    node index.mjs --push          инкремент + отправка на VPS   ← обычный режим
 //    node index.mjs --full --push   пересчитать ВСЕ задачи заново + отправка
 //    node index.mjs --push --dedup  + пересчёт дубль-кластеров (долго, ~5-6 мин)
-//    node index.mjs --help          показать эту справку
+//    node index.mjs --help          показать справку
 //
-//  Токен для отправки на VPS берётся из переменной INDEX_TOKEN или из файла
-//  .index-token рядом с этим скриптом.
+//  Токен для отправки на VPS — из переменной INDEX_TOKEN или файла .index-token.
 // ─────────────────────────────────────────────────────────────────────────────
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
-import { existsSync, mkdirSync, statSync } from 'fs';
 import { PB_URL, OLLAMA_URL, MODEL, PDF_URL, INDEX_TOKEN } from './lib/config.mjs';
+import { buildText } from './2-embed.mjs';
 
-const DATA_DIR = new URL('./data/', import.meta.url).pathname;
-const DB_PATH = `${DATA_DIR}vec.db`;
+const DIM = 1024;
+const VEC_DB = new URL('./data/vec.db', import.meta.url).pathname;
+const PUSH_BATCH = 200;
 const START = Date.now();
 
-const args = process.argv.slice(2);
-const FULL = args.includes('--full');
-const PUSH = args.includes('--push');
-const DEDUP = args.includes('--dedup');
-const HELP = args.includes('--help') || args.includes('-h');
+const FULL = process.argv.includes('--full');
+const PUSH = process.argv.includes('--push');
+const FORCE_DEDUP = process.argv.includes('--dedup');
+const HELP = process.argv.includes('--help') || process.argv.includes('-h');
 
-// ── маленькие утилиты вывода ─────────────────────────────────────────────────
+// ── вывод ────────────────────────────────────────────────────────────────────
 const log = (s = '') => process.stdout.write(s + '\n');
-const same = (s) => process.stdout.write('\r' + s);          // перезапись строки
+const same = (s) => process.stdout.write('\r' + s);
 const fmtSec = (ms) => `${Math.round(ms / 1000)}с`;
 const hr = () => log('─'.repeat(60));
 
@@ -47,8 +51,8 @@ function printHelp() {
                  изменённых задач и сохранить в data/vec.db. На VPS НЕ отправляет.
   --push         Инкремент + отправить новые вектора на VPS. ← обычный режим
                  (то же самое, что \`npm run index\`)
-  --full         Пересчитать эмбеддинги ВСЕХ задач заново (медленно). Сочетается
-                 с --push.
+  --full         Пересчитать эмбеддинги ВСЕХ задач заново (медленно, ~20 мин).
+                 Сочетается с --push.
   --dedup        Дополнительно пересчитать кластеры дублей для вкладки
                  «Похожие (вектор)». Тяжело (~5-6 мин). То же — \`npm run dedup\`.
   --help, -h     Показать эту справку.
@@ -61,118 +65,164 @@ function printHelp() {
 `);
 }
 
-// ── предполётные проверки: чтобы было понятно, ПОЧЕМУ не работает ────────────
+// ── предполётные проверки: чтобы было понятно, ПОЧЕМУ не работает ─────────────
 async function ping(url, opts = {}) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000), ...opts });
     return res.ok;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 async function preflight() {
   log('🔍 Проверяю окружение перед запуском...');
 
-  // 1) Ollama (локальная модель — без неё считать эмбеддинги нечем)
-  const ollamaOk = await ping(`${OLLAMA_URL}/api/tags`);
-  if (!ollamaOk) {
+  if (!(await ping(`${OLLAMA_URL}/api/tags`))) {
     log(`   ❌ Ollama недоступна на ${OLLAMA_URL}`);
-    log(`      Запусти Ollama (приложение или \`ollama serve\`) и убедись, что есть модель:`);
+    log(`      Запусти Ollama (приложение или \`ollama serve\`) и проверь модель:`);
     log(`      ollama pull ${MODEL}`);
     return false;
   }
   log(`   ✓ Ollama отвечает (${OLLAMA_URL})`);
 
-  // 2) PocketBase (откуда берём задачи)
-  const pbOk = await ping(`${PB_URL}/api/health`);
-  if (!pbOk) {
+  if (!(await ping(`${PB_URL}/api/health`))) {
     log(`   ❌ PocketBase недоступен на ${PB_URL}`);
     log(`      Проверь интернет / VPN (Lemma на VPS).`);
     return false;
   }
   log(`   ✓ PocketBase отвечает (${PB_URL})`);
 
-  // 3) Токен для отправки на VPS — нужен только при --push
   if (PUSH && !INDEX_TOKEN) {
     log(`   ❌ Нет токена для отправки на VPS.`);
     log(`      Создай файл .index-token рядом со скриптом или задай INDEX_TOKEN=...`);
     return false;
   }
   if (PUSH) log(`   ✓ Токен для VPS найден`);
-
   return true;
 }
 
-// ── работа с PocketBase ──────────────────────────────────────────────────────
-async function pbFetchAllTasks() {
-  const perPage = 200;
-  let page = 1;
-  let items = [];
-  for (;;) {
-    const url = `${PB_URL}/api/collections/tasks/records?page=${page}&perPage=${perPage}&fields=id,statement_md,answer,topic,updated&skipTotal=1`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
-    if (!res.ok) throw new Error(`PocketBase ответил ${res.status}`);
-    const data = await res.json();
-    const batch = data.items || [];
-    if (batch.length === 0) break;
-    items = items.concat(batch);
-    same(`   загружено задач: ${items.length}`);
-    if (batch.length < perPage) break;
-    page++;
-  }
-  log('');
-  return items;
-}
-
-function buildText(t) {
-  return [t.statement_md || '', t.answer ? `Ответ: ${t.answer}` : '']
-    .filter(Boolean).join('\n').trim();
-}
-
-// ── эмбеддинги через Ollama ──────────────────────────────────────────────────
-async function embed(text) {
-  const r = await fetch(`${OLLAMA_URL}/api/embeddings`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, prompt: text }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!r.ok) throw new Error(`Ollama ответил ${r.status}`);
-  const j = await r.json();
-  return j.embedding;
-}
-
-function toF32Blob(arr) {
-  return Buffer.from(new Float32Array(arr).buffer);
-}
-
-// ── отправка на VPS ──────────────────────────────────────────────────────────
-async function pushVectors(batch) {
+// ── сеть: VPS ────────────────────────────────────────────────────────────────
+async function pushVectors(rows) {
   const res = await fetch(`${PDF_URL}/index-vectors`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
-    body: JSON.stringify({ vectors: batch }),
+    body: JSON.stringify({ vectors: rows }),
     signal: AbortSignal.timeout(30000),
   });
-  return { ok: res.ok, status: res.status };
-}
-
-async function pruneVectors(liveIds) {
-  const res = await fetch(`${PDF_URL}/prune-vectors`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
-    body: JSON.stringify({ live_ids: [...liveIds] }),
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!res.ok) return { deleted: 0, remaining: '?' };
+  if (!res.ok) throw new Error(`index-vectors ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-async function recomputeDedup(db) {
-  // тяжёлая O(n²) кластеризация — считается здесь, на Mac, результат летит на VPS
-  const { runDedup } = await import('./dedup-scan.mjs');
-  await runDedup(db, { PDF_URL, INDEX_TOKEN });
+async function pruneRemote(validIds) {
+  const res = await fetch(`${PDF_URL}/prune-vectors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
+    body: JSON.stringify({ valid_task_ids: validIds }),
+    signal: AbortSignal.timeout(180000), // prune на VPS тяжёлый — даём 3 мин
+  });
+  if (!res.ok) throw new Error(`prune-vectors ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+async function uploadClusters(clusters) {
+  const body = JSON.stringify({ clusters });
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(`${PDF_URL}/upload-clusters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
+        body,
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`upload-clusters ${res.status}: ${await res.text()}`);
+      return res.json();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
+// ── дедуп-кластеризация на Mac (KNN внутри темы, union-find) ──────────────────
+const DEDUP_THRESHOLD = 0.93, DEDUP_K = 10;
+function isDiscriminative(ans) {
+  const a = (ans || '').replace(/\s+/g, '').replace(',', '.').toLowerCase();
+  if (!a || a === 'доказать' || a === 'докажите') return false;
+  if (/^[абвгдеж)(,;.\s]+$/.test(a)) return false;
+  return true;
+}
+function computeClusters(db, meta) {
+  const ids = db.prepare('SELECT task_id FROM vec_tasks').all().map((r) => r.task_id);
+  const parent = new Map();
+  const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+  for (const id of ids) parent.set(id, id);
+  const getVec = db.prepare('SELECT embedding FROM vec_tasks WHERE task_id = ?');
+  const knn = db.prepare('SELECT task_id, distance FROM vec_tasks WHERE embedding MATCH ? AND k = ? ORDER BY distance');
+  for (const id of ids) {
+    const topic = meta.get(id)?.topic || '';
+    for (const nb of knn.all(getVec.get(id).embedding, DEDUP_K + 1)) {
+      if (nb.task_id === id || (1 - nb.distance) < DEDUP_THRESHOLD) continue;
+      if ((meta.get(nb.task_id)?.topic || '') !== topic) continue;
+      parent.set(find(id), find(nb.task_id));
+    }
+  }
+  const groups = new Map();
+  for (const id of ids) { const r = find(id); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(id); }
+  const slim = [];
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    const answers = new Set(members.map((m) => (meta.get(m)?.answer || '')).filter(Boolean));
+    const allSame = answers.size === 1 && members.every((m) => isDiscriminative(meta.get(m)?.answer));
+    slim.push({ type: allSame ? 'exact_dup' : 'param_family', ids: members });
+  }
+  return slim;
+}
+
+// ── эмбеддинги ───────────────────────────────────────────────────────────────
+function textHash(s) { return crypto.createHash('sha256').update(s).digest('hex'); }
+
+async function embed(text) {
+  const r = await fetch(`${OLLAMA_URL}/api/embeddings`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL, prompt: text }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!r.ok) throw new Error(`Ollama ${r.status}: ${await r.text()}`);
+  return (await r.json()).embedding;
+}
+
+async function* allTasks() {
+  const perPage = 500;
+  let page = 1, totalPages = 1;
+  do {
+    const url = `${PB_URL}/api/collections/tasks/records?perPage=${perPage}&page=${page}`
+      + `&expand=topic&fields=id,statement_md,topic,answer,expand.topic.title`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`PocketBase ${r.status} на странице ${page}`);
+    const data = await r.json();
+    totalPages = data.totalPages;
+    for (const it of data.items) {
+      yield {
+        id: it.id,
+        statement_md: it.statement_md || '',
+        topic_title: it.expand?.topic?.title || '',
+        topic: it.topic || '',
+        answer: it.answer || '',
+      };
+    }
+    page++;
+  } while (page <= totalPages);
+}
+
+function openVecDb() {
+  fs.mkdirSync(path.dirname(VEC_DB), { recursive: true });
+  const db = new Database(VEC_DB);
+  sqliteVec.load(db);
+  // distance_metric=cosine — порог дедупа калиброван по КОСИНУСУ (cos = 1 - distance).
+  db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_tasks USING vec0(task_id TEXT, embedding FLOAT[${DIM}] distance_metric=cosine);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS vec_meta (task_id TEXT PRIMARY KEY, model TEXT, dim INTEGER, text_hash TEXT, indexed_at TEXT);`);
+  return db;
 }
 
 // ── главный сценарий ─────────────────────────────────────────────────────────
@@ -183,7 +233,7 @@ async function main() {
   log('📊 Индексация векторного поиска Lemma');
   log(`   Режим: ${FULL ? 'ПОЛНЫЙ пересчёт всех задач' : 'инкремент (только новые/изменённые)'}` +
       `${PUSH ? ' · с отправкой на VPS' : ' · ТОЛЬКО локально (без VPS)'}` +
-      `${DEDUP ? ' · + пересчёт дублей' : ''}`);
+      `${FORCE_DEDUP ? ' · + пересчёт дублей' : ''}`);
   hr();
 
   if (!(await preflight())) {
@@ -192,117 +242,142 @@ async function main() {
     return;
   }
 
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-  const db = new Database(DB_PATH);
-  sqliteVec.load(db);
-  db.exec(`CREATE TABLE IF NOT EXISTS meta (task_id TEXT PRIMARY KEY, updated TEXT, hash TEXT)`);
-  db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_tasks USING vec0(task_id TEXT PRIMARY KEY, embedding float[1024])`);
-
-  // Шаг 1 — выгрузка задач
-  log('\n[1/4] Загружаю список задач из PocketBase...');
-  const tasks = await pbFetchAllTasks();
-  log(`   Всего задач в базе: ${tasks.length}`);
-
-  // Шаг 2 — что нужно пересчитать
-  log('\n[2/4] Сравниваю с локальной базой эмбеддингов...');
-  const existing = new Map();
-  for (const row of db.prepare('SELECT task_id, updated FROM meta').all()) {
-    existing.set(row.task_id, row.updated);
-  }
-  const toEmbed = [];
-  for (const t of tasks) {
-    if (!buildText(t)) continue; // пустые задачи пропускаем
-    if (FULL || !existing.has(t.id) || existing.get(t.id) !== t.updated) toEmbed.push(t);
-  }
-  const skipped = tasks.length - toEmbed.length;
-  if (toEmbed.length === 0) {
-    log(`   Новых/изменённых задач нет — всё уже проиндексировано (${skipped} пропущено).`);
-  } else {
-    log(`   Нужно посчитать эмбеддинги: ${toEmbed.length} (пропущено без изменений: ${skipped})`);
+  if (FULL && fs.existsSync(VEC_DB)) {
+    fs.rmSync(VEC_DB);
+    log('\n--full: старая локальная vec.db удалена, считаю заново.');
   }
 
-  // Шаг 3 — эмбеддинги
-  log('\n[3/4] Считаю эмбеддинги через Ollama (модель ' + MODEL + ')...');
-  let embedded = 0, failed = 0;
-  const pushBatch = [];
+  const db = openVecDb();
+  const getMeta = db.prepare('SELECT text_hash FROM vec_meta WHERE task_id = ?');
+  const delVec = db.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
+  const insVec = db.prepare('INSERT INTO vec_tasks(task_id, embedding) VALUES (?, ?)');
+  const upMeta = db.prepare(`INSERT INTO vec_meta(task_id, model, dim, text_hash, indexed_at)
+    VALUES (@task_id, @model, @dim, @text_hash, @indexed_at)
+    ON CONFLICT(task_id) DO UPDATE SET model=@model, dim=@dim, text_hash=@text_hash, indexed_at=@indexed_at`);
+
+  // Шаг 1 — выгрузка задач (потоково; считаем по ходу)
+  log('\n[1/4] Загружаю задачи из PocketBase и сравниваю с локальным индексом...');
+  let seen = 0, embedded = 0, skipped = 0, failed = 0, pushed = 0;
+  let pushBuf = [];
+  const allIds = [];
+  const taskMeta = new Map(); // id → {topic, answer} для дедупа
   const t0 = Date.now();
-  for (const t of toEmbed) {
+
+  let pushFailedBatches = 0;
+  // Отправка пачки на VPS с ретраями. НЕ валит весь прогон при сбое:
+  // вектора уже в локальной vec.db, повторный запуск дошлёт.
+  const flushPush = async () => {
+    if (!PUSH || pushBuf.length === 0) return;
+    const batch = pushBuf;
+    pushBuf = [];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await pushVectors(batch);
+        pushed += batch.length;
+        return;
+      } catch (e) {
+        if (attempt < 3) { await new Promise((r) => setTimeout(r, 2000 * attempt)); continue; }
+        pushFailedBatches++;
+        log(`\n   ⚠ не удалось отправить пачку (${batch.length}) после 3 попыток: ${e.message}`);
+      }
+    }
+  };
+
+  log('\n[2/4] Считаю эмбеддинги через Ollama (модель ' + MODEL + ')...');
+  for await (const task of allTasks()) {
+    seen++;
+    allIds.push(task.id);
+    taskMeta.set(task.id, { topic: task.topic, answer: task.answer });
+
+    const text = buildText(task);
+    const hash = textHash(text);
+    if (!FULL) {
+      const meta = getMeta.get(task.id);
+      if (meta && meta.text_hash === hash) { skipped++; continue; }
+    }
+
     let vec;
     try {
-      vec = await embed(buildText(t));
+      vec = await embed(text);
     } catch (e) {
       failed++;
-      log(`\n   ⚠ не удалось посчитать задачу ${t.id}: ${e.message}`);
+      log(`\n   ⚠ не удалось посчитать задачу ${task.id}: ${e.message}`);
       continue;
     }
-    db.prepare('INSERT OR REPLACE INTO vec_tasks(task_id, embedding) VALUES (?, ?)').run(t.id, toF32Blob(vec));
-    db.prepare('INSERT OR REPLACE INTO meta(task_id, updated, hash) VALUES (?, ?, ?)').run(t.id, t.updated, '');
-    pushBatch.push({ task_id: t.id, embedding: vec });
+    db.transaction(() => {
+      delVec.run(task.id);
+      insVec.run(task.id, Buffer.from(new Float32Array(vec).buffer));
+      upMeta.run({ task_id: task.id, model: MODEL, dim: DIM, text_hash: hash, indexed_at: new Date().toISOString() });
+    })();
     embedded++;
-    if (embedded % 10 === 0 || embedded === toEmbed.length) {
+
+    if (PUSH) {
+      pushBuf.push({ task_id: task.id, vec, text_hash: hash, model: MODEL });
+      if (pushBuf.length >= PUSH_BATCH) await flushPush();
+    }
+
+    if (embedded % 10 === 0) {
       const elapsed = (Date.now() - t0) / 1000;
       const rate = elapsed > 0 ? embedded / elapsed : 0;
-      const left = rate > 0 ? Math.round((toEmbed.length - embedded) / rate) : 0;
-      same(`   ${embedded}/${toEmbed.length}  (${rate.toFixed(1)} зад/с, осталось ~${left}с)   `);
+      same(`   просмотрено ${seen}, посчитано ${embedded}, пропущено ${skipped}  (${rate.toFixed(1)} зад/с)   `);
     }
   }
-  if (toEmbed.length > 0) log('');
-  log(`   Посчитано: ${embedded}${failed ? `, с ошибками: ${failed}` : ''}`);
+  await flushPush();
+  log('');
+  log(`   Просмотрено ${seen}, посчитано ${embedded}, пропущено без изменений ${skipped}${failed ? `, с ошибками ${failed}` : ''}.`);
 
   // Прунинг локально — убрать вектора удалённых задач
-  const liveIds = new Set(tasks.map((t) => t.id));
-  const localIds = db.prepare('SELECT task_id FROM vec_tasks').all().map((r) => r.task_id);
-  const toPrune = localIds.filter((id) => !liveIds.has(id));
-  if (toPrune.length > 0) {
-    const delV = db.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
-    const delM = db.prepare('DELETE FROM meta WHERE task_id = ?');
-    db.transaction((ids) => { for (const id of ids) { delV.run(id); delM.run(id); } })(toPrune);
-    log(`   Удалено из локальной базы (задачи удалены из Lemma): ${toPrune.length}`);
+  const validSet = new Set(allIds);
+  const localOrphans = db.prepare('SELECT task_id FROM vec_tasks').all()
+    .map((r) => r.task_id).filter((id) => !validSet.has(id));
+  if (localOrphans.length) {
+    const delMeta = db.prepare('DELETE FROM vec_meta WHERE task_id = ?');
+    db.transaction(() => { for (const id of localOrphans) { delVec.run(id); delMeta.run(id); } })();
+    log(`   Удалено из локальной базы (задачи удалены из Lemma): ${localOrphans.length}`);
   }
 
-  // Шаг 4 — отправка на VPS
+  // Шаг 3 — отправка на VPS
   if (PUSH) {
-    log('\n[4/4] Отправляю на VPS...');
-    if (pushBatch.length > 0) {
-      const CHUNK = 500;
-      let sent = 0;
-      for (let i = 0; i < pushBatch.length; i += CHUNK) {
-        const chunk = pushBatch.slice(i, i + CHUNK);
-        const res = await pushVectors(chunk);
-        if (!res.ok) { log(`   ⚠ ошибка отправки пачки: HTTP ${res.status}`); }
-        else { sent += chunk.length; same(`   отправлено векторов: ${sent}/${pushBatch.length}   `); }
-      }
-      if (pushBatch.length > 0) log('');
-    } else {
-      log('   Новых векторов нет — отправлять нечего.');
+    log('\n[3/4] Синхронизирую с VPS...');
+    log(`   Отправлено новых векторов: ${pushed}` + (pushFailedBatches ? `  (⚠ пачек не доставлено: ${pushFailedBatches} — дошлёт следующий запуск)` : ''));
+    try {
+      const pr = await pruneRemote(allIds);
+      log(`   Прунинг на VPS: удалено ${pr.pruned}, осталось ${pr.total}`);
+    } catch (e) {
+      // Прунинг некритичен: осиротевшие векторы безвредны (поиск отсеивает через JOIN).
+      log(`   ⚠ прунинг на VPS пропущен: ${e.message}`);
+      log(`     (не страшно — лишние вектора не мешают поиску, уберутся при следующем запуске)`);
     }
-    const pruneRes = await pruneVectors(liveIds);
-    log(`   Синхронизация удалённых на VPS: убрано ${pruneRes.deleted ?? 0}, осталось ${pruneRes.remaining ?? '?'}`);
   } else {
-    log('\n[4/4] Отправка на VPS пропущена (нет флага --push).');
-    log('       Поиск на сайте использует данные на VPS — без --push изменения');
+    log('\n[3/4] Отправка на VPS пропущена (нет флага --push).');
+    log('       Поиск на сайте читает данные с VPS — без --push изменения');
     log('       останутся только в локальной data/vec.db.');
   }
 
-  // Дедуп (опционально)
-  if (DEDUP) {
-    log('\n➕ Пересчитываю кластеры дублей (это долго, ~5-6 мин)...');
+  // Шаг 4 — дедуп (только по флагу)
+  if (PUSH && FORCE_DEDUP) {
+    log('\n[4/4] Пересчитываю кластеры дублей (это долго, ~5-6 мин)...');
     try {
-      await recomputeDedup(db);
-      log('   ✓ Кластеры дублей обновлены и отправлены на VPS.');
+      const clusters = computeClusters(db, taskMeta);
+      const rc = await uploadClusters(clusters);
+      log(`   ✓ Дубли пересчитаны и залиты: ${rc.exact_dup} точных + ${rc.param_family} параметрических.`);
     } catch (e) {
       log(`   ⚠ пересчёт дублей не удался: ${e.message}`);
     }
+  } else if (PUSH) {
+    log('\n[4/4] Дубли НЕ пересчитывались (для этого нужен флаг --dedup или `npm run dedup`).');
   }
 
   // Итог
-  const totalVec = db.prepare('SELECT COUNT(*) AS n FROM vec_tasks').get().n;
-  const sizeMb = (statSync(DB_PATH).size / 1e6).toFixed(1);
+  const total = db.prepare('SELECT count(*) c FROM vec_tasks').get().c;
+  const sizeMb = (fs.statSync(VEC_DB).size / 1024 / 1024).toFixed(1);
+  db.close();
+
   hr();
   log(`✅ Готово за ${fmtSec(Date.now() - START)}`);
-  log(`   Задач в базе: ${tasks.length}  ·  посчитано сейчас: ${embedded}  ·  пропущено: ${skipped}`);
-  if (PUSH) log(`   Отправлено на VPS: ${pushBatch.length} векторов`);
-  log(`   Всего векторов в локальной vec.db: ${totalVec}  (${sizeMb} MB)`);
+  log(`   Задач просмотрено: ${seen}  ·  посчитано сейчас: ${embedded}  ·  пропущено: ${skipped}`);
+  if (PUSH) log(`   Отправлено на VPS: ${pushed} векторов`);
+  log(`   Всего векторов в локальной vec.db: ${total}  (${sizeMb} MB)`);
   if (!PUSH && embedded > 0) {
     log('   ⚠ Чтобы изменения увидел сайт — запусти ещё раз с флагом --push.');
   }
