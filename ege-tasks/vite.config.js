@@ -39,6 +39,18 @@ export default defineConfig({
       '@shared': resolve(__dirname, 'src/shared'),
     },
   },
+  // Пре-бандлим CodeMirror на старте дев-сервера, иначе при ПЕРВОЙ ленивой
+  // загрузке расширенного редактора Vite обнаруживает новую зависимость и делает
+  // разовый full-reload страницы (теряя несохранённое состояние). В проде неактуально.
+  optimizeDeps: {
+    include: [
+      '@uiw/react-codemirror',
+      '@codemirror/lang-markdown',
+      '@codemirror/lint',
+      '@codemirror/view',
+      '@codemirror/state',
+    ],
+  },
   server: {
     port: 5173,
     host: true,
