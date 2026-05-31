@@ -554,6 +554,8 @@ const TaskList = ({
               { label: '1 — Базовый', value: '1' },
               { label: '2 — Средний', value: '2' },
               { label: '3 — Повышенный', value: '3' },
+              { label: '4 — Высокий', value: '4' },
+              { label: '5 — Олимпиадный', value: '5' },
             ]}
             disabled={bulkLoading}
             allowClear

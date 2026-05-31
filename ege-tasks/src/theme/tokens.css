@@ -93,26 +93,6 @@
 .lemma-chip-amber  { color: var(--c-amber);  background: var(--c-amber-soft); }
 .lemma-chip-rose   { color: var(--c-rose);   background: var(--c-rose-soft); }
 
-/* ── Кружок уровня сложности ── */
-.lemma-level {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  background: transparent;
-  border: 1.5px solid currentColor;
-  flex-shrink: 0;
-  line-height: 1;
-}
-.lemma-level-1 { color: var(--lvl-1); }
-.lemma-level-2 { color: var(--lvl-2); }
-.lemma-level-3 { color: var(--lvl-3); }
-
 /* ── Фокус-ринг — единый для всех интерактивов ── */
 .ant-btn:focus-visible,
 .ant-input:focus,

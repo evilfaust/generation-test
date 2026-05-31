@@ -1,5 +1,4 @@
 export { Chip, topicTint, TOPIC_TINT } from './Chip';
-export { Level } from './Level';
 export { Stat, StatRow } from './Stat';
 export { StatMini } from './StatMini';
 export { PageHeader } from './PageHeader';
