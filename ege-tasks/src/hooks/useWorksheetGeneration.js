@@ -3,6 +3,9 @@ import { App } from 'antd';
 import { api } from '../services/pocketbase';
 import { shuffleArray } from '../utils/shuffle';
 
+const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
+const VECTOR_ENDPOINTS = { seed: '/seed-select', diverse: '/diverse', novelty: '/novelty' };
+
 /**
  * Хук для генерации вариантов работ с задачами
  * Поддерживает разные режимы генерации и структуры фильтров
@@ -395,6 +398,11 @@ export const useWorksheetGeneration = () => {
         }
       }
 
+      // «Лесенка похожести» (sortType='similarity') — перестроить порядок внутри вариантов
+      if (sortType === 'similarity') {
+        await orderVariantsByLadder(generatedVariants);
+      }
+
       setVariants(generatedVariants);
       setAllTasks(generatedVariants.flatMap(v => v.tasks));
 
@@ -408,6 +416,184 @@ export const useWorksheetGeneration = () => {
       throw error;
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Векторный подбор задач (v3.9.41) — три семантических режима:
+   *   'seed'    — по образцу (один ползунок similarity 0..1: близкие↔разные);
+   *   'diverse' — разные сюжеты (diverseMethod: 'mmr' | 'clusters');
+   *   'novelty' — анти-дубль к ранее выданной работе (avoidTaskIds + maxCos).
+   * Выдаёт ту же структуру variants, что и остальные методы.
+   *
+   * @param {Object} params
+   * @param {'seed'|'diverse'|'novelty'} params.method
+   * @param {string} [params.seedTaskId]
+   * @param {number} [params.similarity=0.5]
+   * @param {'mmr'|'clusters'} [params.diverseMethod='mmr']
+   * @param {string} [params.topic]
+   * @param {string} [params.subtopic]
+   * @param {string[]} [params.avoidTaskIds]
+   * @param {number} [params.maxCos=0.85]
+   * @param {Object} options - { variantsMode, variantsCount, tasksPerVariant, sortType }
+   */
+  const generateFromVector = async (params = {}, options = {}) => {
+    const {
+      method,
+      seedTaskId,
+      similarity = 0.5,
+      diverseMethod = 'mmr',
+      topic,
+      subtopic,
+      avoidTaskIds = [],
+      maxCos = 0.85,
+    } = params;
+    const {
+      variantsMode = 'different',
+      variantsCount = 1,
+      tasksPerVariant = 20,
+      sortType = 'random',
+    } = options;
+
+    const fail = (msg) => { if (msg) message.warning(msg); setVariants([]); setAllTasks([]); return []; };
+
+    setLoading(true);
+    try {
+      const poolNeeded = variantsMode === 'different' ? tasksPerVariant * variantsCount : tasksPerVariant;
+
+      let body;
+      if (method === 'seed') {
+        if (!seedTaskId) return fail('Выберите задачу-эталон');
+        body = { task_id: seedTaskId, count: poolNeeded, similarity, same_topic_only: true };
+      } else if (method === 'diverse') {
+        if (!topic) return fail('Выберите тему');
+        body = { topic_id: topic, subtopic_id: subtopic || undefined, count: poolNeeded, method: diverseMethod };
+      } else if (method === 'novelty') {
+        if (!topic) return fail('Выберите тему');
+        body = { topic_id: topic, subtopic_id: subtopic || undefined, count: poolNeeded, avoid_task_ids: avoidTaskIds, max_cos: maxCos };
+      } else {
+        message.error('Неизвестный режим подбора');
+        return [];
+      }
+
+      let data;
+      try {
+        const res = await fetch(`${PDF_SERVICE_URL}${VECTOR_ENDPOINTS[method]}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(20000),
+        });
+        if (res.status === 503) return fail('Сервис семантического поиска недоступен. Векторные режимы временно не работают.');
+        data = await res.json();
+      } catch {
+        return fail('Не удалось связаться с сервисом семантического поиска');
+      }
+
+      if (data.error === 'not_indexed') return fail('Задача-эталон ещё не в семантическом индексе. Прогоните индексатор (vector-benchmark → npm run index).');
+      if (data.error === 'empty' || data.error === 'no_topic') return fail('В этой теме нет проиндексированных задач. Прогоните индексатор.');
+
+      const items = data.items || [];
+      if (items.length === 0) {
+        if (method === 'novelty' && data.filtered_out > 0) {
+          return fail(`Все задачи темы оказались похожи на выбранную работу (отсеяно ${data.filtered_out}). Понизьте порог новизны.`);
+        }
+        return fail('Подходящих задач не найдено. Возможно, нужно прогнать индексатор или ослабить ограничения.');
+      }
+
+      // дотягиваем полные задачи (для печати/ответов), сохраняя порядок и cos
+      const ids = items.map((it) => it.task_id);
+      const cosById = new Map(items.map((it) => [it.task_id, it.cos]));
+      const full = await api.getTasksByIds(ids);
+      const byId = new Map(full.map((t) => [t.id, t]));
+      const ordered = ids
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((t) => (cosById.get(t.id) != null ? { ...t, cos: cosById.get(t.id) } : t));
+
+      if (ordered.length === 0) return fail('Найденные задачи не удалось загрузить');
+
+      const generatedVariants = [];
+      if (variantsMode === 'different') {
+        for (let i = 0; i < variantsCount; i++) {
+          const slice = ordered.slice(i * tasksPerVariant, (i + 1) * tasksPerVariant);
+          if (slice.length === 0) break;
+          if (slice.length < tasksPerVariant) {
+            message.warning(`Вариант ${i + 1}: найдено только ${slice.length} из ${tasksPerVariant} задач`);
+          }
+          generatedVariants.push({ number: i + 1, tasks: slice });
+        }
+      } else {
+        const baseTasks = ordered.slice(0, tasksPerVariant);
+        if (baseTasks.length < tasksPerVariant) {
+          message.warning(`Найдено только ${baseTasks.length} из ${tasksPerVariant} задач`);
+        }
+        createVariantsFromBase(baseTasks, variantsCount, variantsMode, generatedVariants);
+      }
+
+      if (sortType === 'similarity') {
+        await orderVariantsByLadder(generatedVariants);
+      } else {
+        for (const v of generatedVariants) sortTasks(v.tasks, sortType);
+      }
+
+      setVariants(generatedVariants);
+      setAllTasks(generatedVariants.flatMap((v) => v.tasks));
+      const total = generatedVariants.reduce((s, v) => s + v.tasks.length, 0);
+      message.success(`Подобрано задач: ${total} (${generatedVariants.length} вар.)`);
+      return generatedVariants;
+    } catch (error) {
+      console.error('Error generating from vector:', error);
+      message.error('Ошибка при семантическом подборе задач');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Вспомогательная: «лесенка похожести» — упорядочить задачи каждого варианта
+   * от похожих к разным. Если у задач есть cos (seed-режим) — по убыванию cos;
+   * иначе строит цепочку через /pairs (каждая следующая ближе всех к предыдущей).
+   */
+  const orderVariantsByLadder = async (vars) => {
+    for (const v of vars) {
+      v.tasks = await ladderOrder(v.tasks);
+    }
+  };
+
+  const ladderOrder = async (tasks) => {
+    if (!tasks || tasks.length <= 2) return tasks;
+    if (tasks.every((t) => typeof t.cos === 'number')) {
+      return [...tasks].sort((a, b) => (b.cos ?? 0) - (a.cos ?? 0));
+    }
+    const ids = tasks.map((t) => t.id).filter(Boolean);
+    if (ids.length < 3) return tasks;
+    try {
+      const res = await fetch(`${PDF_SERVICE_URL}/pairs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_ids: ids, min_cos: 0.01 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) return tasks;
+      const data = await res.json();
+      const sim = new Map();
+      for (const p of (data.pairs || [])) { sim.set(`${p.a}|${p.b}`, p.cos); sim.set(`${p.b}|${p.a}`, p.cos); }
+      const cosOf = (x, y) => sim.get(`${x}|${y}`) ?? 0;
+      const byId = new Map(tasks.map((t) => [t.id, t]));
+      const remaining = new Set(ids);
+      const order = [ids[0]];
+      remaining.delete(ids[0]);
+      let last = ids[0];
+      while (remaining.size) {
+        let best = null, bestCos = -Infinity;
+        for (const r of remaining) { const c = cosOf(last, r); if (c > bestCos) { bestCos = c; best = r; } }
+        order.push(best); remaining.delete(best); last = best;
+      }
+      return order.map((id) => byId.get(id)).filter(Boolean);
+    } catch {
+      return tasks;
     }
   };
 
@@ -539,6 +725,7 @@ export const useWorksheetGeneration = () => {
     setLoading,
     generateFromStructure,
     generateFromFilters,
+    generateFromVector,
     reset,
   };
 };

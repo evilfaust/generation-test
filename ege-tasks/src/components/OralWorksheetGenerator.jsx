@@ -11,6 +11,8 @@ import FiltersAndDistribution from './worksheet/oral-generator/FiltersAndDistrib
 import AppearanceSection from './worksheet/oral-generator/AppearanceSection';
 import ResultActionBar from './worksheet/oral-generator/ResultActionBar';
 import WorksheetVectorTools from './worksheet/oral-generator/WorksheetVectorTools';
+import SelectionMethodPanel from './worksheet/oral-generator/SelectionMethodPanel';
+import { api } from '../services/pocketbase';
 import WorksheetPreview from './worksheet/oral-generator/WorksheetPreview';
 import WorksheetGridPrint from './worksheet/WorksheetGridPrint';
 import {
@@ -39,7 +41,15 @@ const TaskSheetGenerator = () => {
   const { topics, tags, years, sources, subtopics } = useReferenceData();
   const [form] = Form.useForm();
   const worksheetGen = useWorksheetGeneration();
-  const { variants, setVariants, loading, generateFromFilters } = worksheetGen;
+  const { variants, setVariants, loading, generateFromFilters, generateFromVector } = worksheetGen;
+
+  // Способ подбора задач (v3.9.41): 'filters' | 'seed' | 'diverse' | 'novelty'
+  const [selectionMethod, setSelectionMethod] = useState('filters');
+  const [seedTask, setSeedTask] = useState(null);
+  const [similarity, setSimilarity] = useState(0.5);
+  const [diverseMethod, setDiverseMethod] = useState('mmr');
+  const [avoidWorkId, setAvoidWorkId] = useState(null);
+  const [noveltyMaxCos, setNoveltyMaxCos] = useState(0.85);
 
   // Output mode + appearance
   const [outputMode, setOutputMode] = useState('sheet');
@@ -121,6 +131,48 @@ const TaskSheetGenerator = () => {
   const handleGenerate = async (values) => {
     const tasksPerVariant = values.tasksPerVariant || 20;
 
+    const commonOpts = {
+      variantsMode: values.variantsMode || 'different',
+      variantsCount: values.variantsCount || 1,
+      tasksPerVariant,
+      sortType: values.sortType || 'random',
+    };
+
+    // === Векторные режимы подбора ===
+    if (selectionMethod !== 'filters') {
+      if (selectionMethod === 'seed' && !seedTask) {
+        message.warning('Выберите задачу-эталон');
+        return;
+      }
+      if ((selectionMethod === 'diverse' || selectionMethod === 'novelty') && !values.topic) {
+        message.warning('Выберите тему — из неё будем подбирать задачи');
+        return;
+      }
+      let avoidTaskIds = [];
+      if (selectionMethod === 'novelty') {
+        if (!avoidWorkId) {
+          message.warning('Выберите работу, задачи которой не нужно повторять');
+          return;
+        }
+        const variantsOfWork = await api.getVariantsByWork(avoidWorkId);
+        const idset = new Set();
+        variantsOfWork.forEach(v => (v.tasks || []).forEach(id => idset.add(id)));
+        avoidTaskIds = [...idset];
+      }
+      await generateFromVector({
+        method: selectionMethod,
+        seedTaskId: seedTask?.id,
+        similarity,
+        diverseMethod,
+        topic: values.topic,
+        subtopic: values.subtopic,
+        avoidTaskIds,
+        maxCos: noveltyMaxCos,
+      }, commonOpts);
+      return;
+    }
+
+    // === Классические фильтры (без изменений) ===
     if (values.progressiveDifficulty && distributionsActive) {
       message.warning('Автопрогрессия несовместима с ручным распределением по тегам/сложности');
       return;
@@ -163,6 +215,12 @@ const TaskSheetGenerator = () => {
     form.resetFields();
     setCurrentWork(null);
     setProgressiveDifficulty(false);
+    setSelectionMethod('filters');
+    setSeedTask(null);
+    setSimilarity(0.5);
+    setDiverseMethod('mmr');
+    setAvoidWorkId(null);
+    setNoveltyMaxCos(0.85);
   };
 
   const handleSaveWork = async (values) => {
@@ -313,6 +371,23 @@ const TaskSheetGenerator = () => {
             selectedTopic={selectedTopic}
             distributionsActive={distributionsActive}
             onSubtopicChange={setSelectedSubtopic}
+            methodSlot={
+              <SelectionMethodPanel
+                method={selectionMethod}
+                setMethod={setSelectionMethod}
+                seedTask={seedTask}
+                setSeedTask={setSeedTask}
+                similarity={similarity}
+                setSimilarity={setSimilarity}
+                diverseMethod={diverseMethod}
+                setDiverseMethod={setDiverseMethod}
+                avoidWorkId={avoidWorkId}
+                setAvoidWorkId={setAvoidWorkId}
+                noveltyMaxCos={noveltyMaxCos}
+                setNoveltyMaxCos={setNoveltyMaxCos}
+                selectedTopic={selectedTopic}
+              />
+            }
             filtersSlot={
               <FiltersAndDistribution
                 form={form}
@@ -392,6 +467,7 @@ const TaskSheetGenerator = () => {
           variants={variants}
           setVariants={setVariants}
           workTitle={workTitle}
+          currentWorkId={currentWork?.id || null}
           onOpenWork={(id) => navigate(`/app/works/${id}/edit`)}
         />
       </div>

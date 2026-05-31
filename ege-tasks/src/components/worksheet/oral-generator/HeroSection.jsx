@@ -34,6 +34,7 @@ export default function HeroSection({
   distributionsActive,
   onSubtopicChange,
   filtersSlot,
+  methodSlot,
 }) {
   const variantsCount = Form.useWatch('variantsCount', form) || 0;
   const tasksPerVariant = Form.useWatch('tasksPerVariant', form) || 0;
@@ -81,6 +82,8 @@ export default function HeroSection({
           />
         )}
       </div>
+
+      {methodSlot && <div style={{ marginBottom: 16 }}>{methodSlot}</div>}
 
       <Row gutter={12} style={{ marginBottom: 16 }}>
         <Col xs={24} md={6}>

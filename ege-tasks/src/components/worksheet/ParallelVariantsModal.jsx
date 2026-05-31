@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
-import { Modal, Button, InputNumber, Input, Space, Spin, Alert, Tag, Empty, Tooltip, App } from 'antd';
+import { Modal, Button, InputNumber, Input, Space, Spin, Alert, Tag, Empty, Tooltip, Segmented, App } from 'antd';
 import { ReloadOutlined, SaveOutlined, SwapOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
 import TaskSelectModal from '../TaskSelectModal';
@@ -9,6 +9,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
 
 const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
+
+// Пресеты степени похожести параллелей (полоса cos для /parallel-variants).
+const SIM_PRESETS = {
+  similar:  { label: 'Похожие',        min_cos: 0.90, max_cos: 0.99 },
+  balanced: { label: 'Сбалансировано', min_cos: 0.85, max_cos: 0.995 },
+  diverse:  { label: 'Разные',         min_cos: 0.70, max_cos: 0.90 },
+};
+const SIM_PRESET_OPTIONS = Object.entries(SIM_PRESETS).map(([value, p]) => ({ value, label: p.label }));
 
 function cosColor(cos) {
   if (cos == null) return 'default';
@@ -69,6 +77,7 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
   const { canEdit } = useAuth();
   const { topics, tags, subtopics, years, sources } = useReferenceData();
   const [count, setCount] = useState(2);
+  const [simPreset, setSimPreset] = useState('balanced');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -165,10 +174,11 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
     if (ids.length === 0) return;
     setLoading(true); setError(null);
     try {
+      const band = SIM_PRESETS[simPreset] || SIM_PRESETS.balanced;
       const res = await fetch(`${PDF_SERVICE_URL}/parallel-variants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task_ids: ids, count }),
+        body: JSON.stringify({ task_ids: ids, count, min_cos: band.min_cos, max_cos: band.max_cos }),
         signal: AbortSignal.timeout(20000),
       });
       if (!res.ok) throw new Error(`Сервис ответил ${res.status}`);
@@ -179,7 +189,7 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
     } finally {
       setLoading(false);
     }
-  }, [baseTasks, count]);
+  }, [baseTasks, count, simPreset]);
 
   useEffect(() => {
     if (open) { setTitle(baseTitle || 'Вариант'); setCreated(null); generate(); }
@@ -271,6 +281,10 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
         <Input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: 220 }} placeholder="Название работ" />
         <span>Параллелей:</span>
         <InputNumber min={1} max={5} value={count} onChange={(v) => setCount(v || 2)} />
+        <Tooltip title="Степень похожести параллелей на образец: «Похожие» — почти клоны (другие числа), «Разные» — тот же тип, но заметно иной сюжет.">
+          <span>Похожесть:</span>
+        </Tooltip>
+        <Segmented options={SIM_PRESET_OPTIONS} value={simPreset} onChange={setSimPreset} />
         <Button icon={<ReloadOutlined />} onClick={generate} loading={loading}>Подобрать</Button>
       </Space>
 

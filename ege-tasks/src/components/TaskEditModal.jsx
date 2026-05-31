@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse } from 'antd';
-import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined, ClearOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import TaskStatementRenderer from './TaskStatementRenderer';
 import RefreshFromSdamgiaModal from './RefreshFromSdamgiaModal';
@@ -12,6 +12,7 @@ import { dataUrlToFile } from '../utils/cropImage';
 import { api } from '../services/pocketbase';
 import { useImageUpload } from '../hooks';
 import { parseMatchingTask } from '../utils/parseMatchingTask';
+import { fixLatexRoots } from '../utils/fixLatexRoots';
 
 const DEFINE_API_BASE = import.meta.env.VITE_DEFINE_API_URL?.replace('/define', '') || 'https://l.oipav.ru';
 
@@ -450,6 +451,38 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
       message.warning('Не удалось распознать структуру — попробуйте кнопку «AI»');
     }
   }, [getSourceText, applyConversionResult, message]);
+
+  // Детерминированная починка битых корней/аргументов из плохого парсинга
+  // sdamgia (\sqrt: начало аргумента: X конец аргумента → \sqrt{X}). Мгновенно,
+  // без сети — клиентский fixLatexRoots. Универсальный обработчик: чинит
+  // указанные поля и синхронит их превью.
+  const ROOT_PREVIEW_SETTERS = {
+    statement_md: setPreviewStatement,
+    answer: setPreviewAnswer,
+    solution_md: setPreviewSolution,
+  };
+  const fixRootsIn = useCallback((fieldKeys, label) => {
+    let changed = 0;
+    let hadContent = false;
+    fieldKeys.forEach((key) => {
+      const current = form.getFieldValue(key) || '';
+      if (!current.trim()) return;
+      hadContent = true;
+      const fixed = fixLatexRoots(current);
+      if (fixed !== current) {
+        form.setFieldValue(key, fixed);
+        ROOT_PREVIEW_SETTERS[key]?.(fixed);
+        changed++;
+      }
+    });
+    if (!hadContent) {
+      message.info(`Нечего чинить (${label} пусто)`);
+    } else if (changed === 0) {
+      message.info('Битых корней не найдено');
+    } else {
+      message.success(`Корни починены (${label}). Не забудьте «Сохранить».`);
+    }
+  }, [form, message]);
 
   // Кнопка 2: LLM
   const handleConvertAI = useCallback(async () => {
@@ -944,6 +977,26 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   → Таблица (AI)
                 </Button>
               </Tooltip>
+              <Tooltip title="Чинит битые корни в этом поле: \sqrt: начало аргумента: 3 конец аргумента → \sqrt{3}. Мгновенно, без сети.">
+                <Button
+                  size="small"
+                  icon={<ClearOutlined />}
+                  onClick={() => fixRootsIn(['statement_md'], 'условие')}
+                  style={{ fontWeight: 400 }}
+                >
+                  🧹 Корни
+                </Button>
+              </Tooltip>
+              <Tooltip title="Чинит битые корни сразу в полях «Ответ» и «Решение».">
+                <Button
+                  size="small"
+                  icon={<ClearOutlined />}
+                  onClick={() => fixRootsIn(['answer', 'solution_md'], 'ответ+решение')}
+                  style={{ fontWeight: 400 }}
+                >
+                  🧹 Ответ+решение
+                </Button>
+              </Tooltip>
             </span>
           }
           rules={[{ required: isCreateMode, message: 'Введите текст задания' }]}
@@ -964,7 +1017,24 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         )}
 
         {/* Ответ */}
-        <Form.Item name="answer" label="Ответ (поддерживает LaTeX)">
+        <Form.Item
+          name="answer"
+          label={
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              Ответ (поддерживает LaTeX)
+              <Tooltip title="Чинит битые корни в этом поле. Мгновенно, без сети.">
+                <Button
+                  size="small"
+                  icon={<ClearOutlined />}
+                  onClick={() => fixRootsIn(['answer'], 'ответ')}
+                  style={{ fontWeight: 400 }}
+                >
+                  🧹 Корни
+                </Button>
+              </Tooltip>
+            </span>
+          }
+        >
           <Input placeholder="Введите ответ..." onChange={(e) => setPreviewAnswer(e.target.value)} />
         </Form.Item>
 
@@ -976,7 +1046,24 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         )}
 
         {/* Решение */}
-        <Form.Item name="solution_md" label="Решение (опционально, поддерживает LaTeX)">
+        <Form.Item
+          name="solution_md"
+          label={
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              Решение (опционально, поддерживает LaTeX)
+              <Tooltip title="Чинит битые корни в этом поле. Мгновенно, без сети.">
+                <Button
+                  size="small"
+                  icon={<ClearOutlined />}
+                  onClick={() => fixRootsIn(['solution_md'], 'решение')}
+                  style={{ fontWeight: 400 }}
+                >
+                  🧹 Корни
+                </Button>
+              </Tooltip>
+            </span>
+          }
+        >
           <TextArea rows={5} placeholder="Введите решение задачи..." onChange={(e) => setPreviewSolution(e.target.value)} />
         </Form.Item>
 

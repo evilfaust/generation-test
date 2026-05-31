@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import pb, { api } from '../services/pocketbase';
 import { parseMarkdownFile, parseSdamgiaResult, getRandomTagColor } from '../utils/markdownTaskParser';
+import { rewriteImageUrls } from '../components/TaskStatementRenderer';
 
 const getPdfServiceUrl = () => {
   const envUrl = import.meta.env.VITE_PDF_SERVICE_URL;
@@ -477,6 +478,7 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
           ];
           let uploadedCount = 0;
           let failedCount = 0;
+          const uploadedImages = []; // записи task_images для born-local rewrite
           for (const [role, imgs] of imageRoles) {
             for (const img of imgs) {
               try {
@@ -485,7 +487,7 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
                   const found = await pb.collection('task_images').getList(1, 1, {
                     filter: `task = "${createdTask.id}" && role = "${role}" && order = ${img.order}`,
                   }).catch(() => ({ items: [] }));
-                  if (found.items?.[0]) { uploadedCount++; continue; }
+                  if (found.items?.[0]) { uploadedImages.push(found.items[0]); uploadedCount++; continue; }
                 }
                 // sdamgia блокирует прямые fetch из браузера (DDoS-guard, CORS),
                 // поэтому качаем через серверный прокси /fetch-image — он
@@ -504,11 +506,30 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
                   sdamgia_file_id: img.file_id,
                   original_url: img.url,
                 });
-                if (rec) uploadedCount++; else failedCount++;
+                if (rec) { uploadedImages.push(rec); uploadedCount++; } else failedCount++;
               } catch (e) {
                 console.warn(`[import] img ${img.url}: ${e.message}`);
                 failedCount++;
               }
+            }
+          }
+
+          // «Роды локальными»: сразу переписываем markdown созданной задачи на
+          // локальные URL task_images, чтобы НЕ зависеть от sdamgia при рендере/печати.
+          if (uploadedImages.length > 0) {
+            try {
+              const patch = {};
+              for (const field of ['statement_md', 'solution_md', 'criteria_md']) {
+                const src = createdTask[field];
+                if (!src) continue;
+                const next = rewriteImageUrls(src, uploadedImages);
+                if (next !== src) patch[field] = next;
+              }
+              if (Object.keys(patch).length > 0) {
+                await api.updateTask(createdTask.id, patch);
+              }
+            } catch (e) {
+              console.warn(`[import] born-local rewrite ${createdTask.id}: ${e.message}`);
             }
           }
 

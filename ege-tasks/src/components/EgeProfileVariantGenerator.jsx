@@ -197,7 +197,12 @@ const KimProfileVariantPrint = ({ variant, kimMeta }) => {
   const [state, setState] = useState({ taskKey: null, pages: null });
   const taskRefs = useRef([]);
 
-  const taskKey = allTasks.map((t) => t.id).join(',');
+  // Ключ measure-фазы включает СОДЕРЖИМОЕ, а не только id — иначе правка
+  // задачи через редактор (id не меняется) не триггерит перерасчёт пагинации
+  // и КИМ печатает устаревший текст. solution_md важен для части 2.
+  const taskKey = allTasks
+    .map((t) => `${t.id}|${t.statement_md || ''}|${t.solution_md || ''}|${t.image || ''}|${t.has_image ? 1 : 0}`)
+    .join('§');
   const needsMeasure = state.taskKey !== taskKey;
 
   useLayoutEffect(() => {

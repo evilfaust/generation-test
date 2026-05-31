@@ -17,8 +17,9 @@ import { fixLatex } from './latex-fixer.js';
 // Семантический поиск похожих задач (sqlite-vec). Грузим мягко: если модуль/vec.db
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
 let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null, pruneVectors = null, setClusters = null;
+let selectBySeed = null, selectDiverse = null, selectNovelty = null, scoreNovelty = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1294,6 +1295,89 @@ app.post('/parallel-variants', (req, res) => {
     }));
   } catch (e) {
     console.error('[parallel-variants]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /seed-select — режим «по образцу» для Генератора (v3.9.41).
+ * body: { task_id, count?, similarity? (0..1), same_topic_only? }
+ */
+app.post('/seed-select', (req, res) => {
+  if (!selectBySeed) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_id, count, similarity, same_topic_only } = req.body || {};
+  if (!task_id) return res.status(400).json({ error: 'task_id обязателен' });
+  try {
+    res.json(selectBySeed({
+      taskId: task_id,
+      count: Math.min(Math.max(Number(count) || 20, 1), 200),
+      similarity: similarity != null ? Math.min(Math.max(Number(similarity), 0), 1) : 0.5,
+      sameTopicOnly: same_topic_only !== false,
+    }));
+  } catch (e) {
+    console.error('[seed-select]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /diverse — режим «разные сюжеты» (v3.9.41).
+ * body: { topic_id, subtopic_id?, count?, method? ('mmr'|'clusters') }
+ */
+app.post('/diverse', (req, res) => {
+  if (!selectDiverse) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { topic_id, subtopic_id, count, method } = req.body || {};
+  if (!topic_id) return res.status(400).json({ error: 'topic_id обязателен' });
+  try {
+    res.json(selectDiverse({
+      topicId: topic_id,
+      subtopicId: subtopic_id || null,
+      count: Math.min(Math.max(Number(count) || 20, 1), 200),
+      method: method === 'clusters' ? 'clusters' : 'mmr',
+    }));
+  } catch (e) {
+    console.error('[diverse]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /novelty — режим «анти-дубль» к ранее выданной работе (v3.9.41).
+ * body: { topic_id, subtopic_id?, count?, avoid_task_ids:[...], max_cos? }
+ */
+app.post('/novelty', (req, res) => {
+  if (!selectNovelty) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { topic_id, subtopic_id, count, avoid_task_ids, max_cos } = req.body || {};
+  if (!topic_id) return res.status(400).json({ error: 'topic_id обязателен' });
+  try {
+    res.json(selectNovelty({
+      topicId: topic_id,
+      subtopicId: subtopic_id || null,
+      count: Math.min(Math.max(Number(count) || 20, 1), 200),
+      avoidTaskIds: Array.isArray(avoid_task_ids) ? avoid_task_ids : [],
+      maxCos: max_cos != null ? Math.min(Math.max(Number(max_cos), 0), 1) : 0.85,
+    }));
+  } catch (e) {
+    console.error('[novelty]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /novelty-score — «насколько свежий набор» относительно прошлых работ (v3.9.41).
+ * body: { task_ids:[...сгенерированный набор], ref_task_ids:[...задачи последних работ] }
+ */
+app.post('/novelty-score', (req, res) => {
+  if (!scoreNovelty) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_ids, ref_task_ids } = req.body || {};
+  if (!Array.isArray(task_ids) || task_ids.length === 0) return res.status(400).json({ error: 'task_ids обязателен' });
+  try {
+    res.json(scoreNovelty({
+      taskIds: task_ids,
+      refTaskIds: Array.isArray(ref_task_ids) ? ref_task_ids : [],
+    }));
+  } catch (e) {
+    console.error('[novelty-score]', e.message);
     res.status(500).json({ error: e.message });
   }
 });

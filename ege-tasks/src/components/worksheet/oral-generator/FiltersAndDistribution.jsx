@@ -94,6 +94,7 @@ export default function FiltersAndDistribution({
               <Option value="code">По коду</Option>
               <Option value="difficulty">По сложности</Option>
               <Option value="random">Случайная</Option>
+              <Option value="similarity">По похожести (лесенка)</Option>
             </Select>
           </Form.Item>
         </Col>

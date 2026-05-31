@@ -4,16 +4,18 @@ import { ExperimentOutlined, PlusOutlined } from '@ant-design/icons';
 import VariantSimilarityWarning from '../VariantSimilarityWarning';
 import ParallelVariantsModal from '../ParallelVariantsModal';
 import FillSimilarModal from './FillSimilarModal';
+import NoveltyBadge from './NoveltyBadge';
 
 /**
  * Блок векторных инструментов под результатом «Генератора»:
+ *  - NoveltyBadge — насколько свежий набор относительно последних работ;
  *  - VariantSimilarityWarning (A2) — авто-предупреждение о повторах/дублях внутри вариантов;
  *  - «Дополнить похожими» (A1 + догенерация) — FillSimilarModal;
  *  - «Параллельные варианты» (A4) — ParallelVariantsModal.
  *
  * Рендерится только когда есть сгенерированные варианты.
  */
-export default function WorksheetVectorTools({ variants, setVariants, workTitle, onOpenWork }) {
+export default function WorksheetVectorTools({ variants, setVariants, workTitle, currentWorkId, onOpenWork }) {
   const [parallelOpen, setParallelOpen] = useState(false);
   const [fillOpen, setFillOpen] = useState(false);
 
@@ -34,6 +36,7 @@ export default function WorksheetVectorTools({ variants, setVariants, workTitle,
         <Button icon={<ExperimentOutlined />} onClick={() => setParallelOpen(true)} disabled={baseTasks.length === 0}>
           Параллельные варианты
         </Button>
+        <NoveltyBadge variants={variants} currentWorkId={currentWorkId} />
       </Space>
 
       {/* A2 — авто-предупреждение о возможных повторах внутри вариантов */}

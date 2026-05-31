@@ -343,6 +343,246 @@ export function buildRemediation(failedIds, { perTask = 2, excludeIds = [], minC
   return { groups, all, missing };
 }
 
+// === Подбор задач для «Генератора» (v3.9.41) ===========================
+// Три семантических режима набора листа поверх того же индекса:
+//   selectBySeed   — «по образцу» (один ползунок похожести),
+//   selectDiverse  — «разные сюжеты» (MMR или кластеры),
+//   selectNovelty  — «анти-дубль» к ранее выданной работе.
+
+// Buffer(Float32) → копия Float32Array (не view на пул better-sqlite3).
+function bufToF32(buf) {
+  const view = new Float32Array(buf.buffer, buf.byteOffset, buf.length / 4);
+  return Float32Array.from(view);
+}
+
+// Косинус между двумя Float32Array одинаковой длины.
+function cosF32(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+}
+
+// Загрузить все векторы темы (опц. подтемы) вместе с лёгкими полями задачи.
+// subtopic в tasks — JSON-массив id → matching через LIKE.
+function loadTopicVectors(d, topicId, subtopicId) {
+  let sql = `
+    SELECT v.task_id AS id, v.embedding AS embedding,
+           t.code AS code, t.answer AS answer, t.statement_md AS statement_md
+    FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
+    WHERE t.topic = ?`;
+  const args = [topicId];
+  if (subtopicId) { sql += ' AND t.subtopic LIKE ?'; args.push(`%"${subtopicId}"%`); }
+  return d.prepare(sql).all(...args).map((r) => ({
+    id: r.id, code: r.code, answer: r.answer,
+    statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 200),
+    vec: bufToF32(r.embedding),
+  }));
+}
+
+// Жадный MMR (max-min): из пула выбрать count максимально разных задач.
+// Старт — случайный элемент (разнообразие между перегенерациями).
+// items: [{vec:Float32Array, ...}]. Возвращает выбранные элементы (с полем _cos —
+// похожесть на ближайшего уже выбранного, для отладки/бейджей).
+function mmrSelect(items, count) {
+  if (items.length === 0) return [];
+  const n = Math.min(count, items.length);
+  const chosenIdx = [Math.floor(Math.random() * items.length)];
+  const minSim = items.map((it) => cosF32(it.vec, items[chosenIdx[0]].vec));
+  while (chosenIdx.length < n) {
+    let best = -1, bestSim = Infinity;
+    for (let i = 0; i < items.length; i++) {
+      if (chosenIdx.includes(i)) continue;
+      if (minSim[i] < bestSim) { bestSim = minSim[i]; best = i; }
+    }
+    if (best < 0) break;
+    chosenIdx.push(best);
+    const bv = items[best].vec;
+    for (let i = 0; i < items.length; i++) {
+      const s = cosF32(items[i].vec, bv);
+      if (s < minSim[i]) minSim[i] = s;
+    }
+  }
+  return chosenIdx.map((i) => ({ ...items[i], _cos: minSim[i] }));
+}
+
+/**
+ * «По образцу» — подобрать count задач вокруг эталона, регулируя один ползунок.
+ * similarity ∈ [0,1]: 1 → самые близкие (клоны-тренажёр), 0 → самые далёкие внутри темы.
+ * @returns {{error, source_topic, items:[{task_id,cos,pct,code,statement}]}}
+ */
+export function selectBySeed({ taskId, count = 20, similarity = 0.5, sameTopicOnly = true }) {
+  const d = getDb();
+  const row = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?').get(taskId);
+  if (!row) return { error: 'not_indexed', items: [] };
+  const src = d.prepare('SELECT topic FROM main.tasks WHERE id = ?').get(taskId);
+  const srcTopic = src?.topic || '';
+
+  const k = Math.max(count * 10 + 60, 120);
+  const rows = d.prepare(`
+    SELECT v.task_id AS task_id, v.distance AS distance,
+           t.topic AS topic, t.code AS code, t.statement_md AS statement_md
+    FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
+    WHERE v.embedding MATCH ? AND v.k = ?
+    ORDER BY v.distance`).all(row.embedding, k);
+
+  // кандидаты, отсортированные по cos ↓ (KNN уже по distance ↑ = cos ↓)
+  const pool = [];
+  for (const r of rows) {
+    if (r.task_id === taskId) continue;
+    if (sameTopicOnly && srcTopic && r.topic !== srcTopic) continue;
+    const cos = 1 - r.distance;
+    pool.push({ task_id: r.task_id, cos, code: r.code,
+      statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 200) });
+  }
+  if (pool.length === 0) return { error: null, source_topic: srcTopic, items: [] };
+
+  // окно по ползунку: similarity=1 → с начала (близкие), 0 → с конца (далёкие)
+  const s = Math.max(0, Math.min(1, Number(similarity)));
+  const start = Math.round((1 - s) * Math.max(0, pool.length - count));
+  const slice = pool.slice(start, start + count);
+  const items = slice.map((r) => ({
+    task_id: r.task_id, cos: Number(r.cos.toFixed(4)), pct: Math.round(toPct(r.cos)),
+    code: r.code, statement: r.statement,
+  }));
+  return { error: null, source_topic: srcTopic, items };
+}
+
+/**
+ * «Разные сюжеты» — максимально разнообразный набор внутри темы.
+ * method='mmr' (жадный max-min) | 'clusters' (k-means → медоиды).
+ * @returns {{error, items:[{task_id,code,answer,statement}], pool_size}}
+ */
+export function selectDiverse({ topicId, subtopicId = null, count = 20, method = 'mmr' }) {
+  const d = getDb();
+  if (!topicId) return { error: 'no_topic', items: [], pool_size: 0 };
+  const pool = loadTopicVectors(d, topicId, subtopicId);
+  if (pool.length === 0) return { error: 'empty', items: [], pool_size: 0 };
+
+  let picked;
+  if (method === 'clusters') picked = kmeansMedoids(pool, count);
+  else picked = mmrSelect(pool, count);
+
+  const items = picked.map((p) => ({
+    task_id: p.id, code: p.code, answer: p.answer, statement: p.statement,
+  }));
+  return { error: null, items, pool_size: pool.length };
+}
+
+// k-means (k=count) по векторам темы → медоид каждого кластера (по одной задаче «сюжета»).
+function kmeansMedoids(items, count) {
+  const k = Math.min(count, items.length);
+  if (k <= 1) return items.slice(0, k);
+  const dim = items[0].vec.length;
+  // инициализация: k случайных различных задач
+  const order = items.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, k);
+  let centroids = order.map((i) => Float32Array.from(items[i].vec));
+  let assign = new Array(items.length).fill(0);
+  for (let iter = 0; iter < 10; iter++) {
+    let changed = false;
+    for (let i = 0; i < items.length; i++) {
+      let best = 0, bestSim = -Infinity;
+      for (let c = 0; c < k; c++) {
+        const s = cosF32(items[i].vec, centroids[c]);
+        if (s > bestSim) { bestSim = s; best = c; }
+      }
+      if (assign[i] !== best) { assign[i] = best; changed = true; }
+    }
+    if (!changed && iter > 0) break;
+    const sums = Array.from({ length: k }, () => new Float64Array(dim));
+    const cnts = new Array(k).fill(0);
+    for (let i = 0; i < items.length; i++) {
+      const c = assign[i]; cnts[c]++;
+      const v = items[i].vec;
+      for (let j = 0; j < dim; j++) sums[c][j] += v[j];
+    }
+    centroids = sums.map((s, c) => {
+      const out = new Float32Array(dim);
+      if (cnts[c] > 0) for (let j = 0; j < dim; j++) out[j] = s[j] / cnts[c];
+      return out;
+    });
+  }
+  // медоид каждого непустого кластера
+  const medoids = [];
+  for (let c = 0; c < k; c++) {
+    let best = -1, bestSim = -Infinity;
+    for (let i = 0; i < items.length; i++) {
+      if (assign[i] !== c) continue;
+      const s = cosF32(items[i].vec, centroids[c]);
+      if (s > bestSim) { bestSim = s; best = i; }
+    }
+    if (best >= 0) medoids.push(items[best]);
+  }
+  return medoids;
+}
+
+/**
+ * «Анти-дубль» — набор из темы, не похожий на задачи ранее выданной работы.
+ * Оставляет кандидатов с maxSim(cand, avoid) ≤ maxCos, среди них — MMR до count.
+ * @returns {{error, items:[...], pool_size, filtered_out}}
+ */
+export function selectNovelty({ topicId, subtopicId = null, count = 20, avoidTaskIds = [], maxCos = 0.85 }) {
+  const d = getDb();
+  if (!topicId) return { error: 'no_topic', items: [], pool_size: 0, filtered_out: 0 };
+  const avoid = new Set(avoidTaskIds);
+  const pool = loadTopicVectors(d, topicId, subtopicId).filter((p) => !avoid.has(p.id));
+  if (pool.length === 0) return { error: 'empty', items: [], pool_size: 0, filtered_out: 0 };
+
+  // векторы задач, которых надо избегать (могут быть из любой темы)
+  const getVec = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
+  const avoidVecs = [];
+  for (const id of avoidTaskIds) { const r = getVec.get(id); if (r) avoidVecs.push(bufToF32(r.embedding)); }
+
+  let survivors = pool;
+  let filteredOut = 0;
+  if (avoidVecs.length > 0) {
+    survivors = pool.filter((p) => {
+      let maxSim = 0;
+      for (const av of avoidVecs) { const s = cosF32(p.vec, av); if (s > maxSim) maxSim = s; }
+      if (maxSim > maxCos) { filteredOut++; return false; }
+      return true;
+    });
+  }
+  if (survivors.length === 0) return { error: null, items: [], pool_size: pool.length, filtered_out: filteredOut };
+
+  const picked = mmrSelect(survivors, count);
+  const items = picked.map((p) => ({
+    task_id: p.id, code: p.code, answer: p.answer, statement: p.statement,
+  }));
+  return { error: null, items, pool_size: pool.length, filtered_out: filteredOut };
+}
+
+/**
+ * Оценка «новизны» набора (v3.9.41) — насколько свежий сгенерированный лист
+ * относительно задач ранее выданных работ. Для каждой задачи набора считаем
+ * maxSim к референсному набору (объединение задач последних N работ).
+ * freshCos — ниже него задача считается «новой»; dupCos — выше «почти повтор».
+ * @returns {{error, items:[{task_id,max_sim}], novelty_pct, fresh, dup, scored, ref_count}}
+ */
+export function scoreNovelty({ taskIds = [], refTaskIds = [], dupCos = 0.95, freshCos = 0.85 }) {
+  const d = getDb();
+  const getVec = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
+
+  const refVecs = [];
+  const refSet = new Set(refTaskIds);
+  for (const id of refSet) { const r = getVec.get(id); if (r) refVecs.push(bufToF32(r.embedding)); }
+
+  const items = [];
+  let fresh = 0, dup = 0, scored = 0;
+  for (const id of taskIds) {
+    const r = getVec.get(id);
+    if (!r) { items.push({ task_id: id, max_sim: null }); continue; }
+    const v = bufToF32(r.embedding);
+    let maxSim = 0;
+    for (const rv of refVecs) { const s = cosF32(v, rv); if (s > maxSim) maxSim = s; }
+    scored++;
+    if (maxSim < freshCos) fresh++;
+    if (maxSim >= dupCos) dup++;
+    items.push({ task_id: id, max_sim: Number(maxSim.toFixed(4)) });
+  }
+  const novelty_pct = scored > 0 ? Math.round((fresh / scored) * 100) : 100;
+  return { error: null, items, novelty_pct, fresh, dup, scored, ref_count: refVecs.length };
+}
+
 /**
  * Прунинг осиротевших векторов: удалить из vec.db записи, чьих task_id больше
  * нет в base (актуальный список id задач из PB). Безопасно — поиск и так
