@@ -1,6 +1,6 @@
 {
   "name": "lemma",
-  "version": "3.9.43",
+  "version": "3.9.44",
   "description": "Lemma — платформа для учителя математики",
   "private": true,
   "scripts": {

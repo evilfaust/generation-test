@@ -7,6 +7,7 @@ import RefreshFromSdamgiaModal from './RefreshFromSdamgiaModal';
 import SimilarTasksPanel from './SimilarTasksPanel';
 import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
+import LatexField from './shared/LatexField';
 import { generateTaskCode } from '../utils/taskCodeGenerator';
 import { dataUrlToFile } from '../utils/cropImage';
 import { api } from '../services/pocketbase';
@@ -30,7 +31,6 @@ const PDF_SERVICE_URL = (() => {
 })();
 
 const { Option } = Select;
-const { TextArea } = Input;
 
 const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [], allSources = [], allYears = [], allSubtopics = [], allTopics = [] }) => {
   const { message } = App.useApp();
@@ -56,6 +56,20 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   const [newSubtopicName, setNewSubtopicName] = useState('');
 
   const [selectedExamType, setSelectedExamType] = useState(null);
+
+  // Расширенный редактор (CodeMirror) для условия и решения — выбор учителя,
+  // запоминается в localStorage. Грузится лениво, только при включении.
+  const [codeEditor, setCodeEditor] = useState(() => {
+    try { return localStorage.getItem('taskEditor.codeMode') === '1'; } catch { return false; }
+  });
+  const toggleCodeEditor = useCallback(() => {
+    setCodeEditor((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('taskEditor.codeMode', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  const fieldMode = codeEditor ? 'code' : 'plain';
 
   const img = useImageUpload('url');
   const [imageDeleted, setImageDeleted] = useState(false);
@@ -597,6 +611,16 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             }
           </span>
           {isCreateMode && generatingCode && <Spin size="small" />}
+          <Tooltip title="Подсветка LaTeX/markdown, перенос строк и поиск-замена (Ctrl+F / Ctrl+H) для условия и решения">
+            <Button
+              size="small"
+              type={codeEditor ? 'primary' : 'default'}
+              icon={<HighlightOutlined />}
+              onClick={toggleCodeEditor}
+            >
+              {codeEditor ? 'Расширенный редактор: вкл' : 'Расширенный редактор'}
+            </Button>
+          </Tooltip>
           {/* Бейджи и ссылки для задач из «Решу ЕГЭ» (часть 2) */}
           {task?.exam_part === 2 && <Tag color="purple">Часть 2</Tag>}
           {task?.max_score != null && <Tag color="gold">{task.max_score} б.</Tag>}
@@ -1001,11 +1025,12 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
           }
           rules={[{ required: isCreateMode, message: 'Введите текст задания' }]}
         >
-          <TextArea
+          <LatexField
             ref={statementTextAreaRef}
+            mode={fieldMode}
             rows={4}
             placeholder="Введите текст задания..."
-            onChange={(e) => setPreviewStatement(e.target.value)}
+            onTextChange={setPreviewStatement}
           />
         </Form.Item>
 
@@ -1064,7 +1089,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             </span>
           }
         >
-          <TextArea rows={5} placeholder="Введите решение задачи..." onChange={(e) => setPreviewSolution(e.target.value)} />
+          <LatexField mode={fieldMode} rows={5} placeholder="Введите решение задачи..." onTextChange={setPreviewSolution} />
         </Form.Item>
 
         {previewSolution && (
