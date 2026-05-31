@@ -20,6 +20,7 @@ import TaskList from './components/TaskList';
 import TaskSheetGenerator from './components/OralWorksheetGenerator';
 import TestWorkGenerator from './components/TestWorkGenerator';
 import EgeVariantGenerator from './components/EgeVariantGenerator';
+import EgeProfileVariantGenerator from './components/EgeProfileVariantGenerator';
 import TaskStatsDashboard from './components/TaskStatsDashboard';
 import TaskCatalogManager from './components/TaskCatalogManager';
 import TheoryBrowser from './components/TheoryBrowser';
@@ -96,6 +97,7 @@ export const R = {
   // Рабочие листы
   GENERATOR:           '/app/worksheets/oral',
   EGE_VARIANT:         '/app/worksheets/ege-variant',
+  EGE_PROFILE_VARIANT: '/app/worksheets/ege-profile-variant',
   EGE_SCORE_CALC:      '/app/worksheets/ege-score-calc',
   TEST:                '/app/worksheets/test',
   MC_TEST:             '/app/worksheets/mc-test',
@@ -193,6 +195,7 @@ const ROUTE_META = [
   { re: /^\/app\/catalog/,                 menuKey: 'catalog',                 title: 'Каталог задач' },
   { re: /^\/app\/worksheets\/oral/,        menuKey: 'generator',         menuGroup: 'worksheets-group', title: 'Генератор' },
   { re: /^\/app\/worksheets\/ege-variant/, menuKey: 'ege-variant',       menuGroup: 'worksheets-group', title: 'Варианты ЕГЭ (базовый уровень)' },
+  { re: /^\/app\/worksheets\/ege-profile-variant/, menuKey: 'ege-profile-variant', menuGroup: 'worksheets-group', title: 'Варианты ЕГЭ (профильный уровень)' },
   { re: /^\/app\/worksheets\/ege-score/,   menuKey: 'ege-score-calc',    menuGroup: 'worksheets-group', title: 'Калькулятор баллов ЕГЭ' },
   { re: /^\/app\/worksheets\/test/,        menuKey: 'test-generator',    menuGroup: 'worksheets-group', title: 'Контрольные работы' },
   { re: /^\/app\/worksheets\/mc-test$/,    menuKey: 'mc-test',           menuGroup: 'worksheets-group', title: 'Тесты с выбором' },
@@ -246,6 +249,7 @@ const MENU_KEY_PATH = {
   stats:                    R.STATS,
   generator:                R.GENERATOR,
   'ege-variant':            R.EGE_VARIANT,
+  'ege-profile-variant':    R.EGE_PROFILE_VARIANT,
   'ege-score-calc':         R.EGE_SCORE_CALC,
   'test-generator':         R.TEST,
   'mc-test':                R.MC_TEST,
@@ -546,7 +550,8 @@ function AppLayout() {
       key: 'worksheets-group', icon: <AppstoreOutlined />, label: 'Рабочие листы', section: 'worksheets',
       children: [
         { key: 'generator',       icon: <FileSearchOutlined />, label: 'Генератор' },
-        { key: 'ege-variant',     icon: <FileAddOutlined />,    label: 'Варианты ЕГЭ' },
+        { key: 'ege-variant',     icon: <FileAddOutlined />,    label: 'Варианты ЕГЭ (база)' },
+        { key: 'ege-profile-variant', icon: <FileAddOutlined />, label: 'Варианты ЕГЭ (профиль)' },
         { key: 'ege-score-calc',  icon: <BarChartOutlined />,   label: 'Калькулятор баллов' },
         { key: 'test-generator',  icon: <SnippetsOutlined />,   label: 'Контрольные работы' },
         { key: 'mc-test',         icon: <FormOutlined />,       label: 'Тесты с выбором' },
@@ -787,6 +792,7 @@ function App() {
               {/* Рабочие листы */}
               <Route path={R.GENERATOR}      element={<TaskSheetGenerator />} />
               <Route path={R.EGE_VARIANT}    element={<EgeVariantGenerator />} />
+              <Route path={R.EGE_PROFILE_VARIANT} element={<EgeProfileVariantGenerator />} />
               <Route path={R.EGE_SCORE_CALC} element={<EgeScoreCalculator />} />
               <Route path={R.TEST}           element={<TestWorkGenerator />} />
               <Route path={R.MC_TEST}        element={<MCTestPage />} />

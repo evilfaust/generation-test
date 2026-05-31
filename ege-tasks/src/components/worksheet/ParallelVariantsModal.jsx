@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { Modal, Button, InputNumber, Input, Space, Spin, Alert, Tag, Empty, Tooltip, App } from 'antd';
-import { ReloadOutlined, SaveOutlined, SwapOutlined, PlusOutlined } from '@ant-design/icons';
+import { ReloadOutlined, SaveOutlined, SwapOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
 import TaskSelectModal from '../TaskSelectModal';
+import TaskEditModal from '../TaskEditModal';
 import { api } from '../../services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReferenceData } from '../../contexts/ReferenceDataContext';
 
 const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
 
@@ -15,17 +17,17 @@ function cosColor(cos) {
   return 'gold';
 }
 
-const TaskCell = ({ t, onPick }) => {
+const TaskCell = ({ t, onPick, onEdit, editing }) => {
   if (!t || t.missing) {
     return (
-      <div style={{ padding: 8, border: '1px dashed #ffccc7', borderRadius: 6, background: '#fff2f0', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+      <div style={{ height: '100%', boxSizing: 'border-box', padding: 8, border: '1px dashed #ffccc7', borderRadius: 6, background: '#fff2f0', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
         <span style={{ color: '#cf1322' }}>нет подходящей замены</span>
         {onPick && <Button size="small" icon={<PlusOutlined />} onClick={onPick}>Выбрать</Button>}
       </div>
     );
   }
   return (
-    <div style={{ padding: 8, border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa', fontSize: 12 }}>
+    <div style={{ height: '100%', boxSizing: 'border-box', padding: 8, border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa', fontSize: 12 }}>
       <Space size={4} style={{ marginBottom: 4, width: '100%', justifyContent: 'space-between' }}>
         <Space size={4}>
           <span style={{ color: '#888' }}>{t.code}</span>
@@ -36,11 +38,18 @@ const TaskCell = ({ t, onPick }) => {
             </Tooltip>
           ) : t.manual ? <Tag color="blue" style={{ margin: 0 }}>вручную</Tag> : null}
         </Space>
-        {onPick && (
-          <Tooltip title="Заменить задачу вручную">
-            <Button size="small" type="text" icon={<SwapOutlined />} onClick={onPick} />
-          </Tooltip>
-        )}
+        <Space size={0}>
+          {onEdit && (
+            <Tooltip title="Редактировать задачу (починить LaTeX и т.п.)">
+              <Button size="small" type="text" loading={editing} icon={<EditOutlined />} onClick={onEdit} />
+            </Tooltip>
+          )}
+          {onPick && (
+            <Tooltip title="Заменить задачу вручную">
+              <Button size="small" type="text" icon={<SwapOutlined />} onClick={onPick} />
+            </Tooltip>
+          )}
+        </Space>
       </Space>
       <div style={{ overflow: 'hidden' }}><MathRenderer text={t.statement} /></div>
     </div>
@@ -56,8 +65,9 @@ const TaskCell = ({ t, onPick }) => {
  * @param {Array} baseTasks - [{id, code, ...}] базовый вариант
  */
 export default function ParallelVariantsModal({ open, onClose, baseTasks = [], baseWorkId = null, baseTitle = '', classNumber = null, onOpenWork }) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { canEdit } = useAuth();
+  const { topics, tags, subtopics, years, sources } = useReferenceData();
   const [count, setCount] = useState(2);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -66,6 +76,64 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
   const [created, setCreated] = useState(null); // [{id, role, title}] после создания работ
   const [title, setTitle] = useState('');
   const [pickTarget, setPickTarget] = useState(null); // { vi, pos } — какую ячейку заполняем
+  const [editTask, setEditTask] = useState(null); // полная задача для TaskEditModal
+  const [editingId, setEditingId] = useState(null); // task_id, пока грузим полную задачу
+
+  // Патч одной задачи (по task_id) во всём семействе — образец + все параллели.
+  const patchFamilyTask = (taskId, patch) => {
+    setResult((prev) => {
+      if (!prev) return prev;
+      const fix = (cell) => (cell && cell.task_id === taskId ? { ...cell, ...patch } : cell);
+      return { ...prev, base: prev.base.map(fix), variants: prev.variants.map((v) => v.map(fix)) };
+    });
+  };
+
+  // Открыть редактор: подтянуть полную задачу из БД.
+  const handleEdit = async (taskId) => {
+    if (!taskId) return;
+    setEditingId(taskId);
+    try {
+      const full = await api.getTask(taskId);
+      if (!full) throw new Error('not found');
+      setEditTask(full);
+    } catch {
+      message.error('Не удалось загрузить задачу');
+    } finally {
+      setEditingId(null);
+    }
+  };
+
+  // Сохранить правки задачи и сразу обновить карточки семейства.
+  const handleSaveEdit = async (taskId, values) => {
+    await api.updateTask(taskId, values);
+    patchFamilyTask(taskId, {
+      code: values.code,
+      answer: values.answer,
+      statement: (values.statement_md || '').replace(/\s+/g, ' ').slice(0, 160),
+    });
+    setEditTask(null);
+    message.success('Задача обновлена');
+  };
+
+  // Удалить задачу из базы; в семействе ячейка станет «нет замены».
+  const handleDeleteEdit = async (taskId) => {
+    const finish = () => { patchFamilyTask(taskId, { missing: true, task_id: null }); setEditTask(null); message.success('Задача удалена'); };
+    try {
+      await api.deleteTask(taskId);
+      finish();
+    } catch (error) {
+      if (error?.status === 400) {
+        modal.confirm({
+          title: 'Задача используется в работах',
+          content: 'Задача входит в варианты или другие работы. Удалить её отовсюду и убрать из базы?',
+          okText: 'Удалить', okButtonProps: { danger: true }, cancelText: 'Отмена',
+          onOk: async () => { await api.forceDeleteTask(taskId); finish(); },
+        });
+      } else {
+        message.error('Ошибка при удалении задачи');
+      }
+    }
+  };
 
   // все задачи, уже занятые в семействе (образец + все параллели) — чтобы не повторять
   const usedIds = (() => {
@@ -89,7 +157,6 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
       };
       return { ...prev, variants };
     });
-    setSaved(false);
     setPickTarget(null);
   };
 
@@ -217,22 +284,36 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
       )}
 
       {!loading && result && (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 10, alignItems: 'start' }}>
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 6, textAlign: 'center' }}>Образец</div>
-            <Space direction="vertical" size={6} style={{ width: '100%' }}>
-              {result.base.map((t, i) => <TaskCell key={i} t={t} />)}
-            </Space>
-          </div>
-          {result.variants.map((variant, vi) => (
-            <div key={vi}>
-              <div style={{ fontWeight: 600, marginBottom: 6, textAlign: 'center', color: '#1890ff' }}>Параллель {vi + 1}</div>
-              <Space direction="vertical" size={6} style={{ width: '100%' }}>
-                {variant.map((t, i) => (
-                  <TaskCell key={i} t={t} onPick={() => setPickTarget({ vi, pos: i })} />
-                ))}
-              </Space>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, columnGap: 10, rowGap: 6, alignItems: 'stretch' }}>
+          {/* Шапка колонок */}
+          <div style={{ fontWeight: 600, marginBottom: 2, textAlign: 'center' }}>Образец</div>
+          {result.variants.map((_, vi) => (
+            <div key={`h${vi}`} style={{ fontWeight: 600, marginBottom: 2, textAlign: 'center', color: '#1890ff' }}>
+              Параллель {vi + 1}
             </div>
+          ))}
+
+          {/* Строки задач: каждая позиция образца + параллели в одной grid-строке */}
+          {result.base.map((bt, i) => (
+            <Fragment key={i}>
+              <TaskCell
+                t={bt}
+                onEdit={canEdit && bt?.task_id ? () => handleEdit(bt.task_id) : undefined}
+                editing={editingId === bt?.task_id}
+              />
+              {result.variants.map((variant, vi) => {
+                const cell = variant[i];
+                return (
+                  <TaskCell
+                    key={vi}
+                    t={cell}
+                    onPick={() => setPickTarget({ vi, pos: i })}
+                    onEdit={canEdit && cell?.task_id ? () => handleEdit(cell.task_id) : undefined}
+                    editing={editingId === cell?.task_id}
+                  />
+                );
+              })}
+            </Fragment>
           ))}
         </div>
       )}
@@ -247,6 +328,21 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
         onSelect={handlePick}
         excludeIds={usedIds}
       />
+
+      {editTask && (
+        <TaskEditModal
+          task={editTask}
+          visible={!!editTask}
+          onClose={() => setEditTask(null)}
+          onSave={handleSaveEdit}
+          onDelete={handleDeleteEdit}
+          allTags={tags || []}
+          allSources={sources || []}
+          allYears={years || []}
+          allSubtopics={subtopics || []}
+          allTopics={topics || []}
+        />
+      )}
     </Modal>
   );
 }

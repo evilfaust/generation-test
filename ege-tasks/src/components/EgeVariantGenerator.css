@@ -25,7 +25,7 @@
 .kim-page {
   width: 148.5mm;
   min-height: 210mm;
-  padding: 5mm 7mm;
+  padding: 5mm 5mm;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -327,8 +327,8 @@
 
 .kim-measure-page {
   /* Ширина контентной зоны A5-страницы:
-     148.5mm - 2×7mm (padding left+right) = 134.5mm */
-  width: 134.5mm;
+     148.5mm - 2×5mm (padding left+right) = 138.5mm */
+  width: 138.5mm;
   min-height: 196mm;
 }
 
