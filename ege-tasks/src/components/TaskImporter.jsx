@@ -55,7 +55,7 @@ const SDAMGIA_SOURCE_OPTIONS = Object.entries(SDAMGIA_SOURCE_LABELS).map(([value
 const SDAMGIA_TO_EXAM_TYPE = {
   ege_base: 'ege_base',
   ege_prof: 'ege_profile',
-  oge:      'other',
+  oge:      'oge',
   vpr5:     'vpr',
   vpr6:     'vpr',
   vpr7:     'vpr',
@@ -65,6 +65,7 @@ const SDAMGIA_TO_EXAM_TYPE = {
 const EXAM_TYPE_OPTIONS = [
   { value: 'ege_base',    label: 'ЕГЭ базовый' },
   { value: 'ege_profile', label: 'ЕГЭ профильный' },
+  { value: 'oge',         label: 'ОГЭ (9 кл.)' },
   { value: 'mordkovich',  label: 'Мордкович' },
   { value: 'oral',        label: 'Устный счёт' },
   { value: 'vpr',         label: 'ВПР' },
@@ -536,7 +537,7 @@ export default function TaskImporter() {
                       sdamgiaSourceType.startsWith('vpr')
                         ? `https://math${sdamgiaSourceType.replace('vpr', '')}-vpr.sdamgia.ru/test?category_id=25&filter=all&print=true`
                         : sdamgiaSourceType === 'oge'
-                        ? 'https://mathoge.sdamgia.ru/test?category_id=1&filter=all&print=true'
+                        ? 'https://math-oge.sdamgia.ru/test?category_id=5&filter=all_a&print=true'
                         : 'https://mathb-ege.sdamgia.ru/test?category_id=12&filter=all_a&print=true'
                     }
                     value={sdamgiaUrl}

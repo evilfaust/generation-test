@@ -173,6 +173,19 @@ export const api = {
     }
   },
 
+  // Получить темы ОГЭ (9 класс), отсортированные по ege_number
+  async getOgeTopics() {
+    try {
+      return await pb.collection('topics').getFullList({
+        filter: 'exam_type = "oge"',
+        sort: 'ege_number',
+      });
+    } catch (error) {
+      console.error('Error fetching oge topics:', error);
+      return [];
+    }
+  },
+
   // Получить темы тригонометрических генераторов
   async getTrigTopics() {
     try {

@@ -142,6 +142,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   const EXAM_TYPE_OPTIONS = [
     { value: 'ege_base',    label: 'ЕГЭ базовый' },
     { value: 'ege_profile', label: 'ЕГЭ профильный' },
+    { value: 'oge',         label: 'ОГЭ (9 кл.)' },
     { value: 'mordkovich',  label: 'Мордкович' },
     { value: 'oral',        label: 'Устный счёт' },
     { value: 'vpr',         label: 'ВПР' },

@@ -6,6 +6,7 @@ const { Option } = Select;
 export const EXAM_TYPE_LABELS = {
   ege_base:    'ЕГЭ базовый (11 кл.)',
   ege_profile: 'ЕГЭ профильный (11 кл.)',
+  oge:         'ОГЭ (9 кл.)',
   vpr:         'ВПР',
   oral:        'Устный счёт',
   trig:        'Тригонометрия',

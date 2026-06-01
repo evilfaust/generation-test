@@ -92,6 +92,13 @@ export function ReferenceDataProvider({ children }) {
       .sort((a, b) => (a.exam_part || 0) - (b.exam_part || 0) || a.ege_number - b.ege_number);
   }, [topics]);
 
+  // Темы ОГЭ (9 класс), отсортированы по номеру задания
+  const ogeTopics = useMemo(() => {
+    return topics
+      .filter(t => t.exam_type === 'oge')
+      .sort((a, b) => (a.ege_number || 0) - (b.ege_number || 0));
+  }, [topics]);
+
   // Темы тригонометрических генераторов
   const trigTopics = useMemo(() => {
     return topics
@@ -180,6 +187,7 @@ export function ReferenceDataProvider({ children }) {
       topics,
       egeBaseTopics,
       egeProfileTopics,
+      ogeTopics,
       trigTopics,
       tags,
       years,

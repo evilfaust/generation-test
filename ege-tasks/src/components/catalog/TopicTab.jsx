@@ -5,6 +5,7 @@ import { PlusOutlined, DeleteOutlined, EditOutlined, SwapOutlined, FolderOpenOut
 const EXAM_TYPE_OPTIONS = [
   { value: 'ege_base',    label: 'ЕГЭ базовый (11 кл.)' },
   { value: 'ege_profile', label: 'ЕГЭ профильный (11 кл.)' },
+  { value: 'oge',         label: 'ОГЭ (9 кл.)' },
   { value: 'vpr',         label: 'ВПР' },
   { value: 'oral',        label: 'Устный счёт' },
   { value: 'trig',        label: 'Тригонометрия' },
