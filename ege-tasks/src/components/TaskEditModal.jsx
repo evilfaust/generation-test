@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse } from 'antd';
+import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse, Row, Col } from 'antd';
 import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined, ClearOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import TaskStatementRenderer from './TaskStatementRenderer';
@@ -713,7 +713,9 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         />
       )}
       <Form form={form} layout="vertical">
+       <Row gutter={[16, 0]}>
         {/* Уровень сложности */}
+        <Col xs={24} sm={12} lg={6}>
         <Form.Item name="difficulty" label="Уровень сложности" rules={[{ required: true, message: 'Выберите уровень сложности' }]}>
           <Select>
             <Option value="1">1 - Базовый</Option>
@@ -723,8 +725,10 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             <Option value="5">5 - Олимпиадный</Option>
           </Select>
         </Form.Item>
+        </Col>
 
         {/* Контекст */}
+        <Col xs={24} sm={12} lg={6}>
         <Form.Item label="Контекст">
           <Select
             placeholder="Все темы"
@@ -742,8 +746,10 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             ))}
           </Select>
         </Form.Item>
+        </Col>
 
         {/* Тема */}
+        <Col xs={24} sm={12} lg={6}>
         <Form.Item name="topic" label="Тема" rules={[{ required: true, message: 'Выберите тему' }]}>
           <Select
             placeholder="Выберите тему"
@@ -771,8 +777,10 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             ))}
           </Select>
         </Form.Item>
+        </Col>
 
         {/* Подтема */}
+        <Col xs={24} sm={12} lg={6}>
         <Form.Item name="subtopic" label="Подтема">
           <Select
             placeholder="Выберите подтему"
@@ -798,22 +806,28 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             ))}
           </Select>
         </Form.Item>
+        </Col>
 
         {/* Источник */}
+        <Col xs={24} sm={12} lg={8}>
         <Form.Item name="source" label="Источник">
           <Select placeholder="Выберите или введите источник" allowClear showSearch mode="tags" maxTagCount={1}>
             {allSources.map(s => (<Option key={s} value={s}>{s}</Option>))}
           </Select>
         </Form.Item>
+        </Col>
 
         {/* Год */}
+        <Col xs={24} sm={12} lg={4}>
         <Form.Item name="year" label="Год">
           <Select placeholder="Выберите год" allowClear showSearch>
             {allYears.map(y => (<Option key={y} value={y}>{y}</Option>))}
           </Select>
         </Form.Item>
+        </Col>
 
         {/* Теги */}
+        <Col xs={24} sm={24} lg={12}>
         <Form.Item name="tags" label="Теги" help="Введите название нового тега и нажмите Enter для создания">
           <Select
             mode="tags"
@@ -838,6 +852,8 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
             {tags.map(tag => (<Option key={tag.id} value={tag.id}>{tag.title}</Option>))}
           </Select>
         </Form.Item>
+        </Col>
+       </Row>
 
         {/* Изображение */}
         <Form.Item label="Изображение (опционально)">
