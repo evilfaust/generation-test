@@ -16,6 +16,25 @@ const TYPE_LABELS = {
 
 const MM_TO_PX = 3.7795; // фолбэк, если measureRootRef не готов
 
+const PX_PER_MM = 3.7795;
+
+// Клетка 5 мм — канонический паттерн (div-линии с физическими mm-единицами →
+// нативный вектор в PDF). Кол-во линий считаем ТОЧНО под размер поля (как в
+// GeometryWorksheetPrint), с минимальным запасом +2 — без огромного перерасхода
+// (он ломал расчёт печатной области в Chrome). Лишнее клипуется overflow:hidden.
+function GridLines({ h, v }) {
+  return (
+    <div className="tdf-grid-lines">
+      {Array.from({ length: h }, (_, i) => (
+        <div key={`h${i}`} className="tdf-h-line" style={{ top: `${(i + 1) * 5}mm` }} />
+      ))}
+      {Array.from({ length: v }, (_, i) => (
+        <div key={`v${i}`} className="tdf-v-line" style={{ left: `${(i + 1) * 5}mm` }} />
+      ))}
+    </div>
+  );
+}
+
 const COUNT_LABELS = ['формула', 'формулы', 'формул'];
 function pluralRu(n, forms) {
   const mod10 = n % 10, mod100 = n % 100;
@@ -202,7 +221,29 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
 
   const renderRow = (item, num, refCb, rowHeight) => {
     const rowStyle = rowHeight ? { height: rowHeight } : undefined;
-    const gridCls = (showGrid && isBlank) ? ' tdf-cell--grid' : '';
+    const gridOn = showGrid && isBlank;
+
+    // Высота клеточного поля в px. В фазе 2 строка имеет точную высоту
+    // (rowHeight = stretchRowH), поэтому полю задаём ЯВНУЮ высоту (минус padding
+    // ячейки) — это надёжно заполняет ячейку, в отличие от height:100%, которое
+    // не резолвится внутри table-cell. В фазе измерения (rowHeight undefined)
+    // высоту даёт min-height из CSS. Линии клетки — div с физическими mm
+    // (нативный вектор в PDF), лежат absolute внутри positioned-div (НЕ <td>:
+    // relative на ячейке ломает table-layout при печати).
+    const fieldHpx = rowHeight ? Math.max(40, rowHeight - 12) : null;
+    const fieldStyle = fieldHpx ? { height: `${fieldHpx}px`, minHeight: 0 } : undefined;
+
+    // Точное число линий клетки под размер поля (+2 запас), без перерасхода —
+    // огромный overshoot ломал расчёт печатной области в Chrome (масштаб < 1).
+    const usableMm = (portrait ? 210 : 297) - 10; // ширина листа минус поля 5мм
+    const fieldHmm = fieldHpx ? fieldHpx / PX_PER_MM : 60;
+    const hCount = Math.ceil(fieldHmm / 5) + 2;
+    const vCount = (colPct) => Math.ceil((parseFloat(colPct) / 100 * usableMm) / 5) + 2;
+
+    // Поле для записи в drawing/notation ячейках (без имени).
+    const writeField = (colPct) => gridOn
+      ? <div className="tdf-grid-field" style={fieldStyle}><GridLines h={hCount} v={vCount(colPct)} /></div>
+      : <div className="tdf-blank-area" />;
 
     if (item.is_section_header) {
       return (
@@ -220,7 +261,7 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
       const drawingCell = isBlank
         ? (item.drawing_image_control
             ? <img src={api.getTdfItemControlDrawingUrl(item)} alt="контроль" className="tdf-drawing-img" style={{ maxHeight: dcfg.imgH }} />
-            : <div className={`tdf-blank-area${gridCls}`} />)
+            : writeField(dcfg.drawingCol))
         : (item.drawing_image
             ? <img src={api.getTdfItemDrawingUrl(item)} alt="подготовка" className="tdf-drawing-img" style={{ maxHeight: dcfg.imgH }} />
             : <span className="tdf-empty">—</span>);
@@ -233,15 +274,15 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
               <span className="tdf-type-vertical">{TYPE_LABELS.geometry_formula}</span>
             </div>
           </td>
-          <td className={`tdf-cell tdf-cell-name-formulation`}>
+          <td className="tdf-cell tdf-cell-name-formulation">
             <div className="tdf-item-name">{item.name}</div>
           </td>
-          <td className={`tdf-cell tdf-cell-drawing${gridCls}`}>
+          <td className="tdf-cell tdf-cell-drawing">
             {drawingCell}
           </td>
-          <td className={`tdf-cell tdf-cell-notation${gridCls}`}>
+          <td className="tdf-cell tdf-cell-notation">
             {formulaHidden ? (
-              <div className="tdf-blank-area" />
+              writeField(dcfg.notationCol)
             ) : (
               <div className="tdf-math-content">
                 {item.short_notation_md
@@ -263,30 +304,43 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
             {item.type && <span className="tdf-type-vertical">{TYPE_LABELS[item.type]}</span>}
           </div>
         </td>
-        <td className={`tdf-cell tdf-cell-name-formulation${gridCls}`}>
-          <div className="tdf-item-name">{item.name}</div>
+        <td className="tdf-cell tdf-cell-name-formulation">
           {isBlank ? (
-            <div className="tdf-blank-area" />
+            // Клетка + имя оверлеем поверх неё (имя на белом фоне, поверх линий)
+            gridOn ? (
+              <div className="tdf-grid-field" style={fieldStyle}>
+                <GridLines h={hCount} v={vCount(dcfg.contentCol)} />
+                <div className="tdf-item-name tdf-item-name--overlay">{item.name}</div>
+              </div>
+            ) : (
+              <>
+                <div className="tdf-item-name">{item.name}</div>
+                <div className="tdf-blank-area" />
+              </>
+            )
           ) : (
-            <div className="tdf-formulation-content tdf-math-content">
-              {item.formulation_md
-                ? <MathRenderer content={item.formulation_md} />
-                : <span className="tdf-empty">—</span>}
-            </div>
+            <>
+              <div className="tdf-item-name">{item.name}</div>
+              <div className="tdf-formulation-content tdf-math-content">
+                {item.formulation_md
+                  ? <MathRenderer content={item.formulation_md} />
+                  : <span className="tdf-empty">—</span>}
+              </div>
+            </>
           )}
         </td>
-        <td className={`tdf-cell tdf-cell-drawing${gridCls}`}>
+        <td className="tdf-cell tdf-cell-drawing">
           {isBlank ? (
-            <div className="tdf-blank-area" />
+            writeField(dcfg.drawingCol)
           ) : (
             item.drawing_image
               ? <img src={api.getTdfItemDrawingUrl(item)} alt="чертёж" className="tdf-drawing-img" style={{ maxHeight: dcfg.imgH }} />
               : <span className="tdf-empty">—</span>
           )}
         </td>
-        <td className={`tdf-cell tdf-cell-notation${gridCls}`}>
+        <td className="tdf-cell tdf-cell-notation">
           {isBlank ? (
-            <div className="tdf-blank-area" />
+            writeField(dcfg.notationCol)
           ) : (
             <div className="tdf-math-content">
               {item.short_notation_md

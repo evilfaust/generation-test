@@ -251,30 +251,60 @@
   color: #aaa;
 }
 
+/* Пустое поле для записи (blank без клетки) — границу ячейки рисует <td>. */
 .tdf-blank-area {
   min-height: 60px;
   width: 100%;
-  flex: 1;
 }
 
-/* Сетка «в клетку» для ячеек в blank-режиме */
+/* Клеточное поле — positioned-контейнер с div-линиями.
+   Высота задаётся inline в фазе 2 (точная высота строки), min-height — фолбэк
+   для фазы измерения. Это div (не <td>) → relative безопасен, не ломает
+   table-layout при печати. Клетка = div-линии с физическими mm/pt единицами →
+   нативный вектор в PDF (вместо растрового background-image). См. CLAUDE.md. */
+.tdf-grid-field {
+  position: relative;
+  width: 100%;
+  min-height: 60px;
+  overflow: hidden;
+}
 
-/* Название пункта — белый фон, чтобы текст не попадал на пересечения клеток */
-.tdf-cell--grid .tdf-item-name {
+/* Имя пункта поверх клетки — белый фон, чтобы текст не попадал на линии */
+.tdf-item-name--overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
   background: #fff;
-  display: inline-block;
   padding: 0 3px 1px;
   border-radius: 2px;
-  position: relative;
-  z-index: 1;
+  max-width: 100%;
 }
 
-.tdf-cell--grid {
-  background-image:
-    linear-gradient(to right, #d0d0d0 1px, transparent 1px),
-    linear-gradient(to bottom, #d0d0d0 1px, transparent 1px);
-  background-size: 5mm 5mm;
-  background-position: 0 0;
+/* Контейнер линий — заполняет клеточное поле, лишние линии клипуются */
+.tdf-grid-lines {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tdf-h-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 0.2pt solid #d0d0d0;
+  pointer-events: none;
+}
+
+.tdf-v-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 0.2pt solid #d0d0d0;
+  pointer-events: none;
 }
 
 /* Stretch-режим: строки имеют явно заданную высоту — таблица не должна растягиваться сама */
