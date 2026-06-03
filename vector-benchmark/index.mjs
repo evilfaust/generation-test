@@ -257,7 +257,7 @@ async function main() {
 
   // Шаг 1 — выгрузка задач (потоково; считаем по ходу)
   log('\n[1/4] Загружаю задачи из PocketBase и сравниваю с локальным индексом...');
-  let seen = 0, embedded = 0, skipped = 0, failed = 0, pushed = 0;
+  let seen = 0, embedded = 0, skipped = 0, failed = 0, pushed = 0, reconciled = 0;
   let pushBuf = [];
   const allIds = [];
   const taskMeta = new Map(); // id → {topic, answer} для дедупа
@@ -343,10 +343,38 @@ async function main() {
     try {
       const pr = await pruneRemote(allIds);
       log(`   Прунинг на VPS: удалено ${pr.pruned}, осталось ${pr.total}`);
+
+      // Самосверка: VPS вернул, каких локальных задач у него НЕТ. Такой дрейф
+      // возникает, если когда-то пуш-пачка не доехала — инкремент сам бы эти
+      // задачи пропустил по text_hash и больше никогда не дослал. Здесь чиним.
+      const missing = pr.missing_on_vps || [];
+      if (missing.length) {
+        log(`   ⚠ На VPS не хватает ${missing.length} векторов (рассинхрон) — досылаю...`);
+        const getRow = db.prepare(
+          'SELECT v.embedding e, m.text_hash h, m.model mdl FROM vec_tasks v '
+          + 'LEFT JOIN vec_meta m ON m.task_id = v.task_id WHERE v.task_id = ?');
+        let batch = [];
+        const flushReconcile = async () => {
+          if (!batch.length) return;
+          const b = batch; batch = [];
+          await pushVectors(b); // в try: при сбое словим ниже, дошлёт следующий прогон
+          reconciled += b.length;
+        };
+        for (const id of missing) {
+          const row = getRow.get(id);
+          if (!row || !row.e) continue; // нет локально — нечего слать (не падаем)
+          const vec = Array.from(new Float32Array(row.e.buffer, row.e.byteOffset, row.e.byteLength / 4));
+          batch.push({ task_id: id, vec, text_hash: row.h || '', model: row.mdl || MODEL });
+          if (batch.length >= PUSH_BATCH) await flushReconcile();
+        }
+        await flushReconcile();
+        log(`   ✓ Досверка: дослано ${reconciled} ранее потерянных векторов.`);
+      }
     } catch (e) {
-      // Прунинг некритичен: осиротевшие векторы безвредны (поиск отсеивает через JOIN).
-      log(`   ⚠ прунинг на VPS пропущен: ${e.message}`);
-      log(`     (не страшно — лишние вектора не мешают поиску, уберутся при следующем запуске)`);
+      // Прунинг/досверка некритичны: осиротевшие векторы безвредны (JOIN отсеет),
+      // а недосланное доедет на следующем запуске (досверка повторится).
+      log(`   ⚠ синхронизация с VPS прервана: ${e.message}`);
+      log(`     (не страшно — повторный запуск долечит: лишнее уберётся, недостающее дошлётся)`);
     }
   } else {
     log('\n[3/4] Отправка на VPS пропущена (нет флага --push).');
@@ -373,13 +401,23 @@ async function main() {
   const sizeMb = (fs.statSync(VEC_DB).size / 1024 / 1024).toFixed(1);
   db.close();
 
+  // Недоставленные пачки — НЕ рапортуем успех (иначе дрейф проходит незаметно).
+  // Досверка следующего прогона их долечит, но человек должен увидеть проблему.
+  const incomplete = pushFailedBatches > 0;
+
   hr();
-  log(`✅ Готово за ${fmtSec(Date.now() - START)}`);
+  log(incomplete
+    ? `⚠ Завершено за ${fmtSec(Date.now() - START)}, но НЕ всё доехало на VPS`
+    : `✅ Готово за ${fmtSec(Date.now() - START)}`);
   log(`   Задач просмотрено: ${seen}  ·  посчитано сейчас: ${embedded}  ·  пропущено: ${skipped}`);
-  if (PUSH) log(`   Отправлено на VPS: ${pushed} векторов`);
+  if (PUSH) log(`   Отправлено на VPS: ${pushed} векторов` + (reconciled ? `  ·  досверкой долечено: ${reconciled}` : ''));
   log(`   Всего векторов в локальной vec.db: ${total}  (${sizeMb} MB)`);
   if (!PUSH && embedded > 0) {
     log('   ⚠ Чтобы изменения увидел сайт — запусти ещё раз с флагом --push.');
+  }
+  if (incomplete) {
+    log(`   ⚠ Не доставлено пачек: ${pushFailedBatches}. Запусти ещё раз — досверка дошлёт недостающее.`);
+    process.exitCode = 1;
   }
   hr();
 }

@@ -588,7 +588,10 @@ export function scoreNovelty({ taskIds = [], refTaskIds = [], dupCos = 0.95, fre
  * нет в base (актуальный список id задач из PB). Безопасно — поиск и так
  * игнорирует осиротевшие через JOIN, это гигиена/место.
  * @param {string[]} validIds - актуальные id задач
- * @returns {{ pruned:number, total:number }}
+ * @returns {{ pruned:number, total:number, missing_on_vps:string[] }}
+ *   missing_on_vps — id задач, которые есть локально (в validIds), но отсутствуют
+ *   на VPS. Mac досылает их вектора (самосверка: лечит дрейф из-за непрошедшего
+ *   когда-то пуша — инкремент сам бы их пропустил по text_hash и не дослал).
  */
 export function pruneVectors(validIds) {
   const valid = new Set(validIds);
@@ -598,13 +601,15 @@ export function pruneVectors(validIds) {
     sqliteVec.load(w);
     w.pragma('busy_timeout = 5000');
     const all = w.prepare('SELECT task_id FROM vec_tasks').all().map((r) => r.task_id);
+    const onVps = new Set(all);
     const orphans = all.filter((id) => !valid.has(id));
     const delVec = w.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
     const delMeta = w.prepare('DELETE FROM vec_meta WHERE task_id = ?');
     const tx = w.transaction((ids) => { for (const id of ids) { delVec.run(id); delMeta.run(id); } });
     tx(orphans);
     const total = w.prepare('SELECT count(*) c FROM vec_tasks').get().c;
-    return { pruned: orphans.length, total };
+    const missing_on_vps = validIds.filter((id) => !onVps.has(id));
+    return { pruned: orphans.length, total, missing_on_vps };
   } finally {
     w.close();
   }
