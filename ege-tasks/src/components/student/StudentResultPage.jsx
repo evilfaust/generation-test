@@ -14,11 +14,26 @@ const PB_URL = PB_BASE_URL;
  * Страница результатов ученика.
  */
 const StudentResultPage = ({ studentSession, onNavigateToGallery }) => {
-  const { attempt, tasks, session } = studentSession;
+  const {
+    attempt, tasks, session,
+    passingScore = 0, retryEnabled = false, maxAttempts = 0,
+    attemptsUsed = 0, attemptsLeft = 0, bestAttempt = null,
+    canRetry = false, startRetry,
+  } = studentSession;
   const [attemptAnswers, setAttemptAnswers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState(false);
   const [resolvedAchievement, setResolvedAchievement] = useState(null);
   const [resolvedUnlocked, setResolvedUnlocked] = useState([]);
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      await startRetry();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   useEffect(() => {
     if (!attempt) return;
@@ -120,6 +135,54 @@ const StudentResultPage = ({ studentSession, onNavigateToGallery }) => {
           <div className={`student-result-score-bar-fill ${scoreClass}`} style={{ width: `${percentage}%` }} />
         </div>
       </div>
+
+      {/* Зачёт / попытки */}
+      {(() => {
+        const bestScore = bestAttempt?.score ?? score;
+        const bestTotal = bestAttempt?.total ?? total;
+        const passed = passingScore > 0 && bestScore >= passingScore;
+        if (passingScore <= 0 && !retryEnabled) return null;
+        return (
+          <div
+            className="student-result-passing"
+            style={{
+              marginTop: 16, padding: '16px 18px', borderRadius: 12,
+              background: passingScore > 0 ? (passed ? '#f6ffed' : '#fff2f0') : '#f5f5f5',
+              border: `1px solid ${passingScore > 0 ? (passed ? '#b7eb8f' : '#ffccc7') : '#e8e8e8'}`,
+            }}
+          >
+            {passingScore > 0 && (
+              <div style={{ fontSize: 18, fontWeight: 600, color: passed ? '#389e0d' : '#cf1322' }}>
+                {passed ? '✅ Зачёт' : '❌ Не зачёт'}
+              </div>
+            )}
+            {passingScore > 0 && (
+              <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
+                Проходной балл: {passingScore} из {bestTotal}.
+                {' '}Лучший результат: {bestScore} из {bestTotal}.
+                {!passed && ` Не хватает: ${Math.max(0, passingScore - bestScore)}.`}
+              </Text>
+            )}
+            {retryEnabled && (
+              <Text type="secondary" style={{ display: 'block', marginTop: passingScore > 0 ? 8 : 0 }}>
+                Попытка {attemptsUsed} из {maxAttempts}.
+                {' '}{attemptsLeft > 0 ? `Осталось попыток: ${attemptsLeft}.` : 'Попытки закончились.'}
+              </Text>
+            )}
+            {canRetry && (
+              <Button
+                type="primary"
+                size="large"
+                loading={retrying}
+                onClick={handleRetry}
+                style={{ marginTop: 12 }}
+              >
+                Пройти ещё раз
+              </Button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Summary */}
       <div className={`student-result-summary ${wrongAnswers.length === 0 ? 'student-result-summary--perfect' : ''}`}>

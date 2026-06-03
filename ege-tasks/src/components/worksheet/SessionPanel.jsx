@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Switch, Input, Button, Typography, Spin, Alert, Divider, Modal, App, Tag, Tooltip } from 'antd';
+import { Switch, Input, InputNumber, Button, Typography, Spin, Alert, Divider, Modal, App, Tag, Tooltip } from 'antd';
 import {
   CopyOutlined,
   QrcodeOutlined,
@@ -95,6 +95,38 @@ const SessionPanel = ({ workId, mcTestId }) => {
     } catch {
       message.error('Ошибка обновления сессии');
     }
+  };
+
+  // Универсальный патч полей сессии
+  const patchSession = async (fields, successMsg) => {
+    if (!session) return;
+    try {
+      const updated = await api.updateSession(session.id, fields);
+      setSession({ ...session, ...updated });
+      if (successMsg) message.success(successMsg);
+    } catch {
+      message.error('Ошибка обновления сессии');
+    }
+  };
+
+  const maxAttempts = Number(session?.max_attempts) || 0;
+  const passingScore = Number(session?.passing_score) || 0;
+  const multiAttemptsOn = maxAttempts >= 2;
+  const passingOn = passingScore >= 1;
+
+  const toggleMultiAttempts = (checked) => {
+    patchSession({ max_attempts: checked ? (maxAttempts >= 2 ? maxAttempts : 2) : 0 });
+  };
+  const changeMaxAttempts = (value) => {
+    const v = Math.max(2, Math.round(Number(value) || 2));
+    patchSession({ max_attempts: v });
+  };
+  const togglePassing = (checked) => {
+    patchSession({ passing_score: checked ? (passingScore >= 1 ? passingScore : 1) : 0 });
+  };
+  const changePassingScore = (value) => {
+    const v = Math.max(1, Math.round(Number(value) || 1));
+    patchSession({ passing_score: v });
   };
 
   const handleStudentTitleChange = useCallback((e) => {
@@ -221,6 +253,60 @@ const SessionPanel = ({ workId, mcTestId }) => {
               onPressEnter={(e) => e.target.blur()}
               placeholder="Самостоятельная работа"
             />
+          </div>
+
+          {/* Несколько попыток */}
+          <div className="session-panel__field-row">
+            <Text type="secondary" className="session-panel__field-label">Несколько попыток</Text>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Switch
+                size="small"
+                checked={multiAttemptsOn}
+                onChange={toggleMultiAttempts}
+                checkedChildren="Вкл"
+                unCheckedChildren="Выкл"
+              />
+              {multiAttemptsOn && (
+                <InputNumber
+                  min={2}
+                  step={1}
+                  value={maxAttempts}
+                  onChange={changeMaxAttempts}
+                  addonAfter="попыток"
+                  style={{ width: 150 }}
+                />
+              )}
+              {!multiAttemptsOn && (
+                <Text type="secondary" style={{ fontSize: 12 }}>Одна попытка</Text>
+              )}
+            </div>
+          </div>
+
+          {/* Проходной балл */}
+          <div className="session-panel__field-row">
+            <Text type="secondary" className="session-panel__field-label">Проходной балл</Text>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Switch
+                size="small"
+                checked={passingOn}
+                onChange={togglePassing}
+                checkedChildren="Вкл"
+                unCheckedChildren="Выкл"
+              />
+              {passingOn && (
+                <InputNumber
+                  min={1}
+                  step={1}
+                  value={passingScore}
+                  onChange={changePassingScore}
+                  addonAfter="задач"
+                  style={{ width: 150 }}
+                />
+              )}
+              {!passingOn && (
+                <Text type="secondary" style={{ fontSize: 12 }}>Без зачёта</Text>
+              )}
+            </div>
           </div>
 
           <div className="session-panel__field-row">

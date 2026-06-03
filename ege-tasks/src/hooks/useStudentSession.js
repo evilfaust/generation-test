@@ -47,6 +47,9 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Все попытки текущего ученика/устройства в этой сессии — для подсчёта
+  // оставшихся попыток и лучшей попытки (проходной балл).
+  const [myAttempts, setMyAttempts] = useState([]);
 
   const getIssueNumber = useCallback((attemptRecord, attempts = []) => {
     if (!attemptRecord?.id) return 1;
@@ -102,6 +105,7 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
         // Для авторизованного студента учитываем и student_id, и device_id
         // (чтобы подхватывать попытки, созданные до логина на этом устройстве).
         const existingAttempts = await getAccessibleAttempts();
+        setMyAttempts(existingAttempts);
         let existingAttempt = existingAttempts[0] || null;
 
         // Если попытка была создана как гостевая, привязываем ее к студенту.
@@ -176,14 +180,17 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
     setTasks(taskList);
   };
 
-  // Начать новую попытку: назначить вариант и создать attempt
-  const startAttempt = useCallback(async (studentName) => {
+  // Начать новую попытку: назначить вариант и создать attempt.
+  // forceNew=true — всегда создавать новую попытку (повторная попытка),
+  // не продолжая ранее начатую/завершённую.
+  const startAttempt = useCallback(async (studentName, { forceNew = false } = {}) => {
     if (!session) return null;
 
     try {
       // Если попытка уже есть (включая гостевую на текущем устройстве), продолжаем её.
+      // При forceNew пропускаем этот шаг и создаём свежую попытку.
       const existingAttempts = await getAccessibleAttempts();
-      const existingAttempt = existingAttempts[0] || null;
+      const existingAttempt = forceNew ? null : (existingAttempts[0] || null);
       if (existingAttempt) {
         let resolvedAttempt = existingAttempt;
         if (authStudentId && !existingAttempt.student) {
@@ -344,6 +351,52 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
     return () => clearInterval(interval);
   }, [attempt?.id, attempt?.status, attempt?.achievement, attempt?.unlocked_achievements, getAccessibleAttempts]);
 
+  // Держим список попыток ученика актуальным: при смене попытки или её статуса
+  // (старт новой / отправка) перечитываем — нужно для подсчёта оставшихся
+  // попыток и лучшего результата (проходной балл).
+  useEffect(() => {
+    if (!attempt?.id) return;
+    let cancelled = false;
+    getAccessibleAttempts().then((list) => {
+      if (!cancelled) setMyAttempts(list);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [attempt?.id, attempt?.status, attempt?.score, getAccessibleAttempts]);
+
+  // Повторная попытка: создать свежую попытку (новый вариант по round-robin).
+  const startRetry = useCallback(async () => {
+    const name = attempt?.student_name || 'Студент';
+    return startAttempt(name, { forceNew: true });
+  }, [attempt?.student_name, startAttempt]);
+
+  // ── Производные значения для попыток и проходного балла ──
+  const maxAttempts = Number(session?.max_attempts) || 0;
+  const passingScore = Number(session?.passing_score) || 0;
+  // Повторы включены только при maxAttempts >= 2 (1 = обычная одна попытка).
+  const retryEnabled = maxAttempts >= 2;
+  const attemptsUsed = myAttempts.length;
+  const attemptsLeft = retryEnabled ? Math.max(0, maxAttempts - attemptsUsed) : 0;
+
+  // Лучшая (по баллу) завершённая попытка — итоговая для зачёта.
+  const finishedAttempts = myAttempts.filter(a => a.status && a.status !== 'started');
+  const bestAttempt = finishedAttempts.length
+    ? finishedAttempts.reduce((best, a) => {
+        if (!best) return a;
+        if ((a.score || 0) > (best.score || 0)) return a;
+        if ((a.score || 0) === (best.score || 0)
+          && new Date(a.created) > new Date(best.created)) return a;
+        return best;
+      }, null)
+    : null;
+
+  // Можно начать ещё одну попытку: повторы включены, лимит не исчерпан,
+  // приём открыт и нет незавершённой попытки.
+  const hasStartedAttempt = myAttempts.some(a => a.status === 'started');
+  const canRetry = retryEnabled
+    && attemptsLeft > 0
+    && (session?.is_open !== false)
+    && !hasStartedAttempt;
+
   return {
     session,
     attempt,
@@ -353,5 +406,14 @@ export function useStudentSession(sessionId, deviceId, authStudentId = null) {
     loading,
     error,
     startAttempt,
+    startRetry,
+    // Попытки и проходной балл
+    maxAttempts,
+    passingScore,
+    retryEnabled,
+    attemptsUsed,
+    attemptsLeft,
+    bestAttempt,
+    canRetry,
   };
 }
