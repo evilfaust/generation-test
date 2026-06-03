@@ -137,45 +137,77 @@ const StudentResultPage = ({ studentSession, onNavigateToGallery }) => {
       </div>
 
       {/* Зачёт / попытки */}
-      {(() => {
+      {(passingScore > 0 || retryEnabled) && (() => {
         const bestScore = bestAttempt?.score ?? score;
         const bestTotal = bestAttempt?.total ?? total;
         const passed = passingScore > 0 && bestScore >= passingScore;
-        if (passingScore <= 0 && !retryEnabled) return null;
+        const shortfall = Math.max(0, passingScore - bestScore);
+        const mod = passingScore > 0 ? (passed ? 'pass' : 'fail') : 'neutral';
+        const bestPct = bestTotal > 0 ? Math.min(100, (bestScore / bestTotal) * 100) : 0;
+        const thresholdPct = bestTotal > 0 ? Math.min(100, (passingScore / bestTotal) * 100) : 0;
         return (
-          <div
-            className="student-result-passing"
-            style={{
-              marginTop: 16, padding: '16px 18px', borderRadius: 12,
-              background: passingScore > 0 ? (passed ? '#f6ffed' : '#fff2f0') : '#f5f5f5',
-              border: `1px solid ${passingScore > 0 ? (passed ? '#b7eb8f' : '#ffccc7') : '#e8e8e8'}`,
-            }}
-          >
+          <div className={`srp-status srp-status--${mod}`}>
+            {/* Статус зачёта */}
             {passingScore > 0 && (
-              <div style={{ fontSize: 18, fontWeight: 600, color: passed ? '#389e0d' : '#cf1322' }}>
-                {passed ? '✅ Зачёт' : '❌ Не зачёт'}
+              <div className="srp-status-head">
+                <div className="srp-status-icon">{passed ? '✓' : '✕'}</div>
+                <div className="srp-status-texts">
+                  <div className="srp-status-title">{passed ? 'Зачёт' : 'Не зачёт'}</div>
+                  <div className="srp-status-sub">
+                    {passed
+                      ? `Лучший результат ${bestScore} из ${bestTotal} — порог пройден`
+                      : `Лучший результат ${bestScore} из ${bestTotal}. До зачёта не хватает ${shortfall}`}
+                  </div>
+                </div>
               </div>
             )}
+
+            {/* Прогресс с отметкой проходного балла */}
             {passingScore > 0 && (
-              <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-                Проходной балл: {passingScore} из {bestTotal}.
-                {' '}Лучший результат: {bestScore} из {bestTotal}.
-                {!passed && ` Не хватает: ${Math.max(0, passingScore - bestScore)}.`}
-              </Text>
+              <div className="srp-bar-wrap">
+                <div className="srp-bar">
+                  <div className={`srp-bar-fill srp-bar-fill--${mod}`} style={{ width: `${bestPct}%` }} />
+                  <div className="srp-bar-threshold" style={{ left: `${thresholdPct}%` }}>
+                    <span className="srp-bar-threshold-flag">Порог {passingScore}</span>
+                  </div>
+                </div>
+                <div className="srp-bar-caption">
+                  <span>Лучший: <b>{bestScore}</b></span>
+                  <span>Всего: {bestTotal}</span>
+                </div>
+              </div>
             )}
+
+            {/* Попытки */}
             {retryEnabled && (
-              <Text type="secondary" style={{ display: 'block', marginTop: passingScore > 0 ? 8 : 0 }}>
-                Попытка {attemptsUsed} из {maxAttempts}.
-                {' '}{attemptsLeft > 0 ? `Осталось попыток: ${attemptsLeft}.` : 'Попытки закончились.'}
-              </Text>
+              <div className="srp-attempts">
+                <div className="srp-attempts-row">
+                  <span className="srp-attempts-label">
+                    Попытка <b>{attemptsUsed}</b> из {maxAttempts}
+                  </span>
+                  <span className={`srp-attempts-left ${attemptsLeft > 0 ? '' : 'srp-attempts-left--empty'}`}>
+                    {attemptsLeft > 0 ? `осталось ${attemptsLeft}` : 'попытки закончились'}
+                  </span>
+                </div>
+                <div className="srp-dots">
+                  {Array.from({ length: maxAttempts }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`srp-dot ${i < attemptsUsed ? 'srp-dot--used' : 'srp-dot--free'}`}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
+
             {canRetry && (
               <Button
                 type="primary"
                 size="large"
+                block
                 loading={retrying}
                 onClick={handleRetry}
-                style={{ marginTop: 12 }}
+                className="srp-retry-btn"
               >
                 Пройти ещё раз
               </Button>

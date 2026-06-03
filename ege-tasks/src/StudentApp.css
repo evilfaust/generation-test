@@ -1300,6 +1300,181 @@
   background: rgba(67, 97, 238, 0.04) !important;
 }
 
+/* ── Зачёт / попытки ── */
+.srp-status {
+  margin: 0 0 24px;
+  padding: 20px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  animation: studentFadeInUp 0.5s ease-out 0.45s both;
+}
+.srp-status--pass { border-color: #b7eb8f; background: linear-gradient(180deg, #f6ffed 0%, #fff 70%); }
+.srp-status--fail { border-color: #ffccc7; background: linear-gradient(180deg, #fff2f0 0%, #fff 70%); }
+
+.srp-status-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.srp-status-icon {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.srp-status--pass .srp-status-icon { background: linear-gradient(135deg, #52c41a, #73d13d); }
+.srp-status--fail .srp-status-icon { background: linear-gradient(135deg, #ff4d4f, #ff7875); }
+
+.srp-status-title {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.15;
+  color: #1a1a2e;
+}
+.srp-status--pass .srp-status-title { color: #389e0d; }
+.srp-status--fail .srp-status-title { color: #cf1322; }
+.srp-status-sub {
+  margin-top: 3px;
+  font-size: 13.5px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+/* Прогресс с порогом */
+.srp-bar-wrap { margin-top: 30px; }
+.srp-bar {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: #eef0f4;
+  overflow: visible;
+}
+.srp-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 1s ease-out;
+  animation: studentProgressFill 1s ease-out;
+}
+.srp-bar-fill--pass { background: linear-gradient(90deg, #52c41a, #73d13d); }
+.srp-bar-fill--fail { background: linear-gradient(90deg, #ff7875, #faad14); }
+.srp-bar-threshold {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: #1a1a2e;
+  border-radius: 2px;
+  transform: translateX(-1px);
+}
+.srp-bar-threshold-flag {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+  background: #fff;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid #e1e3e8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.srp-bar-caption {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  font-size: 12.5px;
+  color: #8c8c8c;
+}
+.srp-bar-caption b { color: #1a1a2e; font-weight: 700; }
+
+/* Попытки */
+.srp-attempts {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+.srp-attempts-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.srp-attempts-label { font-size: 14px; color: #4f5b7a; }
+.srp-attempts-label b { color: #1a1a2e; font-weight: 700; }
+.srp-attempts-left {
+  font-size: 12px;
+  font-weight: 600;
+  color: #389e0d;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 20px;
+  padding: 2px 10px;
+}
+.srp-attempts-left--empty {
+  color: #8c8c8c;
+  background: #f5f5f5;
+  border-color: #e8e8e8;
+}
+.srp-dots {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.srp-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.srp-dot--used { background: #4361ee; box-shadow: 0 2px 6px rgba(67, 97, 238, 0.35); }
+.srp-dot--free { background: transparent; border: 2px solid #d3d8e4; }
+
+.srp-retry-btn {
+  margin-top: 18px;
+  height: 50px !important;
+  border-radius: 14px !important;
+  font-weight: 700 !important;
+  font-size: 16px !important;
+  box-shadow: 0 6px 18px rgba(67, 97, 238, 0.3) !important;
+}
+
+/* Тёмная тема */
+.student-theme-dark .srp-status {
+  background: #1f2233;
+  border-color: #2c3050;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.student-theme-dark .srp-status--pass { background: linear-gradient(180deg, rgba(82,196,26,0.12) 0%, #1f2233 70%); border-color: #3a6b2a; }
+.student-theme-dark .srp-status--fail { background: linear-gradient(180deg, rgba(255,77,79,0.12) 0%, #1f2233 70%); border-color: #6b3030; }
+.student-theme-dark .srp-status-title { color: #f0f2f8; }
+.student-theme-dark .srp-status--pass .srp-status-title { color: #73d13d; }
+.student-theme-dark .srp-status--fail .srp-status-title { color: #ff7875; }
+.student-theme-dark .srp-status-sub { color: #9aa3b8; }
+.student-theme-dark .srp-bar { background: #2c3050; }
+.student-theme-dark .srp-bar-threshold { background: #f0f2f8; }
+.student-theme-dark .srp-bar-threshold-flag {
+  color: #f0f2f8; background: #2c3050; border-color: #3a3f63;
+}
+.student-theme-dark .srp-bar-caption { color: #9aa3b8; }
+.student-theme-dark .srp-bar-caption b { color: #f0f2f8; }
+.student-theme-dark .srp-attempts { border-top-color: #2c3050; }
+.student-theme-dark .srp-attempts-label { color: #c3c9da; }
+.student-theme-dark .srp-attempts-label b { color: #f0f2f8; }
+.student-theme-dark .srp-dot--free { border-color: #3a3f63; }
+
 /* Error tasks */
 .student-result-errors-title {
   text-align: center;
