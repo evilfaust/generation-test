@@ -16,68 +16,74 @@ import {
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
   PercentageOutlined,
 } from '@ant-design/icons';
-import TaskList from './components/TaskList';
-import TaskSheetGenerator from './components/OralWorksheetGenerator';
-import TestWorkGenerator from './components/TestWorkGenerator';
-import EgeVariantGenerator from './components/EgeVariantGenerator';
-import EgeProfileVariantGenerator from './components/EgeProfileVariantGenerator';
-import TaskStatsDashboard from './components/TaskStatsDashboard';
-import TaskCatalogManager from './components/TaskCatalogManager';
-import TheoryBrowser from './components/TheoryBrowser';
+// ── Ленивая загрузка страниц-компонентов ────────────────────────────────────
+// Все компоненты ниже используются ТОЛЬКО как элементы маршрутов (через page-
+// wrapper'ы или напрямую в <Route element>). Грузим их по требованию, чтобы не
+// раздувать главный бандл. Граница Suspense — вокруг <Outlet/> в AppLayout.
+// Шелл-компоненты (LoginPage, ProtectedRoute, UserMenu, контексты) остаются
+// статическими импортами — они нужны на каждом экране.
+const TaskList = lazy(() => import('./components/TaskList'));
+const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
+const TestWorkGenerator = lazy(() => import('./components/TestWorkGenerator'));
+const EgeVariantGenerator = lazy(() => import('./components/EgeVariantGenerator'));
+const EgeProfileVariantGenerator = lazy(() => import('./components/EgeProfileVariantGenerator'));
+const TaskStatsDashboard = lazy(() => import('./components/TaskStatsDashboard'));
+const TaskCatalogManager = lazy(() => import('./components/TaskCatalogManager'));
+const TheoryBrowser = lazy(() => import('./components/TheoryBrowser'));
 const TheoryEditor = lazy(() => import('./components/TheoryEditor'));
 const ExcalidrawSection = lazy(() => import('./components/ExcalidrawSection'));
-import TheoryArticleView from './components/TheoryArticleView';
-import TheoryCategoryManager from './components/TheoryCategoryManager';
-import TheoryPrintBuilder from './components/TheoryPrintBuilder';
-import TaskImporter from './components/TaskImporter';
-import WorkManager from './components/WorkManager';
-import WorkEditorPage from './components/WorkEditorPage';
-import StudentProgressDashboard from './components/StudentProgressDashboard';
-import StudentDetailPage from './components/StudentDetailPage';
-import AchievementManager from './components/AchievementManager';
-import GeometryTaskList from './components/GeometryTaskList';
-import GeometryTopicManager from './components/geometry/GeometryTopicManager';
-import TDFManager from './components/tdf/TDFManager';
-import TDFEditor from './components/tdf/TDFEditor';
-import TDFVariantBuilder from './components/tdf/TDFVariantBuilder';
-import TDFFlashcards from './components/tdf/TDFFlashcards';
-import FormulaSheetGenerator from './components/FormulaSheetGenerator';
-import QRWorksheetGenerator from './components/QRWorksheetGenerator';
-import PixelArtWorksheet from './components/PixelArtWorksheet';
-import TeamPixelArtWorksheet from './components/TeamPixelArtWorksheet';
-import RouteSheetGenerator from './components/RouteSheetGenerator';
-import ErrorHeatmap from './components/ErrorHeatmap';
-import UnitCircleGenerator from './components/UnitCircleGenerator';
-import UnitCircleCryptogramGenerator from './components/UnitCircleCryptogramGenerator';
-import CryptogramGenerator from './components/CryptogramGenerator';
-import TrigValuesGenerator from './components/TrigValuesGenerator';
-import TrigExpressionsGenerator from './components/TrigExpressionsGenerator';
-import InverseTrigGenerator from './components/InverseTrigGenerator';
-import TrigEquationsGenerator from './components/TrigEquationsGenerator';
-import TrigEquationsAdvancedGenerator from './components/TrigEquationsAdvancedGenerator';
-import ReductionFormulasGenerator from './components/ReductionFormulasGenerator';
-import AdditionFormulasGenerator from './components/AdditionFormulasGenerator';
-import TrigMixedGenerator from './components/TrigMixedGenerator';
-import DoubleAngleGenerator from './components/DoubleAngleGenerator';
-import OralCountingGenerator from './components/OralCountingGenerator';
-import LogExpEquationsGenerator from './components/LogExpEquationsGenerator';
-import OralPowersRootsGenerator from './components/OralPowersRootsGenerator';
-import OralLogarithmsGenerator from './components/OralLogarithmsGenerator';
-import OralEgeBaseGenerator from './components/OralEgeBaseGenerator';
-import OralFractionsGenerator from './components/OralFractionsGenerator';
-import OralMixedGenerator from './components/OralMixedGenerator';
-import MarathonGenerator from './components/MarathonGenerator';
-import CrosswordGenerator from './components/CrosswordGenerator';
-import EgeScoreCalculator from './components/EgeScoreCalculator';
-import MCTestGenerator from './components/MCTestGenerator';
+const TheoryArticleView = lazy(() => import('./components/TheoryArticleView'));
+const TheoryCategoryManager = lazy(() => import('./components/TheoryCategoryManager'));
+const TheoryPrintBuilder = lazy(() => import('./components/TheoryPrintBuilder'));
+const TaskImporter = lazy(() => import('./components/TaskImporter'));
+const WorkManager = lazy(() => import('./components/WorkManager'));
+const WorkEditorPage = lazy(() => import('./components/WorkEditorPage'));
+const StudentProgressDashboard = lazy(() => import('./components/StudentProgressDashboard'));
+const StudentDetailPage = lazy(() => import('./components/StudentDetailPage'));
+const AchievementManager = lazy(() => import('./components/AchievementManager'));
+const GeometryTaskList = lazy(() => import('./components/GeometryTaskList'));
+const GeometryTopicManager = lazy(() => import('./components/geometry/GeometryTopicManager'));
+const TDFManager = lazy(() => import('./components/tdf/TDFManager'));
+const TDFEditor = lazy(() => import('./components/tdf/TDFEditor'));
+const TDFVariantBuilder = lazy(() => import('./components/tdf/TDFVariantBuilder'));
+const TDFFlashcards = lazy(() => import('./components/tdf/TDFFlashcards'));
+const FormulaSheetGenerator = lazy(() => import('./components/FormulaSheetGenerator'));
+const QRWorksheetGenerator = lazy(() => import('./components/QRWorksheetGenerator'));
+const PixelArtWorksheet = lazy(() => import('./components/PixelArtWorksheet'));
+const TeamPixelArtWorksheet = lazy(() => import('./components/TeamPixelArtWorksheet'));
+const RouteSheetGenerator = lazy(() => import('./components/RouteSheetGenerator'));
+const ErrorHeatmap = lazy(() => import('./components/ErrorHeatmap'));
+const UnitCircleGenerator = lazy(() => import('./components/UnitCircleGenerator'));
+const UnitCircleCryptogramGenerator = lazy(() => import('./components/UnitCircleCryptogramGenerator'));
+const CryptogramGenerator = lazy(() => import('./components/CryptogramGenerator'));
+const TrigValuesGenerator = lazy(() => import('./components/TrigValuesGenerator'));
+const TrigExpressionsGenerator = lazy(() => import('./components/TrigExpressionsGenerator'));
+const InverseTrigGenerator = lazy(() => import('./components/InverseTrigGenerator'));
+const TrigEquationsGenerator = lazy(() => import('./components/TrigEquationsGenerator'));
+const TrigEquationsAdvancedGenerator = lazy(() => import('./components/TrigEquationsAdvancedGenerator'));
+const ReductionFormulasGenerator = lazy(() => import('./components/ReductionFormulasGenerator'));
+const AdditionFormulasGenerator = lazy(() => import('./components/AdditionFormulasGenerator'));
+const TrigMixedGenerator = lazy(() => import('./components/TrigMixedGenerator'));
+const DoubleAngleGenerator = lazy(() => import('./components/DoubleAngleGenerator'));
+const OralCountingGenerator = lazy(() => import('./components/OralCountingGenerator'));
+const LogExpEquationsGenerator = lazy(() => import('./components/LogExpEquationsGenerator'));
+const OralPowersRootsGenerator = lazy(() => import('./components/OralPowersRootsGenerator'));
+const OralLogarithmsGenerator = lazy(() => import('./components/OralLogarithmsGenerator'));
+const OralEgeBaseGenerator = lazy(() => import('./components/OralEgeBaseGenerator'));
+const OralFractionsGenerator = lazy(() => import('./components/OralFractionsGenerator'));
+const OralMixedGenerator = lazy(() => import('./components/OralMixedGenerator'));
+const MarathonGenerator = lazy(() => import('./components/MarathonGenerator'));
+const CrosswordGenerator = lazy(() => import('./components/CrosswordGenerator'));
+const EgeScoreCalculator = lazy(() => import('./components/EgeScoreCalculator'));
+const MCTestGenerator = lazy(() => import('./components/MCTestGenerator'));
 import { api } from './services/pocketbase';
 import { ReferenceDataProvider, useReferenceData } from './contexts/ReferenceDataContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './components/auth/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import UserMenu from './components/auth/UserMenu';
-import UserManager from './components/auth/UserManager';
-import AuditLogPage from './components/auth/AuditLogPage';
+const UserManager = lazy(() => import('./components/auth/UserManager'));
+const AuditLogPage = lazy(() => import('./components/auth/AuditLogPage'));
 import { useVersionSync } from './shared/version/useVersionSync';
 import 'katex/dist/katex.min.css';
 import './theme/tokens.css';
@@ -757,7 +763,9 @@ function AppLayout() {
             background: '#fff',
             borderRadius: noMargin ? 0 : 8,
           }}>
-            <Outlet />
+            <Suspense fallback={<LazyFallback />}>
+              <Outlet />
+            </Suspense>
           </div>
         </Content>
       </Layout>
