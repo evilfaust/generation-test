@@ -1,8 +1,10 @@
 name: Deploy Landing to VPS
 
+# Только ручной запуск (кнопка "Run workflow" во вкладке Actions на GitHub).
+# Авто-деплой при push в main отключён осознанно: лендинг меняется редко,
+# дёргать сборку на каждый коммит смысла нет. Локальная альтернатива —
+# скрипт ./deploy-landing.sh (собирает на Mac и заливает на VPS по SSH).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
