@@ -1,5 +1,47 @@
 # Changelog — История изменений
 
+## [3.9.48] - 2026-06-04
+
+### Производительность
+- **Route-level code splitting** (`App.jsx`): ~67 статических импортов страниц-
+  компонентов переведены на `React.lazy()` + одна граница `<Suspense>` вокруг
+  `<Outlet/>` в `AppLayout`. Главный чанк `main` уменьшился с **2.4 МБ до ~90 КБ**
+  (gzip 29.7 КБ): десятки генераторов, `html2pdf`, mermaid (через Excalidraw) больше
+  не в стартовом бандле, грузятся по требованию на своём роуте. Шелл
+  (`LoginPage`/`ProtectedRoute`/`UserMenu`/контексты) — статические импорты.
+
+### Удалено
+- **Серверная PDF-генерация через Puppeteer/Chromium** — полностью выпилена.
+  На практике использовалась только браузерная печать, а Chromium зря потреблял RAM
+  на VPS. Печать и PDF теперь полностью на клиенте.
+  - Фронт: удалён хук `usePuppeteerPDF`; `useWorksheetActions.handleExportPDF` идёт
+    сразу в `html2pdf.js`; `ActionButtons` — простая кнопка PDF (без выбора метода);
+    в `EgeVariant`/`EgeProfile`/`TestWork`-генераторах и `ResultActionBar` убраны
+    пропсы `pdfMethod`/`puppeteerAvailable`; в Theory-компонентах убрана попытка
+    Puppeteer; в `TDFPrintView` убрана кнопка «Скачать PDF» (осталась «Печать»).
+  - Сервер (`pdf-service.js`, −140 строк): удалён роут `POST /generate`,
+    `getBrowser()`, импорт puppeteer, browser-lifecycle. `/health` →
+    `service: lemma-backend-helper`. Остальные 17 эндпоинтов (sdamgia, `/latex-fix`,
+    векторный поиск) не тронуты.
+  - VPS: `PUPPETEER_EXECUTABLE_PATH` убран из systemd-unit, npm `puppeteer-core`
+    удалён, snap chromium удалён.
+
+### Рефакторинг
+- **`pocketbase.js` разбит на доменные модули**: god-модуль (3091 строка) →
+  тонкий barrel-реэкспорт (40 строк) + 13 доменных модулей в
+  `shared/services/pb/` (`client`, `extras`, `topics`, `tasks`, `catalog`, `works`,
+  `theory`, `sessions`, `answers`, `achievements`, `students`, `geometry`, `tdf`,
+  `worksheets`). `pb/client.js` — клиент `pb` + приватный `_logAudit`. Публичный
+  контракт прежний: `import { api }` / `import pb` и места вызова (200+) не менялись.
+
+### Инфраструктура
+- **Деплой лендинга переведён в ручной режим**: авто-триггер `push` в `main` убран
+  из GitHub Actions (оставлен `workflow_dispatch`); добавлен локальный скрипт
+  `./deploy-landing.sh` (сборка на Mac → rsync на VPS → health-check). Лендинг
+  меняется редко — дёргать сборку на каждый коммит незачем.
+- Уборка корня репозитория: разовые артефакты импорта (`oge-*-result.json` и т.п.)
+  перенесены в `_archive/`, добавлены правила в `.gitignore`.
+
 ## [3.9.47] - 2026-06-03
 
 ### Улучшено
