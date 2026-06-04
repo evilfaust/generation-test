@@ -37,7 +37,17 @@
   /* Два варианта на листе */
   .tmixed-page--half {
     padding: 8mm 14mm 8mm 16mm;
-    min-height: 50vh;
+    /* Половина A4 (297мм / 2 = 148.5мм) минус буфер на разницу экран↔печать.
+       Фиксируем в мм — vh при печати Chrome считает ненадёжно. */
+    min-height: 0;
+    height: 145mm;
+    box-sizing: border-box;
+    overflow: hidden;
+    break-inside: avoid;
+    /* НЕ наследовать page-break-after: always от .tmixed-page —
+       иначе первый вариант выталкивает второй на следующую страницу. */
+    page-break-after: auto;
+    break-after: auto;
     border-bottom: 1px dashed #888;
   }
   .tmixed-page--half:last-of-type {
