@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import katex from 'katex';
+import { printPaged } from '../utils/printPage';
+import { MathInline } from './shared/MathInline';
 import {
   Button, Select, Slider, Radio, Checkbox, Switch,
   Divider, Space, Modal, List, Typography, Tag,
@@ -22,12 +23,6 @@ import {
 
 const { Text } = Typography;
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 const TASK_TYPE_OPTIONS = [
   { value: 'direct', label: 'Прямая (подписать точки)' },
@@ -61,14 +56,7 @@ export default function UnitCircleGenerator() {
     loadSavedList, saveWorksheet, loadWorksheet, deleteWorksheet,
   } = useUnitCircle();
 
-  const handlePrint = () => {
-    const style = document.createElement('style');
-    style.id = 'ucg-print-page-style';
-    style.textContent = '@page { size: A4 portrait; margin: 7mm; }';
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.getElementById('ucg-print-page-style')?.remove(), 1500);
-  };
+  const handlePrint = () => printPaged({ margin: '7mm' });
 
   const handleOpenLoad = async () => {
     await loadSavedList();

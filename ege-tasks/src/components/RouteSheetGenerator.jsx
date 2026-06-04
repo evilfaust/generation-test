@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { printPaged } from '../utils/printPage';
 import {
   App, Button, Divider, Input, Modal, List, Popconfirm,
   Space, Switch, Tooltip, Typography,
@@ -305,14 +306,7 @@ export default function RouteSheetGenerator() {
     }
   }, [addTask, message]);
 
-  const handlePrint = useCallback(() => {
-    const style = document.createElement('style');
-    style.id = 'route-sheet-page-style';
-    style.textContent = '@page { size: A4 portrait; margin: 0; }';
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.getElementById('route-sheet-page-style')?.remove(), 1500);
-  }, []);
+  const handlePrint = useCallback(() => printPaged(), []);
 
   const handleSave = useCallback(async () => {
     if (!tasks.length) { message.warning('Добавьте хотя бы одну задачу'); return; }

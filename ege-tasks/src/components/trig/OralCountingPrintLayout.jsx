@@ -1,15 +1,9 @@
 import React from 'react';
-import katex from 'katex';
+import { MathInline } from '../shared/MathInline';
 import './OralCountingPrintLayout.css';
 
 const LABELS = Array.from({ length: 30 }, (_, i) => String(i + 1));
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 // ─── Одно задание ─────────────────────────────────────────────────────────────
 function TaskRow({ q, qi, equationMode }) {

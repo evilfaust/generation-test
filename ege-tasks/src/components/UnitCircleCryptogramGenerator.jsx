@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import katex from 'katex';
+import { printPaged } from '../utils/printPage';
+import { MathInline } from './shared/MathInline';
 import {
   Button, Select, Radio, Checkbox, Divider,
   Space, Modal, List, Typography, Tag, Input,
@@ -23,12 +24,6 @@ import {
 const { Text } = Typography;
 const { TextArea } = Input;
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 const SHOW_AXES_OPTIONS = [
   { value: 'none', label: 'Ничего' },
@@ -58,14 +53,7 @@ export default function UnitCircleCryptogramGenerator() {
     loadSavedList, saveWorksheet, loadWorksheet, deleteWorksheet,
   } = useCryptogram();
 
-  const handlePrint = () => {
-    const style = document.createElement('style');
-    style.id = 'crg-print-page-style';
-    style.textContent = '@page { size: A4 portrait; margin: 7mm; }';
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.getElementById('crg-print-page-style')?.remove(), 1500);
-  };
+  const handlePrint = () => printPaged({ margin: '7mm' });
 
   const handleOpenLoad = async () => {
     await loadSavedList();

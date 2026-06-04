@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { printPaged } from '../utils/printPage';
 import {
   Button, Input, InputNumber, Space, Tooltip, Select,
   Modal, List, Popconfirm, message, Radio,
@@ -478,14 +479,7 @@ export default function FormulaSheetGenerator() {
     setSavedId(item.id);
   };
 
-  const handlePrint = () => {
-    const style = document.createElement('style');
-    style.id = 'fsheet-print-page-style';
-    style.textContent = '@page { size: A4 portrait; margin: 5mm; }';
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.getElementById('fsheet-print-page-style')?.remove(), 1500);
-  };
+  const handlePrint = () => printPaged({ margin: '5mm' });
 
   const totalFormulas = sections.reduce((s, sec) => s + sec.formulas.length, 0);
   const hasContent = totalFormulas > 0;

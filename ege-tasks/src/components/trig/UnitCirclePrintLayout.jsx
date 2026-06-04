@@ -1,17 +1,7 @@
 import React from 'react';
-import katex from 'katex';
 import './UnitCirclePrintLayout.css';
 import UnitCircleSVG from './UnitCircleSVG';
-
-function MathInline({ latex }) {
-  let html;
-  try {
-    html = katex.renderToString(latex, { throwOnError: false, displayMode: false });
-  } catch {
-    html = latex;
-  }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
+import { MathInline } from '../shared/MathInline';
 
 // Один блок с окружностью + область ответов
 function TaskBlock({ task, isAnswer, settings, taskNumber }) {

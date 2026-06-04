@@ -9,8 +9,7 @@ import {
 import { useOralLogarithms, CATEGORY_LABELS_LOG } from '../hooks/useOralLogarithms';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import OralCountingPrintLayout from './trig/OralCountingPrintLayout';
-import TrigMCSaveModal from './trig/TrigMCSaveModal';
-import TrigMCPrintLayout from './trig/TrigMCPrintLayout';
+import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
   TrigSettingsSection,
@@ -233,23 +232,17 @@ export default function OralLogarithmsGenerator() {
         />
       )}
 
-      <TrigMCSaveModal
+      <TrigMCSection
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+        printTest={printTest}
+        onPrint={handleMCPrint}
         tasksData={tasksData}
         generatorType="oral_logarithms"
         generatorTitle={title}
         settings={settings}
         fillMode={mcFillMode}
-        onPrint={handleMCPrint}
       />
-      {printTest && (
-        <TrigMCPrintLayout
-          variants={printTest.variants}
-          title={printTest.title}
-          shuffleMode={printTest.shuffle_mode || 'fixed'}
-        />
-      )}
     </>
   );
 }

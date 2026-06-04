@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import katex from 'katex';
+import { printPaged } from '../utils/printPage';
+import { MathInline } from './shared/MathInline';
 import { Button, Slider, Checkbox, Divider, Space } from 'antd';
 import { PrinterOutlined, FunctionOutlined, CheckSquareOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useAdditionFormulas } from '../hooks/useAdditionFormulas';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import TrigExprPrintLayout from './trig/TrigExprPrintLayout';
-import TrigMCSaveModal from './trig/TrigMCSaveModal';
-import TrigMCPrintLayout from './trig/TrigMCPrintLayout';
+import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
   TrigSettingsSection,
@@ -16,12 +16,6 @@ import {
   TrigStatBadge,
 } from './trig/TrigGeneratorLayout';
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 const LABELS = Array.from({ length: 20 }, (_, i) => String(i + 1));
 
@@ -49,14 +43,7 @@ export default function AdditionFormulasGenerator() {
   const { title, setTitle, settings, updateSetting, tasksData, generate, reset } = useAdditionFormulas();
   const { modalOpen, setModalOpen, printTest, handlePrint: handleMCPrint } = useTrigMCModal();
 
-  const handlePrint = () => {
-    const style = document.createElement('style');
-    style.id = 'af-print-page-style';
-    style.textContent = '@page { size: A4 portrait; margin: 0; }';
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.getElementById('af-print-page-style')?.remove(), 1500);
-  };
+  const handlePrint = () => printPaged();
 
   const { taskTypes, funcs, incSum, incDiff, variantsCount, tasksPerVariant } = settings;
   const instruction = getInstruction(taskTypes);
@@ -204,22 +191,16 @@ export default function AdditionFormulasGenerator() {
         />
       )}
 
-      <TrigMCSaveModal
+      <TrigMCSection
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+        printTest={printTest}
+        onPrint={handleMCPrint}
         tasksData={tasksData}
         generatorType="addition_formulas"
         generatorTitle={title}
         settings={settings}
-        onPrint={handleMCPrint}
       />
-      {printTest && (
-        <TrigMCPrintLayout
-          variants={printTest.variants}
-          title={printTest.title}
-          shuffleMode={printTest.shuffle_mode || 'fixed'}
-        />
-      )}
     </>
   );
 }

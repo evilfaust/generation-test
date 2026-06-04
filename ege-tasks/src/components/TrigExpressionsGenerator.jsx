@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import katex from 'katex';
+import { MathInline } from './shared/MathInline';
 import {
   Button, Slider, Radio, Checkbox,
   Divider, Space, Switch,
@@ -10,8 +10,7 @@ import {
 import { useTrigExpressions } from '../hooks/useTrigExpressions';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import TrigExprPrintLayout from './trig/TrigExprPrintLayout';
-import TrigMCSaveModal from './trig/TrigMCSaveModal';
-import TrigMCPrintLayout from './trig/TrigMCPrintLayout';
+import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
   TrigSettingsSection,
@@ -21,12 +20,6 @@ import {
   TrigStatBadge,
 } from './trig/TrigGeneratorLayout';
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 const LABELS = Array.from({ length: 20 }, (_, i) => String(i + 1));
 
@@ -208,22 +201,16 @@ export default function TrigExpressionsGenerator() {
         />
       )}
 
-      <TrigMCSaveModal
+      <TrigMCSection
         open={modalOpen}
         onClose={() => setModalOpen(false)}
+        printTest={printTest}
+        onPrint={handleMCPrint}
         tasksData={tasksData}
         generatorType="trig_expressions"
         generatorTitle={title}
         settings={settings}
-        onPrint={handleMCPrint}
       />
-      {printTest && (
-        <TrigMCPrintLayout
-          variants={printTest.variants}
-          title={printTest.title}
-          shuffleMode={printTest.shuffle_mode || 'fixed'}
-        />
-      )}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import katex from 'katex';
+import { printPaged } from '../utils/printPage';
+import { MathInline } from './shared/MathInline';
 import {
   Button, Slider, Radio, Checkbox, Divider, Space,
   Modal, List, Typography, Switch, Tag,
@@ -22,12 +23,6 @@ import {
 
 const { Text } = Typography;
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 function PreviewTable({ points, showSin, showCos, showTan, showCot }) {
   const cols = [
@@ -99,15 +94,9 @@ export default function TrigValuesGenerator() {
     setShowLoadModal(true);
   };
 
-  const handlePrint = () => {
-    const size = settings.layout === 'portrait' ? 'A4 portrait' : 'A4 landscape';
-    const style = document.createElement('style');
-    style.id = 'tvg-print-page-style';
-    style.textContent = `@page { size: ${size}; margin: 0; }`;
-    document.head.appendChild(style);
-    window.print();
-    setTimeout(() => document.getElementById('tvg-print-page-style')?.remove(), 1500);
-  };
+  const handlePrint = () => printPaged({
+    size: settings.layout === 'portrait' ? 'A4 portrait' : 'A4 landscape',
+  });
 
   const columnLabels = [settings.showSin && 'sin', settings.showCos && 'cos', settings.showTan && 'tg', settings.showCot && 'ctg']
     .filter(Boolean)

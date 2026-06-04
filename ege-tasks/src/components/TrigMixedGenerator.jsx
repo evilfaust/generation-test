@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import katex from 'katex';
+import { MathInline } from './shared/MathInline';
 import {
   Button, Switch, Slider, Select, Checkbox, Space,
   Input, Row, Col, Typography, InputNumber, Tabs, Dropdown,
@@ -15,12 +15,6 @@ import { TRIG_TYPES, getTrigType } from '../hooks/trigMixedRegistry';
 
 const { Text } = Typography;
 
-function MathInline({ latex }) {
-  let html;
-  try { html = katex.renderToString(latex, { throwOnError: false, displayMode: false }); }
-  catch { html = latex; }
-  return <span dangerouslySetInnerHTML={{ __html: html }} />;
-}
 
 // ─── Уникальный id для секции ────────────────────────────────────────────────
 let _sectionCounter = 0;
