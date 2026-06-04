@@ -171,8 +171,8 @@ const TECH_STACK = [
     title: 'Backend & Сервисы',
     items: [
       { name: 'PocketBase', ver: '0.36.4', note: 'SQLite + Auth + RLS + Files' },
-      { name: 'Puppeteer', ver: 'core', note: 'PDF-генерация (порт 3001)' },
-      { name: 'Express.js', ver: '', note: 'PDF-сервис + парсер sdamgia' },
+      { name: 'Express.js', ver: '', note: 'backend-сервис: sdamgia + LaTeX + вектор' },
+      { name: 'html2pdf.js', ver: '0.14', note: 'клиентский PDF-экспорт' },
       { name: 'Cheerio', ver: '', note: 'HTML-парсинг' },
     ],
   },
@@ -229,7 +229,7 @@ const API_GROUPS = [
 
 const VPS_ARCH = [
   { service: 'PocketBase', port: '8095', systemd: 'pocketbase-ege', desc: 'Backend API + Auth + Files + SQLite' },
-  { service: 'PDF Service', port: '3001', systemd: 'pdf-service-ege', desc: 'Puppeteer PDF + sdamgia parser' },
+  { service: 'Helper Service', port: '3001', systemd: 'pdf-service-ege', desc: 'sdamgia parser + LaTeX LLM + векторный поиск' },
   { service: 'Telegram Bot', port: '—', systemd: 'telegram-bot-ege', desc: 'Мониторинг VPS + статистика БД' },
 ]
 
@@ -635,12 +635,11 @@ const HowItWorksPage = () => {
                 High-Quality PDF
               </h3>
               <p style={{ color: 'var(--v2-text-dim)', lineHeight: 1.65, marginBottom: 12 }}>
-                Двухуровневая архитектура экспорта с автоматическим переключением.
+                Печать и экспорт прямо из браузера — без серверных зависимостей.
               </p>
               <ul className="v2-how-list">
-                <li><strong style={{ color: 'var(--v2-text)' }}>Основной:</strong> Puppeteer (headless Chrome) — микросервис на порту 3001. Идеальный KaTeX, векторный текст, 2-3× меньший размер</li>
-                <li><strong style={{ color: 'var(--v2-text)' }}>Запасной:</strong> html2pdf.js — клиентский рендеринг, автоматический fallback при недоступности сервиса</li>
-                <li>Хук <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>usePuppeteerPDF</code> — единая точка входа</li>
+                <li><strong style={{ color: 'var(--v2-text)' }}>Печать:</strong> нативный диалог браузера с подготовленными @media print стилями (точная вёрстка А4/А5, клетка, поля)</li>
+                <li><strong style={{ color: 'var(--v2-text)' }}>PDF:</strong> html2pdf.js — клиентский рендеринг, идеальный KaTeX, ничего не уходит на сервер</li>
               </ul>
             </div>
 

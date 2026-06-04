@@ -1,4 +1,4 @@
-import { Button, Space, Tooltip, Dropdown, Divider, Tag } from 'antd';
+import { Button, Tooltip, Divider } from 'antd';
 import {
   PrinterOutlined,
   FilePdfOutlined,
@@ -7,9 +7,6 @@ import {
   FolderOpenOutlined,
   ThunderboltOutlined,
   DeleteOutlined,
-  DownOutlined,
-  CheckOutlined,
-  RocketOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -26,9 +23,6 @@ const ActionButtons = ({
   onExportPDF,
   onExportMD,
   onReset,
-  pdfMethod = 'puppeteer',
-  setPdfMethod,
-  puppeteerAvailable = true,
   exporting = false,
   saving = false,
   generateLabel = 'Сформировать работу',
@@ -37,30 +31,6 @@ const ActionButtons = ({
   loadLabel = 'Открыть сохранённую',
 }) => {
   const { canEdit } = useAuth();
-  const pdfMenuItems = [
-    {
-      key: 'puppeteer',
-      label: (
-        <Space>
-          {pdfMethod === 'puppeteer' && <CheckOutlined style={{ color: '#52c41a' }} />}
-          <RocketOutlined style={{ color: '#52c41a' }} />
-          <span>Высокое качество</span>
-          {!puppeteerAvailable && <Tag color="error" style={{ marginLeft: 4 }}>недоступно</Tag>}
-        </Space>
-      ),
-      disabled: !puppeteerAvailable,
-    },
-    {
-      key: 'legacy',
-      label: (
-        <Space>
-          {pdfMethod === 'legacy' && <CheckOutlined style={{ color: '#52c41a' }} />}
-          <FilePdfOutlined />
-          <span>Стандартный</span>
-        </Space>
-      ),
-    },
-  ];
 
   return (
     <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 8, alignItems: 'center' }}>
@@ -115,29 +85,13 @@ const ActionButtons = ({
             </Tooltip>
           )}
 
-          {/* PDF — кнопка с dropdown для выбора метода */}
+          {/* PDF — клиентский экспорт через html2pdf */}
           {onExportPDF && (
-            setPdfMethod ? (
-              <Dropdown.Button
-                icon={<DownOutlined />}
-                onClick={onExportPDF}
-                loading={exporting}
-                menu={{
-                  items: pdfMenuItems,
-                  onClick: ({ key }) => setPdfMethod(key),
-                }}
-              >
-                <FilePdfOutlined />
-                {' PDF'}
-                {pdfMethod === 'puppeteer' && puppeteerAvailable && (
-                  <RocketOutlined style={{ color: '#52c41a', marginLeft: 4, fontSize: 11 }} />
-                )}
-              </Dropdown.Button>
-            ) : (
+            <Tooltip title="Скачать PDF (клиентский рендеринг)">
               <Button icon={<FilePdfOutlined />} onClick={onExportPDF} loading={exporting}>
                 PDF
               </Button>
-            )
+            </Tooltip>
           )}
 
           {/* Markdown */}

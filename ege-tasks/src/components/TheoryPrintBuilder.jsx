@@ -5,7 +5,7 @@ import {
   HolderOutlined, CloseOutlined, FileTextOutlined,
   BookOutlined, OrderedListOutlined
 } from '@ant-design/icons';
-import { useMarkdownProcessor, usePuppeteerPDF } from '../hooks';
+import { useMarkdownProcessor } from '../hooks';
 import { getPageDimensions, DEFAULT_SETTINGS, THEME_NAMES } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import html2pdf from 'html2pdf.js';
@@ -31,7 +31,6 @@ export default function TheoryPrintBuilder({ onBack }) {
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const previewRef = useRef(null);
-  const puppeteerPDF = usePuppeteerPDF();
 
   useEffect(() => {
     loadArticlesList();
@@ -170,20 +169,7 @@ export default function TheoryPrintBuilder({ onBack }) {
       return;
     }
     const filename = (docTitle || 'conspect').trim();
-    const puppeteerSuccess = await puppeteerPDF.exportToPDF(previewRef, filename, {
-      format: pageSettings.pageSize || 'A4',
-      landscape: pageSettings.orientation === 'landscape',
-      marginTop: `${pageSettings.marginTop}mm`,
-      marginBottom: `${pageSettings.marginBottom}mm`,
-      marginLeft: `${pageSettings.marginLeft}mm`,
-      marginRight: `${pageSettings.marginRight}mm`,
-    });
-
-    if (puppeteerSuccess || !previewRef.current || puppeteerPDF.serverAvailable) {
-      return;
-    }
-
-    message.warning('PDF-сервис недоступен. Используем резервный экспорт.');
+    if (!previewRef.current) return;
     setIsExporting(true);
     try {
       const dims = getPageDimensions(pageSettings.pageSize, pageSettings.orientation);
@@ -200,14 +186,14 @@ export default function TheoryPrintBuilder({ onBack }) {
       };
 
       await html2pdf().set(opt).from(previewRef.current).save();
-      message.success('PDF конспект экспортирован (резервный метод)');
+      message.success('PDF конспект экспортирован');
     } catch (error) {
       console.error('PDF export error:', error);
       message.error('Ошибка при экспорте PDF');
     } finally {
       setIsExporting(false);
     }
-  }, [selectedArticles, docTitle, pageSettings, puppeteerPDF, message]);
+  }, [selectedArticles, docTitle, pageSettings, message]);
 
   const handlePrint = () => window.print();
 
@@ -266,7 +252,7 @@ export default function TheoryPrintBuilder({ onBack }) {
               type="text"
               icon={<FilePdfOutlined />}
               onClick={handleExportPDF}
-              loading={isExporting || puppeteerPDF.exporting}
+              loading={isExporting}
               disabled={selectedArticles.length === 0}
             />
           </Tooltip>

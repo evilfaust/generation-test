@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { App } from 'antd';
 import html2pdf from 'html2pdf.js';
 import { api } from '../services/pocketbase';
-import { usePuppeteerPDF } from './usePuppeteerPDF';
 
 /**
  * Хук для действий с листами работ (сохранение, печать, экспорт)
@@ -11,9 +10,6 @@ export const useWorksheetActions = () => {
   const { message } = App.useApp();
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [pdfMethod, setPdfMethod] = useState('puppeteer'); // 'puppeteer' | 'legacy'
-
-  const puppeteerPDF = usePuppeteerPDF();
 
   /**
    * Печать листа
@@ -39,28 +35,11 @@ export const useWorksheetActions = () => {
   };
 
   /**
-   * Экспорт в PDF (основной метод с выбором)
+   * Экспорт в PDF — клиентский рендеринг через html2pdf.js.
+   * (Серверная PDF-генерация через Puppeteer/Chromium выпилена — браузерная
+   *  печать «Печать» + этот клиентский экспорт покрывают потребность.)
    */
-  const handleExportPDF = async (printRef, filename = 'Лист задач', options = {}) => {
-    if (pdfMethod === 'puppeteer') {
-      const success = await puppeteerPDF.exportToPDF(printRef, filename, options);
-
-      // Fallback на старый метод если Puppeteer недоступен
-      if (!success && !puppeteerPDF.serverAvailable) {
-        message.warning('Переключаемся на резервный метод экспорта...');
-        return handleExportPDFLegacy(printRef, filename);
-      }
-
-      return success;
-    } else {
-      return handleExportPDFLegacy(printRef, filename);
-    }
-  };
-
-  /**
-   * Экспорт в PDF (старый метод через html2pdf.js)
-   */
-  const handleExportPDFLegacy = async (printRef, filename = 'Лист задач') => {
+  const handleExportPDF = async (printRef, filename = 'Лист задач') => {
     if (!printRef?.current) {
       message.error('Не найден элемент для экспорта');
       return false;
@@ -269,18 +248,13 @@ export const useWorksheetActions = () => {
 
   return {
     saving,
-    exporting: exporting || puppeteerPDF.exporting,
+    exporting,
     handlePrint,
     handleExportPDF,
-    handleExportPDFLegacy,
     handleSaveWork,
     handleUpdateWork,
     handleLoadWorks,
     handleLoadWork,
     handleDeleteWork,
-    // Настройки PDF
-    pdfMethod,
-    setPdfMethod,
-    puppeteerAvailable: puppeteerPDF.serverAvailable,
   };
 };

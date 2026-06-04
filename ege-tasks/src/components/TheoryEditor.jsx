@@ -5,7 +5,7 @@ import {
   FormatPainterOutlined, ColumnWidthOutlined, FilePdfOutlined,
   ArrowLeftOutlined, TagsOutlined, CheckCircleOutlined, NodeIndexOutlined
 } from '@ant-design/icons';
-import { useMarkdownProcessor, useKeyboardShortcuts, useDocumentStats, useAutosave, loadAutosave, usePuppeteerPDF, useGeoGebraInjection } from '../hooks';
+import { useMarkdownProcessor, useKeyboardShortcuts, useDocumentStats, useAutosave, loadAutosave, useGeoGebraInjection } from '../hooks';
 import { getPageDimensions, DEFAULT_SETTINGS, THEME_NAMES } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
@@ -77,7 +77,6 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
   const editorRef = useRef(null);
   const previewRef = useRef(null);
   const containerRef = useRef(null);
-  const puppeteerPDF = usePuppeteerPDF();
 
   // Process markdown
   const html = useMarkdownProcessor(markdown, pageSettings.columns);
@@ -202,17 +201,7 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
   // Export PDF
   const handleExportPDF = useCallback(async () => {
     const filename = (title || 'theory-article').trim();
-    const puppeteerSuccess = await puppeteerPDF.exportToPDF(previewRef, filename, {
-      format: pageSettings.pageSize || 'A4',
-      landscape: pageSettings.orientation === 'landscape',
-      marginTop: `${pageSettings.marginTop}mm`,
-      marginBottom: `${pageSettings.marginBottom}mm`,
-      marginLeft: `${pageSettings.marginLeft}mm`,
-      marginRight: `${pageSettings.marginRight}mm`,
-    });
-    if (puppeteerSuccess || !previewRef.current || puppeteerPDF.serverAvailable) return;
-
-    message.warning('PDF-сервис недоступен. Используем резервный экспорт.');
+    if (!previewRef.current) return;
     setIsExporting(true);
     try {
       const dims = getPageDimensions(pageSettings.pageSize, pageSettings.orientation);
@@ -224,14 +213,14 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
         jsPDF: { unit: 'mm', format: [dims.width, dims.height], orientation: pageSettings.orientation },
       };
       await html2pdf().set(opt).from(previewRef.current).save();
-      message.success('PDF экспортирован (резервный метод)');
+      message.success('PDF экспортирован');
     } catch (error) {
       console.error('PDF export error:', error);
       message.error('Ошибка при экспорте PDF');
     } finally {
       setIsExporting(false);
     }
-  }, [title, pageSettings, puppeteerPDF, message]);
+  }, [title, pageSettings, message]);
 
   // Toggle columns
   const toggleColumns = useCallback(() => {
@@ -374,7 +363,7 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
               size="small"
               icon={<FilePdfOutlined />}
               onClick={handleExportPDF}
-              loading={isExporting || puppeteerPDF.exporting}
+              loading={isExporting}
             />
           </Tooltip>
         </div>

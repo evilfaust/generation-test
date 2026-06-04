@@ -332,9 +332,6 @@ const EgeVariantGenerator = () => {
     handleLoadWorks,
     handleLoadWork,
     handleDeleteWork,
-    pdfMethod,
-    setPdfMethod,
-    puppeteerAvailable,
   } = useWorksheetActions();
   const taskEditing = useTaskEditing(variants, setVariants);
 
@@ -879,9 +876,6 @@ const EgeVariantGenerator = () => {
               onPrint={kimStyle ? null : () => handlePrint(printRef)}
               onExportPDF={kimStyle ? null : () => handleExportPDF(printRef, 'Вариант ЕГЭ базовый уровень')}
               onSave={() => setSaveModalVisible(true)}
-              pdfMethod={pdfMethod}
-              setPdfMethod={kimStyle ? null : setPdfMethod}
-              puppeteerAvailable={puppeteerAvailable}
               saving={saving}
               exporting={exporting}
             />

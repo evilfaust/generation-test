@@ -4,7 +4,7 @@ import {
   ArrowLeftOutlined, EditOutlined, FilePdfOutlined,
   PrinterOutlined, FormatPainterOutlined, BookOutlined
 } from '@ant-design/icons';
-import { useMarkdownProcessor, usePuppeteerPDF, useGeoGebraInjection } from '../hooks';
+import { useMarkdownProcessor, useGeoGebraInjection } from '../hooks';
 import { getPageDimensions, DEFAULT_SETTINGS, THEME_NAMES } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import MathRenderer from './MathRenderer';
@@ -33,7 +33,6 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
   const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
   const previewRef = useRef(null);
   const contentRef = useRef(null);
-  const puppeteerPDF = usePuppeteerPDF();
 
   useEffect(() => {
     if (articleId) loadArticle(articleId);
@@ -165,17 +164,7 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
   const handleExportPDF = useCallback(async () => {
     if (!article) return;
     const filename = (article.title || 'theory').trim();
-    const puppeteerSuccess = await puppeteerPDF.exportToPDF(previewRef, filename, {
-      format: pageSettings.pageSize || 'A4',
-      landscape: pageSettings.orientation === 'landscape',
-      marginTop: `${pageSettings.marginTop}mm`,
-      marginBottom: `${pageSettings.marginBottom}mm`,
-      marginLeft: `${pageSettings.marginLeft}mm`,
-      marginRight: `${pageSettings.marginRight}mm`,
-    });
-    if (puppeteerSuccess || !previewRef.current || puppeteerPDF.serverAvailable) return;
-
-    message.warning('PDF-сервис недоступен. Используем резервный экспорт.');
+    if (!previewRef.current) return;
     setIsExporting(true);
     try {
       const dims = getPageDimensions(pageSettings.pageSize, pageSettings.orientation);
@@ -187,14 +176,14 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
         jsPDF: { unit: 'mm', format: [dims.width, dims.height], orientation: pageSettings.orientation },
       };
       await html2pdf().set(opt).from(previewRef.current).save();
-      message.success('PDF экспортирован (резервный метод)');
+      message.success('PDF экспортирован');
     } catch (error) {
       console.error('PDF export error:', error);
       message.error('Ошибка при экспорте PDF');
     } finally {
       setIsExporting(false);
     }
-  }, [article, pageSettings, puppeteerPDF, message]);
+  }, [article, pageSettings, message]);
 
   const handlePrint = useCallback(() => window.print(), []);
 
@@ -251,7 +240,7 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
               type="text"
               icon={<FilePdfOutlined />}
               onClick={handleExportPDF}
-              loading={isExporting || puppeteerPDF.exporting}
+              loading={isExporting}
             />
           </Tooltip>
         </div>
@@ -366,7 +355,7 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
             shape="circle"
             icon={<FilePdfOutlined />}
             onClick={handleExportPDF}
-            loading={isExporting || puppeteerPDF.exporting}
+            loading={isExporting}
           />
         </Tooltip>
         <Tooltip title="Тема" placement="left">

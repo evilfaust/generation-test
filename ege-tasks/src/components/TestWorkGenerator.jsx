@@ -59,9 +59,6 @@ const TestWorkGenerator = () => {
     handleLoadWorks,
     handleLoadWork,
     handleDeleteWork,
-    pdfMethod,
-    setPdfMethod,
-    puppeteerAvailable,
   } = useWorksheetActions();
   const taskEditing = useTaskEditing(variants, setVariants);
 
@@ -445,24 +442,9 @@ const TestWorkGenerator = () => {
               onOpenLoad={handleOpenLoadModal}
               onSave={() => setSaveModalVisible(true)}
               onPrint={handlePrint}
-              onExportPDF={() => handleExportPDF(printRef, form.getFieldValue('workTitle'), {
-                marginTop: '5mm', marginBottom: '5mm', marginLeft: '5mm', marginRight: '5mm',
-                extraCSS: `
-                  .printable-worksheet { min-height: 0 !important; padding: 0 !important; }
-                  .title-page { min-height: 0 !important; }
-                  .variant-container { padding-top: 0 !important; margin-bottom: 6px !important; }
-                  .variant-header { padding: 4px 8px !important; margin-bottom: 4px !important; }
-                  .tasks-content { margin-top: 6px !important; }
-                  .task-item { margin-bottom: 8px !important; padding-bottom: 6px !important; }
-                  .answers-page { padding: 8px !important; }
-                  .variant-answers { margin-bottom: 12px !important; }
-                `,
-              })}
+              onExportPDF={() => handleExportPDF(printRef, form.getFieldValue('workTitle'))}
               onExportMD={handleExportMD}
               onReset={handleReset}
-              pdfMethod={pdfMethod}
-              setPdfMethod={setPdfMethod}
-              puppeteerAvailable={puppeteerAvailable}
               exporting={exporting}
               saving={saving}
               generateLabel="Сформировать работу"

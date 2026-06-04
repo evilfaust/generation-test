@@ -78,9 +78,6 @@ export default function ResultActionBar({
             onExportPDF={onExportPDF}
             onExportMD={onExportMD}
             onReset={onReset}
-            pdfMethod={worksheetActions.pdfMethod}
-            setPdfMethod={worksheetActions.setPdfMethod}
-            puppeteerAvailable={worksheetActions.puppeteerAvailable}
             exporting={worksheetActions.exporting}
             saving={worksheetActions.saving}
           />

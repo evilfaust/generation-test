@@ -1,9 +1,8 @@
 import { useRef, useState, useLayoutEffect } from 'react';
 import { Button, Space, Typography, Segmented } from 'antd';
-import { ArrowLeftOutlined, PrinterOutlined, FilePdfOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PrinterOutlined } from '@ant-design/icons';
 import { api } from '../../services/pocketbase';
 import MathRenderer from '../../shared/components/MathRenderer';
-import { usePuppeteerPDF } from '../../hooks/usePuppeteerPDF';
 import './TDFPrintView.css';
 
 const { Text } = Typography;
@@ -106,7 +105,6 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
   const rowRefs = useRef({});
   const theadRef = useRef(null);
   const measureRootRef = useRef(null); // точный источник pxPerMm
-  const { exportToPDF, exporting } = usePuppeteerPDF();
 
   const [portrait, setPortrait] = useState(false);
   const [drawingSize, setDrawingSize] = useState('m');
@@ -198,14 +196,6 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
     document.head.appendChild(style);
     window.print();
     setTimeout(() => document.head.removeChild(style), 1500);
-  };
-
-  const handleExportPDF = () => {
-    const filename = isBlank
-      ? `ТДФ_Вариант${variantNumber}_${tdfSet?.title || ''}.pdf`
-      : `ТДФ_Конспект_${tdfSet?.title || ''}.pdf`;
-    const landscape = useGeoLayout ? false : !portrait;
-    exportToPDF(printRef, filename, { format: 'A4', landscape });
   };
 
   // ── Переиспользуемые части ──────────────────────────────────────────────────
@@ -439,9 +429,6 @@ export default function TDFPrintView({ tdfSet, items, mode, variantNumber, varia
           </>
         )}
         <Button icon={<PrinterOutlined />} onClick={handlePrint}>Печать</Button>
-        <Button icon={<FilePdfOutlined />} onClick={handleExportPDF} loading={exporting}>
-          Скачать PDF
-        </Button>
       </Space>
       <Text type="secondary" style={{ marginLeft: 16 }}>
         {isBlank ? `Вариант ${variantNumber}${variantTitle ? ' — ' + variantTitle : ''}` : 'Эталонный конспект'}
