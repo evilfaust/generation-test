@@ -14,6 +14,16 @@
   margin: 0;
 }
 
+/* Именованная страница КИМ — привязана к .kim-page через `page: kim`.
+   Гарантирует A5 + поля 0 ИМЕННО для буклета, перебивая глобальный
+   @page { margin: 10mm 8mm } из TaskWorksheet.css независимо от порядка
+   загрузки CSS и выбора «Поля» в диалоге печати. Без этого боковые поля
+   8мм обрезали правый край длинных задач (например, ОГЭ №1). */
+@page kim {
+  size: A5 portrait;
+  margin: 0;
+}
+
 /* ─── КИМ Booklet ─── */
 
 .kim-booklet {
@@ -31,6 +41,8 @@
   flex-direction: column;
   background: #fff;
   position: relative;
+  /* Привязка к именованной @page kim (A5, поля 0) — см. выше */
+  page: kim;
 }
 
 /* ─── Cover page ─── */
@@ -369,16 +381,32 @@
   }
 
   .kim-page {
-    width: 148.5mm;
+    /* width: 100% (а не жёсткие 148.5mm) — страница занимает всю печатную
+       ширину A5. Контент физически не может вылезти за правый край, даже если
+       Chrome применит боковые поля. С инъекцией @page { margin:0 } это ровно
+       148mm; без неё — печатная ширина минус поля, без горизонтальной обрезки. */
+    width: 100%;
     height: 210mm;
     min-height: 0;
+    /* overflow:hidden — переполнение клипуется ВНУТРИ страницы и не «каскадит»
+       на соседние листы (иначе переполнение обложки/страницы накрывало
+       последнюю part-2 страницу, и она печаталась пустой). */
+    overflow: hidden;
     border: none !important;
     box-shadow: none !important;
     break-after: page;
     page-break-after: always;
-    break-inside: avoid;
-    page-break-inside: avoid;
+    /* break-inside: avoid НЕ нужен — страницы и так разделены break-after:page;
+       на полностраничном элементе он сбивал раскладку Chrome (терялся контент
+       последней страницы). */
     justify-content: flex-start;
+  }
+
+  /* Обложка: высота на 4мм меньше листа — иначе футер (прижатый к низу через
+     justify-content:space-between) из-за округлений уезжал на пустой 2-й лист. */
+  .kim-page.kim-page-cover {
+    height: 206mm;
+    justify-content: space-between;
   }
 
   .kim-page:last-child {

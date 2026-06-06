@@ -618,14 +618,27 @@ function parseProblemFromDiv($, probDiv, baseUrl) {
       }
     }
 
-    // Условие задачи
-    const pbody = $(probDiv).find('.pbody');
-    if (pbody.length) {
-      const { text, images, formulas } = processCondition($, pbody.get(0), baseUrl, 'condition');
-      problem.condition = text;
-      problem.condition_images = images;
-      problem.images = images.map(img => img.url); // backward-compat (старый фронт)
-      allFormulas.push(...formulas);
+    // Условие задачи.
+    // У обычных задач — один .pbody (полный текст). У БЛОЧНЫХ задач ОГЭ
+    // (задания 1–5, практико-ориентированный блок) контекст и вопрос лежат в
+    // РАЗНЫХ .pbody: #1 — общая вводная (план/ситуация), #2 — конкретный вопрос.
+    // Берём ВСЕ .pbody условия (вне .solution/.answer/.prob_crits) и склеиваем —
+    // иначе вопрос теряется и задачи 1–5 выглядят одинаково (только вводная).
+    const condPbodies = $(probDiv).find('.pbody').filter(function () {
+      return $(this).closest('.solution, .answer, .prob_crits').length === 0;
+    });
+    if (condPbodies.length) {
+      const texts = [];
+      const imagesAll = [];
+      condPbodies.each(function () {
+        const { text, images, formulas } = processCondition($, this, baseUrl, 'condition');
+        if (text && text.trim()) texts.push(text.trim());
+        imagesAll.push(...images);
+        allFormulas.push(...formulas);
+      });
+      problem.condition = texts.join('\n\n');
+      problem.condition_images = imagesAll;
+      problem.images = imagesAll.map(img => img.url); // backward-compat (старый фронт)
     }
 
     // Ответ

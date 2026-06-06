@@ -122,6 +122,54 @@ export const tasksApi = {
     }
   },
 
+  /**
+   * Сюжеты ОГЭ для практического блока заданий 1–5.
+   *
+   * Задания 1–5 ОГЭ самодостаточны (вводная + план вшиты в текст), но
+   * сгруппированы в «сюжеты» через relation tasks.context → task_contexts
+   * (один план/ситуация = один контекст). Чтобы собрать связный блок 1–5
+   * с ОБЩИМ планом, генератор берёт все 5 заданий из одного сюжета.
+   *
+   * Возвращает только ПОЛНЫЕ сюжеты (есть хотя бы по одной задаче каждого
+   * из номеров 1..5). Внутри — задачи сгруппированы по номеру задания.
+   * Поле `title` — название сюжета (из task_contexts) для выбора учителем.
+   *
+   * @returns {Promise<Array<{ id: string, title: string, byNum: Object<number, Array> }>>}
+   */
+  async getOgeContextBlocks() {
+    try {
+      const tasks = await pb.collection('tasks').getFullList({
+        filter: 'context != "" && topic.exam_type = "oge"',
+        expand: 'topic,context,tags,subtopic',
+        sort: 'code',
+      });
+
+      const blocks = new Map();
+      for (const t of tasks) {
+        const num = t.expand?.topic?.ege_number;
+        if (!num || num < 1 || num > 5) continue;
+        if (!blocks.has(t.context)) {
+          blocks.set(t.context, {
+            id: t.context,
+            title: t.expand?.context?.title || '',
+            byNum: {},
+          });
+        }
+        const b = blocks.get(t.context);
+        if (!b.title && t.expand?.context?.title) b.title = t.expand.context.title;
+        (b.byNum[num] ||= []).push(t);
+      }
+
+      // Только полные сюжеты — где есть все номера 1..5
+      return [...blocks.values()]
+        .filter(b => [1, 2, 3, 4, 5].every(n => (b.byNum[n] || []).length > 0))
+        .sort((a, b) => (a.title || '').localeCompare(b.title || '', 'ru'));
+    } catch (error) {
+      console.error('Error fetching OGE context blocks:', error);
+      return [];
+    }
+  },
+
   // Получить случайные задачи
   async getRandomTasks(count, filters = {}) {
     try {

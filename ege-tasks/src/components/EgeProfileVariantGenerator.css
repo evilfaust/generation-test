@@ -2,6 +2,15 @@
    Базовые классы (.kim-page, .kim-book-task, .kim-page-header/footer/note и т.д.)
    переиспользуются из EgeVariantGenerator.css — здесь только профильные нюансы. */
 
+/* ─── Компактная обложка (ОГЭ: длинная инструкция не влезала в 210мм →
+   футер уезжал на пустую вторую страницу). Ужимаем отступы и текст. ─── */
+.kim-page-cover.kim-cover--compact .kim-cover-body { padding-top: 10mm; }
+.kim-page-cover.kim-cover--compact .kim-cover-student-row { margin-top: 7mm; }
+.kim-page-cover.kim-cover--compact .kim-cover-instruction-title { margin: 5mm 0 2.5mm; }
+.kim-page-cover.kim-cover--compact .kim-cover-text { font-size: 12px; line-height: 1.18; }
+.kim-page-cover.kim-cover--compact .kim-cover-text p { margin: 0 0 1.5mm; }
+.kim-page-cover.kim-cover--compact .kim-cover-wish { margin-top: 6mm; }
+
 /* ─── Блок-разделитель «Часть 2» ─── */
 
 .kim-part2-intro {
