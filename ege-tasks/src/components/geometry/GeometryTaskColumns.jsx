@@ -8,6 +8,20 @@ const { Text } = Typography;
 export const DIFFICULTY_COLORS = { 1: '#52c41a', 2: '#faad14', 3: '#ff4d4f', 4: '#a8071a', 5: '#722ed1' };
 export const DIFFICULTY_LABELS = { 1: 'Базовый', 2: 'Средний', 3: 'Повышенный', 4: 'Высокий', 5: 'Олимпиадный' };
 
+// Превращает statement_md в короткий plain-текст для предпросмотра в таблице.
+// Убираем картинки, markdown-разметку и $-обёртки формул, схлопываем пробелы.
+function statementPreview(md) {
+  if (!md) return '';
+  return String(md)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // ![alt](url) — картинки
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // [text](url) — ссылки → текст
+    .replace(/\$\$([\s\S]*?)\$\$/g, '$1')    // $$...$$
+    .replace(/\$([^$]*)\$/g, '$1')           // $...$
+    .replace(/[#>*_`~]/g, '')                // markdown-символы
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Колонки таблицы задач геометрии, вынесены из GeometryTaskList.jsx (god-компонент).
 // Замыкания на state/обработчики передаются явным объектом deps.
 export function buildGeometryColumns({
@@ -61,6 +75,7 @@ export function buildGeometryColumns({
     {
       title: 'Тема / Подтема',
       key: 'topic_subtopic',
+      width: 220,
       ellipsis: true,
       render: (_, record) => {
         const topic = record.expand?.topic?.title;
@@ -71,6 +86,20 @@ export function buildGeometryColumns({
             {topic && <Text style={{ fontSize: 12 }}>{topic}</Text>}
             {subtopic && <Text type="secondary" style={{ fontSize: 11 }}>{subtopic}</Text>}
           </Space>
+        );
+      },
+    },
+    {
+      title: 'Условие',
+      key: 'statement_preview',
+      ellipsis: true,
+      render: (_, record) => {
+        const preview = statementPreview(record.statement_md);
+        if (!preview) return <Text type="secondary">—</Text>;
+        return (
+          <Tooltip title={preview} mouseEnterDelay={0.4}>
+            <Text type="secondary" style={{ fontSize: 12 }}>{preview}</Text>
+          </Tooltip>
         );
       },
     },
