@@ -14,7 +14,7 @@ import {
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
-  PercentageOutlined, HomeOutlined,
+  PercentageOutlined, HomeOutlined, CalendarOutlined,
 } from '@ant-design/icons';
 // ── Ленивая загрузка страниц-компонентов ────────────────────────────────────
 // Все компоненты ниже используются ТОЛЬКО как элементы маршрутов (через page-
@@ -28,6 +28,7 @@ const GroupDetail = lazy(() => import('./components/workspace/GroupDetail'));
 const GradeJournal = lazy(() => import('./components/workspace/GradeJournal'));
 const KtpList = lazy(() => import('./components/workspace/KtpList'));
 const KtpEditor = lazy(() => import('./components/workspace/KtpEditor'));
+const TeacherCalendar = lazy(() => import('./components/workspace/TeacherCalendar'));
 const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
 const TestWorkGenerator = lazy(() => import('./components/TestWorkGenerator'));
 const EgeVariantGenerator = lazy(() => import('./components/EgeVariantGenerator'));
@@ -109,6 +110,7 @@ export const R = {
   JOURNAL:             '/app/journal',
   KTP:                 '/app/ktp',
   KTP_EDITOR:          '/app/ktp/:courseId',
+  CALENDAR:            '/app/calendar',
   TASKS:               '/app/tasks',
   STATS:               '/app/stats',
   CATALOG:             '/app/catalog',
@@ -198,6 +200,7 @@ const ROUTE_META = [
   { re: /^\/app\/journal$/,       menuKey: 'journal', menuGroup: 'workspace-group', title: 'Журнал сдачи' },
   { re: /^\/app\/ktp\/[^/]+$/,    menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП' },
   { re: /^\/app\/ktp$/,           menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП — планирование' },
+  { re: /^\/app\/calendar$/,      menuKey: 'calendar', menuGroup: 'workspace-group', title: 'Календарь' },
   // Работы (detail)
   { re: /^\/app\/works\/[^/]+\/edit/, menuKey: 'work-editor',        title: 'Редактор работ' },
   // Ученики (detail + sub-pages)
@@ -274,6 +277,7 @@ const MENU_KEY_PATH = {
   groups:                   R.GROUPS,
   journal:                  R.JOURNAL,
   ktp:                      R.KTP,
+  calendar:                 R.CALENDAR,
   tasks:                    R.TASKS,
   stats:                    R.STATS,
   generator:                R.GENERATOR,
@@ -579,6 +583,7 @@ function AppLayout() {
       key: 'workspace-group', icon: <HomeOutlined />, label: 'Моё пространство', section: 'workspace',
       children: [
         { key: 'groups', icon: <TeamOutlined />, label: 'Классы и группы' },
+        { key: 'calendar', icon: <CalendarOutlined />, label: 'Календарь' },
         { key: 'ktp', icon: <SnippetsOutlined />, label: 'КТП' },
         { key: 'journal', icon: <SolutionOutlined />, label: 'Журнал сдачи' },
       ],
@@ -832,6 +837,7 @@ function App() {
               <Route path={R.JOURNAL}       element={<GradeJournal />} />
               <Route path={R.KTP}           element={<KtpList />} />
               <Route path={R.KTP_EDITOR}    element={<KtpEditor />} />
+              <Route path={R.CALENDAR}      element={<TeacherCalendar />} />
 
               {/* Задачи */}
               <Route path={R.TASKS}   element={<TasksPage />} />

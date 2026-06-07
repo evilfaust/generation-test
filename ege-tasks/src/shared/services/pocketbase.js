@@ -21,6 +21,7 @@ import { tdfApi } from './pb/tdf.js';
 import { worksheetsApi } from './pb/worksheets.js';
 import { groupsApi } from './pb/groups.js';
 import { ktpApi } from './pb/ktp.js';
+import { lessonsApi } from './pb/lessons.js';
 
 export const api = {
   ...extrasApi,
@@ -38,6 +39,7 @@ export const api = {
   ...worksheetsApi,
   ...groupsApi,
   ...ktpApi,
+  ...lessonsApi,
 };
 
 export default pb;

@@ -1,5 +1,20 @@
 # Changelog — История изменений
 
+## [3.9.51] - 2026-06-07
+
+### Добавлено
+- **Учительское фло — Календарь (фаза 4).** Сущность «Урок» (`lessons`, миграция
+  `1779000013`): owner→teachers, group→teaching_groups, ktp_entry→ktp_entries
+  (опц.), title, date_plan, date_fact, status (planned/done/cancelled), note_md,
+  materials(json). API `pb/lessons.js`.
+- **Календарь-линза** (`components/workspace/TeacherCalendar.jsx`, роут
+  `/app/calendar`) на `react-big-calendar` (dayjs-локализатор, ru): уроки +
+  дедлайны выдач на сетке месяц/неделя/день/список. **Drag события → перенос даты**
+  (урок → `lessons.date_plan`, дедлайн → `work_sessions.deadline`) — закрывает боль
+  пересчёта дат при сдвигах. Клик по пустому слоту → создание урока; клик по уроку →
+  редактирование (тема/группа/статус/дата/заметка). Фильтр по группе, тумблер
+  дедлайнов, тёмная тема. Новая зависимость `react-big-calendar@1`.
+
 ## [3.9.50] - 2026-06-07
 
 ### Добавлено

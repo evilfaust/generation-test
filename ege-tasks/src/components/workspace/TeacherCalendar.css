@@ -1,0 +1,79 @@
+/* Календарь учителя — поверх стилей react-big-calendar */
+
+.teacher-calendar-wrap {
+  background: var(--ant-color-bg-container, #fff);
+  border-radius: 8px;
+}
+
+/* Типы событий */
+.rbc-evt-lesson {
+  background-color: #1677ff;
+  border-color: #1677ff;
+}
+.rbc-evt-lesson.rbc-evt-done {
+  background-color: #52c41a;
+  border-color: #52c41a;
+}
+.rbc-evt-lesson.rbc-evt-cancelled {
+  background-color: #bfbfbf;
+  border-color: #bfbfbf;
+  text-decoration: line-through;
+}
+.rbc-evt-deadline {
+  background-color: #fa8c16;
+  border-color: #fa8c16;
+}
+
+/* Подсветка «сегодня» */
+.rbc-today {
+  background-color: rgba(22, 119, 255, 0.06);
+}
+
+/* ── Тёмная тема ───────────────────────────────────────────────────────── */
+[data-theme='dark'] .teacher-calendar-wrap,
+.dark .teacher-calendar-wrap {
+  background: #141414;
+}
+[data-theme='dark'] .rbc-calendar,
+.dark .rbc-calendar {
+  color: rgba(255, 255, 255, 0.85);
+}
+[data-theme='dark'] .rbc-off-range-bg,
+.dark .rbc-off-range-bg {
+  background: #1d1d1d;
+}
+[data-theme='dark'] .rbc-header,
+[data-theme='dark'] .rbc-month-view,
+[data-theme='dark'] .rbc-time-view,
+[data-theme='dark'] .rbc-day-bg,
+[data-theme='dark'] .rbc-time-content,
+[data-theme='dark'] .rbc-time-header-content,
+[data-theme='dark'] .rbc-timeslot-group,
+.dark .rbc-header,
+.dark .rbc-month-view,
+.dark .rbc-time-view,
+.dark .rbc-day-bg,
+.dark .rbc-time-content,
+.dark .rbc-time-header-content,
+.dark .rbc-timeslot-group {
+  border-color: #303030 !important;
+}
+[data-theme='dark'] .rbc-today,
+.dark .rbc-today {
+  background-color: rgba(22, 119, 255, 0.16);
+}
+[data-theme='dark'] .rbc-toolbar button,
+.dark .rbc-toolbar button {
+  color: rgba(255, 255, 255, 0.85);
+}
+[data-theme='dark'] .rbc-toolbar button:hover,
+[data-theme='dark'] .rbc-toolbar button.rbc-active,
+.dark .rbc-toolbar button:hover,
+.dark .rbc-toolbar button.rbc-active {
+  background-color: #1677ff;
+  color: #fff;
+}
+[data-theme='dark'] .rbc-off-range,
+.dark .rbc-off-range {
+  color: rgba(255, 255, 255, 0.3);
+}
