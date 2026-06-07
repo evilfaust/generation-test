@@ -465,9 +465,24 @@ GradeJournal · `/app/notes` NotesWorkspace.
 - Журнал матчит попытки по relation `attempt.student` → видит только залогиненных
   учеников (анонимные device-only не попадают — ожидаемо для MVP).
 
-**Следующий шаг по «поехали»** (на выбор): (а) фаза 3 — КТП как ось (темы по неделям +
-экспорт Word/PDF); (б) интеграция ege-journal (пуш внешних решу-результатов в журнал);
-(в) фундамент owner-фильтрации + настоящие PB-правила (перед мультиучительством/ПДн).
+**✅ ФАЗА 3 ОТГРУЖЕНА (2026-06-07).** КТП как ось времени в проде:
+- Миграция `1779000012_create_ktp.js` — коллекции `courses` (owner→teachers,
+  group→teaching_groups опц., title, year, archived) + `ktp_entries` (course→
+  cascadeDelete, order, title, topic→topics опц. из фонда, hours, week_no,
+  planned_date, planned_results, is_section). Применена после бэкапа
+  `backup_2026-06-07_12-23-00`.
+- API `pb/ktp.js` (CRUD courses/entries + reorder). UI `components/workspace/
+  {KtpList,KtpEditor,KtpPrintView}.jsx`. Роуты `/app/ktp`, `/app/ktp/:courseId`.
+- **Экспорт Word** (`docx@9`, ленивый, `utils/ktpDocx.js`) + **печать/PDF** (A4
+  landscape, `KtpPrintView`). Связь строки КТП с темой фонда — опциональная.
+  Тесты 333/333, build зелёный. Версия 3.9.50 в проде (фазы 1+2+3).
+
+**Следующий шаг по «поехали»** (на выбор): (а) фаза 4 — календарь-линза
+(`react-big-calendar`: уроки/выдачи на сетке, drag → пересчёт дат); (б) фаза 5 —
+заметки (BlockNote, блочный редактор); (в) интеграция ege-journal (пуш внешних
+решу-результатов в журнал); (г) фундамент owner-фильтрации + настоящие PB-правила
+(перед мультиучительством/ПДн); (д) КТП-добивки (drag&drop строк, авто-даты из
+расписания, импорт тем фонда пачкой).
 
 ### Интеграция с ege-journal (внешние результаты решу.ЕГЭ, решено 2026-06-07)
 

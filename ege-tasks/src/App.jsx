@@ -26,6 +26,8 @@ const TaskList = lazy(() => import('./components/TaskList'));
 const GroupManager = lazy(() => import('./components/workspace/GroupManager'));
 const GroupDetail = lazy(() => import('./components/workspace/GroupDetail'));
 const GradeJournal = lazy(() => import('./components/workspace/GradeJournal'));
+const KtpList = lazy(() => import('./components/workspace/KtpList'));
+const KtpEditor = lazy(() => import('./components/workspace/KtpEditor'));
 const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
 const TestWorkGenerator = lazy(() => import('./components/TestWorkGenerator'));
 const EgeVariantGenerator = lazy(() => import('./components/EgeVariantGenerator'));
@@ -105,6 +107,8 @@ export const R = {
   GROUPS:              '/app/groups',
   GROUP_DETAIL:        '/app/groups/:groupId',
   JOURNAL:             '/app/journal',
+  KTP:                 '/app/ktp',
+  KTP_EDITOR:          '/app/ktp/:courseId',
   TASKS:               '/app/tasks',
   STATS:               '/app/stats',
   CATALOG:             '/app/catalog',
@@ -192,6 +196,8 @@ const ROUTE_META = [
   { re: /^\/app\/groups\/[^/]+$/, menuKey: 'groups', menuGroup: 'workspace-group', title: 'Группа' },
   { re: /^\/app\/groups$/,        menuKey: 'groups', menuGroup: 'workspace-group', title: 'Классы и группы' },
   { re: /^\/app\/journal$/,       menuKey: 'journal', menuGroup: 'workspace-group', title: 'Журнал сдачи' },
+  { re: /^\/app\/ktp\/[^/]+$/,    menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП' },
+  { re: /^\/app\/ktp$/,           menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП — планирование' },
   // Работы (detail)
   { re: /^\/app\/works\/[^/]+\/edit/, menuKey: 'work-editor',        title: 'Редактор работ' },
   // Ученики (detail + sub-pages)
@@ -267,6 +273,7 @@ function getRouteMeta(pathname) {
 const MENU_KEY_PATH = {
   groups:                   R.GROUPS,
   journal:                  R.JOURNAL,
+  ktp:                      R.KTP,
   tasks:                    R.TASKS,
   stats:                    R.STATS,
   generator:                R.GENERATOR,
@@ -572,6 +579,7 @@ function AppLayout() {
       key: 'workspace-group', icon: <HomeOutlined />, label: 'Моё пространство', section: 'workspace',
       children: [
         { key: 'groups', icon: <TeamOutlined />, label: 'Классы и группы' },
+        { key: 'ktp', icon: <SnippetsOutlined />, label: 'КТП' },
         { key: 'journal', icon: <SolutionOutlined />, label: 'Журнал сдачи' },
       ],
     },
@@ -822,6 +830,8 @@ function App() {
               <Route path={R.GROUPS}        element={<GroupManager />} />
               <Route path={R.GROUP_DETAIL}  element={<GroupDetail />} />
               <Route path={R.JOURNAL}       element={<GradeJournal />} />
+              <Route path={R.KTP}           element={<KtpList />} />
+              <Route path={R.KTP_EDITOR}    element={<KtpEditor />} />
 
               {/* Задачи */}
               <Route path={R.TASKS}   element={<TasksPage />} />

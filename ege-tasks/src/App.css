@@ -377,3 +377,9 @@ html {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
   }
 }
+
+/* КТП — строка-раздел в редакторе */
+.ktp-section-row > td {
+  background: #fafafa;
+  font-weight: 600;
+}
