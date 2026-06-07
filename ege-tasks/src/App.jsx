@@ -14,7 +14,7 @@ import {
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
-  PercentageOutlined,
+  PercentageOutlined, HomeOutlined,
 } from '@ant-design/icons';
 // ── Ленивая загрузка страниц-компонентов ────────────────────────────────────
 // Все компоненты ниже используются ТОЛЬКО как элементы маршрутов (через page-
@@ -23,6 +23,9 @@ import {
 // Шелл-компоненты (LoginPage, ProtectedRoute, UserMenu, контексты) остаются
 // статическими импортами — они нужны на каждом экране.
 const TaskList = lazy(() => import('./components/TaskList'));
+const GroupManager = lazy(() => import('./components/workspace/GroupManager'));
+const GroupDetail = lazy(() => import('./components/workspace/GroupDetail'));
+const GradeJournal = lazy(() => import('./components/workspace/GradeJournal'));
 const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
 const TestWorkGenerator = lazy(() => import('./components/TestWorkGenerator'));
 const EgeVariantGenerator = lazy(() => import('./components/EgeVariantGenerator'));
@@ -98,6 +101,10 @@ const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '
 
 // ── Route path constants ────────────────────────────────────────────────────
 export const R = {
+  // Моё пространство (учительское фло)
+  GROUPS:              '/app/groups',
+  GROUP_DETAIL:        '/app/groups/:groupId',
+  JOURNAL:             '/app/journal',
   TASKS:               '/app/tasks',
   STATS:               '/app/stats',
   CATALOG:             '/app/catalog',
@@ -181,6 +188,10 @@ export function route(template, params) {
 // ── Метаданные маршрутов (для заголовка, подсветки меню, отступов) ──────────
 // Порядок важен: более специфичные паттерны — первее
 const ROUTE_META = [
+  // Моё пространство (учительское фло)
+  { re: /^\/app\/groups\/[^/]+$/, menuKey: 'groups', menuGroup: 'workspace-group', title: 'Группа' },
+  { re: /^\/app\/groups$/,        menuKey: 'groups', menuGroup: 'workspace-group', title: 'Классы и группы' },
+  { re: /^\/app\/journal$/,       menuKey: 'journal', menuGroup: 'workspace-group', title: 'Журнал сдачи' },
   // Работы (detail)
   { re: /^\/app\/works\/[^/]+\/edit/, menuKey: 'work-editor',        title: 'Редактор работ' },
   // Ученики (detail + sub-pages)
@@ -254,6 +265,8 @@ function getRouteMeta(pathname) {
 
 // ── Маппинг menuKey → путь (для навигации по клику в меню) ─────────────────
 const MENU_KEY_PATH = {
+  groups:                   R.GROUPS,
+  journal:                  R.JOURNAL,
   tasks:                    R.TASKS,
   stats:                    R.STATS,
   generator:                R.GENERATOR,
@@ -310,6 +323,7 @@ const MENU_KEY_PATH = {
 
 // ── Метаданные групп меню (для хлебных крошек) ──────────────────────────────
 const GROUP_META = {
+  'workspace-group':    { label: 'Моё пространство', path: R.GROUPS },
   'worksheets-group':   { label: 'Рабочие листы' },
   'gamification-group': { label: 'Геймификация' },
   'students-group':     { label: 'Ученики',      path: R.STUDENTS },
@@ -554,6 +568,13 @@ function AppLayout() {
   // section: ключ из ALL_SECTIONS (см. contexts/AuthContext). Если пользователь
   // не имеет доступа к этой секции — пункт скрывается из меню.
   const allMenuItems = [
+    {
+      key: 'workspace-group', icon: <HomeOutlined />, label: 'Моё пространство', section: 'workspace',
+      children: [
+        { key: 'groups', icon: <TeamOutlined />, label: 'Классы и группы' },
+        { key: 'journal', icon: <SolutionOutlined />, label: 'Журнал сдачи' },
+      ],
+    },
     { key: 'tasks',  icon: <FileTextOutlined />,  label: 'Все задачи', section: 'tasks' },
     { key: 'stats',  icon: <PieChartOutlined />,   label: 'Аналитика',  section: 'tasks' },
     {
@@ -797,6 +818,11 @@ function App() {
             {/* Все учительские страницы — за защитой авторизации */}
             <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
+              {/* Моё пространство (учительское фло) */}
+              <Route path={R.GROUPS}        element={<GroupManager />} />
+              <Route path={R.GROUP_DETAIL}  element={<GroupDetail />} />
+              <Route path={R.JOURNAL}       element={<GradeJournal />} />
+
               {/* Задачи */}
               <Route path={R.TASKS}   element={<TasksPage />} />
               <Route path={R.STATS}   element={<StatsPage />} />

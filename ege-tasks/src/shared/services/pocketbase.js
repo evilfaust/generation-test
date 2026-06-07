@@ -19,6 +19,7 @@ import { studentsApi } from './pb/students.js';
 import { geometryApi } from './pb/geometry.js';
 import { tdfApi } from './pb/tdf.js';
 import { worksheetsApi } from './pb/worksheets.js';
+import { groupsApi } from './pb/groups.js';
 
 export const api = {
   ...extrasApi,
@@ -34,6 +35,7 @@ export const api = {
   ...geometryApi,
   ...tdfApi,
   ...worksheetsApi,
+  ...groupsApi,
 };
 
 export default pb;

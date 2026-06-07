@@ -19,6 +19,7 @@ import pb from '../shared/services/pocketbase';
 
 // Все секции, которые могут быть в allowed_sections (см. App.jsx menuItems).
 export const ALL_SECTIONS = [
+  'workspace',     // Моё пространство (классы/группы, КТП, журнал — учительское фло)
   'tasks',         // Все задачи + Аналитика
   'worksheets',    // Рабочие листы
   'gamification',  // Геймификация

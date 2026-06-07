@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Switch, Input, InputNumber, Button, Typography, Spin, Alert, Divider, Modal, App, Tag, Tooltip } from 'antd';
+import { Switch, Input, InputNumber, Button, Typography, Spin, Alert, Divider, Modal, App, Tag, Tooltip, DatePicker } from 'antd';
+import dayjs from 'dayjs';
 import {
   CopyOutlined,
   QrcodeOutlined,
@@ -127,6 +128,14 @@ const SessionPanel = ({ workId, mcTestId }) => {
   const changePassingScore = (value) => {
     const v = Math.max(1, Math.round(Number(value) || 1));
     patchSession({ passing_score: v });
+  };
+
+  const changeDeadline = (value) => {
+    // value — dayjs | null. Пусто = без дедлайна.
+    patchSession(
+      { deadline: value ? value.toISOString() : '' },
+      value ? 'Дедлайн установлен' : 'Дедлайн снят',
+    );
   };
 
   const handleStudentTitleChange = useCallback((e) => {
@@ -305,6 +314,24 @@ const SessionPanel = ({ workId, mcTestId }) => {
               )}
               {!passingOn && (
                 <Text type="secondary" style={{ fontSize: 12 }}>Без зачёта</Text>
+              )}
+            </div>
+          </div>
+
+          {/* Дедлайн сдачи */}
+          <div className="session-panel__field-row">
+            <Text type="secondary" className="session-panel__field-label">Дедлайн сдачи</Text>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <DatePicker
+                showTime={{ format: 'HH:mm' }}
+                format="DD.MM.YYYY HH:mm"
+                value={session.deadline ? dayjs(session.deadline) : null}
+                onChange={changeDeadline}
+                placeholder="Без дедлайна"
+                style={{ width: 220 }}
+              />
+              {!session.deadline && (
+                <Text type="secondary" style={{ fontSize: 12 }}>Срок не ограничен</Text>
               )}
             </div>
           </div>

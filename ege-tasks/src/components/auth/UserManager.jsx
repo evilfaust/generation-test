@@ -33,6 +33,7 @@ const ROLE_OPTIONS = [
 
 // Человекочитаемые названия секций — должны совпадать с ALL_SECTIONS.
 const SECTION_LABELS = {
+  workspace:    'Моё пространство',
   tasks:        'Задачи + Аналитика',
   worksheets:   'Рабочие листы',
   gamification: 'Геймификация',
