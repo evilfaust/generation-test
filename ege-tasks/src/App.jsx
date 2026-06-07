@@ -23,6 +23,7 @@ import {
 // Шелл-компоненты (LoginPage, ProtectedRoute, UserMenu, контексты) остаются
 // статическими импортами — они нужны на каждом экране.
 const TaskList = lazy(() => import('./components/TaskList'));
+const TodayDashboard = lazy(() => import('./components/workspace/TodayDashboard'));
 const GroupManager = lazy(() => import('./components/workspace/GroupManager'));
 const GroupDetail = lazy(() => import('./components/workspace/GroupDetail'));
 const GradeJournal = lazy(() => import('./components/workspace/GradeJournal'));
@@ -106,6 +107,7 @@ const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '
 // ── Route path constants ────────────────────────────────────────────────────
 export const R = {
   // Моё пространство (учительское фло)
+  TODAY:               '/app/today',
   GROUPS:              '/app/groups',
   GROUP_DETAIL:        '/app/groups/:groupId',
   JOURNAL:             '/app/journal',
@@ -197,6 +199,7 @@ export function route(template, params) {
 // Порядок важен: более специфичные паттерны — первее
 const ROUTE_META = [
   // Моё пространство (учительское фло)
+  { re: /^\/app\/today$/,         menuKey: 'today', menuGroup: 'workspace-group', title: 'Сегодня' },
   { re: /^\/app\/groups\/[^/]+$/, menuKey: 'groups', menuGroup: 'workspace-group', title: 'Группа' },
   { re: /^\/app\/groups$/,        menuKey: 'groups', menuGroup: 'workspace-group', title: 'Классы и группы' },
   { re: /^\/app\/journal$/,       menuKey: 'journal', menuGroup: 'workspace-group', title: 'Журнал сдачи' },
@@ -277,6 +280,7 @@ function getRouteMeta(pathname) {
 
 // ── Маппинг menuKey → путь (для навигации по клику в меню) ─────────────────
 const MENU_KEY_PATH = {
+  today:                    R.TODAY,
   groups:                   R.GROUPS,
   journal:                  R.JOURNAL,
   ktp:                      R.KTP,
@@ -586,6 +590,7 @@ function AppLayout() {
     {
       key: 'workspace-group', icon: <HomeOutlined />, label: 'Моё пространство', section: 'workspace',
       children: [
+        { key: 'today', icon: <HomeOutlined />, label: 'Сегодня' },
         { key: 'groups', icon: <TeamOutlined />, label: 'Классы и группы' },
         { key: 'calendar', icon: <CalendarOutlined />, label: 'Календарь' },
         { key: 'ktp', icon: <SnippetsOutlined />, label: 'КТП' },
@@ -829,14 +834,15 @@ function App() {
             {/* Страница входа — не требует авторизации */}
             <Route path="/login" element={<LoginPage />} />
 
-            {/* Редирект с корня */}
-            <Route path="/" element={<Navigate to={R.TASKS} replace />} />
-            <Route path="/app" element={<Navigate to={R.TASKS} replace />} />
+            {/* Редирект с корня → «Сегодня» (дом = рабочее пространство учителя) */}
+            <Route path="/" element={<Navigate to={R.TODAY} replace />} />
+            <Route path="/app" element={<Navigate to={R.TODAY} replace />} />
 
             {/* Все учительские страницы — за защитой авторизации */}
             <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
               {/* Моё пространство (учительское фло) */}
+              <Route path={R.TODAY}         element={<TodayDashboard />} />
               <Route path={R.GROUPS}        element={<GroupManager />} />
               <Route path={R.GROUP_DETAIL}  element={<GroupDetail />} />
               <Route path={R.JOURNAL}       element={<GradeJournal />} />
@@ -946,7 +952,7 @@ function App() {
 
             {/* Fallback: любой /app/* который не совпал → задачи (тоже под защитой) */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/app/*" element={<Navigate to={R.TASKS} replace />} />
+              <Route path="/app/*" element={<Navigate to={R.TODAY} replace />} />
             </Route>
           </Routes>
         </ReferenceDataProvider>
