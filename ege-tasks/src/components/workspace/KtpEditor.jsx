@@ -143,7 +143,7 @@ export default function KtpEditor() {
   const handleSaveEntry = async (data) => {
     setSaving(true);
     try {
-      if (editing) {
+      if (editing?.id) {
         await api.updateKtpEntry(editing.id, data);
       } else {
         await api.createKtpEntry({ ...data, course: courseId, order: entries.length });
