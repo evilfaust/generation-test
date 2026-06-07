@@ -1,0 +1,94 @@
+/* Заметки — двухколоночная раскладка */
+
+.notes-workspace {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 180px);
+  min-height: 480px;
+}
+
+.notes-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  padding-right: 12px;
+  overflow-y: auto;
+}
+
+.notes-item {
+  cursor: pointer;
+  border-radius: 6px;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+.notes-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+.notes-item--active {
+  background: rgba(22, 119, 255, 0.1) !important;
+}
+.notes-item__title {
+  display: inline-block;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.notes-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notes-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  padding-bottom: 8px;
+}
+
+.notes-title-input {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  padding-left: 0 !important;
+}
+
+.notes-editor__body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.notes-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* BlockNote — убрать лишние внешние отступы внутри нашей колонки */
+.notes-editor__body .bn-container {
+  background: transparent;
+}
+
+/* Мобильно: список сверху, редактор снизу */
+@media (max-width: 768px) {
+  .notes-workspace {
+    flex-direction: column;
+    height: auto;
+  }
+  .notes-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+    padding-right: 0;
+    max-height: 240px;
+  }
+}
