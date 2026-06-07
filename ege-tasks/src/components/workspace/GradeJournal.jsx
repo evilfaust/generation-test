@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Empty, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { App, Card, Empty, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { api } from '../../shared/services/pocketbase';
+import ExternalJournal from './ExternalJournal';
 
 const { Title, Text } = Typography;
 
@@ -64,6 +65,7 @@ export default function GradeJournal() {
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null); // { students, perStudent }
+  const [view, setView] = useState('lemma'); // lemma | ext
 
   // Загрузка групп.
   useEffect(() => {
@@ -197,20 +199,38 @@ export default function GradeJournal() {
     <div>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} wrap>
         <div>
-          <Title level={4} style={{ margin: 0 }}>Журнал сдачи</Title>
-          <Text type="secondary">Кто сдал, кто просрочил — по реальным результатам, без выдуманных оценок</Text>
+          <Title level={4} style={{ margin: 0 }}>Журнал</Title>
+          <Text type="secondary">
+            {view === 'lemma'
+              ? 'Сдача работ Lemma — по реальным результатам, без выдуманных оценок'
+              : 'Внешние работы с решу.ЕГЭ (из приложения «Журнал ЕГЭ»)'}
+          </Text>
         </div>
-        <Select
-          style={{ minWidth: 220 }}
-          placeholder="Выберите группу"
-          loading={loadingGroups}
-          value={groupId}
-          onChange={setGroupId}
-          options={groups.map((g) => ({ value: g.id, label: g.name }))}
-        />
+        <Space wrap>
+          <Segmented
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'lemma', label: 'Сдача (Lemma)' },
+              { value: 'ext', label: 'Решу (внешние)' },
+            ]}
+          />
+          {view === 'lemma' && (
+            <Select
+              style={{ minWidth: 200 }}
+              placeholder="Выберите группу"
+              loading={loadingGroups}
+              value={groupId}
+              onChange={setGroupId}
+              options={groups.map((g) => ({ value: g.id, label: g.name }))}
+            />
+          )}
+        </Space>
       </Space>
 
-      {!groupId ? (
+      {view === 'ext' ? (
+        <ExternalJournal />
+      ) : !groupId ? (
         <Empty description="Сначала создайте группу в «Классы и группы»" />
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
@@ -230,7 +250,7 @@ export default function GradeJournal() {
         </Card>
       )}
 
-      {!!sessions.length && (
+      {view === 'lemma' && !!sessions.length && (
         <Space style={{ marginTop: 12 }} wrap size={[8, 4]}>
           <Text type="secondary" style={{ fontSize: 12 }}>Легенда:</Text>
           <Tag color="green">сдал / зачёт</Tag>

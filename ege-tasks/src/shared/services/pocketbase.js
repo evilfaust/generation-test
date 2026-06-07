@@ -23,6 +23,7 @@ import { groupsApi } from './pb/groups.js';
 import { ktpApi } from './pb/ktp.js';
 import { lessonsApi } from './pb/lessons.js';
 import { notesApi } from './pb/notes.js';
+import { extJournalApi } from './pb/extjournal.js';
 
 export const api = {
   ...extrasApi,
@@ -42,6 +43,7 @@ export const api = {
   ...ktpApi,
   ...lessonsApi,
   ...notesApi,
+  ...extJournalApi,
 };
 
 export default pb;
