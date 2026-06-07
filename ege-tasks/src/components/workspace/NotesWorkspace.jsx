@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
-  App, Button, Empty, Input, List, Popconfirm, Segmented, Space, Tag, Tooltip, Typography,
+  App, Button, DatePicker, Empty, Input, List, Popconfirm, Segmented, Select, Space, Tag, Tooltip, Typography,
 } from 'antd';
 import { DeleteOutlined, InboxOutlined, PlusOutlined } from '@ant-design/icons';
-import { useCreateBlockNote } from '@blocknote/react';
+import dayjs from 'dayjs';
+import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
+import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems } from '@blocknote/core';
 import { ru as bnRu } from '@blocknote/core/locales';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import { MathBlock, mathSlashItem } from './notesMathBlock';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import './NotesWorkspace.css';
 
 const { Title, Text } = Typography;
+
+// Схема BlockNote с кастомным блоком-формулой (LaTeX → KaTeX).
+const noteSchema = BlockNoteSchema.create({
+  blockSpecs: { ...defaultBlockSpecs, math: MathBlock },
+});
 
 // Редактор одной заметки. Ключуется по note.id в родителе (полный remount при смене).
 function NoteEditor({ note, onSaveBody, editable }) {
@@ -21,6 +30,7 @@ function NoteEditor({ note, onSaveBody, editable }) {
     [note.id], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const editor = useCreateBlockNote({
+    schema: noteSchema,
     initialContent,
     dictionary: bnRu,
   });
@@ -49,7 +59,18 @@ function NoteEditor({ note, onSaveBody, editable }) {
       editor={editor}
       editable={editable}
       onChange={editable ? handleChange : undefined}
-    />
+      slashMenu={false}
+    >
+      <SuggestionMenuController
+        triggerCharacter="/"
+        getItems={async (query) =>
+          filterSuggestionItems(
+            [...getDefaultReactSlashMenuItems(editor), mathSlashItem(editor)],
+            query,
+          )
+        }
+      />
+    </BlockNoteView>
   );
 }
 
@@ -57,32 +78,45 @@ export default function NotesWorkspace() {
   const { message } = App.useApp();
   const { canEdit } = useAuth();
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [notes, setNotes] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [filter, setFilter] = useState('all'); // all | inbox
+  const [groupFilter, setGroupFilter] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savedTick, setSavedTick] = useState(0);
 
   const load = useCallback(async (selectId) => {
     setLoading(true);
     try {
-      const list = await api.getNotes();
+      const [list, g] = await Promise.all([api.getNotes(), api.getTeachingGroups()]);
       setNotes(list);
-      if (selectId) setActiveId(selectId);
+      setGroups(g);
+      const wanted = selectId || searchParams.get('note');
+      if (wanted && list.some((n) => n.id === wanted)) setActiveId(wanted);
       else if (!activeId && list.length) setActiveId(list[0].id);
     } catch {
       message.error('Не удалось загрузить заметки');
     } finally {
       setLoading(false);
     }
-  }, [activeId, message]);
+  }, [activeId, message, searchParams]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visibleNotes = useMemo(
-    () => (filter === 'inbox' ? notes.filter((n) => n.is_inbox) : notes),
-    [notes, filter],
-  );
+  // Если пришли с ?note=<id> из календаря — выбрать эту заметку.
+  useEffect(() => {
+    const wanted = searchParams.get('note');
+    if (wanted && notes.some((n) => n.id === wanted)) setActiveId(wanted);
+  }, [searchParams, notes]);
+
+  const visibleNotes = useMemo(() => {
+    let list = notes;
+    if (filter === 'inbox') list = list.filter((n) => n.is_inbox);
+    if (groupFilter) list = list.filter((n) => n.group === groupFilter);
+    return list;
+  }, [notes, filter, groupFilter]);
 
   const active = useMemo(() => notes.find((n) => n.id === activeId) || null, [notes, activeId]);
 
@@ -141,6 +175,24 @@ export default function NotesWorkspace() {
     } catch { message.error('Не удалось'); }
   };
 
+  // Правка метаданных активной заметки (класс/дата).
+  const patchActive = async (patch, optimisticExtra = {}) => {
+    if (!active) return;
+    setNotes((prev) => prev.map((n) => (n.id === active.id ? { ...n, ...patch, ...optimisticExtra } : n)));
+    try {
+      await api.updateNote(active.id, patch);
+      setSavedTick((t) => t + 1);
+    } catch { message.error('Не удалось сохранить'); }
+  };
+
+  const changeGroup = (gid) => {
+    const g = groups.find((x) => x.id === gid);
+    patchActive({ group: gid || '' }, { expand: { ...(active?.expand || {}), group: g || undefined } });
+  };
+  const changeDate = (d) => patchActive({ note_date: d ? d.toISOString() : '' });
+
+  const groupName = (n) => n?.expand?.group?.name;
+
   return (
     <div className="notes-workspace">
       {/* Левая колонка — список */}
@@ -161,6 +213,15 @@ export default function NotesWorkspace() {
             </Button>
           )}
         </Space>
+        <Select
+          allowClear
+          size="small"
+          style={{ width: '100%', marginBottom: 8 }}
+          placeholder="Все классы"
+          value={groupFilter}
+          onChange={setGroupFilter}
+          options={groups.map((g) => ({ value: g.id, label: g.name }))}
+        />
 
         <List
           size="small"
@@ -177,9 +238,18 @@ export default function NotesWorkspace() {
                 </Popconfirm>,
               ] : []}
             >
-              <Space size={6}>
-                {n.is_inbox && <InboxOutlined style={{ color: '#fa8c16' }} />}
-                <span className="notes-item__title">{n.title?.trim() || 'Без названия'}</span>
+              <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                <Space size={6}>
+                  {n.is_inbox && <InboxOutlined style={{ color: '#fa8c16' }} />}
+                  {n.lesson && <Tag color="purple" style={{ marginInlineEnd: 0 }}>урок</Tag>}
+                  <span className="notes-item__title">{n.title?.trim() || 'Без названия'}</span>
+                </Space>
+                {(groupName(n) || n.note_date) && (
+                  <Space size={4}>
+                    {groupName(n) && <Tag color="blue" style={{ marginInlineEnd: 0 }}>{groupName(n)}</Tag>}
+                    {n.note_date && <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(n.note_date).format('DD.MM.YY')}</Text>}
+                  </Space>
+                )}
               </Space>
             </List.Item>
           )}
@@ -216,6 +286,27 @@ export default function NotesWorkspace() {
                   />
                 </Tooltip>
               </Space>
+            </div>
+            <div className="notes-editor__meta">
+              <Select
+                allowClear
+                size="small"
+                style={{ minWidth: 160 }}
+                placeholder="Класс / группа"
+                value={active.group || undefined}
+                onChange={changeGroup}
+                disabled={!canEdit}
+                options={groups.map((g) => ({ value: g.id, label: g.name }))}
+              />
+              <DatePicker
+                size="small"
+                format="DD.MM.YYYY"
+                placeholder="Дата"
+                value={active.note_date ? dayjs(active.note_date) : null}
+                onChange={changeDate}
+                disabled={!canEdit}
+              />
+              {active.lesson && <Tag color="purple">заметка урока</Tag>}
             </div>
             <div className="notes-editor__body">
               <NoteEditor key={active.id} note={active} onSaveBody={saveBody} editable={canEdit} />

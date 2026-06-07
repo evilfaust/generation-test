@@ -500,8 +500,12 @@ GradeJournal · `/app/notes` NotesWorkspace.
   (`import { ru } from '@blocknote/core/locales'`). Роут `/app/notes`. Ленивый чанк.
 - ⚠️ Грабли установки: `@blocknote/mantine@0.51` требует React 19 (через @mantine 9).
   Решение — пин `@blocknote/{core,react,mantine}@0.31.2` (тянет @mantine 7, React 18 ok).
-- ⚠️ KaTeX-блок в заметках и блочный апгрейд `lessons.note_md` — отдельным шагом
-  (кастомный блок BlockNote).
+- ✅ **KaTeX-блок в заметках сделан (v3.9.54)** — кастомный блок `math`
+  (`notesMathBlock.jsx`): edit-as-text / render-on-blur, вставка через slash-меню.
+- ✅ **Общие заметки (v3.9.54)** — `teacher_notes` +group/+lesson/+note_date
+  (миграция 1779000015); заметка урока из календаря = обычная заметка
+  (`getOrCreateLessonNote` → `/app/notes?note=`); класс+дата+фильтр в NotesWorkspace.
+  textarea заметки урока в модалке убрана (единая сущность).
 
 **Следующий шаг по «поехали»** (на выбор): (а) фаза 6 — замыкание петли (материалы+
 результаты в уроке, кнопка коррекции из плана → `ClassRemediationModal`); (б) интеграция

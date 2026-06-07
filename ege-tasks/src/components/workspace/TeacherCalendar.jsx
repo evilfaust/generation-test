@@ -4,7 +4,8 @@ import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import {
   App, Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag, Typography,
 } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { FileTextOutlined, PlusOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import localeData from 'dayjs/plugin/localeData';
@@ -36,7 +37,7 @@ const RU_MESSAGES = {
 
 const STATUS_LABEL = { planned: 'запланирован', done: 'проведён', cancelled: 'отменён' };
 
-function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, saving, canEdit }) {
+function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, onOpenNote, saving, canEdit }) {
   const [form] = Form.useForm();
   useEffect(() => {
     if (open) {
@@ -45,7 +46,6 @@ function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, saving
         group: initial?.group || undefined,
         date_plan: initial?.date_plan ? dayjs(initial.date_plan) : (initial?.slotDate ? dayjs(initial.slotDate) : dayjs()),
         status: initial?.status || 'planned',
-        note_md: initial?.note_md || '',
       });
     }
   }, [open, initial, form]);
@@ -56,7 +56,6 @@ function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, saving
       group: v.group || '',
       date_plan: v.date_plan ? v.date_plan.toISOString() : dayjs().toISOString(),
       status: v.status || 'planned',
-      note_md: v.note_md || '',
     });
   };
 
@@ -105,16 +104,27 @@ function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, saving
         <Form.Item name="date_plan" label="Дата и время" rules={[{ required: true }]}>
           <DatePicker showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item name="note_md" label="Заметка">
-          <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="Заметки к уроку (свободный текст)" maxLength={10000} />
-        </Form.Item>
       </Form>
+
+      {/* Заметка урока = общая заметка (BlockNote + формулы) */}
+      <div style={{ marginTop: 8 }}>
+        {editingExisting ? (
+          <Button icon={<FileTextOutlined />} onClick={() => onOpenNote(initial)} block>
+            Открыть заметку урока (формулы, блоки)
+          </Button>
+        ) : (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Сохраните урок, чтобы добавить заметку с формулами.
+          </Typography.Text>
+        )}
+      </div>
     </Modal>
   );
 }
 
 export default function TeacherCalendar() {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const { canEdit } = useAuth();
 
   const [groups, setGroups] = useState([]);
@@ -252,6 +262,15 @@ export default function TeacherCalendar() {
     }
   };
 
+  const handleOpenNote = async (lesson) => {
+    try {
+      const note = await api.getOrCreateLessonNote(lesson);
+      navigate(`/app/notes?note=${note.id}`);
+    } catch {
+      message.error('Не удалось открыть заметку урока');
+    }
+  };
+
   const handleDelete = async () => {
     if (!editing?.id) return;
     try {
@@ -331,6 +350,7 @@ export default function TeacherCalendar() {
         canEdit={canEdit}
         onSave={handleSave}
         onDelete={handleDelete}
+        onOpenNote={handleOpenNote}
         onCancel={() => { setModalOpen(false); setEditing(null); }}
       />
     </div>

@@ -1,13 +1,35 @@
 import { pb, _logAudit } from './client.js';
+import { escapeFilter } from '../../utils/escapeFilter';
 
 // Учительское фло, фаза 5: API заметок (teacher_notes). body = JSON-документ BlockNote.
+// «Общие заметки»: заметка может быть свободной или привязанной к группе/дате/уроку.
 export const notesApi = {
   async getNotes() {
     try {
-      return await pb.collection('teacher_notes').getFullList({ sort: '-updated' });
+      return await pb.collection('teacher_notes').getFullList({ sort: '-updated', expand: 'group' });
     } catch (error) {
       console.error('Error fetching notes:', error);
       return [];
+    }
+  },
+
+  // Найти или создать заметку урока (связь lesson + копия группы/даты урока).
+  async getOrCreateLessonNote(lesson) {
+    try {
+      const found = await pb.collection('teacher_notes').getFullList({
+        filter: `lesson = "${escapeFilter(lesson.id)}"`,
+        sort: '-updated',
+      });
+      if (found.length) return found[0];
+      return await this.createNote({
+        title: lesson.title || 'Заметка урока',
+        lesson: lesson.id,
+        group: lesson.group || '',
+        note_date: lesson.date_plan || '',
+      });
+    } catch (error) {
+      console.error('Error get/create lesson note:', error);
+      throw error;
     }
   },
 
