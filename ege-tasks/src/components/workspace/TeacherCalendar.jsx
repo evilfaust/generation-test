@@ -4,7 +4,7 @@ import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import {
   App, Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag, Typography,
 } from 'antd';
-import { FileTextOutlined, PlusOutlined } from '@ant-design/icons';
+import { FileTextOutlined, LinkOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -37,8 +37,11 @@ const RU_MESSAGES = {
 
 const STATUS_LABEL = { planned: 'запланирован', done: 'проведён', cancelled: 'отменён' };
 
-function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, onOpenNote, saving, canEdit }) {
+function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel, onOpenNote, onOpenMaterial, saving, canEdit }) {
   const [form] = Form.useForm();
+  const materialIds = Form.useWatch('materials', form) || [];
+  const worksMap = useMemo(() => new Map((works || []).map((w) => [w.id, w.title])), [works]);
+
   useEffect(() => {
     if (open) {
       form.setFieldsValue({
@@ -46,6 +49,7 @@ function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, onOpen
         group: initial?.group || undefined,
         date_plan: initial?.date_plan ? dayjs(initial.date_plan) : (initial?.slotDate ? dayjs(initial.slotDate) : dayjs()),
         status: initial?.status || 'planned',
+        materials: Array.isArray(initial?.materials) ? initial.materials.map((m) => m.id) : [],
       });
     }
   }, [open, initial, form]);
@@ -56,6 +60,7 @@ function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, onOpen
       group: v.group || '',
       date_plan: v.date_plan ? v.date_plan.toISOString() : dayjs().toISOString(),
       status: v.status || 'planned',
+      materials: (v.materials || []).map((id) => ({ type: 'work', id, title: worksMap.get(id) || '' })),
     });
   };
 
@@ -104,7 +109,30 @@ function LessonModal({ open, initial, groups, onSave, onDelete, onCancel, onOpen
         <Form.Item name="date_plan" label="Дата и время" rules={[{ required: true }]}>
           <DatePicker showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
         </Form.Item>
+        <Form.Item name="materials" label="Материалы урока (работы)">
+          <Select
+            mode="multiple"
+            allowClear
+            placeholder="Привязать работы к уроку"
+            optionFilterProp="label"
+            options={(works || []).map((w) => ({ value: w.id, label: w.title }))}
+          />
+        </Form.Item>
       </Form>
+
+      {/* Быстрый переход к материалам: выдача, результаты, работа над ошибками */}
+      {materialIds.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>Открыть материал (выдача · результаты · работа над ошибками):</Typography.Text>
+          <div style={{ marginTop: 4 }}>
+            {materialIds.map((id) => (
+              <Button key={id} size="small" type="link" icon={<LinkOutlined />} style={{ paddingLeft: 0 }} onClick={() => onOpenMaterial(id)}>
+                {worksMap.get(id) || 'Работа'}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Заметка урока = общая заметка (BlockNote + формулы) */}
       <div style={{ marginTop: 8 }}>
@@ -128,6 +156,7 @@ export default function TeacherCalendar() {
   const { canEdit } = useAuth();
 
   const [groups, setGroups] = useState([]);
+  const [works, setWorks] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
   const [groupFilter, setGroupFilter] = useState(null);
@@ -140,14 +169,16 @@ export default function TeacherCalendar() {
 
   const load = useCallback(async () => {
     try {
-      const [g, l, d] = await Promise.all([
+      const [g, l, d, w] = await Promise.all([
         api.getTeachingGroups(),
         api.getLessons(),
         api.getSessionsWithDeadline(),
+        api.getWorks(),
       ]);
       setGroups(g);
       setLessons(l);
       setDeadlines(d);
+      setWorks(w);
     } catch {
       message.error('Не удалось загрузить календарь');
     }
@@ -160,9 +191,10 @@ export default function TeacherCalendar() {
       .filter((l) => !groupFilter || l.group === groupFilter)
       .map((l) => {
         const start = new Date(l.date_plan);
+        const hasMaterials = Array.isArray(l.materials) && l.materials.length > 0;
         return {
           id: l.id,
-          title: l.title,
+          title: hasMaterials ? `📎 ${l.title}` : l.title,
           start,
           end: new Date(start.getTime() + 45 * 60 * 1000),
           resource: { type: 'lesson', raw: l, groupName: l.expand?.group?.name, status: l.status || 'planned' },
@@ -271,6 +303,11 @@ export default function TeacherCalendar() {
     }
   };
 
+  const handleOpenMaterial = (workId) => {
+    setModalOpen(false);
+    navigate(`/app/works/${workId}/edit`);
+  };
+
   const handleDelete = async () => {
     if (!editing?.id) return;
     try {
@@ -347,10 +384,12 @@ export default function TeacherCalendar() {
         initial={editing}
         groups={groups}
         saving={saving}
+        works={works}
         canEdit={canEdit}
         onSave={handleSave}
         onDelete={handleDelete}
         onOpenNote={handleOpenNote}
+        onOpenMaterial={handleOpenMaterial}
         onCancel={() => { setModalOpen(false); setEditing(null); }}
       />
     </div>

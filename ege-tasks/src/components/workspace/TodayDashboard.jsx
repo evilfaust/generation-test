@@ -140,6 +140,7 @@ export default function TodayDashboard() {
           <Space size={6}>
             {l.expand?.group?.name && <Tag color="blue">{l.expand.group.name}</Tag>}
             {(() => { const st = STATUS_TAG[l.status || 'planned']; return <Tag color={st.color}>{st.label}</Tag>; })()}
+            {Array.isArray(l.materials) && l.materials.length > 0 && <Tag>📎 {l.materials.length}</Tag>}
           </Space>
         }
       />
