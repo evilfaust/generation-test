@@ -389,3 +389,8 @@ html {
   border-top: 2px solid #d9d9d9;
   border-bottom: 2px solid #d9d9d9;
 }
+
+/* Внешний журнал — строка-ошибка в разборе по заданию */
+.ext-drill-wrong > td {
+  background: #fff1f0;
+}

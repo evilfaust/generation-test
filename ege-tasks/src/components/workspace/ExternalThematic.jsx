@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  App, Button, Card, Empty, InputNumber, Select, Space, Spin, Table, Tooltip, Typography,
+  App, Button, Card, Empty, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography,
 } from 'antd';
-import { ThunderboltOutlined } from '@ant-design/icons';
+import { ExportOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { api } from '../../shared/services/pocketbase';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
 
 const { Title, Text } = Typography;
 
 const TASK_NUMS = Array.from({ length: 21 }, (_, i) => i + 1);
+
+// Ссылка на задачу на «Решу ЕГЭ» (базовый) по problem_id.
+const problemUrl = (id) => `https://mathb-ege.sdamgia.ru/problem?id=${id}`;
 
 // Цвет ячейки по проценту верных (светлые тинты, тёмный текст).
 function pctColor(p) {
@@ -32,6 +36,13 @@ export default function ExternalThematic() {
   const [threshold, setThreshold] = useState(60);
   const [perTopic, setPerTopic] = useState(3);
   const [building, setBuilding] = useState(false);
+  const [drill, setDrill] = useState(null); // { taskNum, student? }
+  const [onlyStudent, setOnlyStudent] = useState(true);
+
+  const openDrill = (taskNum, student) => {
+    setOnlyStudent(!!student);
+    setDrill({ taskNum, student: student || null });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,6 +119,27 @@ export default function ExternalThematic() {
     return res;
   }, [classStat, threshold, topicByNum]);
 
+  // Данные разбора по выбранному заданию.
+  const examMeta = useMemo(() => {
+    const m = new Map();
+    for (const e of exams) m.set(e.exam_id, { date: e.date, title: e.title });
+    return m;
+  }, [exams]);
+
+  const drillRows = useMemo(() => {
+    if (!drill) return [];
+    let rows = filtered
+      .filter((r) => r.task_number === drill.taskNum)
+      .map((r) => ({ ...r, ...(examMeta.get(r.exam_id) || {}) }));
+    if (onlyStudent && drill.student) rows = rows.filter((r) => r.student_name === drill.student);
+    return rows.sort(
+      (a, b) => a.student_name.localeCompare(b.student_name, 'ru') || (new Date(a.date || 0) - new Date(b.date || 0)),
+    );
+  }, [drill, onlyStudent, filtered, examMeta]);
+
+  const drillTopic = drill ? topicByNum.get(drill.taskNum) : null;
+  const drillStat = drill ? pct(classStat.get(drill.taskNum)) : null;
+
   const handleRemediation = async () => {
     if (!weakTopics.length) { message.info('Нет тем ниже порога — класс справляется'); return; }
     setBuilding(true);
@@ -142,14 +174,21 @@ export default function ExternalThematic() {
     const taskCols = TASK_NUMS.map((n) => {
       const topic = topicByNum.get(n);
       return {
-        title: <Tooltip title={topic?.title || `Задание ${n}`}><div style={{ minWidth: 28, textAlign: 'center' }}>{n}</div></Tooltip>,
+        title: (
+          <Tooltip title={`${topic?.title || `Задание ${n}`} — нажмите для разбора`}>
+            <div style={{ minWidth: 28, textAlign: 'center', cursor: 'pointer' }} onClick={() => openDrill(n, null)}>{n}</div>
+          </Tooltip>
+        ),
         key: n,
         width: 44,
         align: 'center',
         onCell: (row) => {
           const o = row.classRow ? classStat.get(n) : cell.get(`${row.student}|${n}`);
           const p = pct(o);
-          return { style: { background: pctColor(p), padding: '4px 2px', fontWeight: row.classRow ? 600 : 400 } };
+          return {
+            style: { background: pctColor(p), padding: '4px 2px', fontWeight: row.classRow ? 600 : 400, cursor: o ? 'pointer' : 'default' },
+            onClick: o ? () => openDrill(n, row.classRow ? null : row.student) : undefined,
+          };
         },
         render: (_, row) => {
           const o = row.classRow ? classStat.get(n) : cell.get(`${row.student}|${n}`);
@@ -233,6 +272,72 @@ export default function ExternalThematic() {
         <Text style={{ background: '#fffb8f', padding: '0 8px', borderRadius: 4 }}>70–85%</Text>
         <Text style={{ background: '#d9f7be', padding: '0 8px', borderRadius: 4 }}>≥85%</Text>
       </Space>
+
+      <Modal
+        open={!!drill}
+        onCancel={() => setDrill(null)}
+        footer={null}
+        width={680}
+        title={drill ? `Задание №${drill.taskNum}${drillTopic ? ` — ${drillTopic.title}` : ''}` : ''}
+      >
+        {drill && (
+          <>
+            <Space style={{ marginBottom: 12 }} wrap>
+              <Tag color="blue">Класс: {drillStat != null ? `${drillStat}% верных` : '—'}</Tag>
+              {drill.student && (
+                <Space size={6}>
+                  <Switch size="small" checked={onlyStudent} onChange={setOnlyStudent} />
+                  <Text type="secondary" style={{ fontSize: 12 }}>только {drill.student}</Text>
+                </Space>
+              )}
+              {drillTopic && (
+                <Button size="small" type="link" icon={<ThunderboltOutlined />}
+                  onClick={async () => {
+                    try {
+                      const ts = await api.getRandomTasks(perTopic, { topic: drillTopic.id });
+                      if (!ts.length) { message.warning('Нет задач по теме в банке'); return; }
+                      const work = await api.createWork({ title: `Отработка №${drill.taskNum} — ${drillTopic.title}`, class: 11 });
+                      await api.createVariant({ work: work.id, number: 1, tasks: ts.map((x) => x.id), order: ts.map((x, i) => ({ taskId: x.id, position: i })) });
+                      navigate(`/app/works/${work.id}/edit`);
+                    } catch { message.error('Не удалось собрать отработку'); }
+                  }}>
+                  Отработать тему
+                </Button>
+              )}
+            </Space>
+            <Table
+              size="small"
+              rowKey="id"
+              dataSource={drillRows}
+              pagination={false}
+              scroll={{ y: 360 }}
+              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Нет данных" /> }}
+              rowClassName={(r) => (r.is_correct ? '' : 'ext-drill-wrong')}
+              columns={[
+                { title: 'Ученик', dataIndex: 'student_name', key: 's', width: 180 },
+                {
+                  title: 'Работа', key: 'w', width: 150,
+                  render: (_, r) => (
+                    <Tooltip title={r.title || ''}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{r.date ? dayjs(r.date).format('DD.MM.YY') : (r.title || '—')}</Text>
+                    </Tooltip>
+                  ),
+                },
+                {
+                  title: 'Задача', key: 'p', width: 120,
+                  render: (_, r) => r.problem_id
+                    ? <a href={problemUrl(r.problem_id)} target="_blank" rel="noreferrer">№{r.problem_id} <ExportOutlined /></a>
+                    : <Text type="secondary">—</Text>,
+                },
+                {
+                  title: 'Итог', key: 'res', width: 80, align: 'center',
+                  render: (_, r) => r.is_correct ? <Tag color="green">верно</Tag> : <Tag color="red">ошибка</Tag>,
+                },
+              ]}
+            />
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
