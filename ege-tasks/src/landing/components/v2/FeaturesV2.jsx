@@ -3,12 +3,12 @@ const FEATURES = [
     num: '01',
     numColor: 'cyan',
     cardColor: 'cyan',
-    title: 'База задач',
-    desc: '7000+ задач по темам ЕГЭ с LaTeX-формулами, изображениями, тегами и сложностью. Мощные фильтры.',
+    title: 'Банк задач',
+    desc: '17 000+ задач по темам ЕГЭ и ОГЭ с LaTeX-формулами, изображениями, тегами и сложностью. Импорт из «Решу ЕГЭ» в один клик с авто-нормализацией формул.',
     tags: [
       { label: 'LaTeX', color: 'cyan' },
-      { label: 'Фильтры', color: 'cyan' },
-      { label: '3 сложности', color: '' },
+      { label: 'Импорт «Решу ЕГЭ»', color: 'cyan' },
+      { label: 'Фильтры', color: '' },
     ],
   },
   {
@@ -16,10 +16,10 @@ const FEATURES = [
     numColor: 'pink',
     cardColor: 'pink',
     title: 'Генератор работ',
-    desc: 'Устный счёт, контрольные, карточки, маршрутные листы, QR-листы и pixel art worksheets. Несколько вариантов за секунды, печать и PDF-экспорт.',
+    desc: '20+ форматов: устный счёт, контрольные, карточки, маршрутные листы, QR-листы, пиксель-арт, шифровки, марафон. Несколько вариантов за секунды, печать и PDF.',
     tags: [
-      { label: 'PDF', color: 'pink' },
-      { label: 'Маршрутные листы', color: 'pink' },
+      { label: '20+ форматов', color: 'pink' },
+      { label: 'PDF / печать', color: 'pink' },
       { label: 'Drag & Drop', color: '' },
     ],
   },
@@ -27,69 +27,81 @@ const FEATURES = [
     num: '03',
     numColor: 'purple',
     cardColor: 'purple',
-    title: 'Тестирование',
-    desc: 'Ученики заходят по ссылке или QR-коду, решают тест. Авто-проверка, результаты в реальном времени.',
+    title: 'Варианты ЕГЭ и ОГЭ',
+    desc: 'Полные варианты КИМ: ЕГЭ базовый (21 задание), профильный (19, с критериями части 2) и ОГЭ (25, со связным блоком 1–5). Печать как в ФИПИ, лист ответов.',
     tags: [
-      { label: 'QR-код', color: 'purple' },
-      { label: 'Авто-проверка', color: 'purple' },
-      { label: 'Онлайн', color: '' },
+      { label: 'КИМ-стиль', color: 'purple' },
+      { label: 'Критерии', color: 'purple' },
+      { label: 'ЕГЭ / ОГЭ', color: '' },
     ],
   },
   {
     num: '04',
     numColor: 'cyan',
     cardColor: 'cyan',
-    title: 'QR-листы',
-    desc: 'Ученик решает задачи, закрашивает числа-ответы в таблице — из них складывается QR-код. Нестандартный и вовлекающий формат работы.',
+    title: 'Умный подбор',
+    desc: 'Семантический поиск по смыслу задачи: «похожие», анти-дубль, параллельные варианты одинаковой сложности и адресная работа над ошибками класса.',
     tags: [
-      { label: 'Печать A4', color: 'cyan' },
-      { label: 'Сохранение', color: 'cyan' },
-      { label: 'Картинки', color: '' },
+      { label: 'Похожие', color: 'cyan' },
+      { label: 'Анти-дубль', color: 'cyan' },
+      { label: 'Параллели', color: '' },
     ],
   },
   {
     num: '05',
     numColor: 'pink',
     cardColor: 'pink',
-    title: 'Геометрия',
-    desc: 'Отдельный модуль для задач с чертежами. GeoGebra-редактор прямо в браузере, A5-листы для печати, сохранение наборов задач.',
+    title: 'Тестирование',
+    desc: 'Ученики заходят по ссылке или QR-коду, решают тест. Авто-проверка, результаты в реальном времени, несколько попыток и проходной балл с дедлайнами.',
     tags: [
-      { label: 'GeoGebra', color: 'pink' },
-      { label: 'A5-печать', color: 'pink' },
-      { label: 'Чертежи', color: '' },
+      { label: 'QR-код', color: 'pink' },
+      { label: 'Авто-проверка', color: 'pink' },
+      { label: 'Дедлайны', color: '' },
     ],
   },
   {
     num: '06',
     numColor: 'purple',
     cardColor: 'purple',
-    title: 'Теория и ТДФ',
-    desc: 'Библиотека статей с формулами и чертежами. Конспекты теорем, определений и формул (ТДФ) с GeoGebra, плюс бланки для устного опроса.',
+    title: 'Геометрия',
+    desc: 'Отдельный модуль для задач с чертежами. GeoGebra-редактор прямо в браузере, экспорт в SVG, A5-листы для печати, сохранение наборов задач.',
     tags: [
-      { label: 'Конспекты', color: 'purple' },
-      { label: 'Опросники', color: 'purple' },
-      { label: 'GeoGebra', color: '' },
+      { label: 'GeoGebra', color: 'purple' },
+      { label: 'SVG-чертежи', color: 'purple' },
+      { label: 'A5-печать', color: '' },
     ],
   },
   {
     num: '07',
     numColor: 'cyan',
     cardColor: 'cyan',
-    title: 'Пиксель-арт',
-    desc: 'Загрузи изображение — получи pixel art worksheet с сеткой и ключом учителя. Ученик закрашивает клетки по числам-ответам и проявляет рисунок.',
+    title: 'Теория и ТДФ',
+    desc: 'Библиотека статей с формулами и чертежами. Конспекты теорем, определений и формул (ТДФ) с GeoGebra, плюс бланки для устного опроса.',
     tags: [
-      { label: 'Печать A4', color: 'cyan' },
-      { label: 'Сохранение', color: 'cyan' },
-      { label: 'Ключ учителя', color: '' },
+      { label: 'Конспекты', color: 'cyan' },
+      { label: 'Опросники', color: 'cyan' },
+      { label: 'GeoGebra', color: '' },
+    ],
+  },
+  {
+    num: '08',
+    numColor: 'pink',
+    cardColor: 'pink',
+    title: 'Игровые форматы',
+    desc: 'Вовлекающие работы: QR-листы (ответы складываются в QR-код), пиксель-арт по числам-ответам, шифровки и марафон защиты задач с живой доской результатов.',
+    tags: [
+      { label: 'QR-листы', color: 'pink' },
+      { label: 'Пиксель-арт', color: 'pink' },
+      { label: 'Марафон', color: '' },
     ],
   },
 ]
 
 const ANALYTICS_ITEMS = [
-  { icon: '📈', title: 'Динамика результатов', desc: 'График по всем попыткам ученика' },
-  { icon: '⚠️', title: 'Слабые темы', desc: 'Задачи с низким процентом верных ответов' },
-  { icon: '🔥', title: 'Серия успехов', desc: 'Streak при результате ≥70% несколько раз подряд' },
-  { icon: '👥', title: 'Сводка класса', desc: 'Учитель видит всех учеников и их баллы' },
+  { icon: '📈', title: 'Динамика результатов', desc: 'График по всем попыткам ученика и класса' },
+  { icon: '🔥', title: 'Тепловые карты ошибок', desc: 'Слабые темы по классу и каждому ученику' },
+  { icon: '📋', title: 'Журнал, КТП и календарь', desc: 'Классы, оценки и планирование уроков' },
+  { icon: '🎯', title: 'Работа над ошибками', desc: 'Адресные подборки по слабым темам' },
 ]
 
 const ACH_PREVIEW = [
@@ -106,7 +118,7 @@ const FeaturesV2 = () => (
       <div className="v2-section-header v2-reveal">
         <span className="v2-label">{'Возможности'}</span>
         <h2 className="v2-heading" style={{ fontSize: 'clamp(32px, 5vw, 56px)' }}>
-          {'Всё для '}<span className="v2-gradient-text">{'ЕГЭ'}</span>{' в одном месте'}
+          {'Всё для '}<span className="v2-gradient-text">{'ЕГЭ и ОГЭ'}</span>{' в одном месте'}
         </h2>
         <p>{'Полный набор инструментов учителя математики'}</p>
       </div>
@@ -132,10 +144,10 @@ const FeaturesV2 = () => (
       <div className="v2-bento v2-reveal" style={{ marginTop: 16 }}>
         {/* Analytics card */}
         <div className="v2-bento-card v2-bento-card--analytics">
-          <div className="v2-bento-num v2-bento-num--orange">08</div>
-          <h3 className="v2-bento-title">{'Аналитика и прогресс'}</h3>
+          <div className="v2-bento-num v2-bento-num--orange">09</div>
+          <h3 className="v2-bento-title">{'Пространство учителя'}</h3>
           <p className="v2-bento-desc">
-            {'Учитель видит полную картину класса. Ученик отслеживает прогресс и серию успехов.'}
+            {'Классы и группы, журнал оценок, КТП с экспортом в Word, календарь уроков, заметки и аналитика — вся рутина в одном рабочем месте.'}
           </p>
           <div className="v2-analytics-grid">
             {ANALYTICS_ITEMS.map((item, i) => (
@@ -153,10 +165,10 @@ const FeaturesV2 = () => (
         {/* Wide achievement card */}
         <div className="v2-bento-card v2-bento-card--wide v2-bento-card--achievements">
           <div>
-            <div className="v2-bento-num v2-bento-num--orange">09</div>
+            <div className="v2-bento-num v2-bento-num--orange">10</div>
             <h3 className="v2-bento-title">{'Достижения'}</h3>
             <p className="v2-bento-desc">
-              {'72+ достижения трёх уровней редкости. Ученики собирают коллекцию и возвращаются к тренировкам чаще.'}
+              {'88 достижений трёх уровней редкости. Ученики собирают коллекцию и возвращаются к тренировкам чаще.'}
             </p>
           </div>
           <div>
@@ -166,7 +178,7 @@ const FeaturesV2 = () => (
                   <img src={a.icon} alt="Achievement" loading="lazy" />
                 </div>
               ))}
-              <div className="v2-bento-ach-more">+67</div>
+              <div className="v2-bento-ach-more">+83</div>
             </div>
             <div className="v2-bento-rarity-legend">
               <span className="v2-bento-rarity-item">

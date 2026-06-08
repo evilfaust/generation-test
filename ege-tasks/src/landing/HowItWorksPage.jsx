@@ -6,25 +6,26 @@ import { APP_VERSION, BUILD_DATE } from '@shared/version/buildInfo'
 const formatDate = (iso) => iso ? iso.slice(0, 10) : ''
 
 const HERO_FACTS = [
-  { value: '7 000+', label: 'Задач в базе по всем темам ЕГЭ', color: 'cyan' },
-  { value: '6+', label: 'Форматов работы: карточки, контрольные, маршрутные листы, QR-листы, pixel art', color: 'pink' },
-  { value: '72', label: 'Достижения трёх уровней редкости для мотивации', color: 'purple' },
-  { value: '100+', label: 'API-методов для работы с данными', color: 'orange' },
+  { value: '17 000+', label: 'Задач в базе по всем темам ЕГЭ и ОГЭ', color: 'cyan' },
+  { value: '20+', label: 'Форматов работы: карточки, контрольные, варианты КИМ, маршрутные листы, QR-листы, pixel art', color: 'pink' },
+  { value: '88', label: 'Достижений трёх уровней редкости для мотивации', color: 'purple' },
+  { value: '130+', label: 'API-методов для работы с данными', color: 'orange' },
 ]
 
 const CORE_MODULES = [
   {
     num: '01', color: 'cyan', wide: true,
     title: 'Управление задачами',
-    desc: 'Полный контроль над базой ЕГЭ. Фильтрация по темам, подтемам, тегам, сложности, источникам, годам и наличию изображений. Массовые операции: добавление/замена тегов, изменение сложности и источника, удаление.',
+    desc: 'Полный контроль над базой ЕГЭ и ОГЭ (17 000+ задач). Фильтрация по темам, подтемам, тегам, сложности, источникам, годам и наличию изображений. Массовые операции: добавление/замена тегов, изменение сложности и источника, удаление.',
     details: [
       'Поддержка LaTeX (KaTeX) и Markdown (GFM) с мгновенным предпросмотром',
       'Три способа добавления изображений: ссылка, файл, рисование в GeoGebra',
       'Обрезка изображений: слайдеры по 4 сторонам с визуальным предпросмотром',
-      'Уникальные коды задач (14-001, M17-003), цветовые теги',
-      'Импорт из Markdown-файлов и парсинг sdamgia.ru',
+      'Импорт из «Решу ЕГЭ» в один клик: ЕГЭ база/профиль, ОГЭ, ВПР — с критериями, чертежами и многокартиночными условиями',
+      'Авто-нормализация LaTeX через LLM + перепарсинг задачи с диффом ДО/ПОСЛЕ',
+      'Импорт из Markdown/YAML-файлов, уникальные коды задач, цветовые теги',
     ],
-    tags: ['LaTeX & Markdown', 'GeoGebra Crop', 'Sdamgia Parser', 'Импорт YAML'],
+    tags: ['LaTeX & Markdown', 'Импорт «Решу ЕГЭ»', 'LLM LaTeX-fix', 'GeoGebra Crop'],
   },
   {
     num: '02', color: 'pink',
@@ -65,16 +66,17 @@ const CORE_MODULES = [
     tags: ['Мульти-тема', '3 режима', 'Work Editor', 'PDF'],
   },
   {
-    num: '05', color: 'orange',
-    title: 'Маршрутные листы и Pixel Art',
-    desc: 'Нестандартные форматы для вовлекающих уроков и самостоятельной работы: маршрутные листы, QR-механики и pixel art worksheets.',
+    num: '05', color: 'orange', wide: true,
+    title: 'Варианты КИМ и игровые форматы',
+    desc: 'Полные экзаменационные варианты в стиле ФИПИ и нестандартные форматы для вовлекающих уроков и самостоятельной работы.',
     details: [
+      'Полные варианты ЕГЭ базовый (21 задание), профильный (19, с критериями части 2) и ОГЭ (25, со связным практическим блоком 1–5)',
+      'КИМ-печать как в ФИПИ: обложка с инструкцией, поля ответа, отдельный лист ответов и решений',
       'Маршрутные листы для пошаговой самостоятельной работы',
-      'QR-листы с игровым сценарием проверки',
-      'Pixel art worksheets с изображением, сеткой и ключом учителя',
-      'Печать и сохранение готовых шаблонов',
+      'QR-листы с игровым сценарием проверки и pixel art worksheets с ключом учителя',
+      'Шифровки и марафон защиты задач с живой доской результатов',
     ],
-    tags: ['Pixel Art', 'Маршруты', 'Печать'],
+    tags: ['ЕГЭ / ОГЭ КИМ', 'Pixel Art', 'Маршруты', 'Марафон'],
   },
   {
     num: '06', color: 'cyan',
@@ -102,39 +104,66 @@ const CORE_MODULES = [
     ],
     tags: ['Monaco', '5 тем', 'Печать конспектов'],
   },
+  {
+    num: '08', color: 'cyan', wide: true,
+    title: 'Умный подбор задач',
+    desc: 'Семантический (векторный) поиск по смыслу задачи на эмбеддингах bge-m3. Помогает находить похожее, избегать повторов и собирать честные параллельные варианты.',
+    details: [
+      '«Похожие задачи» в карточке и догенерация работы похожими',
+      'Анти-дубль: предупреждение о повторах внутри варианта и относительно прошлой работы',
+      'Параллельные варианты одинаковой сложности (оригинал/дубль N)',
+      'Режимы подбора в генераторе: по образцу, разные сюжеты (MMR), анти-дубль + бейдж новизны',
+      'Дедуп-кластеры в каталоге и адресная работа над ошибками класса',
+    ],
+    tags: ['bge-m3', 'sqlite-vec', 'Анти-дубль', 'Параллели'],
+  },
+  {
+    num: '09', color: 'orange', wide: true,
+    title: 'Пространство учителя',
+    desc: 'Рабочее место, в котором замкнут цикл «план → выдача → результаты → коррекция». Вся организационная рутина в одном разделе.',
+    details: [
+      'Классы и группы с привязкой учеников; «Сегодня» — уроки и ближайшие дедлайны',
+      'Журнал оценок (ученик × выдача) + журнал внешних работ «Решу ЕГЭ»',
+      'Тепловые карты ошибок по темам с точечным разбором и кнопкой «работа над ошибками»',
+      'КТП с экспортом в Word и печатью, календарь уроков с drag-переносом дат',
+      'Заметки на блочном редакторе с LaTeX, материалы урока, дедлайны и проходной балл',
+    ],
+    tags: ['Классы', 'Журнал', 'КТП → Word', 'Календарь', 'Тепловые карты'],
+  },
 ]
 
 const TEACHER_FEATURES = [
-  'StudentProgressDashboard с динамикой оценок и блоком «Проблемные задачи»',
-  'Генерация сессионных ссылок и QR-кодов для раздачи классу',
-  'Ручное распределение достижений ученикам',
+  'Пространство учителя: классы/группы, журнал оценок, КТП, календарь, заметки',
+  'Тепловые карты ошибок по темам — внутренние и внешние работы «Решу ЕГЭ»',
+  'Адресная работа над ошибками класса по слабым темам в один клик',
+  'Генерация сессионных ссылок и QR-кодов, дедлайны, попытки и проходной балл',
   'Аналитика: распределение задач по темам, тегам, сложности, источникам',
-  'Каталог справочников с CRUD, обнаружением и объединением дублей',
-  'Облако тегов с переходом к задачам',
-  'Архивирование работ без удаления данных',
+  'Каталог справочников с CRUD, семантическим поиском и объединением дублей',
+  'Архивирование работ без удаления данных, ручная выдача достижений',
 ]
 
 const STUDENT_FEATURES = [
   'Вход по ссылке /student/{sessionId} — ничего лишнего',
   'Регистрация: имя + логин + пароль (PocketBase Auth)',
   'Автосохранение промежуточных ответов в localStorage',
-  'Галерея достижений (common / rare / legendary)',
-  'Привязка гостевых попыток к аккаунту',
+  'Несколько попыток, проходной балл и дедлайн сдачи',
+  'Работа над ошибками по слабым темам от учителя',
+  'Галерея из 88 достижений (common / rare / legendary)',
   'Страница прогресса: история и статистика по всем сессиям',
   'Защита от читерства: round-robin вариантов',
 ]
 
 const FLOW_STEPS = [
   { num: '01', title: 'Создание варианта', text: 'Учитель конструирует работу: настраивает фильтры, уровень сложности и количество вариантов. Задачи подбираются автоматически или вручную.', side: 'teacher' },
-  { num: '02', title: 'Выдача сессии', text: 'Активация работы. Система генерирует короткую ссылку и QR-код для раздачи классу (вида /student/{id}). Можно настроить заголовок и включить достижения.', side: 'teacher' },
+  { num: '02', title: 'Выдача сессии', text: 'Активация работы. Система генерирует короткую ссылку и QR-код для раздачи классу (вида /student/{id}). Можно настроить заголовок, включить достижения, задать дедлайн, число попыток и проходной балл.', side: 'teacher' },
   { num: '03', title: 'Прохождение теста', text: 'Ученики открывают ссылку с телефона, регистрируются и получают вариант (round-robin распределение). Решают задачи, ответы автосохраняются.', side: 'student' },
   { num: '04', title: 'Автоматическая проверка', text: 'При отправке ответов сервер проверяет их: числовое сравнение с epsilon (1e-6), дроби (1/3), LaTeX-дроби (\\frac{1}{3}), альтернативы через «|». Моментальный результат.', side: 'student' },
   { num: '05', title: 'Система наград', text: 'Achievement Engine выдает случайные значки по проценту решаемости (90%+ → Legendary, 70–89% → Rare, 40–69% → Common) и условные достижения (скорость, кол-во попыток, время суток).', side: 'student' },
-  { num: '06', title: 'Анализ результатов', text: 'Учитель видит статистику: средний балл, «проблемные задачи» класса. Может выдать достижения вручную и разрешить повторную попытку точечно.', side: 'teacher' },
+  { num: '06', title: 'Анализ и коррекция', text: 'Учитель видит статистику и тепловые карты ошибок по темам, оценки попадают в журнал. Одной кнопкой собирает адресную работу над ошибками по слабым темам и точечно разрешает повторные попытки.', side: 'teacher' },
 ]
 
 const ACHIEVEMENTS_DATA = {
-  total: 72,
+  total: 88,
   random: [
     { rarity: 'legendary', label: 'Легендарные', condition: '90%+ правильных', color: '#ffbe0b', examples: 'Железный человек, Джедай, Титан' },
     { rarity: 'rare', label: 'Редкие', condition: '70–89% правильных', color: '#8338ec', examples: 'Алхимик, Стратег, Мастер' },
@@ -164,16 +193,18 @@ const TECH_STACK = [
       { name: 'KaTeX', ver: '0.16.9', note: 'LaTeX формулы' },
       { name: 'react-markdown', ver: '10.1', note: 'Markdown + GFM' },
       { name: 'Monaco Editor', ver: '4.7', note: 'Редактор теории (lazy)' },
-      { name: 'DOMPurify', ver: '3.3', note: 'HTML-санитизация' },
+      { name: 'BlockNote', ver: '0.31', note: 'Блочный редактор заметок + LaTeX' },
+      { name: 'GeoGebra', ver: '', note: 'Чертежи геометрии + ТДФ' },
     ],
   },
   {
     title: 'Backend & Сервисы',
     items: [
-      { name: 'PocketBase', ver: '0.36.4', note: 'SQLite + Auth + RLS + Files' },
+      { name: 'PocketBase', ver: '0.36.4', note: 'SQLite + Auth + Files' },
       { name: 'Express.js', ver: '', note: 'backend-сервис: sdamgia + LaTeX + вектор' },
+      { name: 'sqlite-vec', ver: '', note: 'векторный индекс (cosine) для поиска похожих' },
+      { name: 'Ollama bge-m3', ver: '1024d', note: 'эмбеддинги задач для семантики' },
       { name: 'html2pdf.js', ver: '0.14', note: 'клиентский PDF-экспорт' },
-      { name: 'Cheerio', ver: '', note: 'HTML-парсинг' },
     ],
   },
   {
@@ -209,9 +240,21 @@ const DB_COLLECTIONS = [
     { name: 'attempt_answers', desc: 'Ответы по задачам', fields: 'answer_raw, answer_normalized, is_correct', rel: 'attempts, tasks' },
   ]},
   { group: 'Достижения & Теория', items: [
-    { name: 'achievements', desc: '72 достижения', fields: 'type (random/condition), rarity, condition_type', rel: '—' },
+    { name: 'achievements', desc: '88 достижений', fields: 'type (random/condition), rarity, condition_type', rel: '—' },
     { name: 'theory_categories', desc: 'Категории теории', fields: 'title, color, order', rel: '—' },
     { name: 'theory_articles', desc: 'Статьи теории', fields: 'content_md (100K символов), theme_settings', rel: 'theory_categories' },
+  ]},
+  { group: 'Пространство учителя', items: [
+    { name: 'teaching_groups', desc: 'Классы и группы', fields: 'name, archived', rel: 'students[]' },
+    { name: 'lessons', desc: 'Уроки (календарь)', fields: 'date, title, materials (json)', rel: 'teaching_groups' },
+    { name: 'teacher_notes', desc: 'Заметки (BlockNote)', fields: 'body (json), note_date, tags', rel: 'teaching_groups, lessons' },
+    { name: 'ktp_courses', desc: 'КТП — планы', fields: 'rows (тема, часы, неделя, результаты)', rel: 'teaching_groups' },
+  ]},
+  { group: 'Импорт & Вектор', items: [
+    { name: 'task_images', desc: 'Чертежи импорта «Решу ЕГЭ»', fields: 'role (condition/solution/criteria), order, file', rel: 'tasks (cascade)' },
+    { name: 'task_families', desc: 'Семьи задач (вектор)', fields: 'type (dedup_cluster/variant_family/reviewed_not_dup)', rel: '—' },
+    { name: 'task_family_members', desc: 'Связи задач в семье', fields: 'role, similarity', rel: 'task_families, tasks' },
+    { name: 'vec_tasks', desc: 'Эмбеддинги bge-m3 (vec.db)', fields: '1024d, cosine — отдельная sqlite-vec БД', rel: 'tasks (ATTACH ro)' },
   ]},
 ]
 
@@ -224,6 +267,8 @@ const API_GROUPS = [
   { name: 'Geometry', count: 15, desc: 'Tasks, topics, subtopics, print tests, getGeometryImageUrl' },
   { name: 'Theory', count: 10, desc: 'Articles, categories, getArticleCountByCategory' },
   { name: 'Stats & Catalog', count: 12, desc: 'Topics, subtopics, tags, getTasksStatsSnapshot, getTasksForDuplicateCheck' },
+  { name: 'Vector Search', count: 10, desc: '/similar, /pairs, /duplicates, /parallel-variants, /remediation, /seed-select, /diverse, /novelty' },
+  { name: 'Workspace', count: 14, desc: 'groups, lessons, notes, ktp, grade journal + external «Решу» journal & heatmaps' },
   { name: 'References', count: 8, desc: 'Cached in ReferenceDataContext — topics, tags, years, sources, snapshot' },
 ]
 
@@ -246,6 +291,10 @@ const VERSION_MILESTONES = [
   { ver: '3.8', date: 'Март 2026', title: 'ТДФ + Экспорт MD', desc: 'Модуль ТДФ (Теоремы, Определения, Формулы) с конспектами и вариантами, экспорт в Markdown, объединение аккаунтов учеников', color: 'cyan' },
   { ver: '3.9', date: 'Март 2026', title: 'ТДФ — улучшения', desc: 'Реструктуризация печатного вида (объединение Тема+Формулировка, вертикальная метка типа), новый тип «Следствие»', color: 'orange' },
   { ver: '4.0', date: 'Апрель 2026', title: 'Новые форматы работ', desc: 'Маршрутные листы, QR-механики и pixel art worksheets для более игровых и визуальных сценариев урока', color: 'pink' },
+  { ver: '3.9.31', date: 'Апрель 2026', title: 'Импорт «Решу ЕГЭ»', desc: 'Парсер sdamgia (ЕГЭ база/профиль, ОГЭ, ВПР) с критериями и чертежами, LLM-нормализация LaTeX, перепарсинг с диффом', color: 'cyan' },
+  { ver: '3.9.38', date: 'Май 2026', title: 'Векторный поиск', desc: 'Семантический подбор на bge-m3 + sqlite-vec: похожие, анти-дубль, параллельные варианты, дедуп-кластеры, работа над ошибками', color: 'purple' },
+  { ver: '3.9.50', date: 'Май 2026', title: 'Пространство учителя', desc: 'Классы и группы, журнал оценок, КТП с экспортом в Word, календарь уроков, заметки на блочном редакторе', color: 'orange' },
+  { ver: '3.9.61', date: 'Июнь 2026', title: 'Внешний журнал «Решу»', desc: 'Полные варианты КИМ ЕГЭ/ОГЭ, тепловые карты ошибок по внешним работам, связь внешних задач с банком Лемме', color: 'cyan' },
 ]
 
 const ANSWER_CHECKER_FEATURES = [
@@ -256,6 +305,7 @@ const ANSWER_CHECKER_FEATURES = [
 ]
 
 const TEACHER_NAV = [
+  { key: 'workspace', label: 'Моё пространство', comp: 'Сегодня / Группы / Журнал / КТП / Календарь / Заметки' },
   { key: 'tasks', label: 'Все задачи', comp: 'TaskList' },
   { key: 'stats', label: 'Аналитика', comp: 'TaskStatsDashboard' },
   { key: 'catalog', label: 'Каталог', comp: 'TaskCatalogManager' },
@@ -332,7 +382,7 @@ const HowItWorksPage = () => {
           </h1>
 
           <p className="v2-how-subtitle">
-            Веб-платформа для учителя математики: база задач, автоматическая генерация вариантов, модуль геометрии с GeoGebra, ТДФ-конспекты, онлайн-тестирование и система достижений. Три изолированных интерфейса — учитель, ученик и промо-лендинг.
+            Веб-платформа для учителя математики: банк задач с импортом из «Решу ЕГЭ», 20+ генераторов работ и полные варианты КИМ, семантический поиск похожих задач, модуль геометрии с GeoGebra, ТДФ-конспекты, онлайн-тестирование с достижениями и рабочее пространство учителя — классы, журнал, КТП, календарь и аналитика. Три изолированных интерфейса — учитель, ученик и промо-лендинг.
           </p>
 
           <div className="v2-how-hero-actions">
@@ -790,10 +840,10 @@ const HowItWorksPage = () => {
             <div className="v2-how-feature-card" style={{ background: 'linear-gradient(135deg, rgba(0,245,212,0.04), rgba(131,56,236,0.04))' }}>
               <h3 style={{ fontFamily: 'var(--v2-font-display)', fontSize: 18, marginBottom: 12 }}>Резервное копирование</h3>
               <ul className="v2-how-list">
-                <li>Автоматические бэкапы на VPS каждые 6 часов (cron, до 20 копий)</li>
+                <li>Автоматические бэкапы на VPS каждые 6 часов (root-cron): 4 последних локально</li>
+                <li>Off-site в S3 (Timeweb): 30 суточных + 12 месячных копий</li>
+                <li>В бэкап входят <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>data.db</code>, <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>vec.db</code> (вектор-индекс) и <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>storage/</code> (чертежи)</li>
                 <li>Безопасный бэкап через <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>sqlite3 .backup</code> — safe while running</li>
-                <li>Скрипты: <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>backup.sh</code> / <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>restore.sh</code> с двойным подтверждением</li>
-                <li>macOS LaunchAgent: автобэкап каждый день в 02:00</li>
               </ul>
             </div>
           </div>
@@ -808,7 +858,7 @@ const HowItWorksPage = () => {
             <h2 className="v2-heading" style={{ fontSize: 'clamp(28px, 4vw, 48px)' }}>
               <span className="v2-gradient-text--hot">{API_GROUPS.reduce((s, g) => s + g.count, 0)}+</span> методов API
             </h2>
-            <p>Единый файл <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>pocketbase.js</code> — все запросы к серверу. Реэкспорт для обратной совместимости.</p>
+            <p>Тонкий barrel <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>pocketbase.js</code> реэкспортирует доменные модули <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>shared/services/pb/*.js</code>. Контракт <code style={{ color: 'var(--v2-cyan)', fontFamily: 'var(--v2-font-mono)' }}>import {'{ api }'}</code> неизменен.</p>
           </div>
 
           <div className="v2-how-data-grid v2-reveal">
@@ -871,7 +921,7 @@ const HowItWorksPage = () => {
                 Управляйте учебным процессом <span className="v2-gradient-text">эффективно</span>
               </h2>
               <p>
-                Бесплатная платформа. Ученики подключаются по ссылке или QR-коду. Учитель контролирует всё — от создания задач до анализа результатов. Карточки, контрольные, маршрутные листы, QR-листы, pixel art worksheets, 72 достижения и автопроверка ответов.
+                Бесплатная платформа. Ученики подключаются по ссылке или QR-коду. Учитель контролирует всё — от создания задач до анализа результатов. Импорт из «Решу ЕГЭ», полные варианты КИМ, умный подбор похожих, карточки и контрольные, QR-листы и pixel art, рабочее пространство учителя, 88 достижений и автопроверка ответов.
               </p>
               <div className="v2-how-highlight-actions">
                 <a href="https://github.com/evilfaust/lemma" className="v2-btn v2-btn--primary">Открыть платформу →</a>

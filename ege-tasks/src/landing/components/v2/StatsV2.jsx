@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 const STATS = [
-  { value: 7000, suffix: '+', label: '\u0437\u0430\u0434\u0430\u0447 \u0432 \u0431\u0430\u0437\u0435', color: 'cyan' },
-  { value: 72, suffix: '+', label: '\u0434\u043E\u0441\u0442\u0438\u0436\u0435\u043D\u0438\u0439', color: 'pink' },
-  { value: 8, suffix: '', label: '\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u043E\u0432', color: 'purple' },
+  { value: 17000, suffix: '+', label: '\u0437\u0430\u0434\u0430\u0447 \u0432 \u0431\u0430\u0437\u0435', color: 'cyan' },
+  { value: 88, suffix: '', label: '\u0434\u043E\u0441\u0442\u0438\u0436\u0435\u043D\u0438\u0439', color: 'pink' },
+  { value: 20, suffix: '+', label: '\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u043E\u0432', color: 'purple' },
   { value: 3, suffix: '', label: '\u043C\u0438\u043D\u0443\u0442\u044B \u043D\u0430 \u0440\u0430\u0431\u043E\u0442\u0443', color: 'orange' },
 ]
 
