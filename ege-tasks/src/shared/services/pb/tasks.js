@@ -306,6 +306,25 @@ export const tasksApi = {
     }
   },
 
+  // Карта sdamgia_id → task.id для набора решу-id (для связки внешних результатов).
+  async getTaskIdsBySdamgiaIds(sdamgiaIds = []) {
+    const map = {};
+    try {
+      const ids = [...new Set(sdamgiaIds.map(String).filter(Boolean))];
+      if (!ids.length) return map;
+      const CHUNK = 40;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK);
+        const filter = chunk.map((s) => `sdamgia_id = "${escapeFilter(s)}"`).join(' || ');
+        const recs = await pb.collection('tasks').getFullList({ filter, fields: 'id,sdamgia_id' });
+        for (const r of recs) if (r.sdamgia_id) map[r.sdamgia_id] = r.id;
+      }
+    } catch (error) {
+      console.error('Error mapping sdamgia ids:', error);
+    }
+    return map;
+  },
+
   // Обновить задачу
   async updateTask(id, data) {
     try {

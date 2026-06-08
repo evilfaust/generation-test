@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   App, Button, Card, Empty, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography,
 } from 'antd';
-import { ExportOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { DownloadOutlined, ExportOutlined, FileSearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { api } from '../../shared/services/pocketbase';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { importReshuProblem } from '../../utils/importReshuProblem';
+import TaskPreviewModal from './TaskPreviewModal';
 
 const { Title, Text } = Typography;
 
@@ -28,6 +31,7 @@ export default function ExternalThematic() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { egeBaseTopics } = useReferenceData();
+  const { canEdit } = useAuth();
 
   const [exams, setExams] = useState([]);
   const [taskResults, setTaskResults] = useState([]);
@@ -38,6 +42,9 @@ export default function ExternalThematic() {
   const [building, setBuilding] = useState(false);
   const [drill, setDrill] = useState(null); // { taskNum, student? }
   const [onlyStudent, setOnlyStudent] = useState(true);
+  const [lemmaMap, setLemmaMap] = useState({}); // problem_id → taskId | null
+  const [importingPid, setImportingPid] = useState(null);
+  const [previewTaskId, setPreviewTaskId] = useState(null);
 
   const openDrill = (taskNum, student) => {
     setOnlyStudent(!!student);
@@ -139,6 +146,39 @@ export default function ExternalThematic() {
 
   const drillTopic = drill ? topicByNum.get(drill.taskNum) : null;
   const drillStat = drill ? pct(classStat.get(drill.taskNum)) : null;
+
+  // При открытии разбора — узнать, какие задачи уже есть в Лемме (по sdamgia_id).
+  useEffect(() => {
+    if (!drill || !drillRows.length) return;
+    const pids = [...new Set(drillRows.map((r) => r.problem_id).filter(Boolean))];
+    if (!pids.length) return;
+    let cancelled = false;
+    api.getTaskIdsBySdamgiaIds(pids).then((map) => {
+      if (cancelled) return;
+      // problem_id, у которого нет задачи → помечаем null (показать «Импортировать»)
+      const next = {};
+      for (const pid of pids) next[pid] = map[pid] || null;
+      setLemmaMap((prev) => ({ ...prev, ...next }));
+    });
+    return () => { cancelled = true; };
+  }, [drill, drillRows]);
+
+  const handleImportProblem = async (pid, taskNum) => {
+    const topic = topicByNum.get(taskNum);
+    if (!topic) { message.error('Нет темы ege_base для этого задания'); return; }
+    setImportingPid(pid);
+    try {
+      const task = await importReshuProblem({ problemId: pid, taskNumber: taskNum, topicId: topic.id });
+      setLemmaMap((prev) => ({ ...prev, [pid]: task.id }));
+      message.success('Задача импортирована в Лемму');
+      setPreviewTaskId(task.id);
+    } catch (e) {
+      console.error(e);
+      message.error(`Не удалось импортировать: ${e?.message || 'ошибка'}`);
+    } finally {
+      setImportingPid(null);
+    }
+  };
 
   const handleRemediation = async () => {
     if (!weakTopics.length) { message.info('Нет тем ниже порога — класс справляется'); return; }
@@ -333,11 +373,42 @@ export default function ExternalThematic() {
                   title: 'Итог', key: 'res', width: 80, align: 'center',
                   render: (_, r) => r.is_correct ? <Tag color="green">верно</Tag> : <Tag color="red">ошибка</Tag>,
                 },
+                {
+                  title: 'В Лемме', key: 'lemma', width: 140,
+                  render: (_, r) => {
+                    if (!r.problem_id) return <Text type="secondary">—</Text>;
+                    const tid = lemmaMap[r.problem_id];
+                    if (tid) {
+                      return (
+                        <Button size="small" type="link" icon={<FileSearchOutlined />} style={{ paddingLeft: 0 }}
+                          onClick={() => setPreviewTaskId(tid)}>
+                          открыть
+                        </Button>
+                      );
+                    }
+                    if (tid === null) {
+                      return canEdit ? (
+                        <Button size="small" type="link" icon={<DownloadOutlined />} style={{ paddingLeft: 0 }}
+                          loading={importingPid === r.problem_id}
+                          onClick={() => handleImportProblem(r.problem_id, r.task_number || drill.taskNum)}>
+                          импортировать
+                        </Button>
+                      ) : <Text type="secondary">нет</Text>;
+                    }
+                    return <Text type="secondary">…</Text>;
+                  },
+                },
               ]}
             />
           </>
         )}
       </Modal>
+
+      <TaskPreviewModal
+        open={!!previewTaskId}
+        taskId={previewTaskId}
+        onClose={() => setPreviewTaskId(null)}
+      />
     </div>
   );
 }
