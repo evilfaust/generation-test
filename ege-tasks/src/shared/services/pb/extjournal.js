@@ -22,6 +22,16 @@ export const extJournalApi = {
     }
   },
 
+  // Все потасковые результаты (для тепловой карты по темам/заданиям).
+  async getExtTaskResultsAll() {
+    try {
+      return await pb.collection('ext_journal_task_results').getFullList({ batch: 1000 });
+    } catch (error) {
+      console.error('Error fetching all ext task results:', error);
+      return [];
+    }
+  },
+
   // Потасковые результаты по конкретной внешней работе (для разбора по заданиям).
   async getExtTaskResults(examId) {
     try {

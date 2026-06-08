@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Empty, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { App, Card, Empty, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { api } from '../../shared/services/pocketbase';
+import ExternalThematic from './ExternalThematic';
 
 const { Text } = Typography;
 
@@ -19,6 +20,7 @@ export default function ExternalJournal() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [groupFilter, setGroupFilter] = useState(null);
+  const [subView, setSubView] = useState('grades'); // grades | heat
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,25 +104,46 @@ export default function ExternalJournal() {
 
   const dataSource = useMemo(() => students.map((s) => ({ key: s, student: s })), [students]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
+  const header = (
+    <Space style={{ marginBottom: 12 }} wrap>
+      <Segmented
+        value={subView}
+        onChange={setSubView}
+        options={[
+          { value: 'grades', label: 'Оценки' },
+          { value: 'heat', label: 'Тепловая карта (темы)' },
+        ]}
+      />
+    </Space>
+  );
+
+  if (subView === 'heat') {
+    return <div>{header}<ExternalThematic /></div>;
+  }
+
+  if (loading) return <div>{header}<div style={{ textAlign: 'center', padding: 48 }}><Spin /></div></div>;
 
   if (!exams.length) {
     return (
-      <Empty
-        description={
-          <span>
-            Внешних работ пока нет.<br />
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Результаты приходят из приложения «Журнал ЕГЭ» (синхронизация решу.ЕГЭ).
-            </Text>
-          </span>
-        }
-      />
+      <div>
+        {header}
+        <Empty
+          description={
+            <span>
+              Внешних работ пока нет.<br />
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Результаты приходят из приложения «Журнал ЕГЭ» (синхронизация решу.ЕГЭ).
+              </Text>
+            </span>
+          }
+        />
+      </div>
     );
   }
 
   return (
     <div>
+      {header}
       <Space style={{ marginBottom: 12 }} wrap>
         <Text type="secondary">Результаты внешних работ с решу.ЕГЭ</Text>
         {groupNames.length > 0 && (
