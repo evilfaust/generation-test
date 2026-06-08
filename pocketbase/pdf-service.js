@@ -491,6 +491,23 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL, role = 'co
   // Для формул держим Set дедупа: sdamgia на одну формулу может вставить
   // несколько <img class="tex"> с идентичным alt — оставляем только первое.
   const seenFormulaAlts = new Set();
+
+  // Считаем УНИКАЛЬНЫЕ НЕ-формульные картинки в условии. При 2+ (типичный кейс —
+  // «сопоставьте график функции и формулу/уравнение»: несколько графиков
+  // в одном условии) оставляем их INLINE как ![image](url) — позиции важны.
+  // При одной картинке поведение прежнее: вырезаем (рисуется отдельным полем),
+  // чтобы не было двойного отображения (баг v3.9.31).
+  // Дедуп по URL: sdamgia иногда вставляет один чертёж дважды (retina/печать).
+  const _distinctImgUrls = new Set();
+  $el.find('img').each(function () {
+    const u = $(this).attr('src') || '';
+    if (u && !(u.includes('formula') || u.includes('/formula/'))) {
+      _distinctImgUrls.add(u.startsWith('http') ? u : new URL(u, baseUrl).href);
+    }
+  });
+  const keepImagesInline = _distinctImgUrls.size >= 2;
+  const seenImageUrls = new Set();
+
   $el.find('img').each(function () {
     const imgUrl = $(this).attr('src') || '';
     if (!imgUrl) {
@@ -526,17 +543,20 @@ function processCondition($, conditionEl, baseUrl = SDAMGIA_BASE_URL, role = 'co
       if (!fullUrl.startsWith('http')) {
         fullUrl = new URL(imgUrl, baseUrl).href;
       }
+      // Дедуп повторов одного чертежа (retina/печать).
+      if (seenImageUrls.has(fullUrl)) { $(this).remove(); return; }
+      seenImageUrls.add(fullUrl);
       const fileId = extractSdamgiaFileId(fullUrl);
       const order = imgIndex + 1;
       // Структурированно: фронт качает и заливает в task_images по role+order.
       images.push({ url: fullUrl, file_id: fileId, order, role });
       const marker = `___IMAGE_${imgIndex}___`;
-      // ИЗМЕНЕНО v3.9.33: НЕ оставляем ![image](url) в тексте условия.
-      // Картинка хранится отдельно (file-поле tasks.image + коллекция task_images);
-      // все рендереры (TaskCard, EgeVariantGenerator, PrintableWorksheet и т.п.)
-      // ожидают чистый текст + отдельный <Image>. Inline ![image] в statement_md
-      // приводил к двойному отображению (см. v3.9.31 баг). Просто удаляем маркер.
-      imageReplacements[marker] = '';
+      // Одна картинка (v3.9.33): вырезаем маркер — рисуется отдельным полем
+      // (избегаем двойного отображения, баг v3.9.31).
+      // Несколько картинок (v3.9.60): оставляем ![image](url) ИНЛАЙН на своих
+      // позициях — иначе теряются все, кроме первой (кейс «сопоставь график↔формулу»).
+      // Импортёр для таких задач ставит has_image=false, чтобы не задвоить первую.
+      imageReplacements[marker] = keepImagesInline ? `![image](${fullUrl})` : '';
       imgIndex++;
       $(this).replaceWith(marker);
     }

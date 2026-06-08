@@ -430,8 +430,13 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
           explanation_md: '',
           source: parsedData.metadata.source || '',
           year: parsedData.metadata.year || null,
-          has_image: Boolean(task.imageUrl || imageFile),
-          image_url: imageFile ? '' : (task.imageUrl || ''),
+          // Мультикартиночное условие (2+ картинки, напр. «сопоставь график↔формулу»):
+          // картинки идут INLINE в statement_md (born-local подменит на локальные),
+          // отдельное поле отключаем — иначе первая картинка задвоится.
+          has_image: ((task.condition_images?.length || 0) >= 2)
+            ? false
+            : Boolean(task.imageUrl || imageFile),
+          image_url: (imageFile || (task.condition_images?.length || 0) >= 2) ? '' : (task.imageUrl || ''),
           // Поля для ЕГЭ часть 2 (sdamgia). Пустые значения безопасны для части 1.
           sdamgia_id: task.sdamgiaId || '',
           sdamgia_url: task.sdamgia_url || '',
