@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import {
   App, Button, DatePicker, Empty, Input, List, Popconfirm, Segmented, Select, Space, Tag, Tooltip, Typography,
 } from 'antd';
-import { DeleteOutlined, InboxOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, InboxOutlined, PlusOutlined, PaperClipOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import MaterialPickerModal from './MaterialPickerModal';
 import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems } from '@blocknote/core';
@@ -86,6 +87,7 @@ export default function NotesWorkspace() {
   const [groupFilter, setGroupFilter] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savedTick, setSavedTick] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const load = useCallback(async (selectId) => {
     setLoading(true);
@@ -308,6 +310,38 @@ export default function NotesWorkspace() {
               />
               {active.lesson && <Tag color="purple">заметка урока</Tag>}
             </div>
+            {(() => {
+              const allLinks = Array.isArray(active.links) ? active.links : [];
+              const files = allLinks.filter((l) => l.type === 'material');
+              const saveLinks = (next) => patchActive({ links: [...allLinks.filter((l) => l.type !== 'material'), ...next] });
+              return (
+                <div className="notes-editor__meta" style={{ flexWrap: 'wrap' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}><PaperClipOutlined /> Файлы:</Text>
+                  {files.length === 0 && <Text type="secondary" style={{ fontSize: 12 }}>нет</Text>}
+                  {files.map((f) => (
+                    <Tag key={f.id} closable={canEdit}
+                      onClose={(e) => { e.preventDefault(); saveLinks(files.filter((x) => x.id !== f.id)); }}
+                      style={{ marginInlineEnd: 0 }}>
+                      <a href={f.url} target="_blank" rel="noreferrer"><DownloadOutlined /> {f.title}</a>
+                    </Tag>
+                  ))}
+                  {canEdit && (
+                    <Button size="small" type="dashed" icon={<PaperClipOutlined />} onClick={() => setPickerOpen(true)}>
+                      Прикрепить
+                    </Button>
+                  )}
+                  <MaterialPickerModal
+                    open={pickerOpen}
+                    onClose={() => setPickerOpen(false)}
+                    existingIds={files.map((f) => f.id)}
+                    onPick={(picked) => {
+                      const seen = new Set(files.map((x) => x.id));
+                      saveLinks([...files, ...picked.filter((p) => !seen.has(p.id))]);
+                    }}
+                  />
+                </div>
+              );
+            })()}
             <div className="notes-editor__body">
               <NoteEditor key={active.id} note={active} onSaveBody={saveBody} editable={canEdit} />
             </div>

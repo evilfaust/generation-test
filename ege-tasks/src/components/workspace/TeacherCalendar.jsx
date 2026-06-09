@@ -4,8 +4,9 @@ import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import {
   App, Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Space, Switch, Tag, Typography,
 } from 'antd';
-import { FileTextOutlined, LinkOutlined, PlusOutlined } from '@ant-design/icons';
+import { FileTextOutlined, LinkOutlined, PlusOutlined, PaperClipOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import MaterialPickerModal from './MaterialPickerModal';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import localeData from 'dayjs/plugin/localeData';
@@ -41,16 +42,21 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
   const [form] = Form.useForm();
   const materialIds = Form.useWatch('materials', form) || [];
   const worksMap = useMemo(() => new Map((works || []).map((w) => [w.id, w.title])), [works]);
+  // Файлы из Библиотеки (type:'material') живут отдельно от работ (type:'work').
+  const [fileMaterials, setFileMaterials] = useState([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
+      const all = Array.isArray(initial?.materials) ? initial.materials : [];
       form.setFieldsValue({
         title: initial?.title || '',
         group: initial?.group || undefined,
         date_plan: initial?.date_plan ? dayjs(initial.date_plan) : (initial?.slotDate ? dayjs(initial.slotDate) : dayjs()),
         status: initial?.status || 'planned',
-        materials: Array.isArray(initial?.materials) ? initial.materials.map((m) => m.id) : [],
+        materials: all.filter((m) => m.type !== 'material').map((m) => m.id),
       });
+      setFileMaterials(all.filter((m) => m.type === 'material'));
     }
   }, [open, initial, form]);
 
@@ -60,7 +66,10 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
       group: v.group || '',
       date_plan: v.date_plan ? v.date_plan.toISOString() : dayjs().toISOString(),
       status: v.status || 'planned',
-      materials: (v.materials || []).map((id) => ({ type: 'work', id, title: worksMap.get(id) || '' })),
+      materials: [
+        ...(v.materials || []).map((id) => ({ type: 'work', id, title: worksMap.get(id) || '' })),
+        ...fileMaterials,
+      ],
     });
   };
 
@@ -119,6 +128,47 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
           />
         </Form.Item>
       </Form>
+
+      {/* Файлы из Библиотеки (pb-files) */}
+      <div style={{ marginBottom: 12 }}>
+        <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Typography.Text strong style={{ fontSize: 13 }}>
+            <PaperClipOutlined /> Файлы из Библиотеки
+          </Typography.Text>
+          {canEdit && (
+            <Button size="small" icon={<PaperClipOutlined />} onClick={() => setPickerOpen(true)}>
+              Прикрепить
+            </Button>
+          )}
+        </Space>
+        {fileMaterials.length === 0 ? (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>Нет прикреплённых файлов</Typography.Text>
+        ) : (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            {fileMaterials.map((m) => (
+              <Space key={m.id} style={{ width: '100%', justifyContent: 'space-between' }}>
+                <a href={m.url} target="_blank" rel="noreferrer">
+                  <DownloadOutlined /> {m.title}
+                </a>
+                {canEdit && (
+                  <Button size="small" type="text" danger icon={<DeleteOutlined />}
+                    onClick={() => setFileMaterials((prev) => prev.filter((x) => x.id !== m.id))} />
+                )}
+              </Space>
+            ))}
+          </Space>
+        )}
+      </div>
+
+      <MaterialPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        existingIds={fileMaterials.map((m) => m.id)}
+        onPick={(picked) => setFileMaterials((prev) => {
+          const seen = new Set(prev.map((x) => x.id));
+          return [...prev, ...picked.filter((p) => !seen.has(p.id))];
+        })}
+      />
 
       {/* Быстрый переход к материалам: выдача, результаты, работа над ошибками */}
       {materialIds.length > 0 && (

@@ -31,6 +31,7 @@ const KtpList = lazy(() => import('./components/workspace/KtpList'));
 const KtpEditor = lazy(() => import('./components/workspace/KtpEditor'));
 const TeacherCalendar = lazy(() => import('./components/workspace/TeacherCalendar'));
 const NotesWorkspace = lazy(() => import('./components/workspace/NotesWorkspace'));
+const MaterialsLibrary = lazy(() => import('./components/workspace/MaterialsLibrary'));
 const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
 const TestWorkGenerator = lazy(() => import('./components/TestWorkGenerator'));
 const EgeVariantGenerator = lazy(() => import('./components/EgeVariantGenerator'));
@@ -115,6 +116,7 @@ export const R = {
   KTP_EDITOR:          '/app/ktp/:courseId',
   CALENDAR:            '/app/calendar',
   NOTES:               '/app/notes',
+  MATERIALS:           '/app/materials',
   TASKS:               '/app/tasks',
   STATS:               '/app/stats',
   CATALOG:             '/app/catalog',
@@ -207,6 +209,7 @@ const ROUTE_META = [
   { re: /^\/app\/ktp$/,           menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП — планирование' },
   { re: /^\/app\/calendar$/,      menuKey: 'calendar', menuGroup: 'workspace-group', title: 'Календарь' },
   { re: /^\/app\/notes$/,         menuKey: 'notes', menuGroup: 'workspace-group', title: 'Заметки' },
+  { re: /^\/app\/materials$/,     menuKey: 'materials', menuGroup: 'workspace-group', title: 'Библиотека материалов' },
   // Работы (detail)
   { re: /^\/app\/works\/[^/]+\/edit/, menuKey: 'work-editor',        title: 'Редактор работ' },
   // Ученики (detail + sub-pages)
@@ -286,6 +289,7 @@ const MENU_KEY_PATH = {
   ktp:                      R.KTP,
   calendar:                 R.CALENDAR,
   notes:                    R.NOTES,
+  materials:                R.MATERIALS,
   tasks:                    R.TASKS,
   stats:                    R.STATS,
   generator:                R.GENERATOR,
@@ -596,6 +600,7 @@ function AppLayout() {
         { key: 'ktp', icon: <SnippetsOutlined />, label: 'КТП' },
         { key: 'journal', icon: <SolutionOutlined />, label: 'Журнал сдачи' },
         { key: 'notes', icon: <FileTextOutlined />, label: 'Заметки' },
+        { key: 'materials', icon: <FolderOutlined />, label: 'Библиотека' },
       ],
     },
     { key: 'tasks',  icon: <FileTextOutlined />,  label: 'Все задачи', section: 'tasks' },
@@ -850,6 +855,7 @@ function App() {
               <Route path={R.KTP_EDITOR}    element={<KtpEditor />} />
               <Route path={R.CALENDAR}      element={<TeacherCalendar />} />
               <Route path={R.NOTES}         element={<NotesWorkspace />} />
+              <Route path={R.MATERIALS}     element={<MaterialsLibrary />} />
 
               {/* Задачи */}
               <Route path={R.TASKS}   element={<TasksPage />} />
