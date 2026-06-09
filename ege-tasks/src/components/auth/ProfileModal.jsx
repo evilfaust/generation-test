@@ -106,7 +106,7 @@ export default function ProfileModal({ open, onClose }) {
       okText="Сохранить"
       cancelText="Отмена"
       width={520}
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <Avatar

@@ -862,7 +862,7 @@ export default function GeometryTaskList() {
           )
         }
         width={520}
-        destroyOnClose
+        destroyOnHidden
       >
         {importResults ? (
           <Space direction="vertical" style={{ width: '100%' }}>

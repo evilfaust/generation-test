@@ -316,7 +316,7 @@ export default function UserManager() {
         okText={editingTeacher ? 'Сохранить' : 'Создать'}
         cancelText="Отмена"
         width={640}
-        destroyOnClose
+        destroyOnHidden
       >
         {editingTeacher && (() => {
           const currentUrl = api.getTeacherAvatarUrl(editingTeacher, 'medium');

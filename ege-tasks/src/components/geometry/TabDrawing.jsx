@@ -397,7 +397,7 @@ export default function TabDrawing({
         title="Редактор SVG-чертежа"
         footer={null}
         width={680}
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: 16 } }}
       >
         {svgEditorOpen && editorXml && drawingSvg && (

@@ -64,7 +64,7 @@ function EntryModal({ open, initial, topics, onSave, onCancel, saving }) {
       confirmLoading={saving}
       okText="Сохранить"
       cancelText="Отмена"
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={handleFinish} style={{ marginTop: 8 }}>
         <Form.Item name="is_section" label="Раздел-заголовок" valuePropName="checked" extra="Строка-заголовок раздела (без часов/даты)">

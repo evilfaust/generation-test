@@ -37,7 +37,7 @@ function CourseModal({ open, initial, groups, onSave, onCancel, saving }) {
       confirmLoading={saving}
       okText={initial ? 'Сохранить' : 'Создать'}
       cancelText="Отмена"
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={onSave} style={{ marginTop: 8 }}>
         <Form.Item name="title" label="Название" rules={[{ required: true, message: 'Введите название' }]}>

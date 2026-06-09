@@ -4,13 +4,14 @@
  * Вход — логин в auth-коллекцию `users` (токен 60 дней, SDK сам продлевает).
  */
 import { useState } from 'react';
-import { Card, Button, Input, Form, Typography, Space, message } from 'antd';
+import { Card, Button, Input, Form, Typography, Space, App } from 'antd';
 import { CloudServerOutlined } from '@ant-design/icons';
 import { materialsApi, FILES_BASE_URL } from '../../shared/services/pb/filesClient';
 
 const { Title, Text } = Typography;
 
 export default function ConnectForm({ onConnected, compact = false }) {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
 
@@ -39,11 +40,13 @@ export default function ConnectForm({ onConnected, compact = false }) {
       </Text>
       <Form form={form} layout="vertical" onFinish={onFinish}
         initialValues={{ email: materialsApi.lastEmail() }}>
+        {/* autoComplete=off — иначе менеджер паролей подставляет пароль Google
+            (email совпадает с Google-аккаунтом), и вход падает с 400. */}
         <Form.Item name="email" label="Email" rules={[{ required: true, message: 'Введите email' }]}>
-          <Input autoComplete="username" placeholder="oleg.faust@gmail.com" />
+          <Input autoComplete="off" placeholder="oleg.faust@gmail.com" />
         </Form.Item>
         <Form.Item name="password" label="Пароль хранилища" rules={[{ required: true, message: 'Введите пароль' }]}>
-          <Input.Password autoComplete="current-password" />
+          <Input.Password autoComplete="new-password" />
         </Form.Item>
         <Button type="primary" htmlType="submit" loading={loading} block>Подключить</Button>
       </Form>

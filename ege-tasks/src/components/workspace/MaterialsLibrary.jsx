@@ -10,16 +10,17 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Button, Input, Select, Upload, Tag, Popconfirm, Empty, Spin, message,
+  Card, Button, Input, Select, Upload, Tag, Popconfirm, Empty, Spin, App,
   Row, Col, Typography, Space, Alert, Tooltip,
 } from 'antd';
 import {
   InboxOutlined, FileOutlined, FilePdfOutlined, DeleteOutlined, DownloadOutlined,
-  SearchOutlined, CloudServerOutlined, DisconnectOutlined, ReloadOutlined,
+  SearchOutlined, CloudServerOutlined, DisconnectOutlined, ReloadOutlined, EditOutlined,
 } from '@ant-design/icons';
 import { materialsApi, CATEGORY_LABELS } from '../../shared/services/pb/filesClient';
 import { useAuth } from '../../contexts/AuthContext';
 import ConnectForm from './StorageConnect';
+import MaterialEditModal from './MaterialEditModal';
 
 const { Title, Text } = Typography;
 const { Dragger } = Upload;
@@ -47,6 +48,7 @@ function isPdf(rec) {
 }
 
 export default function MaterialsLibrary() {
+  const { message } = App.useApp();
   const { canEdit, canDelete } = useAuth();
   const [connected, setConnected] = useState(() => materialsApi.isConnected());
   const [items, setItems] = useState([]);
@@ -55,6 +57,7 @@ export default function MaterialsLibrary() {
   const [category, setCategory] = useState('');
   const [uploadCategory, setUploadCategory] = useState('other');
   const [uploading, setUploading] = useState(0);
+  const [editing, setEditing] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,6 +177,11 @@ export default function MaterialsLibrary() {
                         <DownloadOutlined />
                       </a>
                     </Tooltip>,
+                    ...(canEdit ? [
+                      <Tooltip title="Редактировать" key="edit">
+                        <EditOutlined onClick={() => setEditing(rec)} />
+                      </Tooltip>,
+                    ] : []),
                     ...(canDelete ? [
                       <Popconfirm key="del" title="Удалить файл?" okText="Удалить" cancelText="Отмена"
                         okButtonProps={{ danger: true }} onConfirm={() => handleDelete(rec)}>
@@ -181,11 +189,14 @@ export default function MaterialsLibrary() {
                       </Popconfirm>,
                     ] : []),
                   ]}>
-                  <Space align="start">
-                    {isPdf(rec)
-                      ? <FilePdfOutlined style={{ fontSize: 26, color: '#d4380d' }} />
-                      : <FileOutlined style={{ fontSize: 26, color: '#1677ff' }} />}
-                    <div style={{ minWidth: 0 }}>
+                  {/* flex + minWidth:0 — иначе длинные имена не обрезаются ellipsis */}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <div style={{ flexShrink: 0, lineHeight: 1 }}>
+                      {isPdf(rec)
+                        ? <FilePdfOutlined style={{ fontSize: 26, color: '#d4380d' }} />
+                        : <FileOutlined style={{ fontSize: 26, color: '#1677ff' }} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <Tooltip title={rec.title || rec.original_name}>
                         <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {rec.title || rec.original_name || 'Без названия'}
@@ -198,7 +209,7 @@ export default function MaterialsLibrary() {
                         <Text type="secondary" style={{ fontSize: 12 }}>{humanSize(rec.size)}</Text>
                       </Space>
                     </div>
-                  </Space>
+                  </div>
                 </Card>
               </Col>
             ))}
@@ -210,6 +221,13 @@ export default function MaterialsLibrary() {
         <Alert style={{ marginTop: 16 }} type="info" showIcon
           message="Загрузка доступна только редакторам. Вы можете просматривать и скачивать материалы." />
       )}
+
+      <MaterialEditModal
+        open={!!editing}
+        record={editing}
+        onClose={() => setEditing(null)}
+        onSaved={(updated) => setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+      />
     </div>
   );
 }

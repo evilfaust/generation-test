@@ -85,7 +85,7 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
       okText="Сохранить"
       cancelText="Отмена"
       okButtonProps={{ disabled: !canEdit }}
-      destroyOnClose
+      destroyOnHidden
       footer={(_, { OkBtn, CancelBtn }) => (
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
           <span>
