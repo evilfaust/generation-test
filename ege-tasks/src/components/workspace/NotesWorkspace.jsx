@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  App, Button, DatePicker, Empty, Input, List, Popconfirm, Segmented, Select, Space, Tag, Tooltip, Typography,
+  App, Button, DatePicker, Input, List, Popconfirm, Segmented, Select, Space, Tag, Tooltip, Typography,
 } from 'antd';
 import { DeleteOutlined, InboxOutlined, PlusOutlined, PaperClipOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import MaterialPickerModal from './MaterialPickerModal';
+import { EmptyState, Chip, GroupChip } from './ui';
 import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems } from '@blocknote/core';
@@ -17,7 +18,7 @@ import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import './NotesWorkspace.css';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 // Схема BlockNote с кастомным блоком-формулой (LaTeX → KaTeX).
 const noteSchema = BlockNoteSchema.create({
@@ -229,7 +230,7 @@ export default function NotesWorkspace() {
           size="small"
           loading={loading}
           dataSource={visibleNotes}
-          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Нет заметок" /> }}
+          locale={{ emptyText: <EmptyState title="Нет заметок" description={canEdit ? 'Нажмите «Новая», чтобы начать' : undefined} /> }}
           renderItem={(n) => (
             <List.Item
               className={`notes-item ${n.id === activeId ? 'notes-item--active' : ''}`}
@@ -242,13 +243,13 @@ export default function NotesWorkspace() {
             >
               <Space direction="vertical" size={2} style={{ width: '100%' }}>
                 <Space size={6}>
-                  {n.is_inbox && <InboxOutlined style={{ color: '#fa8c16' }} />}
-                  {n.lesson && <Tag color="purple" style={{ marginInlineEnd: 0 }}>урок</Tag>}
+                  {n.is_inbox && <InboxOutlined style={{ color: 'var(--c-amber)' }} />}
+                  {n.lesson && <Chip tone="violet" dot={false}>урок</Chip>}
                   <span className="notes-item__title">{n.title?.trim() || 'Без названия'}</span>
                 </Space>
                 {(groupName(n) || n.note_date) && (
-                  <Space size={4}>
-                    {groupName(n) && <Tag color="blue" style={{ marginInlineEnd: 0 }}>{groupName(n)}</Tag>}
+                  <Space size={6}>
+                    {groupName(n) && <GroupChip id={n.group} name={groupName(n)} />}
                     {n.note_date && <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(n.note_date).format('DD.MM.YY')}</Text>}
                   </Space>
                 )}
@@ -262,7 +263,13 @@ export default function NotesWorkspace() {
       <div className="notes-editor">
         {!active ? (
           <div className="notes-empty">
-            <Empty description="Выберите заметку или создайте новую" />
+            <EmptyState
+              title="Ничего не выбрано"
+              description="Выберите заметку слева или создайте новую"
+              cta={canEdit ? 'Новая заметка' : undefined}
+              ctaIcon={<PlusOutlined />}
+              onCta={handleNew}
+            />
           </div>
         ) : (
           <>
@@ -308,7 +315,7 @@ export default function NotesWorkspace() {
                 onChange={changeDate}
                 disabled={!canEdit}
               />
-              {active.lesson && <Tag color="purple">заметка урока</Tag>}
+              {active.lesson && <Chip tone="violet" dot={false}>заметка урока</Chip>}
             </div>
             {(() => {
               const allLinks = Array.isArray(active.links) ? active.links : [];

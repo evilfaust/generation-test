@@ -5,28 +5,30 @@
   border-radius: 8px;
 }
 
-/* Типы событий */
+/* Типы событий. Цвет урока задаётся инлайном по группе (eventPropGetter),
+   класс .rbc-evt-lesson — лишь фолбэк (акцент) + крючок для статусов. */
 .rbc-evt-lesson {
-  background-color: #1677ff;
-  border-color: #1677ff;
+  background-color: var(--accent, #2B4BFF);
+  border-color: var(--accent, #2B4BFF);
 }
+/* проведён — тот же цвет группы, но бледнее (визуально «сделано») */
 .rbc-evt-lesson.rbc-evt-done {
-  background-color: #52c41a;
-  border-color: #52c41a;
+  opacity: 0.5;
 }
+/* отменён — серый + зачёркнутый, перебивает инлайн-цвет группы */
 .rbc-evt-lesson.rbc-evt-cancelled {
-  background-color: #bfbfbf;
-  border-color: #bfbfbf;
+  background-color: #bfbfbf !important;
+  border-color: #bfbfbf !important;
   text-decoration: line-through;
 }
 .rbc-evt-deadline {
-  background-color: #fa8c16;
-  border-color: #fa8c16;
+  background-color: #D97706;
+  border-color: #D97706;
 }
 
 /* Подсветка «сегодня» */
 .rbc-today {
-  background-color: rgba(22, 119, 255, 0.06);
+  background-color: rgba(43, 75, 255, 0.06);
 }
 
 /* ── Тёмная тема ───────────────────────────────────────────────────────── */

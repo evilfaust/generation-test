@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Empty, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { App, Card, Segmented, Select, Space, Spin, Table, Tooltip, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { api } from '../../shared/services/pocketbase';
 import ExternalThematic from './ExternalThematic';
+import { EmptyState, Chip } from './ui';
 
 const { Text } = Typography;
 
-const GRADE_COLOR = { 5: 'green', 4: 'cyan', 3: 'orange', 2: 'red' };
+// Оценка → тон чипа (шкала «хорошо→плохо»): 5 teal · 4 blue · 3 amber · 2 rose.
+const GRADE_TONE = { 5: 'teal', 4: 'blue', 3: 'amber', 2: 'rose' };
 
 function fmtDate(d) {
   if (!d) return '';
@@ -83,7 +85,7 @@ export default function ExternalJournal() {
       render: (_, row) => {
         const r = cellMap.get(`${row.student}|${e.exam_id}`);
         if (!r) return <Text type="secondary">—</Text>;
-        if (r.did_not_take) return <Tag>н/б</Tag>;
+        if (r.did_not_take) return <Chip tone="neutral" dot={false}>н/б</Chip>;
         const grade = Number(r.grade) || 0;
         const tip = [
           grade ? `оценка ${grade}` : null,
@@ -91,11 +93,9 @@ export default function ExternalJournal() {
           r.part1_score != null ? `ч.1: ${r.part1_score}` : null,
         ].filter(Boolean).join(' · ');
         return (
-          <Tooltip title={tip}>
-            <Tag color={GRADE_COLOR[grade] || 'default'} style={{ margin: 0 }}>
-              {grade || (r.correct_count != null ? `${r.correct_count}` : '?')}
-            </Tag>
-          </Tooltip>
+          <Chip tone={GRADE_TONE[grade] || 'neutral'} dot={false} title={tip}>
+            {grade || (r.correct_count != null ? `${r.correct_count}` : '?')}
+          </Chip>
         );
       },
     }));
@@ -127,15 +127,9 @@ export default function ExternalJournal() {
     return (
       <div>
         {header}
-        <Empty
-          description={
-            <span>
-              Внешних работ пока нет.<br />
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Результаты приходят из приложения «Журнал ЕГЭ» (синхронизация решу.ЕГЭ).
-              </Text>
-            </span>
-          }
+        <EmptyState
+          title="Внешних работ пока нет"
+          description="Результаты приходят из приложения «Журнал ЕГЭ» (синхронизация решу.ЕГЭ)"
         />
       </div>
     );
@@ -167,9 +161,13 @@ export default function ExternalJournal() {
           scroll={{ x: 'max-content' }}
         />
       </Card>
-      <Space style={{ marginTop: 12 }} wrap size={[8, 4]}>
+      <Space style={{ marginTop: 12 }} wrap size={[8, 6]}>
         <Text type="secondary" style={{ fontSize: 12 }}>Оценки:</Text>
-        <Tag color="green">5</Tag><Tag color="cyan">4</Tag><Tag color="orange">3</Tag><Tag color="red">2</Tag><Tag>н/б — не был</Tag>
+        <Chip tone="teal" dot={false}>5</Chip>
+        <Chip tone="blue" dot={false}>4</Chip>
+        <Chip tone="amber" dot={false}>3</Chip>
+        <Chip tone="rose" dot={false}>2</Chip>
+        <Chip tone="neutral" dot={false}>н/б — не был</Chip>
       </Space>
     </div>
   );

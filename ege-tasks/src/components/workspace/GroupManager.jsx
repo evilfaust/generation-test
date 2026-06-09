@@ -24,8 +24,9 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import { WorkspacePageHeader, EmptyState, Chip, groupHex } from './ui';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 // Дефолтный учебный год вида «2025/2026» по текущей дате (учебный год с сентября).
 function defaultYear() {
@@ -181,10 +182,17 @@ export default function GroupManager() {
       dataIndex: 'name',
       key: 'name',
       render: (name, g) => (
-        <Button type="link" style={{ padding: 0, fontWeight: 600 }} onClick={() => navigate(`/app/groups/${g.id}`)}>
-          {name}
-          {g.archived && <Tag style={{ marginLeft: 8 }}>архив</Tag>}
-        </Button>
+        <Space size={8}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+            background: groupHex(g.id || name).base, display: 'inline-block',
+          }}
+          />
+          <Button type="link" style={{ padding: 0, fontWeight: 600 }} onClick={() => navigate(`/app/groups/${g.id}`)}>
+            {name}
+          </Button>
+          {g.archived && <Tag style={{ margin: 0 }}>архив</Tag>}
+        </Space>
       ),
     },
     { title: 'Предмет', dataIndex: 'subject', key: 'subject', responsive: ['md'] },
@@ -210,9 +218,9 @@ export default function GroupManager() {
       key: 'students',
       width: 100,
       render: (_, g) => (
-        <Tag icon={<TeamOutlined />} color={counts[g.id] ? 'blue' : 'default'}>
-          {counts[g.id] ?? 0}
-        </Tag>
+        <Chip tone={counts[g.id] ? 'blue' : 'neutral'} dot={false}>
+          <TeamOutlined style={{ marginRight: 4 }} />{counts[g.id] ?? 0}
+        </Chip>
       ),
     },
     {
@@ -258,30 +266,32 @@ export default function GroupManager() {
 
   return (
     <div style={{ maxWidth: 1100 }}>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} wrap>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>Классы и группы</Title>
-          <Text type="secondary">Ваши учебные группы — основа планирования и журнала</Text>
-        </div>
-        <Space>
-          <Space size={4}>
-            <Switch checked={showArchived} onChange={setShowArchived} size="small" />
-            <Text type="secondary">архив</Text>
-          </Space>
-          {canEdit && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                setEditing(null);
-                setModalOpen(true);
-              }}
-            >
-              Новая группа
-            </Button>
-          )}
-        </Space>
-      </Space>
+      <WorkspacePageHeader
+        icon={<TeamOutlined />}
+        accent="blue"
+        title="Классы и группы"
+        subtitle="Ваши учебные группы — основа планирования и журнала"
+        extra={(
+          <>
+            <Space size={4}>
+              <Switch checked={showArchived} onChange={setShowArchived} size="small" />
+              <Text type="secondary">архив</Text>
+            </Space>
+            {canEdit && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditing(null);
+                  setModalOpen(true);
+                }}
+              >
+                Новая группа
+              </Button>
+            )}
+          </>
+        )}
+      />
 
       <Table
         rowKey="id"
@@ -290,10 +300,15 @@ export default function GroupManager() {
         dataSource={groups}
         pagination={false}
         locale={{
-          emptyText: (
-            <Empty
-              description={showArchived ? 'Архив пуст' : 'Пока нет групп'}
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
+          emptyText: showArchived ? (
+            <Empty description="Архив пуст" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : (
+            <EmptyState
+              title="Пока нет групп"
+              description="Создайте первый класс — к нему привяжутся ученики, журнал и планирование"
+              cta={canEdit ? 'Новая группа' : undefined}
+              ctaIcon={<PlusOutlined />}
+              onCta={() => { setEditing(null); setModalOpen(true); }}
             />
           ),
         }}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  App, Button, Card, Empty, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography,
+  App, Button, Card, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tooltip, Typography,
 } from 'antd';
 import { DownloadOutlined, ExportOutlined, FileSearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -10,21 +10,23 @@ import { useReferenceData } from '../../contexts/ReferenceDataContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { importReshuProblem } from '../../utils/importReshuProblem';
 import TaskPreviewModal from './TaskPreviewModal';
+import { EmptyState, Chip } from './ui';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const TASK_NUMS = Array.from({ length: 21 }, (_, i) => i + 1);
 
 // Ссылка на задачу на «Решу ЕГЭ» (базовый) по problem_id.
 const problemUrl = (id) => `https://mathb-ege.sdamgia.ru/problem?id=${id}`;
 
-// Цвет ячейки по проценту верных (светлые тинты, тёмный текст).
+// Цвет ячейки по проценту верных — мягкие тинты палитры Hybrid (warm→cool).
+const HEAT = ['var(--c-rose-soft)', 'var(--c-amber-soft)', '#E2F7EC', 'var(--c-teal-soft)'];
 function pctColor(p) {
   if (p == null) return 'transparent';
-  if (p < 50) return '#ffccc7';
-  if (p < 70) return '#ffe7ba';
-  if (p < 85) return '#fffb8f';
-  return '#d9f7be';
+  if (p < 50) return HEAT[0];
+  if (p < 70) return HEAT[1];
+  if (p < 85) return HEAT[2];
+  return HEAT[3];
 }
 
 export default function ExternalThematic() {
@@ -250,7 +252,12 @@ export default function ExternalThematic() {
   if (loading) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
 
   if (!exams.length) {
-    return <Empty description="Внешних работ пока нет — нужна синхронизация из «Журнал ЕГЭ»" />;
+    return (
+      <EmptyState
+        title="Внешних работ пока нет"
+        description="Нужна синхронизация из приложения «Журнал ЕГЭ»"
+      />
+    );
   }
 
   return (
@@ -280,7 +287,7 @@ export default function ExternalThematic() {
       </Space>
 
       {!students.length ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Нет потасковых данных по выбранной группе" />
+        <EmptyState description="Нет потасковых данных по выбранной группе" />
       ) : (
         <Card size="small" styles={{ body: { padding: 0 } }}>
           <Table
@@ -295,22 +302,20 @@ export default function ExternalThematic() {
       )}
 
       {!!weakTopics.length && (
-        <div style={{ marginTop: 12 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>Слабые темы (ниже {threshold}%): </Text>
+        <Space style={{ marginTop: 12 }} wrap size={[8, 6]}>
+          <Text type="secondary" style={{ fontSize: 12 }}>Слабые темы (ниже {threshold}%):</Text>
           {weakTopics.map((w) => (
-            <Tooltip key={w.n} title={w.topic.title}>
-              <Text style={{ marginRight: 10, fontSize: 12 }}>№{w.n} — {w.p}%</Text>
-            </Tooltip>
+            <Chip key={w.n} tone="rose" title={w.topic.title}>№{w.n} — {w.p}%</Chip>
           ))}
-        </div>
+        </Space>
       )}
 
-      <Space style={{ marginTop: 12 }} wrap size={[8, 4]}>
+      <Space style={{ marginTop: 12 }} wrap size={[8, 6]}>
         <Text type="secondary" style={{ fontSize: 12 }}>Шкала:</Text>
-        <Text style={{ background: '#ffccc7', padding: '0 8px', borderRadius: 4 }}>&lt;50%</Text>
-        <Text style={{ background: '#ffe7ba', padding: '0 8px', borderRadius: 4 }}>50–70%</Text>
-        <Text style={{ background: '#fffb8f', padding: '0 8px', borderRadius: 4 }}>70–85%</Text>
-        <Text style={{ background: '#d9f7be', padding: '0 8px', borderRadius: 4 }}>≥85%</Text>
+        <span style={{ background: HEAT[0], padding: '1px 8px', borderRadius: 999, fontSize: 12 }}>&lt;50%</span>
+        <span style={{ background: HEAT[1], padding: '1px 8px', borderRadius: 999, fontSize: 12 }}>50–70%</span>
+        <span style={{ background: HEAT[2], padding: '1px 8px', borderRadius: 999, fontSize: 12 }}>70–85%</span>
+        <span style={{ background: HEAT[3], padding: '1px 8px', borderRadius: 999, fontSize: 12 }}>≥85%</span>
       </Space>
 
       <Modal
@@ -323,7 +328,7 @@ export default function ExternalThematic() {
         {drill && (
           <>
             <Space style={{ marginBottom: 12 }} wrap>
-              <Tag color="blue">Класс: {drillStat != null ? `${drillStat}% верных` : '—'}</Tag>
+              <Chip tone="blue" dot={false}>Класс: {drillStat != null ? `${drillStat}% верных` : '—'}</Chip>
               {drill.student && (
                 <Space size={6}>
                   <Switch size="small" checked={onlyStudent} onChange={setOnlyStudent} />
@@ -351,7 +356,7 @@ export default function ExternalThematic() {
               dataSource={drillRows}
               pagination={false}
               scroll={{ y: 360 }}
-              locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Нет данных" /> }}
+              locale={{ emptyText: <EmptyState description="Нет данных" /> }}
               rowClassName={(r) => (r.is_correct ? '' : 'ext-drill-wrong')}
               columns={[
                 { title: 'Ученик', dataIndex: 'student_name', key: 's', width: 180 },
@@ -371,7 +376,9 @@ export default function ExternalThematic() {
                 },
                 {
                   title: 'Итог', key: 'res', width: 80, align: 'center',
-                  render: (_, r) => r.is_correct ? <Tag color="green">верно</Tag> : <Tag color="red">ошибка</Tag>,
+                  render: (_, r) => r.is_correct
+                    ? <Chip tone="teal" dot={false}>верно</Chip>
+                    : <Chip tone="rose" dot={false}>ошибка</Chip>,
                 },
                 {
                   title: 'В Лемме', key: 'lemma', width: 140,

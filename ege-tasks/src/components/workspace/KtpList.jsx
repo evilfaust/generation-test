@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   App, Button, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography,
 } from 'antd';
-import { DeleteOutlined, EditOutlined, InboxOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined, EditOutlined, InboxOutlined, PlusOutlined, ScheduleOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import { WorkspacePageHeader, EmptyState, GroupChip } from './ui';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function defaultYear() {
   const now = new Date();
@@ -136,7 +139,7 @@ export default function KtpList() {
     },
     {
       title: 'Группа', key: 'group', width: 160,
-      render: (_, c) => c.expand?.group?.name ? <Tag color="blue">{c.expand.group.name}</Tag> : '—',
+      render: (_, c) => c.expand?.group?.name ? <GroupChip id={c.group} name={c.expand.group.name} /> : '—',
     },
     { title: 'Год', dataIndex: 'year', key: 'year', width: 120, render: (y) => y || '—' },
     {
@@ -157,23 +160,25 @@ export default function KtpList() {
 
   return (
     <div style={{ maxWidth: 1000 }}>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} wrap>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>Календарно-тематическое планирование</Title>
-          <Text type="secondary">Темы по неделям и часам — с экспортом в Word и PDF</Text>
-        </div>
-        <Space>
-          <Space size={4}>
-            <Switch checked={showArchived} onChange={setShowArchived} size="small" />
-            <Text type="secondary">архив</Text>
-          </Space>
-          {canEdit && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setModalOpen(true); }}>
-              Новое КТП
-            </Button>
-          )}
-        </Space>
-      </Space>
+      <WorkspacePageHeader
+        icon={<ScheduleOutlined />}
+        accent="violet"
+        title="Календарно-тематическое планирование"
+        subtitle="Темы по неделям и часам — с экспортом в Word и PDF"
+        extra={(
+          <>
+            <Space size={4}>
+              <Switch checked={showArchived} onChange={setShowArchived} size="small" />
+              <Text type="secondary">архив</Text>
+            </Space>
+            {canEdit && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setModalOpen(true); }}>
+                Новое КТП
+              </Button>
+            )}
+          </>
+        )}
+      />
 
       <Table
         rowKey="id"
@@ -181,7 +186,19 @@ export default function KtpList() {
         columns={columns}
         dataSource={courses}
         pagination={false}
-        locale={{ emptyText: <Empty description={showArchived ? 'Архив пуст' : 'Пока нет КТП'} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+        locale={{
+          emptyText: showArchived ? (
+            <Empty description="Архив пуст" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          ) : (
+            <EmptyState
+              title="Пока нет планов"
+              description="Создайте КТП: распишите темы по неделям и часам, выгрузите в Word или PDF"
+              cta={canEdit ? 'Новое КТП' : undefined}
+              ctaIcon={<PlusOutlined />}
+              onCta={() => { setEditing(null); setModalOpen(true); }}
+            />
+          ),
+        }}
       />
 
       <CourseModal

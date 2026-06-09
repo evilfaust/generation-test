@@ -87,11 +87,14 @@
   background: currentColor;
   flex-shrink: 0;
 }
-.lemma-chip-blue   { color: var(--c-blue);   background: var(--c-blue-soft); }
-.lemma-chip-teal   { color: var(--c-teal);   background: var(--c-teal-soft); }
-.lemma-chip-violet { color: var(--c-violet); background: var(--c-violet-soft); }
-.lemma-chip-amber  { color: var(--c-amber);  background: var(--c-amber-soft); }
-.lemma-chip-rose   { color: var(--c-rose);   background: var(--c-rose-soft); }
+.lemma-chip-blue    { color: var(--c-blue);   background: var(--c-blue-soft); }
+.lemma-chip-teal    { color: var(--c-teal);   background: var(--c-teal-soft); }
+.lemma-chip-violet  { color: var(--c-violet); background: var(--c-violet-soft); }
+.lemma-chip-amber   { color: var(--c-amber);  background: var(--c-amber-soft); }
+.lemma-chip-rose    { color: var(--c-rose);   background: var(--c-rose-soft); }
+.lemma-chip-neutral { color: var(--ink-3);    background: var(--bg-sunken); }
+/* модификатор — чип без ведущей точки (для статусов с собственной семантикой) */
+.lemma-chip--nodot::before { display: none; }
 
 /* ── Фокус-ринг — единый для всех интерактивов ── */
 .ant-btn:focus-visible,

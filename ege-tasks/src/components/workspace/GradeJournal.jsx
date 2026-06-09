@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Empty, Segmented, Select, Space, Spin, Table, Tag, Tooltip, Typography } from 'antd';
+import { App, Card, Segmented, Select, Space, Spin, Table, Tooltip, Typography } from 'antd';
+import { SolutionOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { api } from '../../shared/services/pocketbase';
 import ExternalJournal from './ExternalJournal';
+import { WorkspacePageHeader, EmptyState, Chip, SubmitChip } from './ui';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 // Человекочитаемое название выдачи из expand сессии.
 function sessionTitle(s) {
@@ -19,18 +22,19 @@ function sessionTitle(s) {
 }
 
 // Статус ячейки «ученик × выдача» по лучшей попытке + дедлайну.
+// kind → тон чипа (см. SubmitChip): passed|late|failed|overdue|in_progress|none.
 function cellStatus(agg, session) {
   const now = dayjs();
   const deadline = session.deadline ? dayjs(session.deadline) : null;
 
   if (!agg || (!agg.best && !agg.started)) {
     if (deadline && now.isAfter(deadline)) {
-      return { color: 'red', text: 'просрочено', tip: 'Не сдал, срок прошёл' };
+      return { kind: 'overdue', text: 'просрочено', tip: 'Не сдал, срок прошёл' };
     }
-    return { color: 'default', text: '—', tip: 'Не сдавал' };
+    return { kind: 'none', text: '—', tip: 'Не сдавал' };
   }
   if (!agg.best && agg.started) {
-    return { color: 'processing', text: 'выполняет', tip: 'Попытка начата, не завершена' };
+    return { kind: 'in_progress', text: 'выполняет', tip: 'Попытка начата, не завершена' };
   }
 
   const a = agg.best;
@@ -38,15 +42,15 @@ function cellStatus(agg, session) {
   const late = deadline && a.submitted_at && dayjs(a.submitted_at).isAfter(deadline);
   const ps = Number(session.passing_score) || 0;
 
-  let color;
+  let kind;
   let label;
   if (ps >= 1) {
     const pass = (a.score || 0) >= ps;
     label = pass ? 'зачёт' : 'незачёт';
-    color = pass ? 'green' : 'volcano';
+    kind = pass ? 'passed' : 'failed';
   } else {
     label = 'сдал';
-    color = late ? 'orange' : 'green';
+    kind = late ? 'late' : 'passed';
   }
 
   const text = pct != null ? `${label} · ${pct}%` : label;
@@ -55,11 +59,12 @@ function cellStatus(agg, session) {
     a.submitted_at ? `сдано ${dayjs(a.submitted_at).format('DD.MM.YYYY HH:mm')}` : null,
     late ? '⏰ с опозданием' : null,
   ].filter(Boolean);
-  return { color, text: late ? `${text} ⏰` : text, tip: tipParts.join(' · ') };
+  return { kind, text: late ? `${text} ⏰` : text, tip: tipParts.join(' · ') };
 }
 
 export default function GradeJournal() {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [groupId, setGroupId] = useState(null);
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -179,11 +184,7 @@ export default function GradeJournal() {
       render: (_, row) => {
         const agg = cellMap.get(`${row.student.id}|${s.id}`);
         const st = cellStatus(agg, s);
-        return (
-          <Tooltip title={st.tip}>
-            <Tag color={st.color} style={{ margin: 0, cursor: 'default' }}>{st.text}</Tag>
-          </Tooltip>
-        );
+        return <SubmitChip kind={st.kind} title={st.tip} dot={st.kind !== 'none'}>{st.text}</SubmitChip>;
       },
     }));
 
@@ -197,47 +198,62 @@ export default function GradeJournal() {
 
   return (
     <div>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} wrap>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>Журнал</Title>
-          <Text type="secondary">
-            {view === 'lemma'
-              ? 'Сдача работ Lemma — по реальным результатам, без выдуманных оценок'
-              : 'Внешние работы с решу.ЕГЭ (из приложения «Журнал ЕГЭ»)'}
-          </Text>
-        </div>
-        <Space wrap>
-          <Segmented
-            value={view}
-            onChange={setView}
-            options={[
-              { value: 'lemma', label: 'Сдача (Lemma)' },
-              { value: 'ext', label: 'Решу (внешние)' },
-            ]}
-          />
-          {view === 'lemma' && (
-            <Select
-              style={{ minWidth: 200 }}
-              placeholder="Выберите группу"
-              loading={loadingGroups}
-              value={groupId}
-              onChange={setGroupId}
-              options={groups.map((g) => ({ value: g.id, label: g.name }))}
+      <WorkspacePageHeader
+        icon={<SolutionOutlined />}
+        accent="teal"
+        title="Журнал сдачи"
+        subtitle={view === 'lemma'
+          ? 'Сдача работ Lemma — по реальным результатам, без выдуманных оценок'
+          : 'Внешние работы с решу.ЕГЭ (из приложения «Журнал ЕГЭ»)'}
+        extra={(
+          <>
+            <Segmented
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'lemma', label: 'Сдача (Lemma)' },
+                { value: 'ext', label: 'Решу (внешние)' },
+              ]}
             />
-          )}
-        </Space>
-      </Space>
+            {view === 'lemma' && (
+              <Select
+                style={{ minWidth: 200 }}
+                placeholder="Выберите группу"
+                loading={loadingGroups}
+                value={groupId}
+                onChange={setGroupId}
+                options={groups.map((g) => ({ value: g.id, label: g.name }))}
+              />
+            )}
+          </>
+        )}
+      />
 
       {view === 'ext' ? (
         <ExternalJournal />
       ) : !groupId ? (
-        <Empty description="Сначала создайте группу в «Классы и группы»" />
+        <EmptyState
+          title="Нет групп"
+          description="Журнал строится по ученикам группы — сначала создайте класс"
+          cta="К группам"
+          onCta={() => navigate('/app/groups')}
+        />
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>
       ) : !dataSource.length ? (
-        <Empty description="В группе нет учеников" />
+        <EmptyState
+          title="В группе нет учеников"
+          description="Добавьте учеников в группу — и здесь появится их сдача"
+          cta="Открыть группу"
+          onCta={() => navigate(`/app/groups/${groupId}`)}
+        />
       ) : !sessions.length ? (
-        <Empty description="У учеников группы пока нет выданных работ" />
+        <EmptyState
+          title="Пока нет выданных работ"
+          description="Создайте работу и выдайте её группе — результаты лягут в журнал"
+          cta="Создать работу"
+          onCta={() => navigate('/app/works/new/edit')}
+        />
       ) : (
         <Card size="small" styles={{ body: { padding: 0 } }}>
           <Table
@@ -251,14 +267,14 @@ export default function GradeJournal() {
       )}
 
       {view === 'lemma' && !!sessions.length && (
-        <Space style={{ marginTop: 12 }} wrap size={[8, 4]}>
+        <Space style={{ marginTop: 12 }} wrap size={[8, 6]}>
           <Text type="secondary" style={{ fontSize: 12 }}>Легенда:</Text>
-          <Tag color="green">сдал / зачёт</Tag>
-          <Tag color="orange">сдал с опозданием</Tag>
-          <Tag color="volcano">незачёт</Tag>
-          <Tag color="red">просрочено</Tag>
-          <Tag color="processing">выполняет</Tag>
-          <Tag>не сдавал</Tag>
+          <SubmitChip kind="passed">сдал / зачёт</SubmitChip>
+          <SubmitChip kind="late">с опозданием</SubmitChip>
+          <SubmitChip kind="failed">незачёт</SubmitChip>
+          <SubmitChip kind="overdue">просрочено</SubmitChip>
+          <SubmitChip kind="in_progress">выполняет</SubmitChip>
+          <Chip tone="neutral" dot={false}>не сдавал</Chip>
         </Space>
       )}
     </div>

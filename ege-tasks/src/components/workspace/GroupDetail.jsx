@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Descriptions,
-  Empty,
   List,
   Modal,
   Select,
@@ -23,8 +22,9 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import { WorkspacePageHeader, EmptyState, Chip, groupTone } from './ui';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export default function GroupDetail() {
   const { groupId } = useParams();
@@ -127,8 +127,21 @@ export default function GroupDetail() {
   }
 
   if (!group) {
-    return <Empty description="Группа не найдена" />;
+    return (
+      <EmptyState
+        title="Группа не найдена"
+        description="Возможно, она была удалена"
+        cta="К группам"
+        onCta={() => navigate('/app/groups')}
+      />
+    );
   }
+
+  const subtitleParts = [
+    group.subject,
+    group.grade ? `${group.grade} кл.` : null,
+    group.year,
+  ].filter(Boolean);
 
   return (
     <div style={{ maxWidth: 900 }}>
@@ -138,12 +151,13 @@ export default function GroupDetail() {
         </Button>
       </Space>
 
-      <Space align="center" style={{ marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>
-          {group.name}
-        </Title>
-        {group.archived && <Tag>архив</Tag>}
-      </Space>
+      <WorkspacePageHeader
+        icon={<TeamOutlined />}
+        accent={groupTone(group.id || group.name)}
+        title={group.name}
+        subtitle={subtitleParts.join(' · ') || undefined}
+        extra={group.archived ? <Tag>архив</Tag> : null}
+      />
 
       <Card size="small" style={{ marginBottom: 16 }}>
         <Descriptions column={{ xs: 1, sm: 2, md: 3 }} size="small">
@@ -192,7 +206,13 @@ export default function GroupDetail() {
         }
       >
         {students.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="В группе пока нет учеников" />
+          <EmptyState
+            title="В группе пока нет учеников"
+            description="Добавьте учеников вручную или привяжите по совпадению класса"
+            cta={canEdit ? 'Добавить учеников' : undefined}
+            ctaIcon={<PlusOutlined />}
+            onCta={() => setAddOpen(true)}
+          />
         ) : (
           <List
             size="small"
@@ -219,9 +239,9 @@ export default function GroupDetail() {
                 <List.Item.Meta
                   title={s.name || '—'}
                   description={
-                    <Space size={4}>
+                    <Space size={6}>
                       {s.username && <Text type="secondary">@{s.username}</Text>}
-                      {s.student_class && <Tag color="geekblue">{s.student_class}</Tag>}
+                      {s.student_class && <Chip tone="neutral" dot={false}>{s.student_class}</Chip>}
                     </Space>
                   }
                 />

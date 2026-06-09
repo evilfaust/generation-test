@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, dayjsLocalizer, Views } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
 import {
-  App, Button, DatePicker, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Switch, Tag, Typography,
+  App, Button, DatePicker, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Switch, Typography,
 } from 'antd';
-import { FileTextOutlined, LinkOutlined, PlusOutlined, PaperClipOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
+import { CalendarOutlined, FileTextOutlined, LinkOutlined, PlusOutlined, PaperClipOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import MaterialPickerModal from './MaterialPickerModal';
+import { WorkspacePageHeader, Chip, groupHex } from './ui';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import localeData from 'dayjs/plugin/localeData';
@@ -23,7 +24,7 @@ dayjs.extend(weekday);
 dayjs.extend(localizedFormat);
 dayjs.locale('ru');
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const localizer = dayjsLocalizer(dayjs);
 const DnDCalendar = withDragAndDrop(Calendar);
 
@@ -271,7 +272,7 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
                     { value: '1', label: '1-я пол.' },
                     { value: '2', label: '2-я пол.' },
                   ]} />
-                {slotRange && <Tag color="blue" style={{ marginInlineEnd: 0 }}>{slotRange[0]}–{slotRange[1]}</Tag>}
+                {slotRange && <Chip tone="blue" dot={false}>{slotRange[0]}–{slotRange[1]}</Chip>}
               </Space>
             ) : (
               <Space wrap>
@@ -283,7 +284,7 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
                   onChange={(v) => applyIntensive(pair, v ?? null)}
                   options={PAIRS.map((p) => ({ value: p.key, label: p.label }))} />
                 {slotRange && (
-                  <Tag color="purple" style={{ marginInlineEnd: 0 }}>{slotRange[0]}–{slotRange[1]} · {intensiveCount} пары</Tag>
+                  <Chip tone="violet" dot={false}>{slotRange[0]}–{slotRange[1]} · {intensiveCount} пары</Chip>
                 )}
                 {pair && endPair && Number(endPair) <= Number(pair) && (
                   <Typography.Text type="danger" style={{ fontSize: 12 }}>конец должен быть позже начала</Typography.Text>
@@ -453,10 +454,12 @@ export default function TeacherCalendar() {
       return { className: 'rbc-evt-deadline' };
     }
     const status = r?.status;
+    // Цвет блока = группа (единый «язык» цвета во всём разделе). Нет группы → акцент.
+    const hex = groupHex(r?.raw?.group || '');
     let cls = 'rbc-evt-lesson';
     if (status === 'done') cls += ' rbc-evt-done';
     else if (status === 'cancelled') cls += ' rbc-evt-cancelled';
-    return { className: cls };
+    return { className: cls, style: { backgroundColor: hex.base, borderColor: hex.base } };
   }, []);
 
   const persistLessonDate = async (lessonId, start) => {
@@ -550,31 +553,33 @@ export default function TeacherCalendar() {
 
   return (
     <div>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} wrap>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>Календарь</Title>
-          <Text type="secondary">Уроки и дедлайны выдач на сетке · перетащите событие, чтобы перенести</Text>
-        </div>
-        <Space wrap>
-          <Select
-            allowClear
-            style={{ minWidth: 180 }}
-            placeholder="Все группы"
-            value={groupFilter}
-            onChange={setGroupFilter}
-            options={groups.map((g) => ({ value: g.id, label: g.name }))}
-          />
-          <Space size={4}>
-            <Switch checked={showDeadlines} onChange={setShowDeadlines} size="small" />
-            <Text type="secondary">дедлайны</Text>
-          </Space>
-          {canEdit && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing({ slotDate: new Date(), group: groupFilter || undefined }); setModalOpen(true); }}>
-              Урок
-            </Button>
-          )}
-        </Space>
-      </Space>
+      <WorkspacePageHeader
+        icon={<CalendarOutlined />}
+        accent="blue"
+        title="Календарь"
+        subtitle="Уроки и дедлайны выдач на сетке · перетащите событие, чтобы перенести"
+        extra={(
+          <>
+            <Select
+              allowClear
+              style={{ minWidth: 180 }}
+              placeholder="Все группы"
+              value={groupFilter}
+              onChange={setGroupFilter}
+              options={groups.map((g) => ({ value: g.id, label: g.name }))}
+            />
+            <Space size={4}>
+              <Switch checked={showDeadlines} onChange={setShowDeadlines} size="small" />
+              <Text type="secondary">дедлайны</Text>
+            </Space>
+            {canEdit && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing({ slotDate: new Date(), group: groupFilter || undefined }); setModalOpen(true); }}>
+                Урок
+              </Button>
+            )}
+          </>
+        )}
+      />
 
       <div className="teacher-calendar-wrap">
         <DnDCalendar
@@ -599,12 +604,11 @@ export default function TeacherCalendar() {
         />
       </div>
 
-      <Space style={{ marginTop: 12 }} wrap size={[8, 4]}>
+      <Space style={{ marginTop: 12 }} wrap size={[8, 6]}>
         <Text type="secondary" style={{ fontSize: 12 }}>Легенда:</Text>
-        <Tag color="blue">урок</Tag>
-        <Tag color="green">проведён</Tag>
-        <Tag>отменён</Tag>
-        <Tag color="orange">дедлайн выдачи</Tag>
+        <Chip tone="neutral" dot={false}>цвет блока = группа</Chip>
+        <Text type="secondary" style={{ fontSize: 12 }}>проведённый — бледнее, отменённый — зачёркнут</Text>
+        <Chip tone="amber">дедлайн выдачи</Chip>
       </Space>
 
       <LessonModal

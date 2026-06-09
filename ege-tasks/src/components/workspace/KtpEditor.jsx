@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  App, Button, Card, DatePicker, Empty, Form, Input, InputNumber, Modal, Popconfirm,
-  Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography,
+  App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm,
+  Select, Space, Spin, Switch, Table, Tooltip, Typography,
 } from 'antd';
 import {
   ArrowLeftOutlined, ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, EditOutlined,
-  FileWordOutlined, PlusOutlined, PrinterOutlined,
+  FileWordOutlined, PlusOutlined, PrinterOutlined, ScheduleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -14,8 +14,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
 import { exportKtpToWord } from '../../utils/ktpDocx';
 import KtpPrintView from './KtpPrintView';
+import { WorkspacePageHeader, EmptyState, GroupChip, groupTone } from './ui';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function topicLabel(t) {
   return `${t.ege_number ? `№${t.ege_number} — ` : ''}${t.title}`;
@@ -213,7 +214,16 @@ export default function KtpEditor() {
   if (loading && !course) {
     return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
   }
-  if (!course) return <Empty description="КТП не найдено" />;
+  if (!course) {
+    return (
+      <EmptyState
+        title="КТП не найдено"
+        description="Возможно, план был удалён"
+        cta="К списку КТП"
+        onCta={() => navigate('/app/ktp')}
+      />
+    );
+  }
 
   const columns = [
     {
@@ -258,30 +268,34 @@ export default function KtpEditor() {
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/app/ktp')}>К списку КТП</Button>
       </Space>
 
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }} align="start" wrap>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>{course.title}</Title>
+      <WorkspacePageHeader
+        icon={<ScheduleOutlined />}
+        accent={course.group ? groupTone(course.group) : 'violet'}
+        title={course.title}
+        subtitle={(
           <Space size={8} wrap>
-            {course.expand?.group?.name && <Tag color="blue">{course.expand.group.name}</Tag>}
-            {course.year && <Text type="secondary">{course.year}</Text>}
-            <Text type="secondary">Всего часов: <b>{totalHours}</b></Text>
+            {course.expand?.group?.name && <GroupChip id={course.group} name={course.expand.group.name} />}
+            {course.year && <span>{course.year}</span>}
+            <span>Всего часов: <b>{totalHours}</b></span>
           </Space>
-        </div>
-        <Space wrap>
-          <Tooltip title="Экспорт в Word (.docx)">
-            <Button icon={<FileWordOutlined />} onClick={handleWord}>Word</Button>
-          </Tooltip>
-          <Tooltip title="Печать / PDF">
-            <Button icon={<PrinterOutlined />} onClick={() => setPrintMode(true)}>Печать</Button>
-          </Tooltip>
-          {canEdit && (
-            <>
-              <Button onClick={() => { setEditing({ is_section: true }); setModalOpen(true); }}>+ Раздел</Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setModalOpen(true); }}>Строка</Button>
-            </>
-          )}
-        </Space>
-      </Space>
+        )}
+        extra={(
+          <>
+            <Tooltip title="Экспорт в Word (.docx)">
+              <Button icon={<FileWordOutlined />} onClick={handleWord}>Word</Button>
+            </Tooltip>
+            <Tooltip title="Печать / PDF">
+              <Button icon={<PrinterOutlined />} onClick={() => setPrintMode(true)}>Печать</Button>
+            </Tooltip>
+            {canEdit && (
+              <>
+                <Button onClick={() => { setEditing({ is_section: true }); setModalOpen(true); }}>+ Раздел</Button>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing(null); setModalOpen(true); }}>Строка</Button>
+              </>
+            )}
+          </>
+        )}
+      />
 
       <Card size="small" styles={{ body: { padding: 0 } }}>
         <Table
@@ -292,7 +306,17 @@ export default function KtpEditor() {
           dataSource={entries}
           pagination={false}
           rowClassName={(e) => (e.is_section ? 'ktp-section-row' : '')}
-          locale={{ emptyText: <Empty description="Пока нет строк — добавьте тему или раздел" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+          locale={{
+            emptyText: (
+              <EmptyState
+                title="План пока пуст"
+                description="Добавьте первую тему или раздел-заголовок"
+                cta={canEdit ? 'Добавить строку' : undefined}
+                ctaIcon={<PlusOutlined />}
+                onCta={() => { setEditing(null); setModalOpen(true); }}
+              />
+            ),
+          }}
         />
       </Card>
 

@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Button, Input, Select, Upload, Tag, Popconfirm, Empty, Spin, App,
+  Card, Button, Input, Select, Upload, Popconfirm, Spin, App,
   Row, Col, Typography, Space, Alert, Tooltip,
 } from 'antd';
 import {
@@ -21,19 +21,20 @@ import { materialsApi, CATEGORY_LABELS } from '../../shared/services/pb/filesCli
 import { useAuth } from '../../contexts/AuthContext';
 import ConnectForm from './StorageConnect';
 import MaterialEditModal from './MaterialEditModal';
+import { WorkspacePageHeader, EmptyState, Chip } from './ui';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Dragger } = Upload;
 
 const CATEGORY_OPTIONS = Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label }));
 
-const CATEGORY_COLORS = {
+const CATEGORY_TONE = {
   textbook: 'blue',
-  worksheet: 'green',
-  generated: 'purple',
-  methodical: 'orange',
-  reference: 'cyan',
-  other: 'default',
+  worksheet: 'teal',
+  generated: 'violet',
+  methodical: 'amber',
+  reference: 'rose',
+  other: 'neutral',
 };
 
 function humanSize(bytes) {
@@ -115,15 +116,13 @@ export default function MaterialsLibrary() {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      <Row align="middle" justify="space-between" style={{ marginBottom: 16 }}>
-        <Col>
-          <Space>
-            <CloudServerOutlined style={{ fontSize: 20 }} />
-            <Title level={3} style={{ margin: 0 }}>Библиотека материалов</Title>
-          </Space>
-        </Col>
-        <Col>
-          <Space>
+      <WorkspacePageHeader
+        icon={<CloudServerOutlined />}
+        accent="teal"
+        title="Библиотека материалов"
+        subtitle="Учебники, методички и PDF — в одном месте, под рукой на уроке"
+        extra={(
+          <>
             <Text type="secondary">{materialsApi.connectedEmail()}</Text>
             <Tooltip title="Отключить хранилище на этом устройстве">
               <Button size="small" icon={<DisconnectOutlined />}
@@ -131,9 +130,9 @@ export default function MaterialsLibrary() {
                 Отключить
               </Button>
             </Tooltip>
-          </Space>
-        </Col>
-      </Row>
+          </>
+        )}
+      />
 
       {canEdit && (
         <Card size="small" style={{ marginBottom: 16 }}>
@@ -164,7 +163,12 @@ export default function MaterialsLibrary() {
 
       <Spin spinning={loading}>
         {items.length === 0 ? (
-          <Empty description="Пока пусто — загрузите первые материалы" />
+          <EmptyState
+            title="Пока пусто"
+            description={canEdit
+              ? 'Перетащите файлы в область выше — учебники, методички, PDF'
+              : 'Материалы ещё не загружены'}
+          />
         ) : (
           <Row gutter={[12, 12]}>
             {items.map((rec) => (
@@ -202,10 +206,10 @@ export default function MaterialsLibrary() {
                           {rec.title || rec.original_name || 'Без названия'}
                         </div>
                       </Tooltip>
-                      <Space size={4} wrap style={{ marginTop: 4 }}>
-                        <Tag color={CATEGORY_COLORS[rec.category] || 'default'} style={{ margin: 0 }}>
+                      <Space size={6} wrap style={{ marginTop: 4 }}>
+                        <Chip tone={CATEGORY_TONE[rec.category] || 'neutral'}>
                           {CATEGORY_LABELS[rec.category] || 'Прочее'}
-                        </Tag>
+                        </Chip>
                         <Text type="secondary" style={{ fontSize: 12 }}>{humanSize(rec.size)}</Text>
                       </Space>
                     </div>
