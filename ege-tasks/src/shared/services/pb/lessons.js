@@ -32,7 +32,8 @@ export const lessonsApi = {
     }
   },
 
-  // data: { title, date_plan, group?, ktp_entry?, status?, note_md?, date_fact? }
+  // data: { title, date_plan, group?, ktp_entry?, status?, note_md?, date_fact?, time_slot?, materials? }
+  // time_slot: "0"|"N"|"Na"/"Nb"|"N-M" (интенсив) — слот расписания пар, см. TeacherCalendar.
   async createLesson(data) {
     try {
       const owner = pb.authStore.model?.id;
