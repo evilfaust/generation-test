@@ -60,10 +60,35 @@ export const materialsApi = {
     pbFiles.authStore.clear();
   },
 
+  // ── Папки (иерархия через parent; коллекция folders — bootstrap-folders.sh) ──
+  // null = коллекции ещё нет (бутстрап не запускался) → UI прячет папки.
+  async listFolders() {
+    try {
+      return await pbFiles.collection('folders').getFullList({ sort: 'name' });
+    } catch (e) {
+      if (e?.status === 404) return null;
+      throw e;
+    }
+  },
+  async createFolder(name, parent = '') {
+    return pbFiles.collection('folders').create({ name, ...(parent ? { parent } : {}) });
+  },
+  async renameFolder(id, name) {
+    return pbFiles.collection('folders').update(id, { name });
+  },
+  // PB сам вычищает ссылки на удалённую папку: подпапки и файлы окажутся в корне.
+  async deleteFolder(id) {
+    return pbFiles.collection('folders').delete(id);
+  },
+
   // ── CRUD материалов ─────────────────────────────────────────────────────────
-  async listMaterials({ page = 1, perPage = 40, category = '', search = '', sort = '-created' } = {}) {
+  // folder: undefined/null = без фильтра по папке; '' = корень; id = конкретная папка.
+  async listMaterials({ page = 1, perPage = 40, category = '', search = '', folder, sort = '-created' } = {}) {
     const parts = [];
     if (category) parts.push(pbFiles.filter('category = {:c}', { c: category }));
+    if (folder != null) {
+      parts.push(folder === '' ? 'folder = ""' : pbFiles.filter('folder = {:f}', { f: folder }));
+    }
     if (search) {
       parts.push(pbFiles.filter(
         '(title ~ {:q} || original_name ~ {:q} || subject ~ {:q} || description ~ {:q})',
@@ -77,7 +102,7 @@ export const materialsApi = {
     });
   },
 
-  async uploadMaterial({ file, title, category = 'other', subject = '', tags = [], description = '' }) {
+  async uploadMaterial({ file, title, category = 'other', subject = '', tags = [], description = '', folder = '' }) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('title', title || file.name);
@@ -87,6 +112,7 @@ export const materialsApi = {
     fd.append('mime', file.type || '');
     if (subject) fd.append('subject', subject);
     if (description) fd.append('description', description);
+    if (folder) fd.append('folder', folder);
     fd.append('tags', JSON.stringify(Array.isArray(tags) ? tags : []));
     return pbFiles.collection('materials').create(fd);
   },

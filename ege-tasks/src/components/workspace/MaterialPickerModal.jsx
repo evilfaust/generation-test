@@ -5,12 +5,13 @@
  * Возвращает массив дескрипторов `{ type:'material', id, title, url }` через onPick.
  * Если хранилище не подключено — показывает форму подключения.
  */
-import { useState, useEffect, useCallback } from 'react';
-import { Modal, Input, Select, List, Checkbox, Tag, Spin, Empty, Space, Typography, Upload, Button, App } from 'antd';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Modal, Input, Select, List, Checkbox, Tag, Spin, Empty, Space, Typography, Upload, Button, App, TreeSelect } from 'antd';
 import { SearchOutlined, FilePdfOutlined, FileOutlined, UploadOutlined } from '@ant-design/icons';
 import { materialsApi, CATEGORY_LABELS } from '../../shared/services/pb/filesClient';
 import { useAuth } from '../../contexts/AuthContext';
 import ConnectForm from './StorageConnect';
+import { buildFolderTree } from './folderTree';
 
 const { Text } = Typography;
 const CATEGORY_OPTIONS = Object.entries(CATEGORY_LABELS).map(([value, label]) => ({ value, label }));
@@ -30,11 +31,19 @@ export default function MaterialPickerModal({ open, onClose, onPick, existingIds
   const [selected, setSelected] = useState({}); // id → record
   const [uploadCategory, setUploadCategory] = useState('other');
   const [uploading, setUploading] = useState(0);
+  // Папки: null = выключены (нет коллекции), array = фильтр-дерево доступен.
+  const [folders, setFolders] = useState(null);
+  const [folderFilter, setFolderFilter] = useState(undefined); // undefined = вся библиотека
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await materialsApi.listMaterials({ search, category, perPage: 100 });
+      const res = await materialsApi.listMaterials({
+        search,
+        category,
+        perPage: 100,
+        ...(folderFilter !== undefined ? { folder: folderFilter } : {}),
+      });
       setItems(res.items || []);
     } catch (e) {
       if (e?.status === 401) { materialsApi.disconnect(); setConnected(false); }
@@ -42,12 +51,25 @@ export default function MaterialPickerModal({ open, onClose, onPick, existingIds
     } finally {
       setLoading(false);
     }
-  }, [search, category]);
+  }, [search, category, folderFilter]);
 
   useEffect(() => {
     if (open && connected) load();
     if (open) setSelected({});
   }, [open, connected, load]);
+
+  useEffect(() => {
+    if (open && connected) {
+      materialsApi.listFolders().then(setFolders).catch(() => setFolders(null));
+    }
+  }, [open, connected]);
+
+  const folderTreeData = useMemo(
+    () => (Array.isArray(folders)
+      ? [{ value: '', title: '📁 Корень библиотеки', children: buildFolderTree(folders) }]
+      : []),
+    [folders],
+  );
 
   const existing = new Set(existingIds);
 
@@ -114,10 +136,16 @@ export default function MaterialPickerModal({ open, onClose, onPick, existingIds
           )}
           <Space style={{ marginBottom: 12, width: '100%' }} wrap>
             <Input.Search allowClear placeholder="Поиск" prefix={<SearchOutlined />}
-              style={{ width: 260 }} onSearch={setSearch}
+              style={{ width: 220 }} onSearch={setSearch}
               onChange={(e) => { if (!e.target.value) setSearch(''); }} />
             <Select allowClear placeholder="Все категории" value={category || undefined}
-              onChange={(v) => setCategory(v || '')} options={CATEGORY_OPTIONS} style={{ width: 200 }} />
+              onChange={(v) => setCategory(v || '')} options={CATEGORY_OPTIONS} style={{ width: 180 }} />
+            {Array.isArray(folders) && folders.length > 0 && (
+              <TreeSelect allowClear placeholder="Все папки" value={folderFilter}
+                onChange={(v) => setFolderFilter(v === undefined || v === null ? undefined : v)}
+                treeData={folderTreeData} treeDefaultExpandAll showSearch
+                treeNodeFilterProp="title" style={{ width: 180 }} />
+            )}
           </Space>
           <Spin spinning={loading}>
             {items.length === 0 ? (

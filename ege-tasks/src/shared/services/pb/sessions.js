@@ -76,7 +76,7 @@ export const sessionsApi = {
       return await pb.collection('work_sessions').getFullList({
         filter,
         sort: '-created',
-        fields: 'id,work,created',
+        fields: 'id,work,created,is_open',
       });
     } catch (error) {
       console.error('Error fetching sessions by works:', error);

@@ -252,7 +252,7 @@ export default function GradeJournal() {
           title="Пока нет выданных работ"
           description="Создайте работу и выдайте её группе — результаты лягут в журнал"
           cta="Создать работу"
-          onCta={() => navigate('/app/works/new/edit')}
+          onCta={() => navigate('/app/worksheets/test')}
         />
       ) : (
         <Card size="small" styles={{ body: { padding: 0 } }}>

@@ -1,0 +1,81 @@
+/* ═══════════════════════════════════════════════════
+   WorkPrintPreview — предпросмотр печати работы
+   (полноэкранный оверлей поверх редактора)
+═══════════════════════════════════════════════════ */
+
+.wpv-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  background: var(--bg, #f0f2f5);
+  padding: 16px;
+}
+
+.wpv-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin-bottom: 16px;
+}
+
+/* Белый «лист» предпросмотра */
+.wpv-sheet {
+  background: #fff;
+  max-width: 210mm;
+  margin: 0 auto 24px;
+  padding: 12mm 10mm;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.12);
+  box-sizing: border-box;
+}
+
+/* Кнопки правки задач из VariantRenderer в предпросмотре не нужны */
+.wpv-print-root .no-print {
+  display: none !important;
+}
+
+/* ── Печать: scoped print по канону проекта ── */
+@media print {
+  body:has(.wpv-overlay) {
+    visibility: hidden;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body:has(.wpv-overlay) .wpv-print-root,
+  body:has(.wpv-overlay) .wpv-print-root * {
+    visibility: visible;
+  }
+
+  body:has(.wpv-overlay) .wpv-toolbar {
+    display: none !important;
+  }
+
+  /* fixed при печати кладёт все страницы друг на друга → нейтрализуем */
+  body:has(.wpv-overlay) .wpv-overlay {
+    position: static !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body:has(.wpv-overlay) .wpv-sheet {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  body:has(.wpv-overlay) .wpv-print-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+}

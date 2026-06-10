@@ -35,6 +35,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   const [workStats, setWorkStats] = useState({});
   const [sessionsByWork, setSessionsByWork] = useState({});
   const [expandedWorkId, setExpandedWorkId] = useState(null);
+  const [resultsSessionId, setResultsSessionId] = useState(null);
   const [previewVariants, setPreviewVariants] = useState({});
   const [previewLoading, setPreviewLoading] = useState({});
 
@@ -210,6 +211,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
       if (newId) loadVariants(newId);
       return newId;
     });
+    setResultsSessionId(null);
   }, [loadVariants]);
 
   // Delete work
@@ -586,7 +588,12 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                 </div>
 
                 {/* Expanded Body */}
-                {isExpanded && (
+                {isExpanded && (() => {
+                  const workSessions = sessionsByWork[work.id] || [];
+                  const activeSessionId = workSessions.some(s => s.id === resultsSessionId)
+                    ? resultsSessionId
+                    : workSessions[0]?.id || null;
+                  return (
                   <div className="wm-work-card-body">
                     <Tabs
                       defaultActiveKey="session"
@@ -603,8 +610,24 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                           label: (
                             <span><TeamOutlined /> Результаты{stats.attempts > 0 ? ` (${stats.attempts})` : ''}</span>
                           ),
-                          children: session ? (
-                            <TeacherResultsDashboard sessionId={session.id} />
+                          children: activeSessionId ? (
+                            <div>
+                              {workSessions.length > 1 && (
+                                <div style={{ marginBottom: 8, textAlign: 'right' }}>
+                                  <Select
+                                    size="small"
+                                    style={{ minWidth: 240 }}
+                                    value={activeSessionId}
+                                    onChange={setResultsSessionId}
+                                    options={workSessions.map((s, i) => ({
+                                      value: s.id,
+                                      label: `Выдача ${workSessions.length - i} — ${new Date(s.created).toLocaleDateString('ru-RU')}${s.is_open ? ' · приём открыт' : ''}`,
+                                    }))}
+                                  />
+                                </div>
+                              )}
+                              <TeacherResultsDashboard key={activeSessionId} sessionId={activeSessionId} />
+                            </div>
                           ) : (
                             <Empty description="Нет активной сессии. Откройте вкладку «Выдача», чтобы создать сессию." />
                           ),
@@ -619,7 +642,8 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                       ]}
                     />
                   </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { App, Button, Card, Col, Row, Space, Spin, Tooltip, Typography } from 'antd';
 import {
   CalendarOutlined, CheckOutlined, ClockCircleOutlined, FileAddOutlined, FileTextOutlined,
-  PlusOutlined, SolutionOutlined, WarningOutlined,
+  InboxOutlined, PlusOutlined, PushpinFilled, SolutionOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -37,6 +37,7 @@ export default function TodayDashboard() {
 
   const [lessons, setLessons] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
+  const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -44,12 +45,14 @@ export default function TodayDashboard() {
     try {
       const from = dayjs().startOf('day').toISOString();
       const to = dayjs().add(7, 'day').endOf('day').toISOString();
-      const [l, d] = await Promise.all([
+      const [l, d, n] = await Promise.all([
         api.getLessons({ from, to }),
         api.getSessionsWithDeadline(),
+        api.getNotes().catch(() => []),
       ]);
       setLessons(l);
       setDeadlines(d);
+      setNotes(n);
     } catch {
       message.error('Не удалось загрузить «Сегодня»');
     } finally {
@@ -98,6 +101,15 @@ export default function TodayDashboard() {
   const overdueCount = useMemo(
     () => deadlines.filter((s) => dayjs(s.deadline).isBefore(today)).length,
     [deadlines], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Закреплённые + инбокс (без архива): пин выше, дальше по свежести. До 7 штук.
+  const dashboardNotes = useMemo(
+    () => notes
+      .filter((n) => !n.is_archived && (n.is_pinned || n.is_inbox))
+      .sort((a, b) => (b.is_pinned - a.is_pinned) || (new Date(b.updated) - new Date(a.updated)))
+      .slice(0, 7),
+    [notes],
   );
 
   const openNote = useCallback(async (l, e) => {
@@ -173,7 +185,7 @@ export default function TodayDashboard() {
           <span className="ws-quick__icon ws-icon--blue"><PlusOutlined /></span>
           <span><span className="ws-quick__label">Запланировать урок</span><span className="ws-quick__hint">в календаре</span></span>
         </button>
-        <button type="button" className="ws-quick__btn" onClick={() => navigate('/app/works/new/edit')}>
+        <button type="button" className="ws-quick__btn" onClick={() => navigate('/app/worksheets/test')}>
           <span className="ws-quick__icon ws-icon--teal"><FileAddOutlined /></span>
           <span><span className="ws-quick__label">Создать работу</span><span className="ws-quick__hint">выдать ученикам</span></span>
         </button>
@@ -274,6 +286,41 @@ export default function TodayDashboard() {
               </div>
             ) : (
               <EmptyState title="Дедлайнов нет" description="Все выданные работы под контролем" />
+            )}
+          </Card>
+
+          {/* Заметки: закреплённые + инбокс */}
+          <Card
+            size="small"
+            title={<Space><FileTextOutlined /><span>Заметки</span></Space>}
+            extra={<Button size="small" type="link" onClick={() => navigate('/app/notes')}>Все</Button>}
+            style={{ marginTop: 16 }}
+          >
+            {dashboardNotes.length ? (
+              <div>
+                {dashboardNotes.map((n) => (
+                  <div key={n.id} className="ws-row"
+                    style={{ padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                    onClick={() => navigate(`/app/notes?note=${n.id}`)}>
+                    <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {n.is_pinned
+                        ? <PushpinFilled style={{ color: 'var(--c-amber)', flexShrink: 0 }} />
+                        : <InboxOutlined style={{ color: 'var(--c-amber)', flexShrink: 0 }} />}
+                      <span className="ws-timeline__title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {n.title?.trim() || 'Без названия'}
+                      </span>
+                    </div>
+                    {n.expand?.group?.name && <GroupChip id={n.group} name={n.expand.group.name} />}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title="Нет закреплённых заметок"
+                description="Закрепите 📌 важное или бросьте мысль в инбокс — появится здесь"
+                cta={canEdit ? 'Открыть заметки' : undefined}
+                onCta={() => navigate('/app/notes')}
+              />
             )}
           </Card>
         </Col>

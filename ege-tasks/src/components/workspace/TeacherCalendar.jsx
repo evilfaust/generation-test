@@ -122,6 +122,8 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
   // Файлы из Библиотеки (type:'material') живут отдельно от работ (type:'work').
   const [fileMaterials, setFileMaterials] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Файлы, прикреплённые к ЗАМЕТКЕ этого урока (read-only, обратная связь урок↔заметка).
+  const [noteFiles, setNoteFiles] = useState([]);
   // Пресет «пара/часть/интенсив» — выставляет время старта по расписанию школы.
   const [mode, setMode] = useState('single');   // 'single' | 'intensive'
   const [pair, setPair] = useState(null);        // '0'..'5' | null (своё время / старт интенсива)
@@ -151,6 +153,20 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
       else { const g = guessSlot(startDate.toDate()); setMode('single'); setPair(g.pair); setPart(g.part); setEndPair(null); }
     }
   }, [open, initial, form]);
+
+  // Подтянуть файлы заметки урока (если заметка есть). Без создания заметки.
+  useEffect(() => {
+    let cancelled = false;
+    if (!open || !initial?.id) { setNoteFiles([]); return undefined; }
+    api.getLessonNote(initial.id)
+      .then((note) => {
+        if (cancelled) return;
+        const links = Array.isArray(note?.links) ? note.links : [];
+        setNoteFiles(links.filter((l) => l.type === 'material'));
+      })
+      .catch(() => { if (!cancelled) setNoteFiles([]); });
+    return () => { cancelled = true; };
+  }, [open, initial?.id]);
 
   const setStartTime = (str) => {
     const [h, m] = str.split(':').map(Number);
@@ -338,6 +354,25 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
           </Space>
         )}
       </div>
+
+      {/* Файлы, прикреплённые к заметке урока (read-only; правка — в самой заметке) */}
+      {noteFiles.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <Typography.Text strong style={{ fontSize: 13 }}>
+            <FileTextOutlined /> Файлы заметки урока
+          </Typography.Text>
+          <Space direction="vertical" size={2} style={{ width: '100%', marginTop: 4 }}>
+            {noteFiles.map((m) => (
+              <Space key={m.id} style={{ width: '100%', justifyContent: 'space-between' }}>
+                <a href={m.url} target="_blank" rel="noreferrer">
+                  <DownloadOutlined /> {m.title}
+                </a>
+                <Chip tone="violet" dot={false}>из заметки</Chip>
+              </Space>
+            ))}
+          </Space>
+        </div>
+      )}
 
       <MaterialPickerModal
         open={pickerOpen}

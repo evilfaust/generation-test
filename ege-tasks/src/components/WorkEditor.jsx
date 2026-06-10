@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Tabs, Form, Input, InputNumber, Select, Button, Space, Typography, Tooltip, Alert, Empty, Tag, Popconfirm, Modal, App } from 'antd';
-import { SaveOutlined, CopyOutlined, EditOutlined, SwapOutlined, DeleteOutlined, PlusOutlined, ExportOutlined, FileMarkdownOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { Card, Tabs, Form, Input, InputNumber, Select, Button, Space, Switch, Typography, Tooltip, Alert, Empty, Tag, Popconfirm, Modal, App } from 'antd';
+import { SaveOutlined, CopyOutlined, EditOutlined, SwapOutlined, DeleteOutlined, PlusOutlined, ExportOutlined, FileMarkdownOutlined, NodeIndexOutlined, PrinterOutlined, RetweetOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import TaskReplaceModal from './TaskReplaceModal';
 import TaskEditModal from './TaskEditModal';
 import TaskSelectModal from './TaskSelectModal';
 import SessionPanel from './worksheet/SessionPanel';
 import TeacherResultsDashboard from './worksheet/TeacherResultsDashboard';
+import WorksheetVectorTools from './worksheet/oral-generator/WorksheetVectorTools';
+import SimilarSwapModal from './worksheet/SimilarSwapModal';
+import WorkPrintPreview from './worksheet/WorkPrintPreview';
+import WorkLessonLinks from './worksheet/WorkLessonLinks';
+import WorkOverlapWarning from './worksheet/WorkOverlapWarning';
 import { useTaskDragDrop, useTaskEditing } from '../hooks';
+import { shuffleArray } from '../utils/shuffle';
 import { PB_BASE_URL } from '../services/pocketbaseUrl';
 import './TaskWorksheet.css';
 
@@ -24,7 +31,9 @@ const WorkEditor = ({
   onSaveAsNew,
   hasAttempts,
   attemptCount = 0,
-  sessionId = null,
+  sessions = [],
+  dirty = false,
+  onDirty,
   topics = [],
   tags = [],
   subtopics = [],
@@ -32,6 +41,7 @@ const WorkEditor = ({
   sources = [],
 }) => {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [form] = Form.useForm();
   const [activeVariantKey, setActiveVariantKey] = useState(null);
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -39,6 +49,10 @@ const WorkEditor = ({
   const [moveModalVisible, setMoveModalVisible] = useState(false);
   const [moveTargetVariantIndex, setMoveTargetVariantIndex] = useState(null);
   const [movingTaskRef, setMovingTaskRef] = useState(null);
+  const [similarRef, setSimilarRef] = useState(null); // { variantIndex, taskIndex, task }
+  const [printOpen, setPrintOpen] = useState(false);
+  const [showAnswers, setShowAnswers] = useState(false);
+  const [resultsSessionId, setResultsSessionId] = useState(null);
 
   const dragDropHandlers = useTaskDragDrop(variants, setVariants);
   const taskEditing = useTaskEditing(variants, setVariants);
@@ -60,6 +74,14 @@ const WorkEditor = ({
     const key = String(variants[0].number || 1);
     setActiveVariantKey(prev => prev || key);
   }, [variants]);
+
+  // По умолчанию в «Результатах» показываем свежайшую сессию (sessions отсортированы -created).
+  useEffect(() => {
+    setResultsSessionId(prev => {
+      if (prev && sessions.some(s => s.id === prev)) return prev;
+      return sessions[0]?.id || null;
+    });
+  }, [sessions]);
 
   const activeVariantIndex = useMemo(() => {
     if (!activeVariantKey) return 0;
@@ -118,6 +140,31 @@ const WorkEditor = ({
     message.success('Задача перенесена в другой вариант');
   };
 
+  const handleSimilarReplace = (fullTask) => {
+    if (!similarRef) return;
+    const { variantIndex, taskIndex } = similarRef;
+    setVariants(prev => {
+      const copy = prev.map(v => ({ ...v, tasks: [...(v.tasks || [])] }));
+      if (copy[variantIndex]?.tasks?.[taskIndex]) {
+        copy[variantIndex].tasks[taskIndex] = fullTask;
+      }
+      return copy;
+    });
+  };
+
+  const handleSimilarAdd = (fullTask) => {
+    if (!similarRef) return;
+    const { variantIndex } = similarRef;
+    setVariants(prev => {
+      const copy = prev.map(v => ({ ...v, tasks: [...(v.tasks || [])] }));
+      const target = copy[variantIndex];
+      if (target && !target.tasks.some(t => t.id === fullTask.id)) {
+        target.tasks.push(fullTask);
+      }
+      return copy;
+    });
+  };
+
   const openAddTaskModal = (variantIndex) => {
     setAddTargetVariant(variantIndex);
     setAddModalVisible(true);
@@ -138,6 +185,27 @@ const WorkEditor = ({
     const next = [...variants, { number: nextNumber, tasks: [] }];
     setVariants(next);
     setActiveVariantKey(String(nextNumber));
+  };
+
+  const handleDuplicateVariant = (variantIndex) => {
+    const source = variants[variantIndex];
+    if (!source) return;
+    const maxNumber = variants.reduce((max, v) => Math.max(max, v.number || 0), 0);
+    const nextNumber = maxNumber + 1;
+    setVariants(prev => [...prev, { number: nextNumber, tasks: [...(prev[variantIndex]?.tasks || [])] }]);
+    setActiveVariantKey(String(nextNumber));
+    message.success(`Вариант ${source.number} продублирован как вариант ${nextNumber}`);
+  };
+
+  const handleShuffleVariant = (variantIndex) => {
+    setVariants(prev => {
+      const copy = prev.map(v => ({ ...v, tasks: [...(v.tasks || [])] }));
+      if (copy[variantIndex]) {
+        copy[variantIndex].tasks = shuffleArray(copy[variantIndex].tasks);
+      }
+      return copy;
+    });
+    message.success('Задачи варианта перемешаны');
   };
 
   const handleRemoveVariant = (variantIndex) => {
@@ -188,14 +256,19 @@ const WorkEditor = ({
     return (
       <Card>
         <Form form={form} component={false} />
-        <Empty description="Выберите работу слева, чтобы редактировать" />
+        <Empty description="Работа не найдена. Откройте её из списка «Мои работы»." />
       </Card>
     );
   }
 
   return (
     <Card
-      title={work.title || 'Работа без названия'}
+      title={
+        <Space size={8} wrap>
+          <span>{work.title || 'Работа без названия'}</span>
+          {dirty && <Tag color="orange" style={{ margin: 0 }}>не сохранено</Tag>}
+        </Space>
+      }
       extra={
         <Space wrap>
           {hasAttempts ? (
@@ -212,6 +285,13 @@ const WorkEditor = ({
           <Button icon={<CopyOutlined />} onClick={handleSaveAsNewClick}>
             Копия
           </Button>
+          {totalTasksCount > 0 && (
+            <Tooltip title="Предпросмотр и печать листа (или экспорт в PDF)">
+              <Button icon={<PrinterOutlined />} onClick={() => setPrintOpen(true)}>
+                Печать / PDF
+              </Button>
+            </Tooltip>
+          )}
           {variants.length > 0 && (
             <Tooltip title="Экспорт вариантов в Markdown для Obsidian">
               <Button icon={<FileMarkdownOutlined />} onClick={handleExportMD}>
@@ -233,6 +313,8 @@ const WorkEditor = ({
         />
       )}
 
+      <WorkLessonLinks workId={work.id} workTitle={work.title} />
+
       <Tabs
         items={[
           {
@@ -247,6 +329,11 @@ const WorkEditor = ({
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
                       <Text type="secondary">Вариантов: {variants.length} • Задач: {totalTasksCount}</Text>
                       <Space wrap>
+                        <Tooltip title="Показывать ответы задач в составе">
+                          <span style={{ fontSize: 13 }}>
+                            <Switch size="small" checked={showAnswers} onChange={setShowAnswers} /> ответы
+                          </span>
+                        </Tooltip>
                         <Button
                           icon={<PlusOutlined />}
                           onClick={handleAddVariant}
@@ -260,6 +347,24 @@ const WorkEditor = ({
                         >
                           Добавить задачу
                         </Button>
+                        <Tooltip title="Создать копию текущего варианта">
+                          <Button
+                            icon={<CopyOutlined />}
+                            onClick={() => handleDuplicateVariant(activeVariantIndex)}
+                            disabled={!activeVariant || (activeVariant.tasks?.length || 0) === 0}
+                          >
+                            Дублировать
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Перемешать порядок задач в текущем варианте">
+                          <Button
+                            icon={<RetweetOutlined />}
+                            onClick={() => handleShuffleVariant(activeVariantIndex)}
+                            disabled={!activeVariant || (activeVariant.tasks?.length || 0) < 2}
+                          >
+                            Перемешать
+                          </Button>
+                        </Tooltip>
                         <Popconfirm
                           title="Удалить вариант?"
                           description="Задачи из варианта будут удалены только из этой работы."
@@ -279,16 +384,46 @@ const WorkEditor = ({
                       </Space>
                     </div>
 
+                    <WorkOverlapWarning
+                      workId={work.id}
+                      variants={variants}
+                      onOpenWork={(id) => navigate(`/app/works/${id}/edit`)}
+                    />
+
+                    <WorksheetVectorTools
+                      variants={variants}
+                      setVariants={setVariants}
+                      workTitle={work.title}
+                      currentWorkId={work.id}
+                      onOpenWork={(id) => navigate(`/app/works/${id}/edit`)}
+                    />
+
                     <Tabs
                       type="card"
                       activeKey={activeVariantKey || undefined}
                       onChange={setActiveVariantKey}
-                      items={variants.map((variant, idx) => ({
+                      items={variants.map((variant, idx) => {
+                        const vTasks = variant.tasks || [];
+                        const diffCounts = vTasks.reduce((acc, t) => {
+                          if (t.difficulty) acc[t.difficulty] = (acc[t.difficulty] || 0) + 1;
+                          return acc;
+                        }, {});
+                        const noAnswer = vTasks.filter(t => !t.answer).length;
+                        return {
                         key: String(variant.number || idx + 1),
                         label: `Вариант ${variant.number || idx + 1}`,
                         children: (
                           <div>
-                            {(variant.tasks || []).map((task, taskIndex) => {
+                            <div style={{ marginBottom: 10 }}>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                Задач: {vTasks.length}
+                                {diffCounts[1] > 0 && <> · <span style={{ color: '#52c41a' }}>базовых: {diffCounts[1]}</span></>}
+                                {diffCounts[2] > 0 && <> · <span style={{ color: '#faad14' }}>средних: {diffCounts[2]}</span></>}
+                                {diffCounts[3] > 0 && <> · <span style={{ color: '#ff4d4f' }}>сложных: {diffCounts[3]}</span></>}
+                                {noAnswer > 0 && <> · <span style={{ color: '#ff4d4f' }}>без ответа: {noAnswer}</span></>}
+                              </Text>
+                            </div>
+                            {vTasks.map((task, taskIndex) => {
                               const isDragging = dragDropHandlers?.isDragging(idx, taskIndex);
                               const isDragOver = dragDropHandlers?.isDragOver(idx, taskIndex);
 
@@ -329,6 +464,14 @@ const WorkEditor = ({
                                           onClick={() => taskEditing.handleReplaceTask(idx, taskIndex, task)}
                                         />
                                       </Tooltip>
+                                      <Tooltip title="Похожие задачи (векторный поиск)">
+                                        <Button
+                                          type="text"
+                                          size="small"
+                                          icon={<NodeIndexOutlined />}
+                                          onClick={() => setSimilarRef({ variantIndex: idx, taskIndex, task })}
+                                        />
+                                      </Tooltip>
                                       <Tooltip title="Перенести в другой вариант">
                                         <Button
                                           type="text"
@@ -359,13 +502,25 @@ const WorkEditor = ({
                                         />
                                       </div>
                                     )}
+                                    {showAnswers && (
+                                      <div style={{
+                                        marginTop: 6, padding: '4px 10px', fontSize: 13,
+                                        background: task.answer ? '#f6ffed' : '#fff2f0',
+                                        border: `1px solid ${task.answer ? '#d9f7be' : '#ffccc7'}`,
+                                        borderRadius: 4,
+                                      }}>
+                                        <Text type="secondary">Ответ: </Text>
+                                        {task.answer ? <MathRenderer text={task.answer} /> : <Text type="danger">не задан</Text>}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
                         ),
-                      }))}
+                        };
+                      })}
                     />
                   </>
                 )}
@@ -376,7 +531,7 @@ const WorkEditor = ({
             key: 'params',
             label: 'Параметры',
             children: (
-              <Form form={form} layout="vertical">
+              <Form form={form} layout="vertical" onValuesChange={() => onDirty?.()}>
                 <Form.Item
                   name="title"
                   label="Название работы"
@@ -409,9 +564,26 @@ const WorkEditor = ({
                 <Card size="small" title="Выдача" style={{ marginBottom: 12 }}>
                   <SessionPanel workId={work.id} />
                 </Card>
-                <Card size="small" title="Результаты">
-                  {sessionId ? (
-                    <TeacherResultsDashboard sessionId={sessionId} />
+                <Card
+                  size="small"
+                  title="Результаты"
+                  extra={
+                    sessions.length > 1 ? (
+                      <Select
+                        size="small"
+                        style={{ minWidth: 240 }}
+                        value={resultsSessionId}
+                        onChange={setResultsSessionId}
+                        options={sessions.map((s, i) => ({
+                          value: s.id,
+                          label: `Выдача ${sessions.length - i} — ${new Date(s.created).toLocaleDateString('ru-RU')}${s.is_open ? ' · приём открыт' : ''}`,
+                        }))}
+                      />
+                    ) : null
+                  }
+                >
+                  {resultsSessionId ? (
+                    <TeacherResultsDashboard key={resultsSessionId} sessionId={resultsSessionId} />
                   ) : (
                     <Empty description="Нет активной сессии" />
                   )}
@@ -461,6 +633,27 @@ const WorkEditor = ({
         subtopics={subtopics}
         tags={tags}
         excludeIds={(activeVariant?.tasks || []).map(t => t.id)}
+      />
+
+      {printOpen && (
+        <WorkPrintPreview
+          work={work}
+          variants={variants}
+          onClose={() => setPrintOpen(false)}
+        />
+      )}
+
+      <SimilarSwapModal
+        open={!!similarRef}
+        task={similarRef?.task}
+        excludeIds={
+          similarRef
+            ? (variants[similarRef.variantIndex]?.tasks || []).map(t => t.id).filter(Boolean)
+            : []
+        }
+        onClose={() => setSimilarRef(null)}
+        onReplace={handleSimilarReplace}
+        onAdd={handleSimilarAdd}
       />
 
       <Modal

@@ -121,6 +121,27 @@ export const worksApi = {
     }
   },
 
+  // Варианты ДРУГИХ работ, содержащие любую из задач (для предупреждения
+  // «задачи уже встречаются в других работах»). taskIds — состав одной работы,
+  // фильтр строится OR-цепочкой.
+  async getVariantsContainingTasks(taskIds = [], excludeWorkId = null) {
+    try {
+      if (!taskIds.length) return [];
+      const orPart = '(' + taskIds.map(id => `tasks ~ "${escapeFilter(id)}"`).join(' || ') + ')';
+      const filter = excludeWorkId
+        ? `${orPart} && work != "${escapeFilter(excludeWorkId)}"`
+        : orPart;
+      return await pb.collection('variants').getFullList({
+        filter,
+        expand: 'work',
+        fields: 'id,work,tasks,expand.work.id,expand.work.title,expand.work.archived',
+      });
+    } catch (error) {
+      console.error('Error fetching variants containing tasks:', error);
+      return [];
+    }
+  },
+
   // Получить все варианты работы
   async getVariantsByWork(workId) {
     try {

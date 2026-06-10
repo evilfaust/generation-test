@@ -1,107 +1,65 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Input, Select, Spin, Empty, App } from 'antd';
-import { ReloadOutlined, InboxOutlined } from '@ant-design/icons';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button, Spin, App } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import WorkEditor from './WorkEditor';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
-import { SplitLayout, StatMini, Chip, topicTint } from '../ui';
 
-const { Option } = Select;
-
+/**
+ * Страница редактора работы: грузит работу по workId и рендерит WorkEditor
+ * во всю ширину. Список работ — единственный, в «Мои работы» (WorkManager);
+ * без workId страница редиректит туда (v3.9.70, левая панель-дубль удалена).
+ */
 const WorkEditorPage = ({ initialWorkId = null }) => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const { topics, tags, subtopics, years, sources } = useReferenceData();
-  const [works, setWorks] = useState([]);
-  const [loadingWorks, setLoadingWorks] = useState(true);
-  const [selectedWorkId, setSelectedWorkId] = useState(null);
   const [workLoading, setWorkLoading] = useState(false);
   const [currentWork, setCurrentWork] = useState(null);
   const [variants, setVariants] = useState([]);
   const [attemptCount, setAttemptCount] = useState(0);
-  const [sessionId, setSessionId] = useState(null);
-  const [workStats, setWorkStats] = useState({});
-  const [filters, setFilters] = useState({
-    status: 'active',
-    search: '',
-    topic: null,
-  });
+  const [sessions, setSessions] = useState([]);
+  const [dirty, setDirty] = useState(false);
 
+  // Без выбранной работы редактору нечего показывать — ведём в список.
   useEffect(() => {
-    if (!initialWorkId) return;
-    setSelectedWorkId(initialWorkId);
-  }, [initialWorkId]);
+    if (!initialWorkId) navigate('/app/works', { replace: true });
+  }, [initialWorkId, navigate]);
 
-  const loadWorks = useCallback(async () => {
-    setLoadingWorks(true);
-    try {
-      const archived = filters.status === 'archived';
-      const data = await api.getWorks({
-        archived,
-        search: filters.search,
-        topic: filters.topic,
-      });
-      setWorks(data);
-      await loadStats(data);
-    } catch (error) {
-      console.error('Error loading works:', error);
-      message.error('Ошибка загрузки работ');
-    } finally {
-      setLoadingWorks(false);
-    }
-  }, [filters]);
-
-  const loadStats = useCallback(async (workList) => {
-    const ids = workList.map(w => w.id);
-    if (!ids.length) {
-      setWorkStats({});
-      return;
-    }
-
-    try {
-      const sessions = await api.getSessionsByWorks(ids);
-      const sessionIds = sessions.map(s => s.id);
-      const attempts = await api.getAttemptsBySessions(sessionIds);
-
-      const stats = {};
-      ids.forEach(id => {
-        stats[id] = { sessions: 0, attempts: 0, avgScore: null };
-      });
-
-      sessions.forEach(s => {
-        if (!stats[s.work]) stats[s.work] = { sessions: 0, attempts: 0, avgScore: null };
-        stats[s.work].sessions += 1;
-      });
-
-      const attemptSumByWork = {};
-      const totalSumByWork = {};
-
-      const sessionToWork = new Map(sessions.map(s => [s.id, s.work]));
-
-      attempts.forEach(a => {
-        const workId = sessionToWork.get(a.session);
-        if (!workId) return;
-        if (!stats[workId]) stats[workId] = { sessions: 0, attempts: 0, avgScore: null };
-        stats[workId].attempts += 1;
-        attemptSumByWork[workId] = (attemptSumByWork[workId] || 0) + (a.score || 0);
-        totalSumByWork[workId] = (totalSumByWork[workId] || 0) + (a.total || 0);
-      });
-
-      Object.keys(stats).forEach(workId => {
-        const total = totalSumByWork[workId] || 0;
-        const score = attemptSumByWork[workId] || 0;
-        stats[workId].avgScore = total > 0 ? Math.round((score / total) * 100) : null;
-      });
-
-      setWorkStats(stats);
-    } catch (error) {
-      console.error('Error loading work stats:', error);
-      setWorkStats({});
-    }
+  // Правки вариантов из редактора помечают работу как «несохранённую».
+  const setVariantsDirty = useCallback((updater) => {
+    setVariants(updater);
+    setDirty(true);
   }, []);
 
+  const markDirty = useCallback(() => setDirty(true), []);
+
+  // Защита от закрытия/перезагрузки вкладки с несохранёнными правками.
   useEffect(() => {
-    loadWorks();
-  }, [loadWorks]);
+    if (!dirty) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const goToList = useCallback(() => {
+    if (dirty) {
+      modal.confirm({
+        title: 'Несохранённые изменения',
+        content: 'В работе есть несохранённые правки. Перейти к списку без сохранения? Изменения будут потеряны.',
+        okText: 'Перейти без сохранения',
+        okButtonProps: { danger: true },
+        cancelText: 'Остаться',
+        onOk: () => navigate('/app/works'),
+      });
+    } else {
+      navigate('/app/works');
+    }
+  }, [dirty, modal, navigate]);
 
   const loadWorkDetails = useCallback(async (workId) => {
     if (!workId) return;
@@ -129,12 +87,13 @@ const WorkEditorPage = ({ initialWorkId = null }) => {
       }));
 
       const attempts = await api.getAttemptsCountByWork(workId);
-      const session = await api.getSessionByWork(workId);
+      const workSessions = await api.getSessionsByWork(workId);
 
       setCurrentWork(work);
       setVariants(normalizedVariants);
       setAttemptCount(attempts);
-      setSessionId(session?.id || null);
+      setSessions(workSessions || []);
+      setDirty(false);
     } catch (error) {
       console.error('Error loading work details:', error);
       message.error('Ошибка загрузки работы');
@@ -144,33 +103,15 @@ const WorkEditorPage = ({ initialWorkId = null }) => {
   }, []);
 
   useEffect(() => {
-    if (selectedWorkId) {
-      loadWorkDetails(selectedWorkId);
+    if (initialWorkId) {
+      loadWorkDetails(initialWorkId);
     } else {
       setCurrentWork(null);
       setVariants([]);
       setAttemptCount(0);
-      setSessionId(null);
+      setSessions([]);
     }
-  }, [selectedWorkId, loadWorkDetails]);
-
-  const handleArchiveToggle = async (work) => {
-    try {
-      if (work.archived) {
-        await api.unarchiveWork(work.id);
-        message.success('Работа возвращена из архива');
-      } else {
-        await api.archiveWork(work.id);
-        message.success('Работа перемещена в архив');
-      }
-      await loadWorks();
-      if (selectedWorkId === work.id) {
-        setSelectedWorkId(null);
-      }
-    } catch (error) {
-      message.error('Ошибка при архивировании');
-    }
-  };
+  }, [initialWorkId, loadWorkDetails]);
 
   const handleSave = async (values) => {
     if (!currentWork) return;
@@ -211,7 +152,7 @@ const WorkEditorPage = ({ initialWorkId = null }) => {
       }
 
       message.success('Работа сохранена');
-      await loadWorks();
+      setDirty(false);
       await loadWorkDetails(currentWork.id);
     } catch (error) {
       console.error('Error saving work:', error);
@@ -241,204 +182,47 @@ const WorkEditorPage = ({ initialWorkId = null }) => {
       }
 
       message.success('Работа сохранена как новая');
-      await loadWorks();
-      setSelectedWorkId(newWork.id);
+      setDirty(false);
+      navigate(`/app/works/${newWork.id}/edit`);
     } catch (error) {
       console.error('Error saving work as new:', error);
       message.error('Ошибка при сохранении работы');
     }
   };
 
-  // ---- Левая панель: список работ ----
-  const leftPanel = (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {/* Шапка */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, letterSpacing: '-0.02em', margin: 0, color: 'var(--ink)' }}>
-          Работы{' '}
-          <span style={{ color: 'var(--ink-4)', fontWeight: 400, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-            · {works.length}
-          </span>
-        </h2>
-        <Button
-          type="text"
-          size="small"
-          icon={<ReloadOutlined />}
-          onClick={loadWorks}
-          loading={loadingWorks}
-        />
+  if (workLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 }}>
+        <Spin size="large" />
       </div>
-
-      {/* Фильтры */}
-      <div style={{ position: 'relative', marginBottom: 8 }}>
-        <Input.Search
-          placeholder="Поиск по названию"
-          allowClear
-          onSearch={(value) => setFilters(prev => ({ ...prev, search: value }))}
-          onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-        />
-      </div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <Select
-          value={filters.status}
-          onChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-          style={{ flex: 1 }}
-        >
-          <Option value="active">Активные</Option>
-          <Option value="archived">Архив</Option>
-        </Select>
-        <Select
-          allowClear
-          placeholder="Все темы"
-          value={filters.topic}
-          onChange={(value) => setFilters(prev => ({ ...prev, topic: value || null }))}
-          showSearch
-          optionFilterProp="children"
-          style={{ flex: 1 }}
-        >
-          {topics.map(topic => (
-            <Option key={topic.id} value={topic.id}>
-              {topic.ege_number ? `№${topic.ege_number} — ` : ''}{topic.title}
-            </Option>
-          ))}
-        </Select>
-      </div>
-
-      {/* Список работ */}
-      <div style={{ flex: 1, overflow: 'auto', margin: '0 -4px', padding: '0 4px 12px' }}>
-        {loadingWorks ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-            <Spin />
-          </div>
-        ) : works.length === 0 ? (
-          <Empty description="Работ нет" style={{ padding: 24 }} />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {works.map(work => {
-              const isSelected = selectedWorkId === work.id;
-              const stats = workStats[work.id] || {};
-              const avg = stats.avgScore;
-              const topic = work.expand?.topic;
-              const kind = topic?.title || '';
-              const tint = topicTint(kind);
-
-              return (
-                <div
-                  key={work.id}
-                  onClick={() => setSelectedWorkId(work.id)}
-                  style={{
-                    padding: 12,
-                    border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--rule)'}`,
-                    borderRadius: 'var(--radius)',
-                    background: isSelected ? 'var(--accent-soft)' : 'var(--bg-raised)',
-                    cursor: 'pointer',
-                    transition: 'border-color .12s, background .12s',
-                  }}
-                  onMouseEnter={e => {
-                    if (!isSelected) e.currentTarget.style.borderColor = 'var(--ink-3)';
-                  }}
-                  onMouseLeave={e => {
-                    if (!isSelected) e.currentTarget.style.borderColor = 'var(--rule)';
-                  }}
-                >
-                  {/* Заголовок + chip */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontWeight: 600,
-                        fontSize: 13.5,
-                        color: 'var(--ink)',
-                        lineHeight: 1.3,
-                        marginBottom: 2,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {work.title || 'Без названия'}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-4)', fontFamily: 'var(--font-mono)' }}>
-                        {new Date(work.created).toLocaleDateString('ru-RU')}
-                      </div>
-                    </div>
-                    {kind && <Chip tint={tint}>{kind}</Chip>}
-                    {work.archived && <Chip tint="rose">архив</Chip>}
-                  </div>
-
-                  {/* Мини-статистика */}
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 1fr',
-                    gap: 6,
-                    paddingTop: 8,
-                    borderTop: `1px solid ${isSelected ? 'var(--accent)' : 'var(--rule-soft)'}`,
-                  }}>
-                    <StatMini label="сессий" value={stats.sessions ?? 0} />
-                    <StatMini label="попыток" value={stats.attempts ?? 0} />
-                    <StatMini
-                      label="средний"
-                      value={avg != null ? `${avg}%` : '—'}
-                      good={avg != null && avg >= 80}
-                      warn={avg != null && avg < 70 && avg >= 40}
-                      danger={avg != null && avg < 40}
-                    />
-                  </div>
-
-                  {/* Кнопки действий */}
-                  <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-                    <Button
-                      size="small"
-                      style={{ flex: 1 }}
-                      onClick={(e) => { e.stopPropagation(); setSelectedWorkId(work.id); }}
-                    >
-                      Открыть
-                    </Button>
-                    <Button
-                      size="small"
-                      icon={<InboxOutlined />}
-                      onClick={(e) => { e.stopPropagation(); handleArchiveToggle(work); }}
-                    >
-                      {work.archived ? 'Вернуть' : 'Архив'}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-  // ---- Правая панель: редактор ----
-  const rightPanel = workLoading ? (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-      <Spin size="large" />
-    </div>
-  ) : (
-    <WorkEditor
-      work={currentWork}
-      variants={variants}
-      setVariants={setVariants}
-      onSave={handleSave}
-      onSaveAsNew={handleSaveAsNew}
-      hasAttempts={attemptCount > 0}
-      attemptCount={attemptCount}
-      sessionId={sessionId}
-      topics={topics}
-      tags={tags}
-      subtopics={subtopics}
-      years={years}
-      sources={sources}
-    />
-  );
+    );
+  }
 
   return (
-    <SplitLayout
-      left={leftPanel}
-      right={rightPanel}
-      leftWidth={320}
-      gap={20}
-    />
+    <div>
+      <div style={{ marginBottom: 12 }}>
+        <Button icon={<ArrowLeftOutlined />} onClick={goToList}>
+          К списку работ
+        </Button>
+      </div>
+      <WorkEditor
+        work={currentWork}
+        variants={variants}
+        setVariants={setVariantsDirty}
+        onSave={handleSave}
+        onSaveAsNew={handleSaveAsNew}
+        hasAttempts={attemptCount > 0}
+        attemptCount={attemptCount}
+        sessions={sessions}
+        dirty={dirty}
+        onDirty={markDirty}
+        topics={topics}
+        tags={tags}
+        subtopics={subtopics}
+        years={years}
+        sources={sources}
+      />
+    </div>
   );
 };
 

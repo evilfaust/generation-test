@@ -39,11 +39,18 @@ sudo docker exec pb-files pocketbase superuser upsert <EMAIL> <PASS> --dir /pb_d
 ```bash
 PB_URL=http://127.0.0.1:8091 SU_EMAIL=<админ> SU_PASS=<пароль> ./bootstrap-materials.sh
 PB_URL=http://127.0.0.1:8091 SU_EMAIL=<админ> SU_PASS=<пароль> USER_EMAIL=<email> ./bootstrap-users-auth.sh
+PB_URL=http://127.0.0.1:8091 SU_EMAIL=<админ> SU_PASS=<пароль> ./bootstrap-folders.sh   # папки (v3.9.72)
 ```
 
 - **`materials`** (base) — файлы: `title, file (≤500MB), original_name, category
   (textbook|worksheet|generated|methodical|reference|other), subject, tags, size,
-  mime, lesson_ids, note_ids, description`. Read публичный, write — логин `users`.
+  mime, lesson_ids, note_ids, description, folder→folders (опц.)`. Read публичный,
+  write — логин `users`.
+- **`folders`** (base, v3.9.72, `bootstrap-folders.sh`) — иерархия папок Библиотеки:
+  `name, parent→folders (self-relation, опц.)`. Явный id коллекции `pbcfilesfolders`.
+  Read публичный, write — логин `users`. Удаление папки: PB вычищает ссылки →
+  подпапки и файлы оказываются в корне. Фронт работает и БЕЗ этой коллекции
+  (listFolders → 404 → null → UI прячет папки).
 - **`users`** (auth) — логин фронта (identity=email, токен 60 дней). Запись в
   `materials` закрыта под него. Управление юзерами — только суперюзер.
 

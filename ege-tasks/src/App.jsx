@@ -307,7 +307,6 @@ const MENU_KEY_PATH = {
   marathon:                 R.MARATHON,
   crossword:                R.CROSSWORD,
   'work-manager':           R.WORKS,
-  'work-editor':            '/app/works/new/edit',
   students:                 R.STUDENTS,
   heatmap:                  R.STUDENTS_HEATMAP,
   achievements:             R.ACHIEVEMENTS,
@@ -630,7 +629,6 @@ function AppLayout() {
       ],
     },
     { key: 'work-manager', icon: <SolutionOutlined />, label: 'Мои работы', section: 'works' },
-    { key: 'work-editor',  icon: <EditOutlined />,     label: 'Редактор работ', section: 'works', editOnly: true },
     {
       key: 'students-group', icon: <TeamOutlined />, label: 'Ученики', section: 'students',
       children: [

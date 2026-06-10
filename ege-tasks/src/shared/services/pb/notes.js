@@ -13,6 +13,20 @@ export const notesApi = {
     }
   },
 
+  // Заметка урока, если есть (read-only, БЕЗ создания) — для модалки календаря.
+  async getLessonNote(lessonId) {
+    try {
+      const found = await pb.collection('teacher_notes').getFullList({
+        filter: `lesson = "${escapeFilter(lessonId)}"`,
+        sort: '-updated',
+      });
+      return found[0] || null;
+    } catch (error) {
+      console.error('Error fetching lesson note:', error);
+      return null;
+    }
+  },
+
   // Найти или создать заметку урока (связь lesson + копия группы/даты урока).
   async getOrCreateLessonNote(lesson) {
     try {

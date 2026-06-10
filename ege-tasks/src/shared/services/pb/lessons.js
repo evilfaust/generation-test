@@ -71,6 +71,22 @@ export const lessonsApi = {
     }
   },
 
+  // Уроки, к которым прикреплён материал (работа или файл) — поиск по json-полю
+  // materials (~ ищет подстроку id в сериализованном json).
+  async getLessonsByMaterialId(materialId) {
+    try {
+      if (!materialId) return [];
+      return await pb.collection('lessons').getFullList({
+        filter: `materials ~ "${escapeFilter(materialId)}"`,
+        sort: '-date_plan',
+        expand: 'group',
+      });
+    } catch (error) {
+      console.error('Error fetching lessons by material:', error);
+      return [];
+    }
+  },
+
   // Сессии выдачи с дедлайном — для событий календаря (дедлайны выдач).
   async getSessionsWithDeadline() {
     try {
