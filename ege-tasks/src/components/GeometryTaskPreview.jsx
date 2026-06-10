@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Input, Segmented, Space, Switch, Tag, Typography } from 'antd';
+import { App, Button, Input, Segmented, Select, Space, Switch, Tag, Typography } from 'antd';
 import { ArrowLeftOutlined, PrinterOutlined, UndoOutlined } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
 import MathRenderer from './MathRenderer';
@@ -9,7 +9,7 @@ import './GeometryTaskPreview.css';
 const { Text } = Typography;
 
 const MODE_OPTIONS = [
-  { label: 'Печать A5 (6)', value: 'print' },
+  { label: 'Печать', value: 'print' },
   { label: 'Вид ученика', value: 'student' },
 ];
 const DRAWING_OPTIONS = [
@@ -20,6 +20,47 @@ export const PRINT_TASKS_PER_PAGE = 6;
 // A5 sheet 148x210mm with 5mm paddings -> content 138x200mm.
 // Grid is 2x3, so one cell is 69 x (200/3) mm.
 export const PRINT_CELL_ASPECT_RATIO = 69 / (200 / 3);
+
+// Габариты листов (мм) для печати «Просмотра».
+const PAGE_DIMS = {
+  A5: { w: 148, h: 210 },
+  A4: { w: 210, h: 297 },
+};
+
+// Раскладки печати: формат листа + сетка задач (cols×rows).
+// fontK подгоняет mm-шрифт условия под размер ячейки — чем крупнее ячейка,
+// тем крупнее текст (учитель всё равно может донастроить макет каждой задачи).
+const PRINT_LAYOUTS = [
+  { id: 'a5-6', label: 'A5 · 6 (2×3)', page: 'A5', cols: 2, rows: 3, fontK: 1 },
+  { id: 'a5-4', label: 'A5 · 4 (2×2)', page: 'A5', cols: 2, rows: 2, fontK: 1.18 },
+  { id: 'a5-2', label: 'A5 · 2 (1×2)', page: 'A5', cols: 1, rows: 2, fontK: 1.45 },
+  { id: 'a4-9', label: 'A4 · 9 (3×3)', page: 'A4', cols: 3, rows: 3, fontK: 1 },
+  { id: 'a4-8', label: 'A4 · 8 (2×4)', page: 'A4', cols: 2, rows: 4, fontK: 1.2 },
+  { id: 'a4-6', label: 'A4 · 6 (2×3)', page: 'A4', cols: 2, rows: 3, fontK: 1.42 },
+  { id: 'a4-4', label: 'A4 · 4 (2×2)', page: 'A4', cols: 2, rows: 2, fontK: 1.7 },
+];
+
+const DEFAULT_PRINT_LAYOUT_ID = 'a5-6';
+
+const getPrintLayout = (id) => PRINT_LAYOUTS.find((l) => l.id === id) || PRINT_LAYOUTS[0];
+
+// Сохранённый лист хранит page_size + tasks_per_page → подбираем раскладку.
+const matchPrintLayout = (printTest) => {
+  if (!printTest) return DEFAULT_PRINT_LAYOUT_ID;
+  const page = String(printTest.page_size || 'A5').toUpperCase();
+  const per = Number(printTest.tasks_per_page) || 6;
+  const found = PRINT_LAYOUTS.find((l) => l.page === page && l.cols * l.rows === per);
+  return found?.id || DEFAULT_PRINT_LAYOUT_ID;
+};
+
+// Кол-во линий клетки 5 мм под размер ячейки раскладки. Считаем точно по
+// габаритам ячейки — лишние линии при печати масштабируют страницу (см. CLAUDE.md).
+const getGridLines = (layout) => {
+  const dims = PAGE_DIMS[layout.page] || PAGE_DIMS.A5;
+  const cellW = (dims.w - 10) / layout.cols;
+  const cellH = (dims.h - 10) / layout.rows;
+  return { vLines: Math.ceil(cellW / 5), hLines: Math.ceil(cellH / 5) };
+};
 
 /** URL изображения задачи: файловое поле → legacy base64 → пусто */
 function getTaskImageSrc(task) {
@@ -120,6 +161,10 @@ export function GeometryPreviewCard({
   onDrop,
   onDragEnd,
   highlightDrop = false,
+  hLines = 15,
+  vLines = 15,
+  fontK = 1,
+  showGrid = true,
 }) {
   // Приоритет: файловое поле (drawing_image) → legacy base64 → пусто
   const imageValue = getTaskImageSrc(task);
@@ -218,9 +263,9 @@ export function GeometryPreviewCard({
   }, [editable, handlePointerMove, isPlaceholder, layout, stopInteraction]);
 
   const textFontSize = useMemo(() => {
-    if (mode === 'print') return `${(2.05 * layout.text.fontScale).toFixed(2)}mm`;
+    if (mode === 'print') return `${(2.05 * fontK * layout.text.fontScale).toFixed(2)}mm`;
     return `${Math.round(17 * layout.text.fontScale)}px`;
-  }, [layout.text.fontScale, mode]);
+  }, [layout.text.fontScale, mode, fontK]);
 
   return (
     <article
@@ -241,29 +286,32 @@ export function GeometryPreviewCard({
         ref={stageRef}
         className={`geometry-preview-stage ${editable ? 'is-editing' : ''}`}
       >
-        {/* Клетка 5 мм — div-линии с физическими mm/pt-единицами → нативные векторы в PDF */}
-        {Array.from({ length: 15 }, (_, i) => (
-          <div key={`gh-${i}`} className="geo-preview-h-line" style={{ top: `${(i + 1) * 5}mm` }} />
-        ))}
-        {Array.from({ length: 15 }, (_, i) => (
-          <div key={`gv-${i}`} className="geo-preview-v-line" style={{ left: `${(i + 1) * 5}mm` }} />
-        ))}
+        {/* Клетка 5 мм — div-линии с физическими mm/pt-единицами → нативные векторы в PDF.
+            Кол-во линий считается точно под ячейку раскладки (hLines/vLines). */}
+        {showGrid && (
+          <>
+            {Array.from({ length: hLines }, (_, i) => (
+              <div key={`gh-${i}`} className="geo-preview-h-line" style={{ top: `${(i + 1) * 5}mm` }} />
+            ))}
+            {Array.from({ length: vLines }, (_, i) => (
+              <div key={`gv-${i}`} className="geo-preview-v-line" style={{ left: `${(i + 1) * 5}mm` }} />
+            ))}
+          </>
+        )}
 
         <div
           className={`geometry-preview-layer geometry-preview-layer-image ${editable ? 'editable' : ''}`}
           style={toLayerStyle(layout.image, 1)}
           onPointerDown={(e) => startInteraction(e, 'image', 'move')}
         >
-          {isPlaceholder ? null : showImage && imageValue ? (
+          {!isPlaceholder && showImage && imageValue ? (
             <img
               className="geometry-preview-image"
               src={imageValue}
               alt={`Чертёж ${task.code || index + 1}`}
               draggable={false}
             />
-          ) : (
-            <div className="geometry-preview-drawing-placeholder">Чертёж не задан</div>
-          )}
+          ) : null}
 
           {editable && !isPlaceholder && (
             <>
@@ -326,7 +374,9 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
   const [orderedTasks, setOrderedTasks] = useState(tasks);
   const [mode, setMode] = useState('print');
   const [showAnswers, setShowAnswers] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   const [drawingMode, setDrawingMode] = useState('task');
+  const [printLayoutId, setPrintLayoutId] = useState(() => matchPrintLayout(initialPrintTest));
   const [layoutEdit, setLayoutEdit] = useState(false);
   const [layoutOverrides, setLayoutOverrides] = useState({ print: {}, student: {} });
   const [savingLayout, setSavingLayout] = useState(false);
@@ -362,14 +412,24 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
   layoutOverridesRef.current = layoutOverrides;
   taskLayoutsRef.current = taskLayouts;
 
-  // Задаём формат страницы A5 при печати и убираем при демонтировании,
+  // ── Выбранная раскладка печати: формат листа + сетка ───────────────────────
+  const printLayout = getPrintLayout(printLayoutId);
+  const perPage = printLayout.cols * printLayout.rows;
+  const pageDims = PAGE_DIMS[printLayout.page] || PAGE_DIMS.A5;
+  const gridLines = useMemo(() => getGridLines(printLayout), [printLayout]);
+  const gridTemplate = {
+    gridTemplateColumns: `repeat(${printLayout.cols}, 1fr)`,
+    gridTemplateRows: `repeat(${printLayout.rows}, 1fr)`,
+  };
+
+  // Задаём формат страницы (A5/A4) при печати и убираем при демонтировании,
   // чтобы не ломать @page других разделов приложения.
   useEffect(() => {
     const style = document.createElement('style');
-    style.textContent = '@page { size: A5 portrait; margin: 0; }';
+    style.textContent = `@page { size: ${printLayout.page} portrait; margin: 0; }`;
     document.head.appendChild(style);
     return () => style.remove();
-  }, []);
+  }, [printLayout.page]);
 
   // Автосохранение layoutOverrides в БД после 800мс без изменений
   const scheduleAutosave = useCallback((currentMode) => {
@@ -388,12 +448,16 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
       for (const [taskKey, layoutForMode] of entries) {
         const task = allTasks.find((t, idx) => (t?.id || t?.code || `slot-${idx}`) === taskKey);
         if (!task?.id) continue;
+        const existing = safeParseLayout(currentTaskLayouts[taskKey]) || {};
+        const nextNorm = normalizeLayout(layoutForMode, currentMode);
+        // Уже сохранено — не дёргаем БД повторно (оверрайды не очищаем, так что
+        // одни и те же значения иначе переписывались бы при каждом движении).
+        if (JSON.stringify(existing[currentMode]) === JSON.stringify(nextNorm)) {
+          okCount += 1;
+          continue;
+        }
         try {
-          const existing = safeParseLayout(currentTaskLayouts[taskKey]) || {};
-          const nextPreviewLayout = {
-            ...existing,
-            [currentMode]: normalizeLayout(layoutForMode, currentMode),
-          };
+          const nextPreviewLayout = { ...existing, [currentMode]: nextNorm };
           await api.updateGeometryTask(task.id, { preview_layout: nextPreviewLayout });
           okCount += 1;
         } catch {
@@ -402,6 +466,9 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
       }
 
       if (okCount > 0) {
+        // Синхронизируем «сохранённый» макет, НО оверрайды НЕ очищаем — они
+        // остаются живым источником истины редактора до конца сессии правки.
+        // Очистка во время жеста сбрасывала макет на снапшот/дефолт (баг «слетает»).
         setTaskLayouts((prev) => {
           const next = { ...prev };
           entries.forEach(([taskKey, layoutForMode]) => {
@@ -413,7 +480,6 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
           });
           return next;
         });
-        setLayoutOverrides((prev) => ({ ...prev, [currentMode]: {} }));
         setAutosaveStatus('saved');
         setTimeout(() => setAutosaveStatus((s) => (s === 'saved' ? null : s)), 3000);
       } else if (failCount > 0) {
@@ -428,6 +494,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
     setCurrentPrintTest(initialPrintTest || null);
     setHeaderTopic(initialPrintTest?.sheet_topic || '');
     setHeaderSubtopic(initialPrintTest?.sheet_subtopic || '');
+    if (initialPrintTest) setPrintLayoutId(matchPrintLayout(initialPrintTest));
   }, [initialPrintTest]);
 
   useEffect(() => {
@@ -444,13 +511,13 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
 
   const printPages = useMemo(() => {
     const pages = [];
-    for (let i = 0; i < orderedTasks.length; i += PRINT_TASKS_PER_PAGE) {
-      pages.push(orderedTasks.slice(i, i + PRINT_TASKS_PER_PAGE));
+    for (let i = 0; i < orderedTasks.length; i += perPage) {
+      pages.push(orderedTasks.slice(i, i + perPage));
     }
     if (pages.length === 0) pages.push([]);
     return pages.map((pageTasks) =>
-      Array.from({ length: PRINT_TASKS_PER_PAGE }, (_, i) => pageTasks[i] || null));
-  }, [orderedTasks]);
+      Array.from({ length: perPage }, (_, i) => pageTasks[i] || null));
+  }, [orderedTasks, perPage]);
   const visibleTasks = mode === 'print' ? printPages.flat() : orderedTasks;
   const pendingCount = Object.keys(layoutOverrides[mode] || {}).length;
   const snapshotLayouts = useMemo(() => {
@@ -471,7 +538,15 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
 
   const handleLayoutChange = useCallback((taskKey, layerName, patch) => {
     setLayoutOverrides((prev) => {
-      const currentTaskLayout = normalizeLayout(prev[mode]?.[taskKey], mode);
+      // База первой правки — текущий ОТОБРАЖАЕМЫЙ макет (оверрайд → снапшот листа →
+      // сохранённый → дефолт), а не дефолт. Иначе частичный патч ресайза/перемещения
+      // сбрасывал остальные поля слоя на дефолт (баг «слетает при первом движении»).
+      let base = prev[mode]?.[taskKey];
+      if (!base) {
+        if (mode === 'print' && snapshotLayouts[taskKey]) base = snapshotLayouts[taskKey];
+        else base = taskLayouts[taskKey]?.[mode];
+      }
+      const currentTaskLayout = normalizeLayout(base, mode);
       const nextTaskLayout = normalizeLayout({
         ...currentTaskLayout,
         [layerName]: {
@@ -488,7 +563,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
       };
     });
     scheduleAutosave(mode);
-  }, [mode, scheduleAutosave]);
+  }, [mode, scheduleAutosave, snapshotLayouts, taskLayouts]);
 
   const resetLayout = useCallback(() => {
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -536,7 +611,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
           });
           return next;
         });
-        setLayoutOverrides((prev) => ({ ...prev, [mode]: {} }));
+        // Оверрайды НЕ очищаем (см. scheduleAutosave) — иначе макет слетает на снапшот.
       }
       if (okCount > 0 && failCount === 0) {
         message.success(`Макет сохранён для ${okCount} задач`);
@@ -552,16 +627,16 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
 
   const handleSaveAsPrintTest = useCallback(async (values) => {
     const printTasks = orderedTasks.filter(Boolean);
-    if (printTasks.length !== 6) {
-      message.error('Для печатного теста нужно ровно 6 задач на листе A5');
+    if (printTasks.length !== perPage) {
+      message.error(`Для листа ${printLayout.page} нужно ровно ${perPage} задач`);
       return;
     }
     const title = String(values?.title || '').trim();
     if (!title) return;
 
     const taskIds = printTasks.map((t) => t.id).filter(Boolean);
-    if (taskIds.length !== 6) {
-      message.error('Не удалось определить id всех 6 задач');
+    if (taskIds.length !== perPage) {
+      message.error(`Не удалось определить id всех ${perPage} задач`);
       return;
     }
 
@@ -586,8 +661,8 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
         tasks: taskIds,
         task_order: taskIds,
         layout_snapshot: layoutSnapshot,
-        page_size: 'A5',
-        tasks_per_page: 6,
+        page_size: printLayout.page,
+        tasks_per_page: perPage,
       };
 
       let saved;
@@ -608,7 +683,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
     } finally {
       setSavingPrintTest(false);
     }
-  }, [currentPrintTest, getTaskLayout, layoutOverrides.print, orderedTasks]);
+  }, [currentPrintTest, getTaskLayout, layoutOverrides.print, orderedTasks, perPage, printLayout.page]);
 
   const reorderTasks = useCallback((fromIndex, toIndex) => {
     if (fromIndex === null || toIndex === null || fromIndex === toIndex) return;
@@ -623,7 +698,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
     });
   }, []);
 
-  const handlePrintA5 = useCallback(() => {
+  const handlePrint = useCallback(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
     const styleId = 'geometry-print-page-size';
@@ -631,7 +706,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
 
     const style = document.createElement('style');
     style.id = styleId;
-    style.textContent = '@media print { @page { size: A5 portrait; margin: 0; } }';
+    style.textContent = `@media print { @page { size: ${printLayout.page} portrait; margin: 0; } }`;
     document.head.appendChild(style);
 
     const cleanup = () => {
@@ -641,7 +716,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
 
     window.addEventListener('afterprint', cleanup, { once: true });
     window.print();
-  }, []);
+  }, [printLayout.page]);
 
   return (
     <div className="geometry-preview-root">
@@ -668,14 +743,29 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
             <Switch checked={showAnswers} onChange={setShowAnswers} />
             <Text>Показывать ответы</Text>
           </Space>
-          {mode === 'print' && <Tag>A5: {PRINT_TASKS_PER_PAGE} задач на лист · Листов: {printPages.length}</Tag>}
+          <Space size={8}>
+            <Switch checked={showGrid} onChange={setShowGrid} />
+            <Text>Клетка</Text>
+          </Space>
+          {mode === 'print' && (
+            <Space size={8}>
+              <Text>Раскладка</Text>
+              <Select
+                value={printLayoutId}
+                onChange={setPrintLayoutId}
+                options={PRINT_LAYOUTS.map((l) => ({ value: l.id, label: l.label }))}
+                style={{ width: 150 }}
+              />
+              <Tag>Задач/лист: {perPage} · Листов: {printPages.length}</Tag>
+            </Space>
+          )}
         </Space>
         <Space>
           <Button
             onClick={() => setSaveModalVisible(true)}
             disabled={mode !== 'print'}
           >
-            {currentPrintTest?.id ? 'Обновить лист A5' : 'Сохранить лист A5'}
+            {currentPrintTest?.id ? 'Обновить лист' : 'Сохранить лист'}
           </Button>
           {autosaveStatus === 'saving' && <Tag color="processing">Сохранение макета…</Tag>}
           {autosaveStatus === 'saved' && <Tag color="success">Макет сохранён ✓</Tag>}
@@ -689,7 +779,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
               Сохранить макет{pendingCount > 0 ? ` (${pendingCount})` : ''}
             </Button>
           )}
-          <Button icon={<PrinterOutlined />} onClick={handlePrintA5}>
+          <Button icon={<PrinterOutlined />} onClick={handlePrint}>
             Печать
           </Button>
         </Space>
@@ -717,7 +807,11 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
       {mode === 'print' ? (
         <div className="geometry-preview-pages">
           {printPages.map((pageTasks, pageIndex) => (
-            <div className="geometry-preview-sheet a5" key={`page-${pageIndex + 1}`}>
+            <div
+              className="geometry-preview-sheet is-print"
+              key={`page-${pageIndex + 1}`}
+              style={{ width: `${pageDims.w}mm`, height: `${pageDims.h}mm`, padding: '5mm' }}
+            >
               {(headerTopic || headerSubtopic) && (
                 <div className="geometry-preview-sheet-header">
                   {headerTopic && (
@@ -728,9 +822,9 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
                   )}
                 </div>
               )}
-              <div className="geometry-preview-grid a5">
+              <div className="geometry-preview-grid is-print" style={gridTemplate}>
                 {pageTasks.map((task, idx) => {
-                  const globalIndex = pageIndex * PRINT_TASKS_PER_PAGE + idx;
+                  const globalIndex = pageIndex * perPage + idx;
                   const taskKey = task?.id || task?.code || `slot-${pageIndex}-${idx}`;
                   const layout = getTaskLayout(task, globalIndex);
                   return (
@@ -744,6 +838,10 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
                       drawingMode={drawingMode}
                       editable={layoutEdit}
                       layout={layout}
+                      hLines={gridLines.hLines}
+                      vLines={gridLines.vLines}
+                      fontK={printLayout.fontK}
+                      showGrid={showGrid}
                       onLayoutChange={(layerName, patch) => handleLayoutChange(taskKey, layerName, patch)}
                       draggable={!layoutEdit && !!task}
                       onDragStart={!layoutEdit && !!task ? () => setDragTaskIndex(globalIndex) : undefined}
@@ -788,6 +886,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
                   drawingMode={drawingMode}
                   editable={layoutEdit}
                   layout={layout}
+                  showGrid={showGrid}
                   onLayoutChange={(layerName, patch) => handleLayoutChange(taskKey, layerName, patch)}
                   draggable={!layoutEdit && !!task}
                   onDragStart={!layoutEdit && !!task ? () => setDragTaskIndex(idx) : undefined}
@@ -820,10 +919,10 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
         onSave={handleSaveAsPrintTest}
         saving={savingPrintTest}
         isUpdate={!!currentPrintTest?.id}
-        tasksCount={PRINT_TASKS_PER_PAGE}
+        tasksCount={perPage}
         initialTitle={
           currentPrintTest?.title
-            || `Геометрия A5 · ${new Date().toLocaleDateString('ru-RU')}`
+            || `Геометрия ${printLayout.page} · ${new Date().toLocaleDateString('ru-RU')}`
         }
         initialSheetTopic={headerTopic}
         initialSheetSubtopic={headerSubtopic}

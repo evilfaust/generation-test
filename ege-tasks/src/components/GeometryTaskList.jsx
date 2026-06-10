@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Input,
   Modal,
   Pagination,
   Popconfirm,
@@ -31,6 +32,7 @@ import {
   LoadingOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SearchOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
@@ -46,6 +48,10 @@ import './GeometryTaskPreview.css';
 
 const { Text } = Typography;
 
+// Условие для превью карточки: убираем картинки (чертёж показываем отдельно),
+// чтобы внутри сниппета не дублировался рисунок и не распухал текст.
+const stripStatementImages = (md = '') => String(md).replace(/!\[[^\]]*\]\([^)]*\)/g, '').trim();
+
 
 export default function GeometryTaskList() {
   const { message } = App.useApp();
@@ -54,8 +60,10 @@ export default function GeometryTaskList() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({});
+  const [searchInput, setSearchInput] = useState('');
   const [geoTopics, setGeoTopics] = useState([]);
   const [geoSubtopics, setGeoSubtopics] = useState([]);
+  const [geoSources, setGeoSources] = useState([]);
 
   // Редактор: null = скрыт, объект = редактирование, 'new' = создание
   const [editingTask, setEditingTask] = useState(null);
@@ -103,13 +111,26 @@ export default function GeometryTaskList() {
 
   // Загружаем справочники один раз
   useEffect(() => {
-    Promise.all([api.getGeometryTopics(), api.getGeometrySubtopics()])
-      .then(([topics, subtopics]) => {
+    Promise.all([api.getGeometryTopics(), api.getGeometrySubtopics(), api.getGeometrySources()])
+      .then(([topics, subtopics, sources]) => {
         setGeoTopics(topics);
         setGeoSubtopics(subtopics);
+        setGeoSources(sources);
       })
       .catch(() => {});
   }, []);
+
+  // Debounce поля поиска → filters.search (API ищет по code/title/условию/ответу/источнику)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((f) => {
+        const next = searchInput.trim();
+        if ((f.search || '') === next) return f;
+        return { ...f, search: next || undefined };
+      });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -456,56 +477,83 @@ export default function GeometryTaskList() {
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {/* ── Панель фильтров ────────────────────────────────────────────── */}
       <Card size="small">
-        <Space wrap>
-          <Select
-            placeholder="Тема"
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Input
             allowClear
-            style={{ width: 200 }}
-            value={filters.topic}
-            onChange={(v) => setFilters((f) => ({ ...f, topic: v, subtopic: undefined }))}
-            options={geoTopics.map((t) => ({ value: t.id, label: t.title }))}
+            size="large"
+            prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+            placeholder="Поиск по коду, названию, условию, ответу или источнику…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
-          <Select
-            placeholder="Подтема"
-            allowClear
-            style={{ width: 220 }}
-            value={filters.subtopic}
-            onChange={(v) => setFilters((f) => ({ ...f, subtopic: v }))}
-            options={(filters.topic
-              ? geoSubtopics.filter((s) => s.topic === filters.topic)
-              : geoSubtopics
-            ).map((s) => ({ value: s.id, label: s.title }))}
-          />
-          <Select
-            placeholder="Сложность"
-            allowClear
-            style={{ width: 130 }}
-            value={filters.difficulty}
-            onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
-            options={[
-              { value: '1', label: '1 — Базовый' },
-              { value: '2', label: '2 — Средний' },
-              { value: '3', label: '3 — Повышенный' },
-              { value: '4', label: '4 — Высокий' },
-              { value: '5', label: '5 — Олимпиадный' },
-            ]}
-          />
-          <Button
-            onClick={() => setFilters({})}
-            disabled={!Object.keys(filters).some((k) => filters[k])}
-          >
-            Сбросить
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={loadTasks} loading={loading}>
-            Обновить
-          </Button>
+          <Space wrap>
+            <Select
+              placeholder="Тема"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ width: 200 }}
+              value={filters.topic}
+              onChange={(v) => setFilters((f) => ({ ...f, topic: v, subtopic: undefined }))}
+              options={geoTopics.map((t) => ({ value: t.id, label: t.title }))}
+            />
+            <Select
+              placeholder="Подтема"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ width: 220 }}
+              value={filters.subtopic}
+              onChange={(v) => setFilters((f) => ({ ...f, subtopic: v }))}
+              options={(filters.topic
+                ? geoSubtopics.filter((s) => s.topic === filters.topic)
+                : geoSubtopics
+              ).map((s) => ({ value: s.id, label: s.title }))}
+            />
+            <Select
+              placeholder="Сложность"
+              allowClear
+              style={{ width: 150 }}
+              value={filters.difficulty}
+              onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
+              options={[
+                { value: '1', label: '1 — Базовый' },
+                { value: '2', label: '2 — Средний' },
+                { value: '3', label: '3 — Повышенный' },
+                { value: '4', label: '4 — Высокий' },
+                { value: '5', label: '5 — Олимпиадный' },
+              ]}
+            />
+            <Select
+              placeholder="Источник"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              style={{ width: 220 }}
+              value={filters.source}
+              onChange={(v) => setFilters((f) => ({ ...f, source: v }))}
+              options={geoSources.map((s) => ({ value: s, label: s }))}
+              notFoundContent="Источники не заданы"
+            />
+            <Button
+              onClick={() => { setFilters({}); setSearchInput(''); }}
+              disabled={!searchInput && !Object.keys(filters).some((k) => filters[k])}
+            >
+              Сбросить
+            </Button>
+            <Button icon={<ReloadOutlined />} onClick={loadTasks} loading={loading}>
+              Обновить
+            </Button>
+          </Space>
         </Space>
       </Card>
 
       {/* ── Заголовок + кнопка создания ───────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text type="secondary">
-          Всего задач: <strong>{tasks.length}</strong>
+          {(searchInput || Object.keys(filters).some((k) => filters[k]))
+            ? <>Найдено: <strong>{tasks.length}</strong></>
+            : <>Всего задач: <strong>{tasks.length}</strong></>}
         </Text>
         <Space>
           <Segmented
@@ -662,7 +710,7 @@ export default function GeometryTaskList() {
                   )}
                 >
                   <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                    <Space size={8}>
+                    <Space size={4} wrap>
                       {record.difficulty ? (
                         <Tooltip title={DIFFICULTY_LABELS[record.difficulty]}>
                           <Badge
@@ -680,6 +728,12 @@ export default function GeometryTaskList() {
                       ) : (
                         <Tag style={{ margin: 0 }}>Без чертежа</Tag>
                       )}
+                      {record.source && (
+                        <Tag color="blue" style={{ margin: 0, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {record.source}
+                        </Tag>
+                      )}
+                      {record.year && <Tag style={{ margin: 0 }}>{record.year}</Tag>}
                     </Space>
 
                     <div>
@@ -731,6 +785,25 @@ export default function GeometryTaskList() {
                         />
                       </div>
                     ) : null}
+
+                    {stripStatementImages(record.statement_md) && (
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>Условие:</Text>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            lineHeight: 1.45,
+                            maxHeight: 64,
+                            overflow: 'hidden',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                          }}
+                        >
+                          <MathRenderer text={stripStatementImages(record.statement_md)} />
+                        </div>
+                      </div>
+                    )}
 
                     <div>
                       <Text type="secondary" style={{ fontSize: 11 }}>Ответ:</Text>

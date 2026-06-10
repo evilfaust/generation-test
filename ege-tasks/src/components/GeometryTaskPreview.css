@@ -48,6 +48,14 @@
   flex-direction: column;
 }
 
+/* Печатный лист «Просмотра» (A5/A4) — размер/поля задаются inline. */
+.geometry-preview-sheet.is-print {
+  box-sizing: border-box;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
 .geometry-preview-sheet-header {
   text-align: center;
   padding: 3mm 4mm 2mm;
@@ -102,10 +110,29 @@
   overflow: hidden;
 }
 
-.geometry-preview-grid.a5 .geometry-preview-cell {
+.geometry-preview-grid.a5 .geometry-preview-cell,
+.geometry-preview-grid.is-print .geometry-preview-cell {
   min-height: 0;
   padding: 7mm 2mm 1.8mm;
   border-color: #c0c0c0;
+}
+
+/* Печать «Просмотра»: формат листа и сетка задаются inline (cols×rows).
+   Рамку рисуем равномерно вне зависимости от числа колонок:
+   верх+лево — на ячейках, правый+нижний край — на самой сетке. */
+.geometry-preview-grid.is-print {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border-right: 1.5px solid #c0c0c0;
+  border-bottom: 1.5px solid #c0c0c0;
+}
+
+.geometry-preview-grid.is-print .geometry-preview-cell {
+  border-right: 0;
+  border-bottom: 0;
+  border-top: 1.5px solid #c0c0c0;
+  border-left: 1.5px solid #c0c0c0;
 }
 
 .geometry-preview-grid .geometry-preview-cell:nth-child(2n) {
@@ -143,7 +170,8 @@
   z-index: 4;
 }
 
-.geometry-preview-grid.a5 .geometry-preview-number {
+.geometry-preview-grid.a5 .geometry-preview-number,
+.geometry-preview-grid.is-print .geometry-preview-number {
   min-width: 9mm;
   height: 7.5mm;
   font-size: 4.2mm;
@@ -163,7 +191,8 @@
   letter-spacing: 0.3px;
 }
 
-.geometry-preview-grid.a5 .geometry-preview-code {
+.geometry-preview-grid.a5 .geometry-preview-code,
+.geometry-preview-grid.is-print .geometry-preview-code {
   top: 0.8mm;
   right: 1.5mm;
   font-size: 1.7mm;
@@ -202,7 +231,8 @@
   z-index: 0;
 }
 
-.geometry-preview-grid.a5 .geometry-preview-stage {
+.geometry-preview-grid.a5 .geometry-preview-stage,
+.geometry-preview-grid.is-print .geometry-preview-stage {
   min-height: 0;
 }
 
@@ -409,7 +439,8 @@
   padding-top: 6px;
 }
 
-.geometry-preview-grid.a5 .geometry-preview-answer {
+.geometry-preview-grid.a5 .geometry-preview-answer,
+.geometry-preview-grid.is-print .geometry-preview-answer {
   margin-top: 1.6mm;
   font-size: 2.35mm;
   padding-top: 1.2mm;
@@ -489,13 +520,10 @@
     background: #fff;
   }
 
-  .geometry-preview-sheet.a5 {
-    width: 148mm;
-    height: 210mm;
-    min-height: 210mm;
+  .geometry-preview-sheet.is-print {
+    /* width/height/padding приходят inline под выбранный формат (A5/A4) */
     margin: 0 auto;
     border: 0;
-    padding: 5mm;
     box-sizing: border-box;
     box-shadow: none;
     display: flex;
@@ -506,12 +534,12 @@
     gap: 0;
   }
 
-  .geometry-preview-pages .geometry-preview-sheet.a5 {
+  .geometry-preview-pages .geometry-preview-sheet.is-print {
     break-after: page;
     page-break-after: always;
   }
 
-  .geometry-preview-pages .geometry-preview-sheet.a5:last-child {
+  .geometry-preview-pages .geometry-preview-sheet.is-print:last-child {
     break-after: auto;
     page-break-after: auto;
   }
@@ -521,14 +549,13 @@
     print-color-adjust: exact;
   }
 
-  .geometry-preview-grid.a5 {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: repeat(3, 1fr);
+  .geometry-preview-grid.is-print {
+    /* grid-template приходит inline под раскладку (cols×rows) */
     flex: 1;
     min-height: 0;
   }
 
-  .geometry-preview-grid.a5 .geometry-preview-cell {
+  .geometry-preview-grid.is-print .geometry-preview-cell {
     min-height: 0;
     break-inside: avoid;
     page-break-inside: avoid;

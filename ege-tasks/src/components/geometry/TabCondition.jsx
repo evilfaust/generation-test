@@ -1,8 +1,7 @@
-import { useMemo } from 'react';
 import { Card, Form, Input, InputNumber, Select, Space, Typography } from 'antd';
 import MathRenderer from '../MathRenderer';
+import LatexField from '../shared/LatexField';
 
-const { TextArea } = Input;
 const { Text } = Typography;
 
 const DIFFICULTY_OPTIONS = [
@@ -12,7 +11,7 @@ const DIFFICULTY_OPTIONS = [
 ];
 
 export default function TabCondition({
-  form, initialValues, previewStatement, onStatementChange,
+  form, initialValues, fieldMode = 'plain', previewStatement, onStatementChange,
   geoTopics, geoSubtopics, selectedTopicId, onTopicChange,
 }) {
   const filteredSubtopics = selectedTopicId
@@ -72,10 +71,11 @@ export default function TabCondition({
         name="statement_md"
         label="Условие задачи (Markdown + LaTeX)"
       >
-        <TextArea
+        <LatexField
+          mode={fieldMode}
           rows={5}
           placeholder="Дано: $\triangle MEN$, $MN - KL = 6$. Найдите $MN$."
-          onChange={(e) => onStatementChange(e.target.value)}
+          onTextChange={onStatementChange}
         />
       </Form.Item>
 

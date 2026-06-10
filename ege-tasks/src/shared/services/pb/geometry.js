@@ -113,9 +113,12 @@ export const geometryApi = {
       if (filters.difficulty) {
         filterArr.push(`difficulty = ${Number(filters.difficulty)}`);
       }
+      if (filters.source) {
+        filterArr.push(`source = "${escapeFilter(filters.source)}"`);
+      }
       if (filters.search) {
         const s = escapeFilter(filters.search);
-        filterArr.push(`(code ~ "${s}" || title ~ "${s}" || statement_md ~ "${s}")`);
+        filterArr.push(`(code ~ "${s}" || title ~ "${s}" || statement_md ~ "${s}" || answer ~ "${s}" || source ~ "${s}")`);
       }
 
       // Исключаем тяжёлые base64-поля из списка — они перенесены в файловое поле drawing_image.
@@ -139,6 +142,25 @@ export const geometryApi = {
       });
     } catch (error) {
       console.error('Error fetching geometry tasks:', error);
+      return [];
+    }
+  },
+
+  // Уникальные непустые источники из всех задач геометрии — для фильтра по источнику.
+  async getGeometrySources() {
+    try {
+      const rows = await pb.collection('geometry_tasks').getFullList({
+        fields: 'source',
+        sort: 'source',
+      });
+      const set = new Set();
+      for (const r of rows) {
+        const s = (r.source || '').trim();
+        if (s) set.add(s);
+      }
+      return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
+    } catch (error) {
+      console.error('Error fetching geometry sources:', error);
       return [];
     }
   },

@@ -80,11 +80,17 @@ export function buildGeometryColumns({
       render: (_, record) => {
         const topic = record.expand?.topic?.title;
         const subtopic = record.expand?.subtopic?.title;
-        if (!topic && !subtopic) return <Text type="secondary">—</Text>;
+        const sourceLine = [record.source, record.year].filter(Boolean).join(', ');
+        if (!topic && !subtopic && !sourceLine) return <Text type="secondary">—</Text>;
         return (
           <Space direction="vertical" size={0}>
             {topic && <Text style={{ fontSize: 12 }}>{topic}</Text>}
             {subtopic && <Text type="secondary" style={{ fontSize: 11 }}>{subtopic}</Text>}
+            {sourceLine && (
+              <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }} ellipsis={{ tooltip: sourceLine }}>
+                {sourceLine}
+              </Text>
+            )}
           </Space>
         );
       },

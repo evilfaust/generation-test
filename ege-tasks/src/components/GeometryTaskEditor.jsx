@@ -7,11 +7,13 @@ import {
   Space,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import {
   ArrowLeftOutlined,
   DeleteOutlined,
+  HighlightOutlined,
   SaveOutlined,
 } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
@@ -51,6 +53,20 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const isCreate = !task;
+
+  // Расширенный редактор (CodeMirror) для условия и решения — выбор учителя,
+  // запоминается между сессиями. Тот же паттерн, что в TaskEditModal.
+  const [codeEditor, setCodeEditor] = useState(() => {
+    try { return localStorage.getItem('geoEditor.codeMode') === '1'; } catch { return false; }
+  });
+  const toggleCodeEditor = useCallback(() => {
+    setCodeEditor((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('geoEditor.codeMode', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  const fieldMode = codeEditor ? 'code' : 'plain';
 
   // ── Состояние чертежа ─────────────────────────────────────────────────────
   const ggbApiRef = useRef(null);
@@ -331,6 +347,7 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
       children: <TabCondition
         form={form}
         initialValues={initialValues}
+        fieldMode={fieldMode}
         previewStatement={previewStatement}
         onStatementChange={setPreviewStatement}
         geoTopics={geoTopics}
@@ -394,6 +411,7 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
       children: <TabSolution
         form={form}
         initialValues={initialValues}
+        fieldMode={fieldMode}
         previewSolution={previewSolution}
         onSolutionChange={setPreviewSolution}
       />,
@@ -418,6 +436,16 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
           <Title level={4} style={{ margin: 0 }}>
             {isCreate ? 'Новая геометрическая задача' : `Редактирование: ${task.code}`}
           </Title>
+          <Tooltip title="Подсветка LaTeX/markdown, перенос строк и поиск-замена (Ctrl+F / Ctrl+H) для условия и решения">
+            <Button
+              size="small"
+              type={codeEditor ? 'primary' : 'default'}
+              icon={<HighlightOutlined />}
+              onClick={toggleCodeEditor}
+            >
+              {codeEditor ? 'Расширенный редактор: вкл' : 'Расширенный редактор'}
+            </Button>
+          </Tooltip>
         </Space>
 
         <Space>
