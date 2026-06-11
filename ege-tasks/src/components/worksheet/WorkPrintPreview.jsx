@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Button, Card, Radio, Select, Space, Switch, Tooltip } from 'antd';
-import { ArrowLeftOutlined, PrinterOutlined, FilePdfOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PrinterOutlined, FilePdfOutlined, TableOutlined } from '@ant-design/icons';
 import VariantRenderer from './VariantRenderer';
 import AnswersPage from './AnswersPage';
 import { useWorksheetActions } from '../../hooks';
@@ -18,7 +18,7 @@ import './WorkPrintPreview.css';
  * @param {Array} variants - [{ number, tasks }]
  * @param {function} onClose
  */
-export default function WorkPrintPreview({ work, variants = [], onClose }) {
+export default function WorkPrintPreview({ work, variants = [], onClose, onOpenWorksheet }) {
   const printRef = useRef(null);
   const { handlePrint, handleExportPDF, exporting } = useWorksheetActions();
 
@@ -45,6 +45,14 @@ export default function WorkPrintPreview({ work, variants = [], onClose }) {
             Назад к редактору
           </Button>
           <span style={{ fontWeight: 600 }}>{title}</span>
+
+          {onOpenWorksheet && (
+            <Tooltip title="Печать рабочего листа в клетку — поля для решения от руки">
+              <Button icon={<TableOutlined />} onClick={onOpenWorksheet}>
+                Рабочий лист
+              </Button>
+            </Tooltip>
+          )}
 
           <Radio.Group
             size="small"

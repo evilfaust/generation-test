@@ -11,6 +11,7 @@ import TeacherResultsDashboard from './worksheet/TeacherResultsDashboard';
 import WorksheetVectorTools from './worksheet/oral-generator/WorksheetVectorTools';
 import SimilarSwapModal from './worksheet/SimilarSwapModal';
 import WorkPrintPreview from './worksheet/WorkPrintPreview';
+import WorksheetGridPrint from './worksheet/WorksheetGridPrint';
 import WorkLessonLinks from './worksheet/WorkLessonLinks';
 import WorkOverlapWarning from './worksheet/WorkOverlapWarning';
 import { useTaskDragDrop, useTaskEditing } from '../hooks';
@@ -51,6 +52,7 @@ const WorkEditor = ({
   const [movingTaskRef, setMovingTaskRef] = useState(null);
   const [similarRef, setSimilarRef] = useState(null); // { variantIndex, taskIndex, task }
   const [printOpen, setPrintOpen] = useState(false);
+  const [worksheetPrintOpen, setWorksheetPrintOpen] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
   const [resultsSessionId, setResultsSessionId] = useState(null);
 
@@ -258,6 +260,23 @@ const WorkEditor = ({
         <Form form={form} component={false} />
         <Empty description="Работа не найдена. Откройте её из списка «Мои работы»." />
       </Card>
+    );
+  }
+
+  // Режим печати рабочего листа в клетку — отдельная страница (паттерн как в
+  // Генераторе): контент редактора убран из дерева, иначе он ломает абсолютное
+  // позиционирование .wgp-root при печати → пустые листы.
+  if (worksheetPrintOpen) {
+    const wsTitle = work.title || 'Рабочий лист';
+    return (
+      <WorksheetGridPrint
+        pages={variants.map((v) => ({
+          title: wsTitle,
+          label: `Вариант ${v.number}`,
+          tasks: v.tasks || [],
+        }))}
+        onBack={() => setWorksheetPrintOpen(false)}
+      />
     );
   }
 
@@ -640,6 +659,10 @@ const WorkEditor = ({
           work={work}
           variants={variants}
           onClose={() => setPrintOpen(false)}
+          onOpenWorksheet={() => {
+            setPrintOpen(false);
+            setWorksheetPrintOpen(true);
+          }}
         />
       )}
 
