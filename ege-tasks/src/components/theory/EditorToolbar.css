@@ -79,6 +79,18 @@
   gap: 12px;
 }
 
+.theory-image-size {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.theory-image-size__label {
+  font-size: 13px;
+  color: var(--ink-3, #646a76);
+}
+
 .theory-image-insert-preview {
   width: 100%;
   max-height: 150px;

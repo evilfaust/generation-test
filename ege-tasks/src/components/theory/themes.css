@@ -249,3 +249,32 @@
     border-left-color: #9aa0ac;
     background: #f7f7f8;
 }
+
+.theory-preview-content .theory-callout--condition {
+    border-left-color: #475569;
+    background: #f4f6f8;
+}
+.theory-preview-content .theory-callout--condition .theory-callout__label { color: #475569; }
+
+.theory-preview-content .theory-callout--answer {
+    border-left-color: #16a34a;
+    background: #f1faf2;
+}
+.theory-preview-content .theory-callout--answer .theory-callout__label { color: #15803d; }
+
+.theory-preview-content .theory-callout--qed {
+    border-left-color: #9aa0ac;
+    background: #f7f7f8;
+}
+.theory-preview-content .theory-callout--qed .theory-callout__label::after { content: ' ∎'; }
+
+/* ── Размер изображений: S / M / L / XL (через ![alt](url){M}) ── */
+.theory-preview-content img.theory-img {
+    height: auto;
+    display: block;
+    margin: 1.2em auto;
+}
+.theory-preview-content img.theory-img--s  { max-width: 30%; }
+.theory-preview-content img.theory-img--m  { max-width: 50%; }
+.theory-preview-content img.theory-img--l  { max-width: 70%; }
+.theory-preview-content img.theory-img--xl { max-width: 100%; }

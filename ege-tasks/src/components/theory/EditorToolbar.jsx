@@ -24,11 +24,14 @@ function insertIntoEditor(editor, opts) {
 
 // Каллауты теории (тип → подпись по умолчанию)
 const CALLOUTS = [
+  { type: 'condition', label: 'Условие задачи' },
   { type: 'definition', label: 'Определение' },
   { type: 'theorem', label: 'Теорема' },
   { type: 'example', label: 'Пример' },
   { type: 'remark', label: 'Замечание' },
   { type: 'proof', label: 'Доказательство' },
+  { type: 'answer', label: 'Ответ' },
+  { type: 'qed', label: 'Что и требовалось доказать' },
   { type: 'note', label: 'Заметка' },
 ];
 
@@ -38,6 +41,7 @@ export default function EditorToolbar({ editorRef }) {
   const [imageMode, setImageMode] = useState('upload'); // 'upload' | 'url'
   const [imageUrl, setImageUrl] = useState('');
   const [imageAlt, setImageAlt] = useState('');
+  const [imageSize, setImageSize] = useState('M'); // S | M | L | XL — градация размера в превью/печати
   const [localDataUrl, setLocalDataUrl] = useState(null); // выбранный/обрезанный файл (data-url)
   const [localName, setLocalName] = useState('image.png');
   const [uploading, setUploading] = useState(false);
@@ -54,9 +58,10 @@ export default function EditorToolbar({ editorRef }) {
     insertIntoEditor(editorRef.current, { text: tableMarkdown });
   }, [editorRef]);
 
-  const insertImageMd = useCallback((url, altRaw) => {
+  const insertImageMd = useCallback((url, altRaw, size) => {
     const alt = (altRaw || '').trim() || 'Изображение';
-    insertIntoEditor(editorRef.current, { text: `\n![${alt}](${url})\n` });
+    const sizeTag = size ? `{${size}}` : '';
+    insertIntoEditor(editorRef.current, { text: `\n![${alt}](${url})${sizeTag}\n` });
   }, [editorRef]);
 
   const resetImageModal = useCallback(() => {
@@ -87,7 +92,7 @@ export default function EditorToolbar({ editorRef }) {
   const handleImageOk = useCallback(async () => {
     if (imageMode === 'url') {
       if (!imageUrl.trim()) return;
-      insertImageMd(imageUrl.trim(), imageAlt);
+      insertImageMd(imageUrl.trim(), imageAlt, imageSize);
       resetImageModal();
       return;
     }
@@ -105,7 +110,7 @@ export default function EditorToolbar({ editorRef }) {
         category: 'other',
       });
       const url = materialsApi.fileUrl(rec);
-      insertImageMd(url, imageAlt);
+      insertImageMd(url, imageAlt, imageSize);
       message.success('Картинка загружена');
       resetImageModal();
     } catch {
@@ -113,7 +118,7 @@ export default function EditorToolbar({ editorRef }) {
     } finally {
       setUploading(false);
     }
-  }, [imageMode, imageUrl, imageAlt, localDataUrl, localName, insertImageMd, resetImageModal, message]);
+  }, [imageMode, imageUrl, imageAlt, imageSize, localDataUrl, localName, insertImageMd, resetImageModal, message]);
 
   const handleLinkInsert = useCallback(() => {
     if (!linkUrl.trim()) return;
@@ -326,6 +331,21 @@ export default function EditorToolbar({ editorRef }) {
               )}
             </>
           )}
+
+          <div className="theory-image-size">
+            <span className="theory-image-size__label">Размер на странице</span>
+            <Segmented
+              size="small"
+              value={imageSize}
+              onChange={setImageSize}
+              options={[
+                { value: 'S', label: 'S' },
+                { value: 'M', label: 'M' },
+                { value: 'L', label: 'L' },
+                { value: 'XL', label: 'XL' },
+              ]}
+            />
+          </div>
         </div>
       </Modal>
 

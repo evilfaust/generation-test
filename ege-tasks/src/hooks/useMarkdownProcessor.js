@@ -46,11 +46,14 @@ const MARKERS = {
 
 // Каллауты теории: блок ":::definition Заголовок \n тело \n :::"
 const CALLOUT_LABELS = {
+  condition: 'Условие задачи',
   definition: 'Определение',
   theorem: 'Теорема',
   example: 'Пример',
   remark: 'Замечание',
   proof: 'Доказательство',
+  answer: 'Ответ',
+  qed: 'Что и требовалось доказать',
   note: 'Заметка',
 }
 const CALLOUT_OPEN_RE = new RegExp(
@@ -216,6 +219,12 @@ function postprocess(html, columns, geogebraBlocks = [], callouts = []) {
   result = result.replace(
     new RegExp(`<p>\\s*${MARKERS.calloutClose}\\s*</p>|${MARKERS.calloutClose}`, 'g'),
     '</div>',
+  )
+
+  // Размер картинки: ![alt](url){S|M|L|XL} → class на <img>, токен убираем.
+  result = result.replace(
+    /<img\b([^>]*?)\s*\/?>\s*\{(s|m|l|xl)\}/gi,
+    (_, attrs, size) => `<img${attrs} class="theory-img theory-img--${size.toLowerCase()}">`,
   )
 
   const colBreakPattern = `<p>\\s*${MARKERS.colBreak}\\s*</p>|${MARKERS.colBreak}`
