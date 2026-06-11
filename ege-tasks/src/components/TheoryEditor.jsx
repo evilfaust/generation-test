@@ -2,11 +2,11 @@ import React, { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspens
 import { Button, Select, Input, Modal, Spin, InputNumber, Radio, Tag, Space, Tooltip, Badge, Popover, App } from 'antd';
 import {
   SaveOutlined, SettingOutlined,
-  ColumnWidthOutlined, FilePdfOutlined,
+  ColumnWidthOutlined, FilePdfOutlined, PrinterOutlined,
   ArrowLeftOutlined, TagsOutlined, CheckCircleOutlined, NodeIndexOutlined
 } from '@ant-design/icons';
 import { useMarkdownProcessor, useKeyboardShortcuts, useDocumentStats, useAutosave, loadAutosave, useGeoGebraInjection } from '../hooks';
-import { getPageDimensions, DEFAULT_SETTINGS } from '../utils/theoryThemes';
+import { getPageDimensions, DEFAULT_SETTINGS, printWithPageSize } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import EditorToolbar from './theory/EditorToolbar';
@@ -246,6 +246,9 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
     }
   }, [title, pageSettings, message]);
 
+  // Печать прямо из редактора (печатается только лист превью — см. @media print).
+  const handlePrint = useCallback(() => printWithPageSize(pageSettings), [pageSettings]);
+
   // Toggle columns
   const toggleColumns = useCallback(() => {
     setPageSettings(prev => ({ ...prev, columns: prev.columns === 1 ? 2 : 1 }));
@@ -401,7 +404,7 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
         <div className="theory-settings-presets">
           <Button size="small" onClick={() => setPageSettings({
             pageSize: 'A4', orientation: 'portrait', columns: 1,
-            marginTop: 20, marginBottom: 20, marginLeft: 20, marginRight: 20, fontSize: 16
+            marginTop: 12, marginBottom: 12, marginLeft: 10, marginRight: 10, fontSize: 16
           })}>A4 стандарт</Button>
           <Button size="small" onClick={() => setPageSettings({
             pageSize: 'A4', orientation: 'landscape', columns: 2,
@@ -503,6 +506,14 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
           >
             Сохранить
           </Button>
+          <Tooltip title="Печать">
+            <Button
+              type="text"
+              size="small"
+              icon={<PrinterOutlined />}
+              onClick={handlePrint}
+            />
+          </Tooltip>
           <Tooltip title="Экспорт PDF">
             <Button
               type="text"

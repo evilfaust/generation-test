@@ -306,3 +306,73 @@
     max-width: 100%;
   }
 }
+
+/* ===== Печать из редактора: печатаем только лист превью ===== */
+@media print {
+  /* Шелл приложения и хром редактора — скрываем */
+  body:has(.theory-editor-container) .ant-layout-sider,
+  body:has(.theory-editor-container) .ant-layout-header,
+  .theory-editor-meta-toolbar,
+  .theory-format-toolbar,
+  .theory-editor-panel.editor-panel,
+  .theory-editor-resize-handle,
+  .theory-editor-statusbar,
+  .theory-editor-panel .panel-header {
+    display: none !important;
+  }
+
+  /* Разворачиваем контейнеры, сбрасываем масштаб → лист печатается 1:1 */
+  .theory-editor-container {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .theory-editor-body {
+    display: block !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+  .theory-editor-panel.preview-panel {
+    display: block !important;
+    width: 100% !important;
+  }
+  .theory-preview-wrapper {
+    overflow: visible !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+  .theory-preview-sizer {
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+  .theory-preview-scaler {
+    transform: none !important;
+    width: auto !important;
+  }
+  .theory-preview-content {
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    min-height: auto !important;
+  }
+
+  /* Печатать фоны (тёмная плашка H1, тинты каллаутов, шапки таблиц) */
+  .theory-preview-content,
+  .theory-preview-content * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Контроль разрывов */
+  .theory-preview-content h1,
+  .theory-preview-content h2,
+  .theory-preview-content h3 {
+    break-after: avoid;
+  }
+  .theory-preview-content img,
+  .theory-preview-content table,
+  .theory-preview-content .katex-display,
+  .theory-preview-content .theory-callout {
+    break-inside: avoid;
+  }
+}

@@ -42,6 +42,7 @@ const MARKERS = {
   geogebraPrefix: 'GGBLOCK_7f3a9b_',
   calloutOpenPrefix: 'CALLOUTOPEN7f3a9b',
   calloutClose: 'CALLOUTCLOSE7f3a9b',
+  pagebreak: 'PAGEBREAK7f3a9b',
 }
 
 // Каллауты теории: блок ":::definition Заголовок \n тело \n :::"
@@ -182,6 +183,7 @@ function preprocess(md) {
 
   const processed = outLines
     .join('\n')
+    .replace(/^:::(pagebreak|newpage)\s*$/gim, MARKERS.pagebreak)
     .replace(/^:::\s*$/gm, MARKERS.colBreak)
     .replace(/^~~~\s*$/gm, MARKERS.vspaceLg)
     .replace(/^~~\s*$/gm, MARKERS.vspaceSm)
@@ -225,6 +227,12 @@ function postprocess(html, columns, geogebraBlocks = [], callouts = []) {
   result = result.replace(
     /<img\b([^>]*?)\s*\/?>\s*\{(s|m|l|xl)\}/gi,
     (_, attrs, size) => `<img${attrs} class="theory-img theory-img--${size.toLowerCase()}">`,
+  )
+
+  // Ручной разрыв страницы (печать): :::pagebreak → <div class="theory-pagebreak">
+  result = result.replace(
+    new RegExp(`<p>\\s*${MARKERS.pagebreak}\\s*</p>|${MARKERS.pagebreak}`, 'g'),
+    '<div class="theory-pagebreak"></div>',
   )
 
   const colBreakPattern = `<p>\\s*${MARKERS.colBreak}\\s*</p>|${MARKERS.colBreak}`

@@ -6,7 +6,7 @@ import {
   BookOutlined, OrderedListOutlined
 } from '@ant-design/icons';
 import { useMarkdownProcessor } from '../hooks';
-import { getPageDimensions, DEFAULT_SETTINGS } from '../utils/theoryThemes';
+import { getPageDimensions, DEFAULT_SETTINGS, printWithPageSize } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import html2pdf from 'html2pdf.js';
 import 'katex/dist/katex.min.css';
@@ -194,7 +194,7 @@ export default function TheoryPrintBuilder({ onBack }) {
     }
   }, [selectedArticles, docTitle, pageSettings, message]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => printWithPageSize(pageSettings);
 
   // Get ordered selected articles for the reorder panel
   const orderedSelected = useMemo(() => {

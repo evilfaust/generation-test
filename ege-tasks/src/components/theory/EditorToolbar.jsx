@@ -5,7 +5,7 @@ import {
   OrderedListOutlined, UnorderedListOutlined,
   CodeOutlined, PictureOutlined, LinkOutlined,
   MinusOutlined, FunctionOutlined, ContainerOutlined, DownOutlined,
-  InboxOutlined, ScissorOutlined, ReloadOutlined
+  InboxOutlined, ScissorOutlined, ReloadOutlined, BorderHorizontalOutlined
 } from '@ant-design/icons';
 import TableInsertPopover from './TableInsertPopover';
 import FormulaPalette from './FormulaPalette';
@@ -201,6 +201,10 @@ export default function EditorToolbar({ editorRef }) {
         <Tooltip title="Разделитель">
           <Button size="small" type="text" className="tf-btn" icon={<MinusOutlined />}
             onClick={() => insert({ text: '\n---\n' })} />
+        </Tooltip>
+        <Tooltip title="Разрыв страницы (для печати)">
+          <Button size="small" type="text" className="tf-btn" icon={<BorderHorizontalOutlined />}
+            onClick={() => insert({ text: '\n:::pagebreak\n' })} />
         </Tooltip>
 
         {DIVIDER}

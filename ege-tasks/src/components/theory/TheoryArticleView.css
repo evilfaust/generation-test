@@ -313,11 +313,6 @@
     overflow: visible !important;
   }
 
-  .theory-article-header {
-    padding: 0 !important;
-    border: none !important;
-  }
-
   .theory-article-content-wrapper,
   .theory-print-preview {
     padding: 0 !important;
@@ -327,59 +322,40 @@
     width: 100% !important;
   }
 
+  /* Лист печатается как превью: формат/поля/шрифт берутся из inline-стилей
+     (previewStyles) и темы. @page подгоняется JS-хелпером (printWithPageSize). */
   .theory-article-print-area {
-    width: 100% !important;
-    min-height: auto !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    margin: 0 auto !important;
     box-shadow: none !important;
     border: none !important;
-    font-size: 12pt !important;
-    line-height: 1.5 !important;
-    background: white !important;
+    min-height: auto !important;
   }
 
-  .theory-article-print-area h1 {
-    font-size: 18pt !important;
-    margin-bottom: 12pt !important;
-    page-break-after: avoid;
+  /* Печатать фоны/цвета: иначе тёмная плашка H1 и тинты каллаутов пропадают
+     (а белый текст H1 становится невидимым на белом). */
+  .theory-article-print-area,
+  .theory-article-print-area * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  .theory-article-print-area h2 {
-    font-size: 15pt !important;
-    margin-top: 16pt !important;
-    margin-bottom: 8pt !important;
-    page-break-after: avoid;
-  }
-
+  /* Контроль разрывов страниц */
+  .theory-article-print-area h1,
+  .theory-article-print-area h2,
   .theory-article-print-area h3 {
-    font-size: 13pt !important;
-    margin-top: 12pt !important;
-    margin-bottom: 6pt !important;
+    break-after: avoid;
     page-break-after: avoid;
   }
-
   .theory-article-print-area p {
-    margin-bottom: 6pt !important;
     orphans: 3;
     widows: 3;
   }
-
-  .theory-article-print-area table {
+  .theory-article-print-area img,
+  .theory-article-print-area table,
+  .theory-article-print-area .katex-display,
+  .theory-article-print-area .theory-callout {
+    break-inside: avoid;
     page-break-inside: avoid;
-    border-collapse: collapse !important;
-  }
-
-  .theory-article-print-area td,
-  .theory-article-print-area th {
-    border: 1px solid #333 !important;
-    padding: 4pt 8pt !important;
-  }
-
-  @page {
-    size: A4;
-    margin: 15mm;
   }
 }
 

@@ -5,7 +5,7 @@ import {
   PrinterOutlined, BookOutlined
 } from '@ant-design/icons';
 import { useMarkdownProcessor, useGeoGebraInjection } from '../hooks';
-import { getPageDimensions, DEFAULT_SETTINGS } from '../utils/theoryThemes';
+import { getPageDimensions, DEFAULT_SETTINGS, printWithPageSize } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import MathRenderer from './MathRenderer';
 import html2pdf from 'html2pdf.js';
@@ -182,7 +182,7 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
     }
   }, [article, pageSettings, message]);
 
-  const handlePrint = useCallback(() => window.print(), []);
+  const handlePrint = useCallback(() => printWithPageSize(pageSettings), [pageSettings]);
 
   const scrollToHeading = useCallback((headingId) => {
     const el = document.getElementById(headingId);
