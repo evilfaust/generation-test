@@ -1,53 +1,29 @@
 import { useState, useCallback } from 'react';
-import { Tooltip, Modal, Input } from 'antd';
+import { Tooltip, Modal, Input, Popover, Dropdown } from 'antd';
 import {
   BoldOutlined, ItalicOutlined, StrikethroughOutlined,
   OrderedListOutlined, UnorderedListOutlined,
   CodeOutlined, PictureOutlined, LinkOutlined,
-  MinusOutlined, FunctionOutlined
+  MinusOutlined, FunctionOutlined, ContainerOutlined, DownOutlined
 } from '@ant-design/icons';
 import TableInsertPopover from './TableInsertPopover';
+import FormulaPalette from './FormulaPalette';
 import './EditorToolbar.css';
 
-// Вставка текста в Monaco Editor
-function insertIntoEditor(editor, { before = '', after = '', text = '', newLine = false }) {
-  if (!editor) return;
-  const selection = editor.getSelection();
-  const model = editor.getModel();
-  const selectedText = model.getValueInRange(selection) || '';
-
-  let textToInsert;
-  if (text) {
-    // Полная вставка (для таблиц и т.д.)
-    textToInsert = text;
-  } else if (newLine) {
-    const lineNumber = selection.startLineNumber;
-    const lineContent = model.getLineContent(lineNumber);
-    const needsNewLine = lineContent.trim().length > 0;
-    const prefix = needsNewLine ? '\n' : '';
-    textToInsert = `${prefix}${before}${selectedText}${after}`;
-  } else {
-    textToInsert = `${before}${selectedText}${after}`;
-  }
-
-  editor.executeEdits('toolbar', [{
-    range: selection,
-    text: textToInsert,
-    forceMoveMarkers: true,
-  }]);
-
-  // Позиция курсора
-  if (!selectedText && !text) {
-    const pos = editor.getPosition();
-    if (after) {
-      editor.setPosition({
-        lineNumber: pos.lineNumber,
-        column: pos.column - after.length,
-      });
-    }
-  }
-  editor.focus();
+// Вставка/обёртка через императивный хэндл редактора (TheoryMarkdownEditor).
+function insertIntoEditor(editor, opts) {
+  editor?.insert?.(opts);
 }
+
+// Каллауты теории (тип → подпись по умолчанию)
+const CALLOUTS = [
+  { type: 'definition', label: 'Определение' },
+  { type: 'theorem', label: 'Теорема' },
+  { type: 'example', label: 'Пример' },
+  { type: 'remark', label: 'Замечание' },
+  { type: 'proof', label: 'Доказательство' },
+  { type: 'note', label: 'Заметка' },
+];
 
 export default function EditorToolbar({ editorRef }) {
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -82,6 +58,19 @@ export default function EditorToolbar({ editorRef }) {
     setLinkText('');
     setLinkModalOpen(false);
   }, [editorRef, linkUrl, linkText]);
+
+  // Вставка каллаута: курсор встаёт в пустую строку тела блока.
+  const insertCallout = useCallback(({ type, label }) => {
+    insertIntoEditor(editorRef.current, { before: `\n:::${type} ${label}\n`, after: '\n:::\n' });
+  }, [editorRef]);
+
+  const calloutMenu = {
+    items: CALLOUTS.map((c) => ({ key: c.type, label: c.label })),
+    onClick: ({ key }) => {
+      const c = CALLOUTS.find((x) => x.type === key);
+      if (c) insertCallout(c);
+    },
+  };
 
   return (
     <>
@@ -179,6 +168,27 @@ export default function EditorToolbar({ editorRef }) {
               <span className="formula-label">∑</span>
             </button>
           </Tooltip>
+          <Popover
+            trigger="click"
+            placement="bottomLeft"
+            content={<FormulaPalette onInsert={insert} />}
+            title="Палитра формул"
+          >
+            <Tooltip title="Палитра символов и шаблонов">
+              <button className="toolbar-btn toolbar-btn--wide" type="button">
+                <FunctionOutlined />
+                <DownOutlined className="toolbar-caret" />
+              </button>
+            </Tooltip>
+          </Popover>
+          <Dropdown menu={calloutMenu} trigger={['click']} placement="bottomLeft">
+            <Tooltip title="Блок теории (определение, теорема…)">
+              <button className="toolbar-btn toolbar-btn--wide" type="button">
+                <ContainerOutlined />
+                <DownOutlined className="toolbar-caret" />
+              </button>
+            </Tooltip>
+          </Dropdown>
           <Tooltip title="Изображение">
             <button className="toolbar-btn" type="button"
               onClick={() => setImageModalOpen(true)}>

@@ -95,7 +95,7 @@
 }
 
 .theory-print-counter strong {
-  color: #4361ee;
+  color: var(--accent, #2b4bff);
 }
 
 /* Article list */
@@ -125,7 +125,7 @@
 
 .theory-print-article-item.selected {
   background: #f0f5ff;
-  border-color: #4361ee;
+  border-color: var(--accent, #2b4bff);
 }
 
 .theory-print-article-item .ant-checkbox-wrapper {
@@ -161,7 +161,7 @@
 }
 
 .theory-print-article-item.selected .theory-print-article-order {
-  color: #4361ee;
+  color: var(--accent, #2b4bff);
 }
 
 /* Selected articles reorder section */
@@ -220,7 +220,7 @@
 }
 
 .theory-print-selected-item.drag-over {
-  border-color: #4361ee;
+  border-color: var(--accent, #2b4bff);
   background: #e0e7ff;
 }
 
@@ -231,7 +231,7 @@
 
 .theory-print-selected-item-num {
   font-weight: 700;
-  color: #4361ee;
+  color: var(--accent, #2b4bff);
   min-width: 18px;
   flex-shrink: 0;
 }
@@ -309,7 +309,7 @@
 }
 
 .theory-print-page-info strong {
-  color: #4361ee;
+  color: var(--accent, #2b4bff);
 }
 
 /* Print area */

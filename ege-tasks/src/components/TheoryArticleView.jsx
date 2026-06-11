@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Button, Spin, Tag, Select, Tooltip, Drawer, App } from 'antd';
+import { Button, Spin, Tag, Tooltip, App } from 'antd';
 import {
   ArrowLeftOutlined, EditOutlined, FilePdfOutlined,
-  PrinterOutlined, FormatPainterOutlined, BookOutlined
+  PrinterOutlined, BookOutlined
 } from '@ant-design/icons';
 import { useMarkdownProcessor, useGeoGebraInjection } from '../hooks';
-import { getPageDimensions, DEFAULT_SETTINGS, THEME_NAMES } from '../utils/theoryThemes';
+import { getPageDimensions, DEFAULT_SETTINGS } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import MathRenderer from './MathRenderer';
 import html2pdf from 'html2pdf.js';
@@ -22,7 +22,6 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
   const { canEdit } = useAuth();
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentTheme, setCurrentTheme] = useState('classic');
   const [pageSettings, setPageSettings] = useState(DEFAULT_SETTINGS);
   const [isExporting, setIsExporting] = useState(false);
   const [relatedTasks, setRelatedTasks] = useState([]);
@@ -30,7 +29,6 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
   const [loadingRelated, setLoadingRelated] = useState(false);
   const [toc, setToc] = useState([]);
   const [activeHeading, setActiveHeading] = useState(-1);
-  const [themeDrawerOpen, setThemeDrawerOpen] = useState(false);
   const previewRef = useRef(null);
   const contentRef = useRef(null);
 
@@ -54,7 +52,6 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
       setArticle(data);
       if (data?.theme_settings) {
         if (data.theme_settings.pageSettings) setPageSettings(data.theme_settings.pageSettings);
-        if (data.theme_settings.currentTheme) setCurrentTheme(data.theme_settings.currentTheme);
       }
     } catch (error) {
       message.error('Ошибка при загрузке статьи');
@@ -215,16 +212,6 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
       <div className="theory-article-toolbar no-print">
         <div className="theory-article-toolbar-left">
           <Button type="text" icon={<ArrowLeftOutlined />} onClick={onBack}>Назад</Button>
-          <div className="theory-article-toolbar-divider" />
-          <Select
-            value={currentTheme}
-            onChange={setCurrentTheme}
-            size="small"
-            style={{ width: 160 }}
-            options={Object.entries(THEME_NAMES).map(([key, label]) => ({
-              value: key, label,
-            }))}
-          />
         </div>
         <div className="theory-article-toolbar-right">
           {canEdit && (
@@ -293,7 +280,6 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
             <div
               ref={previewRef}
               className="theory-preview-content theory-article-print-area"
-              data-theme={currentTheme}
               style={previewStyles}
               dangerouslySetInnerHTML={{ __html: html }}
             />
@@ -358,35 +344,7 @@ export default function TheoryArticleView({ articleId, onBack, onEdit }) {
             loading={isExporting}
           />
         </Tooltip>
-        <Tooltip title="Тема" placement="left">
-          <Button
-            shape="circle"
-            icon={<FormatPainterOutlined />}
-            onClick={() => setThemeDrawerOpen(true)}
-          />
-        </Tooltip>
       </div>
-
-      {/* Theme drawer */}
-      <Drawer
-        title="Тема оформления"
-        open={themeDrawerOpen}
-        onClose={() => setThemeDrawerOpen(false)}
-        width={280}
-      >
-        <div className="theory-theme-drawer">
-          {Object.entries(THEME_NAMES).map(([key, label]) => (
-            <div
-              key={key}
-              className={`theory-theme-option ${currentTheme === key ? 'active' : ''}`}
-              onClick={() => { setCurrentTheme(key); setThemeDrawerOpen(false); }}
-            >
-              <span>{label}</span>
-              {currentTheme === key && <Tag color="green">Выбрана</Tag>}
-            </div>
-          ))}
-        </div>
-      </Drawer>
     </div>
   );
 }

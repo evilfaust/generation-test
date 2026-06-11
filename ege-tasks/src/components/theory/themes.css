@@ -1,762 +1,70 @@
 /* ============================================================
-   THEORY THEMES — EGE Tasks Manager
-   5 тем оформления для теоретических статей
+   THEORY — единый печатный стиль теоретических статей
+   Один чистый стиль под плотную вёрстку и печать/PDF
+   (бывшая «компактная» тема, промоутнутая в базовую).
    ============================================================ */
 
-/* Google Fonts — подключаем характерные шрифты для каждой темы */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300&family=Caveat:wght@400;500;600;700&family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,200;0,9..40,300;0,9..40,400;1,9..40,300&display=swap');
+/* Шрифты: DM Sans — текст, IBM Plex Mono — заголовки/таблицы. */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;600&display=swap');
 
-/* ============================================================
-   БАЗОВЫЕ СТИЛИ (применяются ко всем темам)
-   ============================================================ */
-
+/* ── Контейнер «лист» ── */
 .theory-preview-content {
     margin: 0 auto;
-    background: white;
-    box-shadow: 0 2px 24px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.06);
-    line-height: 1.8;
-    transition: background 0.4s ease, color 0.4s ease;
+    background: #fdfdfd;
+    box-shadow: 0 2px 24px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.06);
     overflow: hidden;
     word-wrap: break-word;
     overflow-wrap: break-word;
-}
-
-/* Общие элементы — базис для всех тем */
-.theory-preview-content p {
-    margin-bottom: 1em;
-}
-
-.theory-preview-content strong {
-    font-weight: 700;
-}
-
-.theory-preview-content em {
-    font-style: italic;
-}
-
-.theory-preview-content ul,
-.theory-preview-content ol {
-    margin-left: 1.6em;
-    margin-bottom: 1em;
-    padding-left: 0.4em;
-}
-
-.theory-preview-content li {
-    margin-bottom: 0.4em;
-}
-
-.theory-preview-content hr {
-    border: none;
-    margin: 2em 0;
-}
-
-.theory-preview-content img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 1.5em auto;
-}
-
-.theory-preview-content .katex {
-    font-size: 1.05em;
-}
-
-.theory-preview-content .katex-display {
-    margin: 1.5em 0;
-    text-align: center;
-    overflow-x: auto;
-}
-
-/* Vertical spaces */
-.theory-preview-content .vspace {
-    display: block;
-    height: 1em;
-    margin: 0;
-    padding: 0;
-}
-.theory-preview-content .vspace-sm { height: 0.5em; }
-.theory-preview-content .vspace-lg { height: 2em; }
-
-/* Column sections */
-.theory-preview-content .col-section {
-    min-width: 0;
-}
-.theory-preview-content .col-section + .col-section {
-    border-left: 1px solid rgba(0,0,0,0.1);
-    padding-left: 15px;
-}
-.theory-preview-content > :not(.col-section) {
-    grid-column: 1 / -1;
-}
-
-
-/* ============================================================
-   ТЕМА: КЛАССИЧЕСКАЯ
-   Концепция: Редакционный стиль quality journalism.
-   Playfair Display для заголовков — элегантная типографика
-   с контрастом thick/thin штрихов. Source Serif для текста.
-   Акцент — тёмный индиго с золотым подчёркиванием.
-   ============================================================ */
-
-.theory-preview-content[data-theme="classic"] {
-    font-family: 'Source Serif 4', 'Georgia', serif;
-    font-size: 1em;
-    color: #1a1a2e;
-    background: #fffef9;
-}
-
-.theory-preview-content[data-theme="classic"] h1 {
-    font-family: 'Playfair Display', 'Georgia', serif;
-    font-size: 2em;
-    font-weight: 700;
-    line-height: 1.2;
-    margin-top: 0.2em;
-    margin-bottom: 0.8em;
-    color: #12103a;
-    letter-spacing: -0.01em;
-    position: relative;
-    padding-bottom: 0.5em;
-}
-
-.theory-preview-content[data-theme="classic"] h1::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 3em;
-    height: 3px;
-    background: linear-gradient(90deg, #c9a84c, #e8c97a);
-    border-radius: 2px;
-}
-
-.theory-preview-content[data-theme="classic"] h2 {
-    font-family: 'Playfair Display', 'Georgia', serif;
-    font-size: 1.4em;
-    font-weight: 700;
-    font-style: italic;
-    margin-top: 1.8em;
-    margin-bottom: 0.6em;
-    color: #12103a;
-    letter-spacing: 0;
-}
-
-.theory-preview-content[data-theme="classic"] h3 {
-    font-family: 'Source Serif 4', 'Georgia', serif;
-    font-size: 1.1em;
-    font-weight: 600;
-    margin-top: 1.4em;
-    margin-bottom: 0.4em;
-    color: #2d2a5e;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.9em;
-}
-
-.theory-preview-content[data-theme="classic"] p {
-    line-height: 1.85;
-    color: #2a2840;
-}
-
-.theory-preview-content[data-theme="classic"] strong {
-    color: #12103a;
-    font-weight: 700;
-}
-
-.theory-preview-content[data-theme="classic"] blockquote {
-    border-left: 3px solid #c9a84c;
-    padding: 0.6em 1.2em;
-    margin: 1.5em 0;
-    background: #fdf9f0;
-    color: #3d3a5c;
-    font-style: italic;
-    font-size: 1.02em;
-    border-radius: 0 4px 4px 0;
-}
-
-.theory-preview-content[data-theme="classic"] hr {
-    border-top: none;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #c9a84c 20%, #c9a84c 80%, transparent);
-    margin: 2.5em 0;
-}
-
-/* Таблицы — Classic */
-.theory-preview-content[data-theme="classic"] table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1.5em 0;
-    font-size: 0.93em;
-}
-.theory-preview-content[data-theme="classic"] thead {
-    background: #12103a;
-    color: #fffef9;
-}
-.theory-preview-content[data-theme="classic"] th {
-    font-weight: 600;
-    text-align: left;
-    padding: 9px 14px;
-    border: none;
-    color: #f5e8c4;
-    letter-spacing: 0.04em;
-    font-size: 0.9em;
-    text-transform: uppercase;
-}
-.theory-preview-content[data-theme="classic"] td {
-    padding: 7px 14px;
-    border-bottom: 1px solid #e8e0cc;
-    color: #2a2840;
-}
-.theory-preview-content[data-theme="classic"] tbody tr:hover {
-    background: #fdf9f0;
-}
-
-/* Списки — Classic */
-.theory-preview-content[data-theme="classic"] li::marker {
-    color: #c9a84c;
-}
-
-
-/* ============================================================
-   ТЕМА: МИНИМАЛИЗМ
-   Концепция: Японский вабисаби-минимализм.
-   DM Sans — чистейший гротеск с геометрической основой.
-   Почти монохромная палитра: уголь, дымчатый белый, один
-   акцент — тонкая линия оттенка сажи. Воздух = содержание.
-   ============================================================ */
-
-.theory-preview-content[data-theme="minimal"] {
-    font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
-    color: #1c1c1c;
-    background: #f8f7f5;
-    font-weight: 300;
-}
-
-.theory-preview-content[data-theme="minimal"] h1 {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 1.9em;
-    font-weight: 200;
-    line-height: 1.15;
-    margin-top: 0;
-    margin-bottom: 1.4em;
-    color: #0d0d0d;
-    letter-spacing: -0.03em;
-    border-bottom: 1px solid #d8d5cf;
-    padding-bottom: 0.7em;
-}
-
-.theory-preview-content[data-theme="minimal"] h2 {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 1.1em;
-    font-weight: 400;
-    margin-top: 2.4em;
-    margin-bottom: 0.5em;
-    color: #1c1c1c;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.theory-preview-content[data-theme="minimal"] h3 {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.85em;
-    font-weight: 400;
-    margin-top: 1.8em;
-    margin-bottom: 0.4em;
-    color: #888;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-}
-
-.theory-preview-content[data-theme="minimal"] p {
-    line-height: 1.9;
-    color: #3a3a3a;
-    font-weight: 300;
-}
-
-.theory-preview-content[data-theme="minimal"] strong {
-    font-weight: 500;
-    color: #0d0d0d;
-}
-
-.theory-preview-content[data-theme="minimal"] blockquote {
-    border-left: 1px solid #999;
-    padding: 0.2em 1.2em;
-    margin: 1.8em 0 1.8em 0;
-    color: #666;
-    font-style: normal;
-    font-weight: 300;
-    background: none;
-}
-
-.theory-preview-content[data-theme="minimal"] hr {
-    border-top: 1px solid #d8d5cf;
-    margin: 2.5em 0;
-}
-
-/* Таблицы — Minimal */
-.theory-preview-content[data-theme="minimal"] table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1.5em 0;
-    font-size: 0.92em;
-}
-.theory-preview-content[data-theme="minimal"] thead {
-    background: none;
-    border-bottom: 2px solid #1c1c1c;
-}
-.theory-preview-content[data-theme="minimal"] th {
-    font-weight: 400;
-    text-align: left;
-    padding: 8px 10px;
-    border: none;
-    color: #1c1c1c;
-    letter-spacing: 0.06em;
-    font-size: 0.88em;
-    text-transform: uppercase;
-}
-.theory-preview-content[data-theme="minimal"] td {
-    padding: 8px 10px;
-    border-bottom: 1px solid #e5e3df;
-    color: #3a3a3a;
-}
-.theory-preview-content[data-theme="minimal"] tbody tr:hover {
-    background: #f0eeea;
-}
-
-/* Списки — Minimal */
-.theory-preview-content[data-theme="minimal"] li {
-    color: #3a3a3a;
-    font-weight: 300;
-}
-.theory-preview-content[data-theme="minimal"] li::marker {
-    color: #bbb;
-}
-
-
-/* ============================================================
-   ТЕМА: АКАДЕМИЧЕСКАЯ
-   Концепция: Строгая монография — стиль LaTeX/article.
-   Computer Modern через Charter/Palatino. Чёрно-белая
-   типографическая иерархия без декоративных элементов.
-   Нумерация разделов, justify, сноски, плотная вёрстка.
-   ============================================================ */
-
-.theory-preview-content[data-theme="academic"] {
-    font-family: 'Libre Baskerville', 'Palatino Linotype', 'Book Antiqua', 'Palatino', serif;
-    color: #0a0a0a;
-    background: #ffffff;
-    font-size: 0.97em;
-    line-height: 1.7;
-    counter-reset: section subsection;
-}
-
-/* H1 — как \title в LaTeX: по центру, с автором/датой-линией */
-.theory-preview-content[data-theme="academic"] h1 {
-    font-family: 'Libre Baskerville', serif;
-    font-size: 1.45em;
-    font-weight: 700;
-    line-height: 1.25;
-    margin-top: 0;
-    margin-bottom: 0.3em;
-    color: #000;
-    text-align: center;
-    letter-spacing: 0.01em;
-    border: none;
-    padding: 0;
-}
-
-/* Декоративная линия под H1 — две параллельные как в монографиях */
-.theory-preview-content[data-theme="academic"] h1::after {
-    content: '';
-    display: block;
-    margin: 0.7em auto 1.3em;
-    width: 100%;
-    height: 0;
-    border-top: 2.5px solid #000;
-    border-bottom: 1px solid #000;
-    padding-bottom: 3px;
-    box-sizing: content-box;
-}
-
-/* H2 — нумерованный раздел: §1. Заголовок */
-.theory-preview-content[data-theme="academic"] h2 {
-    font-family: 'Libre Baskerville', serif;
-    font-size: 1.08em;
-    font-weight: 700;
-    margin-top: 2.2em;
-    margin-bottom: 0.7em;
-    color: #000;
-    text-align: left;
-    letter-spacing: 0;
-    counter-increment: section;
-    counter-reset: subsection;
-}
-
-.theory-preview-content[data-theme="academic"] h2::before {
-    content: counter(section) '. ';
-    font-variant-numeric: oldstyle-nums;
-}
-
-/* H3 — курсивный подраздел */
-.theory-preview-content[data-theme="academic"] h3 {
-    font-family: 'Libre Baskerville', serif;
-    font-size: 1em;
-    font-weight: 400;
-    font-style: italic;
-    margin-top: 1.6em;
-    margin-bottom: 0.5em;
-    color: #000;
-    counter-increment: subsection;
-}
-
-.theory-preview-content[data-theme="academic"] h3::before {
-    content: counter(section) '.' counter(subsection) ' ';
-    font-style: normal;
-    font-weight: 700;
-}
-
-/* Абзацы — классический justify с красной строкой */
-.theory-preview-content[data-theme="academic"] p {
-    text-align: justify;
-    text-indent: 1.8em;
-    line-height: 1.75;
-    margin-bottom: 0;
-    color: #0a0a0a;
-    hyphens: auto;
-}
-
-/* Первый абзац после заголовка без красной строки */
-.theory-preview-content[data-theme="academic"] h1 + p,
-.theory-preview-content[data-theme="academic"] h2 + p,
-.theory-preview-content[data-theme="academic"] h3 + p {
-    text-indent: 0;
-}
-
-.theory-preview-content[data-theme="academic"] strong {
-    font-weight: 700;
-    color: #000;
-}
-
-.theory-preview-content[data-theme="academic"] em {
-    font-style: italic;
-}
-
-/* Цитата — как \begin{quote} в LaTeX */
-.theory-preview-content[data-theme="academic"] blockquote {
-    border-left: none;
-    border: none;
-    padding: 0 0 0 0;
-    margin: 1.2em 3em;
-    color: #111;
-    font-style: italic;
-    font-size: 0.95em;
-    background: none;
-    line-height: 1.65;
-}
-
-.theory-preview-content[data-theme="academic"] blockquote p {
-    text-indent: 0;
-    text-align: left;
-    margin-bottom: 0.4em;
-}
-
-.theory-preview-content[data-theme="academic"] hr {
-    border: none;
-    border-top: 1px solid #888;
-    margin: 2em auto;
-    width: 40%;
-}
-
-/* Таблицы — booktabs-стиль (только горизонтальные линии) */
-.theory-preview-content[data-theme="academic"] table {
-    border-collapse: collapse;
-    width: auto;
-    min-width: 50%;
-    margin: 1.8em auto;
-    font-size: 0.9em;
-    border-top: 2px solid #000;
-    border-bottom: 2px solid #000;
-}
-.theory-preview-content[data-theme="academic"] thead {
-    background: none;
-    border-bottom: 1px solid #000;
-}
-.theory-preview-content[data-theme="academic"] th {
-    font-weight: 700;
-    font-style: italic;
-    text-align: center;
-    padding: 5px 16px;
-    border: none;
-    color: #000;
-    font-size: 0.92em;
-    white-space: nowrap;
-}
-.theory-preview-content[data-theme="academic"] td {
-    padding: 4px 16px;
-    border: none;
-    color: #0a0a0a;
-    text-align: center;
-}
-.theory-preview-content[data-theme="academic"] tbody tr:last-child td {
-    padding-bottom: 6px;
-}
-
-/* Списки — LaTeX-стиль, компактные */
-.theory-preview-content[data-theme="academic"] ul {
-    list-style: none;
-    margin: 0.6em 0 0.6em 2em;
-    padding: 0;
-}
-.theory-preview-content[data-theme="academic"] ul > li::before {
-    content: '—';
-    margin-right: 0.6em;
-    font-weight: 400;
-    color: #000;
-}
-.theory-preview-content[data-theme="academic"] ol {
-    margin: 0.6em 0 0.6em 2em;
-    padding: 0 0 0 0.4em;
-}
-.theory-preview-content[data-theme="academic"] li {
-    text-align: justify;
-    line-height: 1.7;
-    margin-bottom: 0.15em;
-}
-
-/* KaTeX в academic — чуть крупнее для чёткости */
-.theory-preview-content[data-theme="academic"] .katex {
-    font-size: 1.08em;
-}
-.theory-preview-content[data-theme="academic"] .katex-display {
-    margin: 1.4em 0;
-}
-
-
-/* ============================================================
-   ТЕМА: ТЕТРАДЬ (Moleskine / Скетчбук)
-   Концепция: Белая страница блокнота с записями коричневыми
-   чернилами — как в скетчбуке или записной книжке.
-   Caveat — рукописный шрифт. Сепия и терракота как чернила.
-   Горизонтальные линии как в dot-grid блокноте.
-   ============================================================ */
-
-.theory-preview-content[data-theme="notebook"] {
-    font-family: 'Caveat', 'Patrick Hand', cursive;
-    font-size: 1.15em;
-    color: #3d2b1f;
-    background-color: #ffffff;
-    background-image:
-        /* dot-grid: точки вместо линий */
-        radial-gradient(circle, rgba(160, 120, 80, 0.18) 1px, transparent 1px);
-    background-size: 24px 24px;
-    position: relative;
-    line-height: 1.75;
-}
-
-.theory-preview-content[data-theme="notebook"] h1 {
-    font-family: 'Caveat', cursive;
-    font-size: 2em;
-    font-weight: 700;
-    line-height: 1.25;
-    margin-top: 0;
-    margin-bottom: 0.2em;
-    color: #2c1a0e;
-    border: none;
-    padding: 0;
-}
-
-/* Широкая подчёркивающая линия как от маркера/линейки */
-.theory-preview-content[data-theme="notebook"] h1::after {
-    content: '';
-    display: block;
-    margin-top: 0.25em;
-    margin-bottom: 0.6em;
-    height: 2px;
-    background: linear-gradient(90deg, #a0522d 0%, #c8813a 40%, rgba(168, 90, 40, 0.1) 100%);
-    border-radius: 1px;
-}
-
-.theory-preview-content[data-theme="notebook"] h2 {
-    font-family: 'Caveat', cursive;
-    font-size: 1.5em;
-    font-weight: 700;
-    margin-top: 1.4em;
-    margin-bottom: 0.2em;
-    color: #5c3317;
-    /* подчёркивание как неровная карандашная линия */
-    border-bottom: 1.5px solid rgba(140, 80, 30, 0.35);
-    padding-bottom: 0.05em;
-}
-
-.theory-preview-content[data-theme="notebook"] h3 {
-    font-family: 'Caveat', cursive;
-    font-size: 1.25em;
-    font-weight: 600;
-    margin-top: 1em;
-    margin-bottom: 0.1em;
-    color: #7a4520;
-    font-style: italic;
-}
-
-.theory-preview-content[data-theme="notebook"] p {
-    line-height: 1.75;
-    margin-bottom: 0.9em;
-    color: #3d2b1f;
-}
-
-.theory-preview-content[data-theme="notebook"] strong {
-    font-weight: 700;
-    color: #2c1a0e;
-    /* лёгкое выделение как маркером */
-    background: linear-gradient(transparent 55%, rgba(210, 150, 60, 0.28) 55%);
-    padding: 0 1px;
-}
-
-.theory-preview-content[data-theme="notebook"] em {
-    font-style: italic;
-    color: #6b3a1f;
-}
-
-/* Цитата — рамка как в записной книжке */
-.theory-preview-content[data-theme="notebook"] blockquote {
-    border-left: 3px solid #a0522d;
-    padding: 0.4em 0.9em;
-    margin: 1em 0;
-    background: rgba(160, 82, 45, 0.05);
-    color: #4a2e18;
-    font-style: italic;
-    border-radius: 0 3px 3px 0;
-}
-
-.theory-preview-content[data-theme="notebook"] blockquote p {
-    margin-bottom: 0;
-}
-
-.theory-preview-content[data-theme="notebook"] hr {
-    border: none;
-    /* двойная линия как от карандаша */
-    border-top: 1px solid rgba(140, 80, 30, 0.3);
-    margin: 1.5em 0;
-}
-
-/* Таблицы — Notebook */
-.theory-preview-content[data-theme="notebook"] table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1em 0 1.2em;
-    font-size: 0.97em;
-}
-.theory-preview-content[data-theme="notebook"] thead {
-    background: rgba(160, 82, 45, 0.07);
-    border-bottom: 1.5px solid rgba(140, 80, 30, 0.4);
-}
-.theory-preview-content[data-theme="notebook"] th {
-    font-weight: 700;
-    text-align: left;
-    padding: 7px 12px;
-    border: 1px solid rgba(140, 80, 30, 0.2);
-    color: #4a2e18;
-}
-.theory-preview-content[data-theme="notebook"] td {
-    padding: 5px 12px;
-    border: 1px solid rgba(140, 80, 30, 0.15);
-    color: #3d2b1f;
-}
-.theory-preview-content[data-theme="notebook"] tbody tr:nth-child(even) {
-    background: rgba(160, 82, 45, 0.04);
-}
-.theory-preview-content[data-theme="notebook"] tbody tr:hover {
-    background: rgba(160, 82, 45, 0.08);
-}
-
-/* Списки — Notebook */
-.theory-preview-content[data-theme="notebook"] li {
-    line-height: 1.75;
-    margin-bottom: 0.2em;
-    color: #3d2b1f;
-}
-.theory-preview-content[data-theme="notebook"] li::marker {
-    color: #a0522d;
-}
-/* Маркер от руки — дефис вместо точки */
-.theory-preview-content[data-theme="notebook"] ul > li::marker {
-    content: '– ';
-}
-
-/* KaTeX — стандартный чёрный, хорошо читается */
-.theory-preview-content[data-theme="notebook"] .katex {
-    color: #2c1a0e;
-}
-.theory-preview-content[data-theme="notebook"] .katex-display {
-    margin: 1.2em 0;
-    padding: 0.4em 0;
-}
-
-
-/* ============================================================
-   ТЕМА: КОМПАКТНАЯ
-   Концепция: Техническая документация / engineering manual.
-   IBM Plex Mono для заголовков — программистский, чёткий.
-   DM Sans для текста — читаемый при плотной вёрстке.
-   Тёмная шапка у h1, нумерованные h2 с чёрным префиксом.
-   Максимальная информационная плотность.
-   ============================================================ */
-
-.theory-preview-content[data-theme="compact"] {
     font-family: 'DM Sans', 'Arial', sans-serif;
     font-size: 0.92em;
-    color: #1c1c1c;
-    background: #fdfdfd;
     line-height: 1.6;
+    color: #1c1c1c;
 }
 
-.theory-preview-content[data-theme="compact"] h1 {
+/* ── Заголовки ── */
+.theory-preview-content h1 {
     font-family: 'IBM Plex Mono', 'Courier New', monospace;
     font-size: 1.2em;
     font-weight: 600;
     line-height: 1.3;
-    margin-top: 0;
-    margin-bottom: 1em;
+    margin: 0 -1em 1em;
+    padding: 0.6em 1em;
     color: #f0f0f0;
     background: #1a1a1a;
-    padding: 0.6em 1em;
     letter-spacing: 0.02em;
     border-radius: 3px;
-    margin-left: -1em;
-    margin-right: -1em;
-    /* учитываем padding страницы */
 }
 
-.theory-preview-content[data-theme="compact"] h2 {
+.theory-preview-content h2 {
     font-family: 'IBM Plex Mono', 'Courier New', monospace;
     font-size: 0.9em;
     font-weight: 600;
-    margin-top: 1.5em;
-    margin-bottom: 0.4em;
+    margin: 1.5em 0 0.4em;
+    padding-left: 0.8em;
     color: #1a1a1a;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    padding-left: 0.8em;
     border-left: 3px solid #1a1a1a;
 }
 
-.theory-preview-content[data-theme="compact"] h3 {
+.theory-preview-content h3 {
     font-family: 'DM Sans', sans-serif;
     font-size: 0.88em;
     font-weight: 600;
-    margin-top: 1em;
-    margin-bottom: 0.3em;
+    margin: 1em 0 0.3em;
     color: #444;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
 
-.theory-preview-content[data-theme="compact"] p {
+/* ── Текст ── */
+.theory-preview-content p {
     line-height: 1.65;
     margin-bottom: 0.65em;
     color: #1c1c1c;
 }
 
-.theory-preview-content[data-theme="compact"] strong {
+.theory-preview-content strong {
     font-weight: 700;
     color: #000;
     background: #f5f5f5;
@@ -764,12 +72,12 @@
     border-radius: 2px;
 }
 
-.theory-preview-content[data-theme="compact"] em {
+.theory-preview-content em {
     font-style: italic;
     color: #444;
 }
 
-.theory-preview-content[data-theme="compact"] blockquote {
+.theory-preview-content blockquote {
     border-left: 2px solid #888;
     padding: 0.3em 0.8em;
     margin: 0.8em 0;
@@ -780,23 +88,41 @@
     border-radius: 0 2px 2px 0;
 }
 
-.theory-preview-content[data-theme="compact"] hr {
+.theory-preview-content hr {
+    border: none;
     border-top: 1px solid #ddd;
     margin: 1.2em 0;
 }
 
-/* Таблицы — Compact */
-.theory-preview-content[data-theme="compact"] table {
+/* ── Списки ── */
+.theory-preview-content ul {
+    margin: 0 0 0.6em 1.2em;
+    padding-left: 0.4em;
+}
+.theory-preview-content ol {
+    margin: 0 0 0.6em 1.4em;
+    padding-left: 0.4em;
+}
+.theory-preview-content li {
+    margin-bottom: 0.2em;
+    font-size: 0.97em;
+}
+.theory-preview-content li::marker {
+    color: #888;
+}
+
+/* ── Таблицы ── */
+.theory-preview-content table {
     border-collapse: collapse;
     width: 100%;
     margin: 0.8em 0;
     font-size: 0.88em;
 }
-.theory-preview-content[data-theme="compact"] thead {
+.theory-preview-content thead {
     background: #1a1a1a;
     color: #f0f0f0;
 }
-.theory-preview-content[data-theme="compact"] th {
+.theory-preview-content th {
     font-family: 'IBM Plex Mono', monospace;
     font-weight: 400;
     text-align: left;
@@ -808,42 +134,118 @@
     text-transform: uppercase;
     white-space: nowrap;
 }
-.theory-preview-content[data-theme="compact"] td {
+.theory-preview-content td {
     padding: 4px 10px;
     border: 1px solid #ddd;
     color: #1c1c1c;
     vertical-align: top;
 }
-.theory-preview-content[data-theme="compact"] tbody tr:nth-child(even) {
+.theory-preview-content tbody tr:nth-child(even) {
     background: #f8f8f8;
 }
-.theory-preview-content[data-theme="compact"] tbody tr:hover {
+.theory-preview-content tbody tr:hover {
     background: #f0f4ff;
 }
 
-/* Списки — Compact */
-.theory-preview-content[data-theme="compact"] ul {
-    margin-left: 1.2em;
-    margin-bottom: 0.6em;
-}
-.theory-preview-content[data-theme="compact"] ol {
-    margin-left: 1.4em;
-    margin-bottom: 0.6em;
-}
-.theory-preview-content[data-theme="compact"] li {
-    margin-bottom: 0.2em;
-    font-size: 0.97em;
-}
-.theory-preview-content[data-theme="compact"] li::marker {
-    color: #888;
-}
-
-/* Код внутри compact — inline code */
-.theory-preview-content[data-theme="compact"] code {
+/* ── Код ── */
+.theory-preview-content code {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.9em;
     background: #f0f0f0;
     padding: 1px 4px;
     border-radius: 2px;
     color: #c0392b;
+}
+
+/* ── Изображения ── */
+.theory-preview-content img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.5em auto;
+}
+
+/* ── Формулы (KaTeX) ── */
+.theory-preview-content .katex {
+    font-size: 1.05em;
+}
+.theory-preview-content .katex-display {
+    margin: 1.5em 0;
+    text-align: center;
+    overflow-x: auto;
+}
+
+/* ── Вертикальные отступы (плейсхолдеры из markdown) ── */
+.theory-preview-content .vspace {
+    display: block;
+    height: 1em;
+    margin: 0;
+    padding: 0;
+}
+.theory-preview-content .vspace-sm { height: 0.5em; }
+.theory-preview-content .vspace-lg { height: 2em; }
+
+/* ── Колонки ── */
+.theory-preview-content .col-section {
+    min-width: 0;
+}
+.theory-preview-content .col-section + .col-section {
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    padding-left: 15px;
+}
+.theory-preview-content > :not(.col-section) {
+    grid-column: 1 / -1;
+}
+
+/* ── Каллауты (Определение / Теорема / Пример / Замечание / …) ── */
+.theory-preview-content .theory-callout {
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid #9aa0ac;
+    background: #f7f7f8;
+    border-radius: 4px;
+    padding: 0.5em 0.85em;
+    margin: 0.9em 0;
+    break-inside: avoid;
+}
+.theory-preview-content .theory-callout__label {
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.3em;
+    color: #646a76;
+}
+.theory-preview-content .theory-callout > :last-child {
+    margin-bottom: 0;
+}
+
+.theory-preview-content .theory-callout--definition {
+    border-left-color: #0d9488;
+    background: #f0fbf8;
+}
+.theory-preview-content .theory-callout--definition .theory-callout__label { color: #0d9488; }
+
+.theory-preview-content .theory-callout--theorem {
+    border-left-color: #2b4bff;
+    background: #f2f4ff;
+}
+.theory-preview-content .theory-callout--theorem .theory-callout__label { color: #2b4bff; }
+
+.theory-preview-content .theory-callout--example {
+    border-left-color: #d97706;
+    background: #fffaf0;
+}
+.theory-preview-content .theory-callout--example .theory-callout__label { color: #b45309; }
+
+.theory-preview-content .theory-callout--remark {
+    border-left-color: #7c3aed;
+    background: #f8f5ff;
+}
+.theory-preview-content .theory-callout--remark .theory-callout__label { color: #7c3aed; }
+
+.theory-preview-content .theory-callout--proof,
+.theory-preview-content .theory-callout--note {
+    border-left-color: #9aa0ac;
+    background: #f7f7f8;
 }

@@ -1,31 +1,28 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect, lazy, Suspense } from 'react';
-import { Button, Select, Input, Modal, Spin, InputNumber, Radio, Tag, Space, Tooltip, Badge, App } from 'antd';
+import { Button, Select, Input, Modal, Spin, InputNumber, Radio, Tag, Space, Tooltip, Badge, Popover, App } from 'antd';
 import {
   SaveOutlined, SettingOutlined,
-  FormatPainterOutlined, ColumnWidthOutlined, FilePdfOutlined,
+  ColumnWidthOutlined, FilePdfOutlined,
   ArrowLeftOutlined, TagsOutlined, CheckCircleOutlined, NodeIndexOutlined
 } from '@ant-design/icons';
 import { useMarkdownProcessor, useKeyboardShortcuts, useDocumentStats, useAutosave, loadAutosave, useGeoGebraInjection } from '../hooks';
-import { getPageDimensions, DEFAULT_SETTINGS, THEME_NAMES } from '../utils/theoryThemes';
+import { getPageDimensions, DEFAULT_SETTINGS } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import EditorToolbar from './theory/EditorToolbar';
 import GeoGebraBlocksModal from './theory/GeoGebraBlocksModal';
+import { Chip } from './workspace/ui';
 import html2pdf from 'html2pdf.js';
 import 'katex/dist/katex.min.css';
 import './theory/themes.css';
 import './theory/TheoryGeoGebraEmbed.css';
 import './theory/TheoryEditor.css';
 
-const MonacoEditor = lazy(() => import('@monaco-editor/react'));
+const TheoryMarkdownEditor = lazy(() => import('./theory/TheoryMarkdownEditor'));
 
-const THEMES = [
-  { id: 'classic', name: 'Классическая', description: 'Стандартное оформление с засечками' },
-  { id: 'minimal', name: 'Минималистичная', description: 'Чистый и простой стиль' },
-  { id: 'academic', name: 'Академическая', description: 'Для научных работ' },
-  { id: 'notebook', name: 'Тетрадь', description: 'Как школьная тетрадь' },
-  { id: 'compact', name: 'Компактная', description: 'Плотная вёрстка, мелкий шрифт' },
-];
+// Единый печатный стиль теории (бывшая «компактная» тема). Хранится в
+// theme_settings.currentTheme для обратной совместимости со схемой.
+const THEME = 'compact';
 
 const DEFAULT_CONTENT = `# Заголовок статьи
 
@@ -50,20 +47,18 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
     return {
       content: content || DEFAULT_CONTENT,
       pageSettings: settings?.pageSettings || DEFAULT_SETTINGS,
-      theme: settings?.currentTheme || 'classic',
       geogebraApplets: Array.isArray(settings?.geogebra_applets) ? settings.geogebra_applets : [],
     };
   }, [articleId]);
 
   const [markdown, setMarkdown] = useState(initialData.content);
-  const [currentTheme, setCurrentTheme] = useState(initialData.theme);
   const [pageSettings, setPageSettings] = useState(initialData.pageSettings);
   const [geogebraApplets, setGeogebraApplets] = useState(initialData.geogebraApplets);
-  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [articleLoading, setArticleLoading] = useState(!!articleId);
   const [splitPos, setSplitPos] = useState(50);
   const [isGeoModalOpen, setIsGeoModalOpen] = useState(false);
@@ -77,6 +72,16 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
   const editorRef = useRef(null);
   const previewRef = useRef(null);
   const containerRef = useRef(null);
+  const previewWrapRef = useRef(null);
+
+  // Масштаб превью «вписать по ширине»: реальная страница (мм) ужимается,
+  // чтобы целиком влезать в правую панель без горизонтального скролла.
+  const [previewScale, setPreviewScale] = useState(1);
+  const [previewContentH, setPreviewContentH] = useState(0);
+
+  // Dirty-трекинг: сравниваем сигнатуру контента с последней сохранённой в БД.
+  const savedSigRef = useRef(null);
+  const resyncRef = useRef(true);
 
   // Process markdown
   const html = useMarkdownProcessor(markdown, pageSettings.columns);
@@ -86,8 +91,33 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
     [geogebraApplets],
   );
 
-  // Autosave
-  useAutosave(markdown, pageSettings, currentTheme, articleId, autosaveExtraSettings);
+  // Autosave (локальный черновик в localStorage)
+  useAutosave(markdown, pageSettings, THEME, articleId, autosaveExtraSettings);
+
+  // Сигнатура контента для dirty-трекинга относительно сохранения в БД
+  const contentSignature = useMemo(
+    () => JSON.stringify({ markdown, title, categoryId, articleTags, summary, pageSettings, geogebraApplets }),
+    [markdown, title, categoryId, articleTags, summary, pageSettings, geogebraApplets],
+  );
+
+  useEffect(() => {
+    if (resyncRef.current) {
+      // Первый рендер или после загрузки/сохранения — принимаем текущее за «сохранённое».
+      resyncRef.current = false;
+      savedSigRef.current = contentSignature;
+      setDirty(false);
+      return;
+    }
+    setDirty(contentSignature !== savedSigRef.current);
+  }, [contentSignature]);
+
+  // Предупреждение при уходе со страницы с несохранёнными правками
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
 
   // Load article if editing
   useEffect(() => {
@@ -110,9 +140,6 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
           if (article.theme_settings.pageSettings) {
             setPageSettings(article.theme_settings.pageSettings);
           }
-          if (article.theme_settings.currentTheme) {
-            setCurrentTheme(article.theme_settings.currentTheme);
-          }
           if (Array.isArray(article.theme_settings.geogebra_applets)) {
             setGeogebraApplets(article.theme_settings.geogebra_applets);
           }
@@ -122,33 +149,22 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
       message.error('Ошибка при загрузке статьи');
     } finally {
       setArticleLoading(false);
+      resyncRef.current = true; // после загрузки принять контент за «сохранённый»
     }
   };
 
   const insertGeoBlockAtCursor = useCallback((applet) => {
-    const editor = editorRef.current;
-    if (!editor || !applet?.id) return;
-    const block = `\n:::geogebra ${applet.id}:::\n`;
-    const selection = editor.getSelection();
-    editor.executeEdits('geogebra', [{ range: selection, text: block }]);
-    editor.focus();
+    if (!applet?.id) return;
+    editorRef.current?.insert({ text: `\n:::geogebra ${applet.id}:::\n` });
   }, []);
 
   // Insert formula at cursor
   const insertFormula = useCallback((type) => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    const selection = editor.getSelection();
     if (type === 'inline') {
-      editor.executeEdits('', [{ range: selection, text: '$ $' }]);
-      const pos = selection.getStartPosition();
-      editor.setPosition({ lineNumber: pos.lineNumber, column: pos.column + 2 });
+      editorRef.current?.insert({ before: '$', after: '$' });
     } else if (type === 'block') {
-      editor.executeEdits('', [{ range: selection, text: '\n$$\n\n$$\n' }]);
-      const pos = selection.getStartPosition();
-      editor.setPosition({ lineNumber: pos.lineNumber + 2, column: 1 });
+      editorRef.current?.insert({ before: '\n$$\n', after: '\n$$\n' });
     }
-    editor.focus();
   }, []);
 
   // Save article
@@ -171,7 +187,7 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
         summary: summary.trim(),
         theme_settings: {
           pageSettings,
-          currentTheme,
+          currentTheme: THEME,
           geogebra_applets: geogebraApplets,
         },
       };
@@ -183,13 +199,15 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
         message.success('Статья создана');
         onSaved?.(created.id);
       }
+      savedSigRef.current = contentSignature; // зафиксировать как сохранённое
+      setDirty(false);
       reloadData();
     } catch (error) {
       message.error('Ошибка при сохранении');
     } finally {
       setSaving(false);
     }
-  }, [title, categoryId, markdown, articleTags, summary, pageSettings, currentTheme, geogebraApplets, articleId, onSaved, reloadData, message]);
+  }, [title, categoryId, markdown, articleTags, summary, pageSettings, geogebraApplets, articleId, onSaved, reloadData, message, contentSignature]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -203,6 +221,11 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
     const filename = (title || 'theory-article').trim();
     if (!previewRef.current) return;
     setIsExporting(true);
+    // На время съёмки снимаем масштаб со scaler — html2canvas рендерит лист
+    // в реальном размере (а не уменьшенным под превью).
+    const scaler = previewRef.current.parentElement;
+    const prevTransform = scaler ? scaler.style.transform : '';
+    if (scaler) scaler.style.transform = 'none';
     try {
       const dims = getPageDimensions(pageSettings.pageSize, pageSettings.orientation);
       const opt = {
@@ -218,6 +241,7 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
       console.error('PDF export error:', error);
       message.error('Ошибка при экспорте PDF');
     } finally {
+      if (scaler) scaler.style.transform = prevTransform;
       setIsExporting(false);
     }
   }, [title, pageSettings, message]);
@@ -253,10 +277,7 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
     document.addEventListener('mouseup', onUp);
   }, [splitPos]);
 
-  // Trigger Monaco layout on split change
-  useEffect(() => {
-    editorRef.current?.layout();
-  }, [splitPos]);
+  // CodeMirror сам пересчитывает раскладку при ресайзе панели — спец-вызов не нужен.
 
   // Map applets by id for preview injection
   const geogebraAppletsById = useMemo(
@@ -287,6 +308,118 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
     return base;
   }, [pageSettings]);
 
+  // Ширина страницы в px (мм → px при 96 dpi) — для масштабирования превью
+  const MM_TO_PX = 96 / 25.4;
+  const pageWidthPx = useMemo(() => {
+    const dims = getPageDimensions(pageSettings.pageSize, pageSettings.orientation);
+    return dims.width * MM_TO_PX;
+  }, [pageSettings.pageSize, pageSettings.orientation, MM_TO_PX]);
+
+  // Вписать страницу по ширине панели превью (ужать, не увеличивать).
+  // Масштаб вешаем на обёртку-scaler, сама .theory-preview-content остаётся
+  // в реальном размере — чтобы экспорт PDF (html2canvas с previewRef) снимал
+  // лист в полном разрешении, а не уменьшенным.
+  useEffect(() => {
+    const wrap = previewWrapRef.current;
+    const content = previewRef.current;
+    if (!wrap || !content) return undefined;
+    const recompute = () => {
+      const avail = wrap.clientWidth - 40; // padding обёртки 20px с двух сторон
+      const s = Math.min(1, Math.max(0.25, avail / pageWidthPx));
+      setPreviewScale(s);
+      setPreviewContentH(content.offsetHeight);
+    };
+    recompute();
+    const ro = new ResizeObserver(recompute);
+    ro.observe(wrap);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [pageWidthPx, html, pageSettings]);
+
+  // Панель параметров листа (в Popover у кнопки настроек)
+  const pageSettingsPanel = (
+    <div className="theory-settings-content" style={{ width: 320 }}>
+      <div className="theory-settings-section">
+        <div className="theory-settings-section-title">Формат и ориентация</div>
+        <Space wrap>
+          <Radio.Group
+            size="small"
+            value={pageSettings.pageSize}
+            onChange={e => setPageSettings(prev => ({ ...prev, pageSize: e.target.value }))}
+          >
+            <Radio.Button value="A4">A4</Radio.Button>
+            <Radio.Button value="A5">A5</Radio.Button>
+          </Radio.Group>
+          <Radio.Group
+            size="small"
+            value={pageSettings.orientation}
+            onChange={e => setPageSettings(prev => ({ ...prev, orientation: e.target.value }))}
+          >
+            <Radio.Button value="portrait">Книжная</Radio.Button>
+            <Radio.Button value="landscape">Альбомная</Radio.Button>
+          </Radio.Group>
+        </Space>
+      </div>
+
+      <div className="theory-settings-section">
+        <div className="theory-settings-section-title">Поля (мм)</div>
+        <Space>
+          {[
+            ['Верх', 'marginTop'],
+            ['Низ', 'marginBottom'],
+            ['Лево', 'marginLeft'],
+            ['Право', 'marginRight'],
+          ].map(([label, key]) => (
+            <div key={key}>
+              <div className="theory-settings-hint">{label}</div>
+              <InputNumber
+                size="small"
+                min={5}
+                max={50}
+                style={{ width: 60 }}
+                value={pageSettings[key]}
+                onChange={v => setPageSettings(prev => ({ ...prev, [key]: v || 15 }))}
+              />
+            </div>
+          ))}
+        </Space>
+      </div>
+
+      <div className="theory-settings-section">
+        <div className="theory-settings-section-title">Размер шрифта (px)</div>
+        <InputNumber
+          size="small"
+          min={10}
+          max={24}
+          value={pageSettings.fontSize}
+          onChange={v => setPageSettings(prev => ({ ...prev, fontSize: v || 16 }))}
+        />
+      </div>
+
+      <div className="theory-settings-section">
+        <div className="theory-settings-section-title">Пресеты</div>
+        <div className="theory-settings-presets">
+          <Button size="small" onClick={() => setPageSettings({
+            pageSize: 'A4', orientation: 'portrait', columns: 1,
+            marginTop: 20, marginBottom: 20, marginLeft: 20, marginRight: 20, fontSize: 16
+          })}>A4 стандарт</Button>
+          <Button size="small" onClick={() => setPageSettings({
+            pageSize: 'A4', orientation: 'landscape', columns: 2,
+            marginTop: 10, marginBottom: 10, marginLeft: 15, marginRight: 15, fontSize: 12
+          })}>A4 в 2 колонки</Button>
+          <Button size="small" onClick={() => setPageSettings({
+            pageSize: 'A5', orientation: 'portrait', columns: 1,
+            marginTop: 15, marginBottom: 15, marginLeft: 15, marginRight: 15, fontSize: 14
+          })}>A5 компакт</Button>
+          <Button size="small" onClick={() => setPageSettings({
+            pageSize: 'A4', orientation: 'portrait', columns: 1,
+            marginTop: 8, marginBottom: 8, marginLeft: 8, marginRight: 8, fontSize: 11
+          })}>A4 плотная</Button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (articleLoading) {
     return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>;
   }
@@ -305,7 +438,7 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
             placeholder="Название статьи"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            size="small"
+            variant="borderless"
             className="theory-title-input"
           />
           <Select
@@ -335,18 +468,31 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
               onClick={toggleColumns}
             />
           </Tooltip>
-          <Tooltip title="Настройки страницы">
-            <Button type="text" size="small" icon={<SettingOutlined />} onClick={() => setIsSettingsModalOpen(true)} />
-          </Tooltip>
-          <Tooltip title="Тема оформления">
-            <Button type="text" size="small" icon={<FormatPainterOutlined />} onClick={() => setIsThemeModalOpen(true)} />
-          </Tooltip>
+          <Popover
+            open={isSettingsOpen}
+            onOpenChange={setIsSettingsOpen}
+            trigger="click"
+            placement="bottomRight"
+            content={pageSettingsPanel}
+            title="Параметры листа"
+          >
+            <Tooltip title="Параметры листа">
+              <Button type="text" size="small" icon={<SettingOutlined />} />
+            </Tooltip>
+          </Popover>
           <Tooltip title="GeoGebra-блоки">
             <Badge count={geogebraApplets.length} size="small" offset={[-4, 0]}>
               <Button type="text" size="small" icon={<NodeIndexOutlined />} onClick={() => setIsGeoModalOpen(true)} />
             </Badge>
           </Tooltip>
           <div className="toolbar-divider" />
+          <span className="theory-save-status">
+            {saving
+              ? <Chip tone="neutral" dot={false}>Сохранение…</Chip>
+              : dirty
+                ? <Chip tone="amber" dot={false}>Не сохранено</Chip>
+                : <Chip tone="teal" dot={false}>Сохранено</Chip>}
+          </span>
           <Button
             type="primary"
             size="small"
@@ -378,27 +524,12 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
         <div className="theory-editor-panel editor-panel" style={{ width: `calc(${splitPos}% - 3px)` }}>
           <div className="panel-header">
             <span>Markdown + LaTeX</span>
-            <span className="hint">Ctrl+I — inline, Ctrl+B — блочная формула</span>
           </div>
           <Suspense fallback={<div className="theory-editor-loading">Загрузка редактора...</div>}>
-            <MonacoEditor
-              height="100%"
-              defaultLanguage="markdown"
+            <TheoryMarkdownEditor
+              ref={editorRef}
               value={markdown}
               onChange={(value) => setMarkdown(value || '')}
-              onMount={(editor) => { editorRef.current = editor; }}
-              theme="vs-light"
-              options={{
-                fontSize: 14,
-                lineNumbers: 'on',
-                minimap: { enabled: false },
-                wordWrap: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 2,
-                fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
-              }}
-              loading={<div className="theory-editor-loading">Загрузка Monaco Editor...</div>}
             />
           </Suspense>
         </div>
@@ -412,16 +543,28 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
             <span>
               Превью ({pageSettings.pageSize} {pageSettings.orientation === 'landscape' ? '↔' : '↕'})
             </span>
-            <span className="hint">{THEME_NAMES[currentTheme] || currentTheme}</span>
+            <span className="hint">{pageSettings.columns > 1 ? `${pageSettings.columns} колонки` : '1 колонка'}</span>
           </div>
-          <div className="theory-preview-wrapper">
+          <div className="theory-preview-wrapper" ref={previewWrapRef}>
             <div
-              ref={previewRef}
-              className="theory-preview-content"
-              data-theme={currentTheme}
-              style={previewStyles}
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
+              className="theory-preview-sizer"
+              style={{
+                width: `${pageWidthPx * previewScale}px`,
+                height: previewContentH ? `${previewContentH * previewScale}px` : undefined,
+              }}
+            >
+              <div
+                className="theory-preview-scaler"
+                style={{ transform: `scale(${previewScale})`, transformOrigin: 'top left' }}
+              >
+                <div
+                  ref={previewRef}
+                  className="theory-preview-content"
+                  style={previewStyles}
+                  dangerouslySetInnerHTML={{ __html: html }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -433,16 +576,9 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
         <span className="statusbar-item">{stats.formulas} формул</span>
         <span className="statusbar-divider" />
         <span className="statusbar-item">{stats.chars} символов</span>
-        <span className="statusbar-divider" />
-        <span
-          className="statusbar-item statusbar-theme"
-          onClick={() => setIsThemeModalOpen(true)}
-        >
-          <FormatPainterOutlined /> {THEME_NAMES[currentTheme] || currentTheme}
-        </span>
         <div className="statusbar-spacer" />
         <span className="statusbar-item statusbar-autosave">
-          <CheckCircleOutlined /> Автосохранение
+          <CheckCircleOutlined /> Черновик в браузере
         </span>
       </div>
 
@@ -496,123 +632,6 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
         onAppletsChange={setGeogebraApplets}
         onInsertBlock={insertGeoBlockAtCursor}
       />
-
-      {/* Theme Selector Modal */}
-      <Modal
-        title="Выбор темы"
-        open={isThemeModalOpen}
-        onCancel={() => setIsThemeModalOpen(false)}
-        footer={null}
-        width={700}
-      >
-        <div className="theory-theme-grid">
-          {THEMES.map(theme => (
-            <div
-              key={theme.id}
-              className={`theory-theme-card ${currentTheme === theme.id ? 'active' : ''}`}
-              onClick={() => { setCurrentTheme(theme.id); setIsThemeModalOpen(false); }}
-            >
-              <div className="theme-preview" data-theme={theme.id}>
-                <div className="preview-title">Заголовок</div>
-                <div className="preview-text">Текст документа</div>
-                <div className="preview-formula">x² + y² = r²</div>
-              </div>
-              <div className="theme-info">
-                <h4>{theme.name}</h4>
-                <p>{theme.description}</p>
-                {currentTheme === theme.id && <Tag color="green" style={{ marginTop: 4 }}>Выбрана</Tag>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Modal>
-
-      {/* Page Settings Modal */}
-      <Modal
-        title="Настройки страницы"
-        open={isSettingsModalOpen}
-        onCancel={() => setIsSettingsModalOpen(false)}
-        footer={null}
-        width={500}
-      >
-        <div className="theory-settings-content">
-          <div className="theory-settings-section">
-            <div className="theory-settings-section-title">Формат страницы</div>
-            <Radio.Group
-              value={pageSettings.pageSize}
-              onChange={e => setPageSettings(prev => ({ ...prev, pageSize: e.target.value }))}
-            >
-              <Radio.Button value="A4">A4 (210 × 297 мм)</Radio.Button>
-              <Radio.Button value="A5">A5 (148 × 210 мм)</Radio.Button>
-            </Radio.Group>
-          </div>
-
-          <div className="theory-settings-section">
-            <div className="theory-settings-section-title">Ориентация</div>
-            <Radio.Group
-              value={pageSettings.orientation}
-              onChange={e => setPageSettings(prev => ({ ...prev, orientation: e.target.value }))}
-            >
-              <Radio.Button value="portrait">Книжная</Radio.Button>
-              <Radio.Button value="landscape">Альбомная</Radio.Button>
-            </Radio.Group>
-          </div>
-
-          <div className="theory-settings-section">
-            <div className="theory-settings-section-title">Поля (мм)</div>
-            <Space>
-              <div>
-                <div style={{ fontSize: 12, color: '#8c8c8c' }}>Верх</div>
-                <InputNumber min={5} max={50} value={pageSettings.marginTop}
-                  onChange={v => setPageSettings(prev => ({ ...prev, marginTop: v || 15 }))} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, color: '#8c8c8c' }}>Низ</div>
-                <InputNumber min={5} max={50} value={pageSettings.marginBottom}
-                  onChange={v => setPageSettings(prev => ({ ...prev, marginBottom: v || 15 }))} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, color: '#8c8c8c' }}>Лево</div>
-                <InputNumber min={5} max={50} value={pageSettings.marginLeft}
-                  onChange={v => setPageSettings(prev => ({ ...prev, marginLeft: v || 15 }))} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, color: '#8c8c8c' }}>Право</div>
-                <InputNumber min={5} max={50} value={pageSettings.marginRight}
-                  onChange={v => setPageSettings(prev => ({ ...prev, marginRight: v || 15 }))} />
-              </div>
-            </Space>
-          </div>
-
-          <div className="theory-settings-section">
-            <div className="theory-settings-section-title">Размер шрифта (px)</div>
-            <InputNumber min={10} max={24} value={pageSettings.fontSize}
-              onChange={v => setPageSettings(prev => ({ ...prev, fontSize: v || 16 }))} />
-          </div>
-
-          <div className="theory-settings-section">
-            <div className="theory-settings-section-title">Быстрые пресеты</div>
-            <div className="theory-settings-presets">
-              <Button size="small" onClick={() => setPageSettings({
-                pageSize: 'A4', orientation: 'portrait', columns: 1,
-                marginTop: 20, marginBottom: 20, marginLeft: 20, marginRight: 20, fontSize: 16
-              })}>A4 Стандарт</Button>
-              <Button size="small" onClick={() => setPageSettings({
-                pageSize: 'A4', orientation: 'landscape', columns: 2,
-                marginTop: 10, marginBottom: 10, marginLeft: 15, marginRight: 15, fontSize: 12
-              })}>A4 Альбомная</Button>
-              <Button size="small" onClick={() => setPageSettings({
-                pageSize: 'A5', orientation: 'portrait', columns: 1,
-                marginTop: 15, marginBottom: 15, marginLeft: 15, marginRight: 15, fontSize: 14
-              })}>A5 Компакт</Button>
-              <Button size="small" onClick={() => setPageSettings({
-                pageSize: 'A4', orientation: 'portrait', columns: 1,
-                marginTop: 8, marginBottom: 8, marginLeft: 8, marginRight: 8, fontSize: 11
-              })}>A4 Плотная</Button>
-            </div>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

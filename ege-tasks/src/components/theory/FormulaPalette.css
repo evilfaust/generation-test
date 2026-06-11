@@ -1,0 +1,53 @@
+/* ===== Палитра формул LaTeX (popover-контент) ===== */
+.fp-palette {
+  width: 296px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fp-group__title {
+  font-size: var(--eyebrow-size, 10.5px);
+  font-weight: var(--eyebrow-weight, 600);
+  letter-spacing: var(--eyebrow-tracking, 0.08em);
+  text-transform: uppercase;
+  color: var(--ink-3, #646a76);
+  margin-bottom: 6px;
+}
+
+.fp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.fp-btn {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--rule, #e5e7eb);
+  background: var(--bg-raised, #fff);
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--ink, #0d1321);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.fp-btn:hover {
+  border-color: var(--accent, #2b4bff);
+  background: var(--accent-soft, #e7ecff);
+  color: var(--accent, #2b4bff);
+}
+
+.fp-btn:active {
+  transform: translateY(0.5px);
+}
+
+.fp-btn--sym {
+  min-width: 30px;
+  font-size: 15px;
+}

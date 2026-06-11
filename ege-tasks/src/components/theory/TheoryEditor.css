@@ -10,8 +10,8 @@
 /* Meta toolbar (top) */
 .theory-editor-meta-toolbar {
   padding: 8px 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #e8e8e8;
+  background: var(--bg-raised, #fff);
+  border-bottom: 1px solid var(--rule, #e5e7eb);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -35,31 +35,42 @@
 }
 
 .theory-title-input {
-  max-width: 280px;
-  font-weight: 600;
+  flex: 1;
+  min-width: 120px;
+  max-width: 520px;
 }
 
-.theory-title-input input {
+.theory-title-input input,
+.theory-title-input.ant-input {
+  font-size: 17px !important;
   font-weight: 600 !important;
+  letter-spacing: -0.01em;
+  color: var(--ink, #0d1321);
+  padding-left: 4px !important;
+}
+
+.theory-title-input input::placeholder {
+  font-weight: 500;
+  color: var(--ink-4, #9aa0ac);
+}
+
+.theory-save-status {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 2px;
 }
 
 .theory-editor-meta-toolbar .toolbar-divider {
   width: 1px;
   height: 24px;
-  background: #d9d9d9;
+  background: var(--rule, #e5e7eb);
   margin: 0 4px;
 }
 
 /* Save button */
 .theory-save-btn {
-  border-radius: 8px !important;
+  border-radius: var(--radius, 6px) !important;
   font-weight: 600 !important;
-  background: linear-gradient(135deg, #4361ee, #3a0ca3) !important;
-  border: none !important;
-}
-
-.theory-save-btn:hover {
-  opacity: 0.9;
 }
 
 /* Editor body — split pane */
@@ -88,10 +99,10 @@
 
 .theory-editor-panel .panel-header {
   padding: 6px 16px;
-  background: #f5f5f5;
-  border-bottom: 1px solid #e8e8e8;
+  background: var(--bg-sunken, #f3f4f6);
+  border-bottom: 1px solid var(--rule-soft, #eef0f3);
   font-weight: 600;
-  color: #595959;
+  color: var(--ink-3, #646a76);
   font-size: 12px;
   display: flex;
   justify-content: space-between;
@@ -132,11 +143,11 @@
 }
 
 .theory-editor-resize-handle:hover {
-  background: #e0e7ff;
+  background: var(--accent-soft, #e7ecff);
 }
 
 .theory-editor-resize-handle:hover::after {
-  background: #4361ee;
+  background: var(--accent, #2b4bff);
 }
 
 /* Preview wrapper */
@@ -144,7 +155,28 @@
   flex: 1;
   overflow: auto;
   padding: 20px;
-  background: #e0e0e0;
+  background: var(--bg-sunken, #f3f4f6);
+}
+
+/* Sizer резервирует место под масштабированную страницу (центрируем) */
+.theory-preview-sizer {
+  margin: 0 auto;
+}
+
+/* Scaler несёт визуальный transform; контент внутри — в реальном размере */
+.theory-preview-scaler {
+  width: max-content;
+}
+
+/* CodeMirror-редактор заполняет оставшуюся высоту панели под заголовком */
+.theory-cm-editor {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.theory-cm-editor .cm-editor {
+  height: 100%;
 }
 
 /* Loading state */
@@ -162,10 +194,10 @@
   display: flex;
   align-items: center;
   padding: 4px 16px;
-  background: #fafafa;
-  border-top: 1px solid #f0f0f0;
+  background: var(--bg, #fbfbfd);
+  border-top: 1px solid var(--rule-soft, #eef0f3);
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--ink-4, #9aa0ac);
   flex-shrink: 0;
   gap: 12px;
 }
@@ -180,7 +212,7 @@
 .statusbar-divider {
   width: 1px;
   height: 12px;
-  background: #e0e0e0;
+  background: var(--rule, #e5e7eb);
 }
 
 .statusbar-spacer {
@@ -188,145 +220,35 @@
 }
 
 .statusbar-autosave {
-  color: #52c41a;
+  color: var(--c-teal, #0d9488);
 }
 
-.statusbar-theme {
-  cursor: pointer;
-  border-radius: 4px;
-  padding: 1px 6px;
-  transition: background 0.2s;
-}
-
-.statusbar-theme:hover {
-  background: #f0f0f0;
-}
-
-/* Theme selector modal */
-.theory-theme-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-
-.theory-theme-card {
-  border: 2px solid #e8e8e8;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  overflow: hidden;
-}
-
-.theory-theme-card:hover {
-  border-color: #4361ee;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(67, 97, 238, 0.2);
-}
-
-.theory-theme-card.active {
-  border-color: #52c41a;
-  box-shadow: 0 4px 12px rgba(82, 196, 26, 0.2);
-}
-
-.theory-theme-card .theme-preview {
-  height: 100px;
-  padding: 16px;
+/* Панель параметров листа (Popover) */
+.theory-settings-content {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  overflow: hidden;
+  gap: 14px;
 }
 
-.theory-theme-card .theme-preview[data-theme="classic"] {
-  background: white;
-  font-family: Georgia, serif;
-}
-
-.theory-theme-card .theme-preview[data-theme="classic"] .preview-title {
-  color: #2c3e50;
-  border-bottom: 2px solid #3498db;
-  padding-bottom: 4px;
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.theory-theme-card .theme-preview[data-theme="minimal"] {
-  background: #f9f9f9;
-  font-family: 'Helvetica Neue', sans-serif;
-}
-
-.theory-theme-card .theme-preview[data-theme="minimal"] .preview-title {
-  color: #333;
-  font-size: 16px;
-  font-weight: 300;
-}
-
-.theory-theme-card .theme-preview[data-theme="academic"] {
-  background: #fefefe;
-  font-family: 'Times New Roman', serif;
-}
-
-.theory-theme-card .theme-preview[data-theme="academic"] .preview-title {
-  color: #000;
-  text-align: center;
-  font-size: 16px;
-  font-weight: bold;
+.theory-settings-section-title {
+  font-size: var(--eyebrow-size, 10.5px);
+  font-weight: var(--eyebrow-weight, 600);
+  letter-spacing: var(--eyebrow-tracking, 0.08em);
   text-transform: uppercase;
+  color: var(--ink-3, #646a76);
+  margin-bottom: 6px;
 }
 
-.theory-theme-card .theme-preview[data-theme="notebook"] {
-  background: linear-gradient(white 20px, #e8f4f8 20px);
-  background-size: 100% 21px;
-  border-left: 3px solid #ff6b6b;
-  font-family: 'Comic Sans MS', cursive;
-}
-
-.theory-theme-card .theme-preview[data-theme="notebook"] .preview-title {
-  color: #2c3e50;
-  font-size: 16px;
-}
-
-.theory-theme-card .theme-preview[data-theme="compact"] {
-  background: white;
-  font-family: Arial, sans-serif;
-}
-
-.theory-theme-card .theme-preview[data-theme="compact"] .preview-title {
-  color: #2c3e50;
-  font-size: 14px;
-  font-weight: bold;
-  border-bottom: 1px solid #3498db;
-  padding-bottom: 3px;
-}
-
-.theory-theme-card .theme-info {
-  padding: 10px 14px;
-  background: #f8f9fa;
-  border-top: 1px solid #f0f0f0;
-}
-
-.theory-theme-card .theme-info h4 {
-  margin: 0 0 2px 0;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.theory-theme-card .theme-info p {
-  margin: 0;
+.theory-settings-hint {
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--ink-4, #9aa0ac);
+  margin-bottom: 2px;
 }
 
-.preview-text {
-  font-size: 13px;
-  color: #555;
-}
-
-.preview-formula {
-  font-family: 'Times New Roman', serif;
-  font-style: italic;
-  color: #34495e;
-  font-size: 14px;
+.theory-settings-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* GeoGebra placeholder — только пока div пустой (до инжекции хуком) */

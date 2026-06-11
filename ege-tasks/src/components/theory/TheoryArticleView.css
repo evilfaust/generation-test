@@ -35,12 +35,6 @@
   gap: 4px;
 }
 
-.theory-article-toolbar-divider {
-  width: 1px;
-  height: 20px;
-  background: #d9d9d9;
-}
-
 /* Content layout with TOC sidebar */
 .theory-article-layout {
   flex: 1;
@@ -84,12 +78,12 @@
 
 .toc-item:hover {
   background: #f0f5ff;
-  color: #4361ee;
+  color: var(--accent, #2b4bff);
 }
 
 .toc-item.active {
   background: #e0e7ff;
-  color: #4361ee;
+  color: var(--accent, #2b4bff);
   font-weight: 600;
 }
 
@@ -199,7 +193,7 @@
 .theory-floating-actions .ant-btn:hover {
   transform: scale(1.1);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-  color: #4361ee;
+  color: var(--accent, #2b4bff);
 }
 
 /* Related tasks section */
@@ -284,34 +278,6 @@
 .difficulty-dot.difficulty-1 { background: #52c41a; }
 .difficulty-dot.difficulty-2 { background: #faad14; }
 .difficulty-dot.difficulty-3 { background: #ff4d4f; }
-
-/* Theme selector drawer */
-.theory-theme-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.theory-theme-option {
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1.5px solid #f0f0f0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.theory-theme-option:hover {
-  border-color: #4361ee;
-  background: #f0f5ff;
-}
-
-.theory-theme-option.active {
-  border-color: #52c41a;
-  background: #f6ffed;
-}
 
 /* Print styles */
 @media print {

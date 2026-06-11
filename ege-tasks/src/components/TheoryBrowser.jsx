@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Input, Select, Button, Tag, Spin, Popconfirm, Tooltip, App } from 'antd';
+import { Input, Button, Spin, Popconfirm, Tooltip, App } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined,
-  SearchOutlined, BookOutlined, AppstoreOutlined, ClockCircleOutlined
+  SearchOutlined, BookOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { useAuth } from '../contexts/AuthContext';
+import { WorkspacePageHeader, EmptyState } from './workspace/ui';
 import './theory/TheoryBrowser.css';
 
 export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateArticle }) {
@@ -93,63 +94,44 @@ export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateAr
 
   return (
     <div>
-      {/* Hero секция */}
-      <div className="theory-browser-hero">
-        <div className="theory-hero-card theory-hero-card--articles">
-          <div className="theory-hero-icon"><BookOutlined /></div>
-          <div className="theory-hero-value">{totalArticles}</div>
-          <div className="theory-hero-label">Статей</div>
-        </div>
-        <div className="theory-hero-card theory-hero-card--categories">
-          <div className="theory-hero-icon"><AppstoreOutlined /></div>
-          <div className="theory-hero-value">{categories.length}</div>
-          <div className="theory-hero-label">Категорий</div>
-        </div>
-        <div className="theory-hero-card theory-hero-card--recent">
-          <div className="theory-hero-icon"><ClockCircleOutlined /></div>
-          <div className="theory-hero-value">{recentCount}</div>
-          <div className="theory-hero-label">За неделю</div>
-        </div>
-      </div>
-
-      {/* Панель поиска */}
-      <div className="theory-browser-search-bar">
-        <div className="theory-search-input">
-          <Input
-            placeholder="Поиск по названию, описанию или тегам..."
-            prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-            size="large"
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            allowClear
-          />
-        </div>
-        {canEdit && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="large"
-            className="theory-create-btn"
-            onClick={onCreateArticle}
-          >
+      <WorkspacePageHeader
+        icon={<BookOutlined />}
+        accent="violet"
+        title="Теория"
+        subtitle={`Статей: ${totalArticles} · Категорий: ${categories.length} · За неделю: ${recentCount}`}
+        extra={canEdit && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={onCreateArticle}>
             Новая статья
           </Button>
         )}
+      />
+
+      {/* Панель поиска */}
+      <div className="theory-browser-search-bar">
+        <Input
+          className="theory-search-input"
+          placeholder="Поиск по названию, описанию или тегам…"
+          prefix={<SearchOutlined style={{ color: 'var(--ink-4, #9aa0ac)' }} />}
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          allowClear
+        />
       </div>
 
       {/* Category pills */}
       {categories.length > 0 && (
         <div className="theory-category-pills">
-          <div
+          <button
+            type="button"
             className={`theory-category-pill ${!selectedCategory ? 'active' : ''}`}
-            style={{ '--pill-color': '#4361ee' }}
             onClick={() => setSelectedCategory(null)}
           >
             Все
             <span className="pill-count">{totalArticles}</span>
-          </div>
+          </button>
           {categories.map(cat => (
-            <div
+            <button
+              type="button"
               key={cat.id}
               className={`theory-category-pill ${selectedCategory === cat.id ? 'active' : ''}`}
               style={{ '--pill-color': cat.color }}
@@ -158,7 +140,7 @@ export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateAr
               <span className="pill-dot" style={{ background: cat.color }} />
               {cat.title}
               <span className="pill-count">{articleCounts[cat.id] || 0}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -169,17 +151,15 @@ export default function TheoryBrowser({ onEditArticle, onViewArticle, onCreateAr
           <Spin size="large" />
         </div>
       ) : filteredArticles.length === 0 ? (
-        <div className="theory-browser-empty">
-          <div className="theory-browser-empty-icon"><BookOutlined /></div>
-          <div className="theory-browser-empty-text">
-            {articles.length === 0 ? 'Нет статей. Создайте первую!' : 'Ничего не найдено'}
-          </div>
-          {articles.length === 0 && canEdit && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={onCreateArticle}>
-              Создать статью
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          title={articles.length === 0 ? 'Пока нет статей' : 'Ничего не найдено'}
+          description={articles.length === 0
+            ? (canEdit ? 'Создайте первую статью теории' : undefined)
+            : 'Попробуйте изменить запрос или категорию'}
+          cta={articles.length === 0 && canEdit ? 'Создать статью' : undefined}
+          ctaIcon={<PlusOutlined />}
+          onCta={onCreateArticle}
+        />
       ) : (
         <div className="theory-articles-grid">
           {filteredArticles.map(article => {

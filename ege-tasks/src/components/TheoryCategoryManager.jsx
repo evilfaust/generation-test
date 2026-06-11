@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Button, Modal, Form, Input, InputNumber, ColorPicker, Space, Popconfirm, Tag, App } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, ColorPicker, Popconfirm, Spin, App } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, BookOutlined, HolderOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
+import { WorkspacePageHeader, EmptyState } from './workspace/ui';
 import './theory/TheoryCategoryManager.css';
 
 const DEFAULT_CATEGORIES = [
@@ -172,25 +173,30 @@ export default function TheoryCategoryManager() {
 
   return (
     <div>
-      <div className="theory-categories-header">
-        <h2><AppstoreOutlined /> Категории</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Добавить категорию
-        </Button>
-      </div>
+      <WorkspacePageHeader
+        icon={<AppstoreOutlined />}
+        accent="violet"
+        title="Категории теории"
+        subtitle="Разделы, по которым группируются статьи"
+        extra={(
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
+            Добавить категорию
+          </Button>
+        )}
+      />
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40 }}>
-          <span style={{ color: '#8c8c8c' }}>Загрузка...</span>
+          <Spin />
         </div>
       ) : categories.length === 0 ? (
-        <div className="theory-categories-empty">
-          <div className="theory-categories-empty-icon"><AppstoreOutlined /></div>
-          <div>Категорий пока нет</div>
-          <Button onClick={handleSeedDefaults} style={{ marginTop: 16 }}>
-            Создать категории по умолчанию
-          </Button>
-        </div>
+        <EmptyState
+          title="Категорий пока нет"
+          description="Создайте категории по умолчанию или добавьте свою"
+          cta="Создать категории по умолчанию"
+          ctaType="default"
+          onCta={handleSeedDefaults}
+        />
       ) : (
         <div className="theory-categories-grid">
           {categories.map((cat, index) => {

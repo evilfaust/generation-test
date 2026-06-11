@@ -66,7 +66,6 @@ export default defineConfig({
       },
       output: {
         manualChunks: {
-          'monaco-editor': ['monaco-editor', '@monaco-editor/react'],
           'markdown': ['unified', 'remark-parse', 'remark-math', 'remark-rehype', 'rehype-katex', 'rehype-stringify'],
           'antd': ['antd', '@ant-design/icons'],
         },

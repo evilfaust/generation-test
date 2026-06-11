@@ -40,7 +40,22 @@ const MARKERS = {
   vspaceSm: 'VSPACESM_7f3a9b',
   vspaceLg: 'VSPACELG_7f3a9b',
   geogebraPrefix: 'GGBLOCK_7f3a9b_',
+  calloutOpenPrefix: 'CALLOUTOPEN7f3a9b',
+  calloutClose: 'CALLOUTCLOSE7f3a9b',
 }
+
+// Каллауты теории: блок ":::definition Заголовок \n тело \n :::"
+const CALLOUT_LABELS = {
+  definition: 'Определение',
+  theorem: 'Теорема',
+  example: 'Пример',
+  remark: 'Замечание',
+  proof: 'Доказательство',
+  note: 'Заметка',
+}
+const CALLOUT_OPEN_RE = new RegExp(
+  `^:::(${Object.keys(CALLOUT_LABELS).join('|')})\\b\\s*(.*)$`,
+)
 
 function parseGeoGebraConfig(rawConfig = '') {
   const allowedApps = new Set(['geometry', 'graphing', 'classic', '3d'])
@@ -92,9 +107,29 @@ function preprocess(md) {
   const lines = normalized.split('\n')
   const outLines = []
   const geogebraBlocks = []
+  const callouts = []
 
   for (let i = 0; i < lines.length; i += 1) {
     const trimmed = lines[i].trim()
+
+    // Каллаут теории: :::definition Заголовок \n тело \n :::
+    const calloutMatch = trimmed.match(CALLOUT_OPEN_RE)
+    if (calloutMatch) {
+      const type = calloutMatch[1]
+      const title = (calloutMatch[2] || '').trim() || CALLOUT_LABELS[type]
+      const marker = `${MARKERS.calloutOpenPrefix}${callouts.length}E`
+      callouts.push({ marker, type, title })
+
+      const bodyLines = []
+      i += 1
+      for (; i < lines.length; i += 1) {
+        if (lines[i].trim() === ':::') break
+        bodyLines.push(lines[i])
+      }
+      // Маркеры окружаем пустыми строками → становятся отдельными <p>.
+      outLines.push('', marker, '', ...bodyLines, '', MARKERS.calloutClose, '')
+      continue
+    }
 
     // Однострочный формат: :::geogebra ggb-id:::
     const inlineMatch = trimmed.match(INLINE_GEO_RE)
@@ -152,6 +187,7 @@ function preprocess(md) {
   return {
     text: processed,
     geogebraBlocks,
+    callouts,
   }
 }
 
@@ -163,7 +199,7 @@ function escapeAttr(value = '') {
     .replace(/>/g, '&gt;')
 }
 
-function postprocess(html, columns, geogebraBlocks = []) {
+function postprocess(html, columns, geogebraBlocks = [], callouts = []) {
   let result = html
     .replace(new RegExp(`<p>\\s*${MARKERS.vspaceLg}\\s*</p>`, 'g'), '<div class="vspace vspace-lg"></div>')
     .replace(new RegExp(`<p>\\s*${MARKERS.vspaceSm}\\s*</p>`, 'g'), '<div class="vspace vspace-sm"></div>')
@@ -171,6 +207,16 @@ function postprocess(html, columns, geogebraBlocks = []) {
     .replace(new RegExp(MARKERS.vspaceLg, 'g'), '<div class="vspace vspace-lg"></div>')
     .replace(new RegExp(MARKERS.vspaceSm, 'g'), '<div class="vspace vspace-sm"></div>')
     .replace(new RegExp(MARKERS.vspace, 'g'), '<div class="vspace"></div>')
+
+  // Каллауты: маркер-открытие → стилизованный div + лейбл, маркер-закрытие → </div>
+  callouts.forEach((c) => {
+    const openHtml = `<div class="theory-callout theory-callout--${c.type}"><div class="theory-callout__label">${escapeAttr(c.title)}</div>`
+    result = result.replace(new RegExp(`<p>\\s*${c.marker}\\s*</p>|${c.marker}`, 'g'), openHtml)
+  })
+  result = result.replace(
+    new RegExp(`<p>\\s*${MARKERS.calloutClose}\\s*</p>|${MARKERS.calloutClose}`, 'g'),
+    '</div>',
+  )
 
   const colBreakPattern = `<p>\\s*${MARKERS.colBreak}\\s*</p>|${MARKERS.colBreak}`
   const hasColBreak = new RegExp(colBreakPattern).test(result)
@@ -212,9 +258,9 @@ export function useMarkdownProcessor(markdown, columns = 1) {
 
   const processMarkdown = useCallback(async (text) => {
     try {
-      const { text: preprocessed, geogebraBlocks } = preprocess(text)
+      const { text: preprocessed, geogebraBlocks, callouts } = preprocess(text)
       const result = await processorRef.current.process(preprocessed)
-      const withCustom = postprocess(String(result), columnsRef.current, geogebraBlocks)
+      const withCustom = postprocess(String(result), columnsRef.current, geogebraBlocks, callouts)
 
       const cleanHtml = DOMPurify.sanitize(withCustom, {
         ADD_TAGS: ['math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub',

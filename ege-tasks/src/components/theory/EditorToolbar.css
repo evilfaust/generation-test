@@ -5,8 +5,8 @@
   align-items: center;
   gap: 2px;
   padding: 4px 12px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--bg-raised, #fff);
+  border-bottom: 1px solid var(--rule-soft, #eef0f3);
   flex-shrink: 0;
   overflow-x: auto;
 }
@@ -31,7 +31,7 @@
 }
 
 .theory-format-toolbar .toolbar-group + .toolbar-group {
-  border-left: 1px solid #f0f0f0;
+  border-left: 1px solid var(--rule-soft, #eef0f3);
 }
 
 .theory-format-toolbar .toolbar-btn {
@@ -39,24 +39,35 @@
   height: 28px;
   border: none;
   background: transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-sm, 4px);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #595959;
+  color: var(--ink-2, #2a2f3a);
   transition: all 0.15s ease;
   font-size: 14px;
   padding: 0;
 }
 
 .theory-format-toolbar .toolbar-btn:hover {
-  background: #f0f5ff;
-  color: #4361ee;
+  background: var(--accent-soft, #e7ecff);
+  color: var(--accent, #2b4bff);
 }
 
 .theory-format-toolbar .toolbar-btn:active {
-  background: #e0e7ff;
+  background: var(--accent-soft, #e7ecff);
+}
+
+.theory-format-toolbar .toolbar-btn--wide {
+  width: auto;
+  gap: 3px;
+  padding: 0 7px;
+}
+
+.theory-format-toolbar .toolbar-caret {
+  font-size: 8px;
+  opacity: 0.5;
 }
 
 .theory-format-toolbar .heading-btn {

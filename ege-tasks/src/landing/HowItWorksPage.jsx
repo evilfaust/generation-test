@@ -97,12 +97,12 @@ const CORE_MODULES = [
     title: 'Модуль теории',
     desc: 'Каталог теоретических конспектов с полноценным редактором.',
     details: [
-      'Monaco Editor с кастомной Toolbar: заголовки, списки, таблицы, формулы',
+      'CodeMirror 6 с кастомной Toolbar: заголовки, списки, таблицы, формулы',
       '5 тем оформления: от академической LaTeX до скетчбука Moleskine',
       'TOC sidebar с IntersectionObserver',
       'Конструктор конспектов для печати с выбором статей',
     ],
-    tags: ['Monaco', '5 тем', 'Печать конспектов'],
+    tags: ['CodeMirror', '5 тем', 'Печать конспектов'],
   },
   {
     num: '08', color: 'cyan', wide: true,
@@ -192,7 +192,7 @@ const TECH_STACK = [
     items: [
       { name: 'KaTeX', ver: '0.16.9', note: 'LaTeX формулы' },
       { name: 'react-markdown', ver: '10.1', note: 'Markdown + GFM' },
-      { name: 'Monaco Editor', ver: '4.7', note: 'Редактор теории (lazy)' },
+      { name: 'CodeMirror 6', ver: '4.25', note: 'Редактор теории и задач (lazy)' },
       { name: 'BlockNote', ver: '0.31', note: 'Блочный редактор заметок + LaTeX' },
       { name: 'GeoGebra', ver: '', note: 'Чертежи геометрии + ТДФ' },
     ],

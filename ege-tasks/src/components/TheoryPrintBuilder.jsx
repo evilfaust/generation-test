@@ -6,7 +6,7 @@ import {
   BookOutlined, OrderedListOutlined
 } from '@ant-design/icons';
 import { useMarkdownProcessor } from '../hooks';
-import { getPageDimensions, DEFAULT_SETTINGS, THEME_NAMES } from '../utils/theoryThemes';
+import { getPageDimensions, DEFAULT_SETTINGS } from '../utils/theoryThemes';
 import { api } from '../services/pocketbase';
 import html2pdf from 'html2pdf.js';
 import 'katex/dist/katex.min.css';
@@ -25,7 +25,6 @@ export default function TheoryPrintBuilder({ onBack }) {
   const [categoryFilter, setCategoryFilter] = useState(null);
   const [includeToc, setIncludeToc] = useState(true);
   const [docTitle, setDocTitle] = useState('Конспект');
-  const [currentTheme, setCurrentTheme] = useState('classic');
   const [pageSettings] = useState(DEFAULT_SETTINGS);
   const [isExporting, setIsExporting] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
@@ -226,14 +225,6 @@ export default function TheoryPrintBuilder({ onBack }) {
             onChange={e => setDocTitle(e.target.value)}
             style={{ width: 200 }}
           />
-          <Select
-            value={currentTheme}
-            onChange={setCurrentTheme}
-            style={{ width: 160 }}
-            options={Object.entries(THEME_NAMES).map(([key, label]) => ({
-              value: key, label,
-            }))}
-          />
           <Checkbox checked={includeToc} onChange={e => setIncludeToc(e.target.checked)}>
             Оглавление
           </Checkbox>
@@ -377,7 +368,6 @@ export default function TheoryPrintBuilder({ onBack }) {
                 <div
                   ref={previewRef}
                   className="theory-preview-content theory-article-print-area"
-                  data-theme={currentTheme}
                   style={previewStyles}
                   dangerouslySetInnerHTML={{ __html: html }}
                 />
