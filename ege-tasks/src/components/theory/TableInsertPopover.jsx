@@ -64,9 +64,7 @@ export default function TableInsertPopover({ onInsert }) {
       placement="bottom"
     >
       <Tooltip title="Таблица">
-        <button className="toolbar-btn" type="button">
-          <TableOutlined />
-        </button>
+        <Button size="small" type="text" className="tf-btn" icon={<TableOutlined />} />
       </Tooltip>
     </Popover>
   );

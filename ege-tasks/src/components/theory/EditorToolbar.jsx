@@ -1,14 +1,21 @@
-import { useState, useCallback } from 'react';
-import { Tooltip, Modal, Input, Popover, Dropdown } from 'antd';
+import { useState, useCallback, useRef } from 'react';
+import { Tooltip, Modal, Input, Popover, Dropdown, Button, Divider, Segmented, Upload, Alert, Space, App } from 'antd';
 import {
   BoldOutlined, ItalicOutlined, StrikethroughOutlined,
   OrderedListOutlined, UnorderedListOutlined,
   CodeOutlined, PictureOutlined, LinkOutlined,
-  MinusOutlined, FunctionOutlined, ContainerOutlined, DownOutlined
+  MinusOutlined, FunctionOutlined, ContainerOutlined, DownOutlined,
+  InboxOutlined, ScissorOutlined, ReloadOutlined
 } from '@ant-design/icons';
 import TableInsertPopover from './TableInsertPopover';
 import FormulaPalette from './FormulaPalette';
+import CropModal from '../shared/CropModal';
+import { materialsApi } from '../../shared/services/pb/filesClient';
+import { dataUrlToFile } from '../../utils/cropImage';
 import './EditorToolbar.css';
+
+// Вертикальный разделитель групп — как в тулбаре редактора геометрии.
+const DIVIDER = <Divider type="vertical" className="tf-divider" />;
 
 // Вставка/обёртка через императивный хэндл редактора (TheoryMarkdownEditor).
 function insertIntoEditor(editor, opts) {
@@ -26,9 +33,15 @@ const CALLOUTS = [
 ];
 
 export default function EditorToolbar({ editorRef }) {
+  const { message } = App.useApp();
   const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [imageMode, setImageMode] = useState('upload'); // 'upload' | 'url'
   const [imageUrl, setImageUrl] = useState('');
   const [imageAlt, setImageAlt] = useState('');
+  const [localDataUrl, setLocalDataUrl] = useState(null); // выбранный/обрезанный файл (data-url)
+  const [localName, setLocalName] = useState('image.png');
+  const [uploading, setUploading] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
@@ -41,14 +54,66 @@ export default function EditorToolbar({ editorRef }) {
     insertIntoEditor(editorRef.current, { text: tableMarkdown });
   }, [editorRef]);
 
-  const handleImageInsert = useCallback(() => {
-    if (!imageUrl.trim()) return;
-    const alt = imageAlt.trim() || 'Изображение';
-    insertIntoEditor(editorRef.current, { text: `\n![${alt}](${imageUrl.trim()})\n` });
+  const insertImageMd = useCallback((url, altRaw) => {
+    const alt = (altRaw || '').trim() || 'Изображение';
+    insertIntoEditor(editorRef.current, { text: `\n![${alt}](${url})\n` });
+  }, [editorRef]);
+
+  const resetImageModal = useCallback(() => {
+    setImageModalOpen(false);
     setImageUrl('');
     setImageAlt('');
-    setImageModalOpen(false);
-  }, [editorRef, imageUrl, imageAlt]);
+    setLocalDataUrl(null);
+    setLocalName('image.png');
+    setImageMode('upload');
+  }, []);
+
+  // Выбор файла (Upload.Dragger / клик) → читаем в data-url, без авто-загрузки.
+  const handleFilePicked = useCallback((file) => {
+    if (file && !file.type?.startsWith('image/')) {
+      message.warning('Можно загружать только изображения');
+      return false;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setLocalDataUrl(String(reader.result));
+      setLocalName(file.name || 'image.png');
+    };
+    reader.readAsDataURL(file);
+    return false;
+  }, [message]);
+
+  // OK модалки: ветвление по режиму (ссылка / загрузка на files.l.oipav.ru).
+  const handleImageOk = useCallback(async () => {
+    if (imageMode === 'url') {
+      if (!imageUrl.trim()) return;
+      insertImageMd(imageUrl.trim(), imageAlt);
+      resetImageModal();
+      return;
+    }
+    if (!localDataUrl) return;
+    if (!materialsApi.isConnected()) {
+      message.warning('Хранилище файлов не подключено — войдите в разделе «Библиотека материалов»');
+      return;
+    }
+    setUploading(true);
+    try {
+      const file = dataUrlToFile(localDataUrl, localName || 'image.png');
+      const rec = await materialsApi.uploadMaterial({
+        file,
+        title: imageAlt.trim() || localName,
+        category: 'other',
+      });
+      const url = materialsApi.fileUrl(rec);
+      insertImageMd(url, imageAlt);
+      message.success('Картинка загружена');
+      resetImageModal();
+    } catch {
+      message.error('Не удалось загрузить картинку');
+    } finally {
+      setUploading(false);
+    }
+  }, [imageMode, imageUrl, imageAlt, localDataUrl, localName, insertImageMd, resetImageModal, message]);
 
   const handleLinkInsert = useCallback(() => {
     if (!linkUrl.trim()) return;
@@ -76,168 +141,202 @@ export default function EditorToolbar({ editorRef }) {
     <>
       <div className="theory-format-toolbar">
         {/* Заголовки */}
-        <div className="toolbar-group">
-          <Tooltip title="Заголовок 1">
-            <button className="toolbar-btn heading-btn h1" type="button"
-              onClick={() => insert({ before: '# ', after: '', newLine: true })}>H1</button>
-          </Tooltip>
-          <Tooltip title="Заголовок 2">
-            <button className="toolbar-btn heading-btn h2" type="button"
-              onClick={() => insert({ before: '## ', after: '', newLine: true })}>H2</button>
-          </Tooltip>
-          <Tooltip title="Заголовок 3">
-            <button className="toolbar-btn heading-btn h3" type="button"
-              onClick={() => insert({ before: '### ', after: '', newLine: true })}>H3</button>
-          </Tooltip>
-          <Tooltip title="Заголовок 4">
-            <button className="toolbar-btn heading-btn h4" type="button"
-              onClick={() => insert({ before: '#### ', after: '', newLine: true })}>H4</button>
-          </Tooltip>
-        </div>
+        <Tooltip title="Заголовок 1">
+          <Button size="small" type="text" className="tf-btn tf-h"
+            onClick={() => insert({ before: '# ', after: '', newLine: true })}>H1</Button>
+        </Tooltip>
+        <Tooltip title="Заголовок 2">
+          <Button size="small" type="text" className="tf-btn tf-h"
+            onClick={() => insert({ before: '## ', after: '', newLine: true })}>H2</Button>
+        </Tooltip>
+        <Tooltip title="Заголовок 3">
+          <Button size="small" type="text" className="tf-btn tf-h"
+            onClick={() => insert({ before: '### ', after: '', newLine: true })}>H3</Button>
+        </Tooltip>
+        <Tooltip title="Заголовок 4">
+          <Button size="small" type="text" className="tf-btn tf-h tf-h4"
+            onClick={() => insert({ before: '#### ', after: '', newLine: true })}>H4</Button>
+        </Tooltip>
+
+        {DIVIDER}
 
         {/* Форматирование текста */}
-        <div className="toolbar-group">
-          <Tooltip title="Жирный">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '**', after: '**' })}>
-              <BoldOutlined />
-            </button>
-          </Tooltip>
-          <Tooltip title="Курсив">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '*', after: '*' })}>
-              <ItalicOutlined />
-            </button>
-          </Tooltip>
-          <Tooltip title="Зачёркнутый">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '~~', after: '~~' })}>
-              <StrikethroughOutlined />
-            </button>
-          </Tooltip>
-        </div>
+        <Tooltip title="Жирный">
+          <Button size="small" type="text" className="tf-btn" icon={<BoldOutlined />}
+            onClick={() => insert({ before: '**', after: '**' })} />
+        </Tooltip>
+        <Tooltip title="Курсив">
+          <Button size="small" type="text" className="tf-btn" icon={<ItalicOutlined />}
+            onClick={() => insert({ before: '*', after: '*' })} />
+        </Tooltip>
+        <Tooltip title="Зачёркнутый">
+          <Button size="small" type="text" className="tf-btn" icon={<StrikethroughOutlined />}
+            onClick={() => insert({ before: '~~', after: '~~' })} />
+        </Tooltip>
+
+        {DIVIDER}
 
         {/* Блочные элементы */}
-        <div className="toolbar-group">
-          <Tooltip title="Маркированный список">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '- ', after: '', newLine: true })}>
-              <UnorderedListOutlined />
-            </button>
-          </Tooltip>
-          <Tooltip title="Нумерованный список">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '1. ', after: '', newLine: true })}>
-              <OrderedListOutlined />
-            </button>
-          </Tooltip>
-          <Tooltip title="Цитата">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '> ', after: '', newLine: true })}>
-              <span style={{ fontWeight: 700, fontSize: 16 }}>"</span>
-            </button>
-          </Tooltip>
-          <Tooltip title="Блок кода">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '```\n', after: '\n```', newLine: true })}>
-              <CodeOutlined />
-            </button>
-          </Tooltip>
-          <Tooltip title="Разделитель">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ text: '\n---\n' })}>
-              <MinusOutlined />
-            </button>
-          </Tooltip>
-        </div>
+        <Tooltip title="Маркированный список">
+          <Button size="small" type="text" className="tf-btn" icon={<UnorderedListOutlined />}
+            onClick={() => insert({ before: '- ', after: '', newLine: true })} />
+        </Tooltip>
+        <Tooltip title="Нумерованный список">
+          <Button size="small" type="text" className="tf-btn" icon={<OrderedListOutlined />}
+            onClick={() => insert({ before: '1. ', after: '', newLine: true })} />
+        </Tooltip>
+        <Tooltip title="Цитата">
+          <Button size="small" type="text" className="tf-btn tf-quote"
+            onClick={() => insert({ before: '> ', after: '', newLine: true })}>&ldquo;</Button>
+        </Tooltip>
+        <Tooltip title="Блок кода">
+          <Button size="small" type="text" className="tf-btn" icon={<CodeOutlined />}
+            onClick={() => insert({ before: '```\n', after: '\n```', newLine: true })} />
+        </Tooltip>
+        <Tooltip title="Разделитель">
+          <Button size="small" type="text" className="tf-btn" icon={<MinusOutlined />}
+            onClick={() => insert({ text: '\n---\n' })} />
+        </Tooltip>
+
+        {DIVIDER}
 
         {/* Вставка */}
-        <div className="toolbar-group">
-          <TableInsertPopover onInsert={handleTableInsert} />
-          <Tooltip title="Формула (inline) — Ctrl+I">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '$', after: '$' })}>
-              <FunctionOutlined />
-              <span className="formula-label">x</span>
-            </button>
+        <TableInsertPopover onInsert={handleTableInsert} />
+        <Tooltip title="Формула (inline) — Ctrl+I">
+          <Button size="small" type="text" className="tf-btn tf-fx"
+            onClick={() => insert({ before: '$', after: '$' })}>
+            <FunctionOutlined /><span className="tf-fx__sub">x</span>
+          </Button>
+        </Tooltip>
+        <Tooltip title="Формула (блок) — Ctrl+B">
+          <Button size="small" type="text" className="tf-btn tf-fx"
+            onClick={() => insert({ before: '\n$$\n', after: '\n$$\n' })}>
+            <FunctionOutlined /><span className="tf-fx__sub">∑</span>
+          </Button>
+        </Tooltip>
+        <Popover
+          trigger="click"
+          placement="bottomLeft"
+          content={<FormulaPalette onInsert={insert} />}
+          title="Палитра формул"
+        >
+          <Tooltip title="Палитра символов и шаблонов">
+            <Button size="small" type="text" className="tf-btn tf-btn--menu">
+              <FunctionOutlined /><DownOutlined className="tf-caret" />
+            </Button>
           </Tooltip>
-          <Tooltip title="Формула (блок) — Ctrl+B">
-            <button className="toolbar-btn" type="button"
-              onClick={() => insert({ before: '\n$$\n', after: '\n$$\n' })}>
-              <FunctionOutlined />
-              <span className="formula-label">∑</span>
-            </button>
+        </Popover>
+        <Dropdown menu={calloutMenu} trigger={['click']} placement="bottomLeft">
+          <Tooltip title="Блок теории (определение, теорема…)">
+            <Button size="small" type="text" className="tf-btn tf-btn--menu">
+              <ContainerOutlined /><DownOutlined className="tf-caret" />
+            </Button>
           </Tooltip>
-          <Popover
-            trigger="click"
-            placement="bottomLeft"
-            content={<FormulaPalette onInsert={insert} />}
-            title="Палитра формул"
-          >
-            <Tooltip title="Палитра символов и шаблонов">
-              <button className="toolbar-btn toolbar-btn--wide" type="button">
-                <FunctionOutlined />
-                <DownOutlined className="toolbar-caret" />
-              </button>
-            </Tooltip>
-          </Popover>
-          <Dropdown menu={calloutMenu} trigger={['click']} placement="bottomLeft">
-            <Tooltip title="Блок теории (определение, теорема…)">
-              <button className="toolbar-btn toolbar-btn--wide" type="button">
-                <ContainerOutlined />
-                <DownOutlined className="toolbar-caret" />
-              </button>
-            </Tooltip>
-          </Dropdown>
-          <Tooltip title="Изображение">
-            <button className="toolbar-btn" type="button"
-              onClick={() => setImageModalOpen(true)}>
-              <PictureOutlined />
-            </button>
-          </Tooltip>
-          <Tooltip title="Ссылка">
-            <button className="toolbar-btn" type="button"
-              onClick={() => setLinkModalOpen(true)}>
-              <LinkOutlined />
-            </button>
-          </Tooltip>
-        </div>
+        </Dropdown>
+        <Tooltip title="Изображение">
+          <Button size="small" type="text" className="tf-btn" icon={<PictureOutlined />}
+            onClick={() => setImageModalOpen(true)} />
+        </Tooltip>
+        <Tooltip title="Ссылка">
+          <Button size="small" type="text" className="tf-btn" icon={<LinkOutlined />}
+            onClick={() => setLinkModalOpen(true)} />
+        </Tooltip>
       </div>
 
       {/* Modal: Вставка изображения */}
       <Modal
         title="Вставка изображения"
         open={imageModalOpen}
-        onCancel={() => { setImageModalOpen(false); setImageUrl(''); setImageAlt(''); }}
-        onOk={handleImageInsert}
-        okText="Вставить"
+        onCancel={resetImageModal}
+        onOk={handleImageOk}
+        okText={imageMode === 'upload' ? 'Загрузить и вставить' : 'Вставить'}
         cancelText="Отмена"
-        okButtonProps={{ disabled: !imageUrl.trim() }}
-        width={450}
+        confirmLoading={uploading}
+        okButtonProps={{ disabled: imageMode === 'url' ? !imageUrl.trim() : !localDataUrl }}
+        width={520}
       >
         <div className="theory-image-insert">
-          <Input
-            placeholder="URL изображения"
-            value={imageUrl}
-            onChange={e => setImageUrl(e.target.value)}
-            autoFocus
+          <Segmented
+            block
+            value={imageMode}
+            onChange={setImageMode}
+            options={[
+              { value: 'upload', label: 'Загрузить файл' },
+              { value: 'url', label: 'По ссылке' },
+            ]}
           />
-          <Input
-            placeholder="Описание (alt текст)"
-            value={imageAlt}
-            onChange={e => setImageAlt(e.target.value)}
-          />
-          {imageUrl.trim() && (
-            <img
-              src={imageUrl}
-              alt="Превью"
-              className="theory-image-insert-preview"
-              onError={e => { e.target.style.display = 'none'; }}
-              onLoad={e => { e.target.style.display = 'block'; }}
-            />
+
+          {imageMode === 'upload' ? (
+            <>
+              {!materialsApi.isConnected() && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="Хранилище файлов не подключено"
+                  description="Войдите в разделе «Библиотека материалов», чтобы загружать картинки на сервер."
+                />
+              )}
+              {!localDataUrl ? (
+                <Upload.Dragger
+                  accept="image/*"
+                  multiple={false}
+                  showUploadList={false}
+                  beforeUpload={handleFilePicked}
+                >
+                  <p className="ant-upload-drag-icon"><InboxOutlined /></p>
+                  <p className="ant-upload-text">Перетащите картинку сюда или нажмите</p>
+                  <p className="ant-upload-hint">PNG, JPG, GIF, WebP — загрузится на files.l.oipav.ru</p>
+                </Upload.Dragger>
+              ) : (
+                <>
+                  <img src={localDataUrl} alt="Превью" className="theory-image-insert-preview" />
+                  <Space>
+                    <Button icon={<ScissorOutlined />} onClick={() => setCropOpen(true)}>Кадрировать</Button>
+                    <Button icon={<ReloadOutlined />} onClick={() => setLocalDataUrl(null)}>Заменить</Button>
+                  </Space>
+                </>
+              )}
+              <Input
+                placeholder="Описание (alt текст)"
+                value={imageAlt}
+                onChange={e => setImageAlt(e.target.value)}
+              />
+            </>
+          ) : (
+            <>
+              <Input
+                placeholder="URL изображения"
+                value={imageUrl}
+                onChange={e => setImageUrl(e.target.value)}
+                autoFocus
+              />
+              <Input
+                placeholder="Описание (alt текст)"
+                value={imageAlt}
+                onChange={e => setImageAlt(e.target.value)}
+              />
+              {imageUrl.trim() && (
+                <img
+                  src={imageUrl}
+                  alt="Превью"
+                  className="theory-image-insert-preview"
+                  onError={e => { e.target.style.display = 'none'; }}
+                  onLoad={e => { e.target.style.display = 'block'; }}
+                />
+              )}
+            </>
           )}
         </div>
       </Modal>
+
+      <CropModal
+        open={cropOpen}
+        onCancel={() => setCropOpen(false)}
+        onCropped={(cropped) => { setLocalDataUrl(cropped); setCropOpen(false); }}
+        imageUrl={localDataUrl}
+        title="Кадрирование картинки"
+        messageApi={message}
+      />
 
       {/* Modal: Вставка ссылки */}
       <Modal

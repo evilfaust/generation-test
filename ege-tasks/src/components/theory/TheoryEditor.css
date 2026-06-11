@@ -7,9 +7,9 @@
   height: 100vh;
 }
 
-/* Meta toolbar (top) */
+/* Meta toolbar (top) — тонкая документная полоса */
 .theory-editor-meta-toolbar {
-  padding: 8px 16px;
+  padding: 5px 12px;
   background: var(--bg-raised, #fff);
   border-bottom: 1px solid var(--rule, #e5e7eb);
   display: flex;

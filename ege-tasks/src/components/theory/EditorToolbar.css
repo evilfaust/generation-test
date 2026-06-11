@@ -1,93 +1,75 @@
-/* ===== Editor Formatting Toolbar ===== */
+/* ===== Editor Formatting Toolbar (стиль панели редактора геометрии) ===== */
 
+/* Контейнер-«пилюля»: скруглённая светлая панель с отступом от краёв. */
 .theory-format-toolbar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px 12px;
-  background: var(--bg-raised, #fff);
-  border-bottom: 1px solid var(--rule-soft, #eef0f3);
-  flex-shrink: 0;
-  overflow-x: auto;
-}
-
-.theory-format-toolbar::-webkit-scrollbar {
-  height: 2px;
-}
-
-.theory-format-toolbar::-webkit-scrollbar-thumb {
-  background: #d9d9d9;
-  border-radius: 2px;
-}
-
-.theory-format-toolbar .toolbar-group {
-  display: flex;
   gap: 1px;
-  padding: 0 6px;
+  flex-wrap: wrap;
+  padding: 5px 8px;
+  margin: 8px 12px;
+  background: var(--bg-sunken, #fafafa);
+  border: 1px solid var(--rule-soft, #f0f0f0);
+  border-radius: var(--radius-lg, 8px);
+  flex-shrink: 0;
 }
 
-.theory-format-toolbar .toolbar-group:first-child {
-  padding-left: 0;
+/* Вертикальный разделитель групп */
+.theory-format-toolbar .tf-divider {
+  height: 18px;
+  margin: 0 4px;
+  border-color: var(--rule, #e5e7eb);
 }
 
-.theory-format-toolbar .toolbar-group + .toolbar-group {
-  border-left: 1px solid var(--rule-soft, #eef0f3);
-}
-
-.theory-format-toolbar .toolbar-btn {
-  width: 32px;
+/* Кнопки тулбара (Ant text-button) — компактные, моноширина по высоте */
+.theory-format-toolbar .tf-btn {
+  min-width: 28px;
   height: 28px;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-sm, 4px);
-  cursor: pointer;
-  display: flex;
+  padding: 0 6px;
+  color: var(--ink-2, #2a2f3a);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-2, #2a2f3a);
-  transition: all 0.15s ease;
-  font-size: 14px;
-  padding: 0;
 }
 
-.theory-format-toolbar .toolbar-btn:hover {
-  background: var(--accent-soft, #e7ecff);
-  color: var(--accent, #2b4bff);
+.theory-format-toolbar .tf-btn:hover {
+  color: var(--accent, #2b4bff) !important;
+  background: var(--accent-soft, #e7ecff) !important;
 }
 
-.theory-format-toolbar .toolbar-btn:active {
-  background: var(--accent-soft, #e7ecff);
-}
-
-.theory-format-toolbar .toolbar-btn--wide {
-  width: auto;
-  gap: 3px;
-  padding: 0 7px;
-}
-
-.theory-format-toolbar .toolbar-caret {
-  font-size: 8px;
-  opacity: 0.5;
-}
-
-.theory-format-toolbar .heading-btn {
+/* Заголовки H1–H4 */
+.theory-format-toolbar .tf-h {
   font-weight: 700;
+  font-size: 13px;
+}
+.theory-format-toolbar .tf-h4 {
   font-size: 12px;
-  width: auto;
-  padding: 0 7px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ink-4, #9aa0ac);
 }
 
-.theory-format-toolbar .heading-btn.h1 { font-size: 14px; }
-.theory-format-toolbar .heading-btn.h2 { font-size: 13px; }
-.theory-format-toolbar .heading-btn.h3 { font-size: 12px; }
-.theory-format-toolbar .heading-btn.h4 { font-size: 11px; color: #8c8c8c; }
+.theory-format-toolbar .tf-quote {
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1;
+}
 
-.theory-format-toolbar .formula-label {
+/* Кнопки-формулы (fx с подстрочным символом) */
+.theory-format-toolbar .tf-fx {
+  gap: 1px;
+}
+.theory-format-toolbar .tf-fx__sub {
   font-size: 11px;
   font-style: italic;
   font-family: 'Georgia', serif;
-  margin-left: 2px;
+}
+
+/* Кнопки с выпадающим меню (палитра, каллауты) */
+.theory-format-toolbar .tf-btn--menu {
+  gap: 2px;
+}
+.theory-format-toolbar .tf-caret {
+  font-size: 8px;
+  opacity: 0.5;
 }
 
 /* Image insert modal */
