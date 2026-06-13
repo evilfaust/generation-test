@@ -226,21 +226,36 @@ export default function TheoryEditor({ articleId = null, onBack, onSaved }) {
     const scaler = previewRef.current.parentElement;
     const prevTransform = scaler ? scaler.style.transform : '';
     if (scaler) scaler.style.transform = 'none';
+    // Поля даёт опция margin html2pdf (на каждую страницу), поэтому на время
+    // съёмки снимаем собственный padding листа и сужаем его до печатной ширины —
+    // иначе поля задвоятся, а со 2-й страницы верхнего отступа не будет.
+    const el = previewRef.current;
+    const prevPad = el.style.padding;
+    const prevWidth = el.style.width;
     try {
       const dims = getPageDimensions(pageSettings.pageSize, pageSettings.orientation);
+      const mT = pageSettings.marginTop ?? DEFAULT_SETTINGS.marginTop;
+      const mR = pageSettings.marginRight ?? DEFAULT_SETTINGS.marginRight;
+      const mB = pageSettings.marginBottom ?? DEFAULT_SETTINGS.marginBottom;
+      const mL = pageSettings.marginLeft ?? DEFAULT_SETTINGS.marginLeft;
+      el.style.padding = '0';
+      el.style.width = `${dims.width - mL - mR}mm`;
       const opt = {
-        margin: 0,
+        margin: [mT, mR, mB, mL],
         filename: `${filename}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: [dims.width, dims.height], orientation: pageSettings.orientation },
+        pagebreak: { mode: ['css', 'legacy'] },
       };
-      await html2pdf().set(opt).from(previewRef.current).save();
+      await html2pdf().set(opt).from(el).save();
       message.success('PDF экспортирован');
     } catch (error) {
       console.error('PDF export error:', error);
       message.error('Ошибка при экспорте PDF');
     } finally {
+      el.style.padding = prevPad;
+      el.style.width = prevWidth;
       if (scaler) scaler.style.transform = prevTransform;
       setIsExporting(false);
     }

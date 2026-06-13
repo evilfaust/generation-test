@@ -322,13 +322,17 @@
     width: 100% !important;
   }
 
-  /* Лист печатается как превью: формат/поля/шрифт берутся из inline-стилей
-     (previewStyles) и темы. @page подгоняется JS-хелпером (printWithPageSize). */
+  /* Поля листа задаёт @page margin (printWithPageSize), а НЕ padding листа —
+     иначе со 2-й страницы верхний отступ пропадает. Поэтому при печати
+     снимаем собственный padding и фиксированную ширину: контент занимает
+     печатную область страницы, поля одинаковы на каждом листе. */
   .theory-article-print-area {
     margin: 0 auto !important;
     box-shadow: none !important;
     border: none !important;
     min-height: auto !important;
+    padding: 0 !important;
+    width: auto !important;
   }
 
   /* Печатать фоны/цвета: иначе тёмная плашка H1 и тинты каллаутов пропадают
@@ -350,10 +354,16 @@
     orphans: 3;
     widows: 3;
   }
+  /* Неделимы только «атомы» — картинка/чертёж/формула/таблица. Сам каллаут
+     при печати разрывать МОЖНО: иначе высокий каллаут с чертежом не влезает на
+     страницу целиком и обрезается снизу. При разрыве текст остаётся, а чертёж
+     (тоже в этом списке) уезжает на след. страницу неразрезанным. */
   .theory-article-print-area img,
+  .theory-article-print-area figure,
   .theory-article-print-area table,
   .theory-article-print-area .katex-display,
-  .theory-article-print-area .theory-callout {
+  .theory-article-print-area .theory-ggb-block,
+  .theory-article-print-area .geogebra-embed {
     break-inside: avoid;
     page-break-inside: avoid;
   }

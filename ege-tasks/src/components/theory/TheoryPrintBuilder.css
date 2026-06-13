@@ -445,6 +445,16 @@
     page-break-inside: avoid;
   }
 
+  /* Неделимы только «атомы» — чертёж/формула. Сам каллаут разрывать можно,
+     иначе высокий каллаут с чертежом не влезает на страницу и обрезается. */
+  .theory-article-print-area figure,
+  .theory-article-print-area .katex-display,
+  .theory-article-print-area .theory-ggb-block,
+  .theory-article-print-area .geogebra-embed {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;

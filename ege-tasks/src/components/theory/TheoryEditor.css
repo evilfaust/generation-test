@@ -350,10 +350,14 @@
     transform: none !important;
     width: auto !important;
   }
+  /* Поля задаёт @page margin (printWithPageSize), padding листа снимаем —
+     иначе поля задвоятся / пропадут на 2-й странице. */
   .theory-preview-content {
     margin: 0 auto !important;
     box-shadow: none !important;
     min-height: auto !important;
+    padding: 0 !important;
+    width: auto !important;
   }
 
   /* Печатать фоны (тёмная плашка H1, тинты каллаутов, шапки таблиц) */
@@ -369,10 +373,14 @@
   .theory-preview-content h3 {
     break-after: avoid;
   }
+  /* Неделимы только «атомы» (картинка/чертёж/формула/таблица). Сам каллаут
+     разрывать можно — иначе высокий каллаут с чертежом не влезает и обрезается. */
   .theory-preview-content img,
+  .theory-preview-content figure,
   .theory-preview-content table,
   .theory-preview-content .katex-display,
-  .theory-preview-content .theory-callout {
+  .theory-preview-content .theory-ggb-block,
+  .theory-preview-content .geogebra-embed {
     break-inside: avoid;
   }
 }
