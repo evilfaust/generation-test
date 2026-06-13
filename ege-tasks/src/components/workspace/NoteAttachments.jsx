@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { App, Button, Popconfirm, Tooltip, Typography, Upload } from 'antd';
 import {
   DeleteOutlined, DownloadOutlined, FileImageOutlined, FileOutlined,
-  FilePdfOutlined, FolderOpenOutlined, PaperClipOutlined,
+  FilePdfOutlined, FolderOpenOutlined, PaperClipOutlined, UploadOutlined,
 } from '@ant-design/icons';
 import { materialsApi } from '../../shared/services/pb/filesClient';
 import MaterialPickerModal from './MaterialPickerModal';
@@ -27,9 +27,9 @@ function fileKind(f) {
 }
 
 const KIND_ICON = {
-  pdf: <FilePdfOutlined style={{ color: '#d4380d' }} />,
-  image: <FileImageOutlined style={{ color: '#389e0d' }} />,
-  other: <FileOutlined style={{ color: '#1677ff' }} />,
+  pdf: <FilePdfOutlined style={{ color: 'var(--c-rose)' }} />,
+  image: <FileImageOutlined style={{ color: 'var(--c-teal)' }} />,
+  other: <FileOutlined style={{ color: 'var(--c-blue)' }} />,
 };
 
 function FileRow({ f, fromLesson, canEdit, onPreview, onDetach }) {
@@ -114,9 +114,16 @@ export default function NoteAttachments({ noteFiles = [], lessonFiles = [], canE
           <PaperClipOutlined /> Вложения{isEmpty ? '' : ` (${allRows.length})`}
         </Text>
         {canEdit && (
-          <Button size="small" type="text" icon={<FolderOpenOutlined />} onClick={() => setPickerOpen(true)}>
-            Из Библиотеки
-          </Button>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <Upload multiple customRequest={customUpload} showUploadList={false}>
+              <Button size="small" type="text" icon={<UploadOutlined />} loading={uploading > 0}>
+                Загрузить
+              </Button>
+            </Upload>
+            <Button size="small" type="text" icon={<FolderOpenOutlined />} onClick={() => setPickerOpen(true)}>
+              Из Библиотеки
+            </Button>
+          </span>
         )}
       </div>
 

@@ -1,75 +1,203 @@
-/* Заметки — двухколоночная раскладка */
+/* Заметки — панель списка + «лист» редактора. Цвета/радиусы — токены theme/tokens.css */
 
 .notes-workspace {
   display: flex;
   gap: 16px;
-  height: calc(100vh - 180px);
+  height: calc(100vh - 250px);
   min-height: 480px;
 }
 
+/* ── Левая панель — список заметок ── */
 .notes-sidebar {
-  width: 280px;
+  width: 304px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  padding-right: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.notes-sidebar__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.notes-sidebar__list {
+  flex: 1;
   overflow-y: auto;
+  padding: 6px 8px 12px;
+}
+.notes-sidebar__empty {
+  padding: 32px 8px;
 }
 
-.notes-item {
-  cursor: pointer;
-  border-radius: 6px;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
-}
-.notes-item:hover {
-  background: rgba(0, 0, 0, 0.03);
-}
-.notes-item--active {
-  background: rgba(22, 119, 255, 0.1) !important;
-}
-.notes-item__title {
+/* счётчик в переключателе Все/Инбокс/Архив */
+.notes-seg-count {
   display: inline-block;
-  max-width: 170px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
+  margin-left: 5px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--c-amber-soft);
+  color: var(--c-amber);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
 }
 
 /* Заголовки секций списка: Закреплённые / Инбокс / классы / Без класса */
 .notes-section-header {
-  list-style: none;
-  padding: 10px 8px 4px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 12px 8px 4px;
+  font-size: var(--eyebrow-size, 10.5px);
+  font-weight: var(--eyebrow-weight, 600);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ant-color-text-tertiary, #8c8c8c);
+  letter-spacing: var(--eyebrow-tracking, 0.08em);
+  color: var(--ink-4);
 }
 
-.notes-editor {
-  flex: 1;
+/* ── Карточка заметки в списке ── */
+.notes-item {
+  position: relative;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.notes-item + .notes-item { margin-top: 2px; }
+.notes-item:hover { background: var(--bg-hover); }
+.notes-item--active { background: var(--accent-soft); }
+.notes-item--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.notes-item__titlerow {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
+.notes-item__flag {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--c-amber);
+}
+.notes-item__clip {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--ink-4);
+}
+.notes-item__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-item__title--untitled {
+  color: var(--ink-4);
+  font-weight: 400;
+}
+.notes-item__snippet {
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  min-width: 0;
+}
+.notes-item__date {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
 
+/* hover-действия — плавающая мини-панель в правом верхнем углу карточки */
+.notes-item__actions {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 1px;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.notes-item:hover .notes-item__actions,
+.notes-item:focus-within .notes-item__actions { opacity: 1; }
+@media (hover: none) {
+  .notes-item__actions { opacity: 1; background: transparent; box-shadow: none; }
+}
+
+/* ── Правая панель — «лист» заметки ── */
+.notes-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* 54px слева — выравнивание по тексту BlockNote (.bn-editor padding-inline: 54px) */
 .notes-editor__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  padding-bottom: 8px;
+  padding: 14px 20px 0 54px;
 }
-
 .notes-title-input {
-  font-size: 22px !important;
-  font-weight: 700 !important;
+  font-size: 23px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em;
   padding-left: 0 !important;
+  color: var(--ink);
+}
+.notes-title-input::placeholder { color: var(--ink-4); }
+.notes-editor__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.notes-saved {
+  margin-right: 6px;
+  font-size: 12px;
+  color: var(--c-teal);
+  white-space: nowrap;
+  animation: notes-saved-in 0.25s ease;
+}
+@keyframes notes-saved-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .notes-editor__meta {
@@ -77,21 +205,30 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  padding: 6px 20px 12px 54px;
+  border-bottom: 1px solid var(--rule-soft);
 }
 
 .notes-editor__body {
   flex: 1;
   overflow-y: auto;
+  padding: 10px 0 32px;
 }
 
-/* ── Панель вложений ───────────────────────────────────────────────────── */
+.notes-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Панель вложений ── */
 .note-att {
-  margin-bottom: 8px;
+  margin: 12px 20px 0 54px;
   padding: 8px 10px;
-  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  border-radius: 8px;
-  background: var(--ant-color-fill-quaternary, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
 }
 .note-att__head {
   display: flex;
@@ -111,12 +248,10 @@
   align-items: center;
   gap: 8px;
   padding: 3px 4px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   min-width: 0;
 }
-.note-att__row:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
+.note-att__row:hover { background: var(--bg-hover); }
 .note-att__icon {
   flex-shrink: 0;
   display: inline-flex;
@@ -133,11 +268,9 @@
   padding: 0;
   cursor: pointer;
   font-size: 13px;
-  color: var(--ant-color-text, #333);
+  color: var(--ink-2);
 }
-.note-att__title:hover {
-  color: var(--ant-color-primary, #1677ff);
-}
+.note-att__title:hover { color: var(--accent); }
 .note-att__actions {
   flex-shrink: 0;
   display: inline-flex;
@@ -146,12 +279,9 @@
   opacity: 0;
   transition: opacity 0.15s;
 }
-.note-att__row:hover .note-att__actions {
-  opacity: 1;
-}
-.note-att__action {
-  padding: 0 4px;
-}
+.note-att__row:hover .note-att__actions { opacity: 1; }
+@media (hover: none) { .note-att__actions { opacity: 1; } }
+.note-att__action { padding: 0 4px; }
 /* Компактная зона перетаскивания (не как большой Dragger Библиотеки) */
 .note-att__dropzone {
   margin-top: 6px;
@@ -159,47 +289,36 @@
 }
 .note-att__dropzone .ant-upload-drag {
   border-style: dashed;
+  border-color: var(--rule);
   background: transparent;
 }
-.note-att__dropzone .ant-upload-btn {
-  padding: 4px 8px !important;
-}
+.note-att__dropzone .ant-upload-btn { padding: 4px 8px !important; }
 
-/* ── LaTeX-блок в редакторе ─────────────────────────────────────────────── */
+/* ── LaTeX-блок в редакторе ── */
 .bn-math {
   padding: 6px 8px;
   margin: 2px 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   cursor: text;
   overflow-x: auto;
 }
-.bn-math:hover {
-  background: rgba(22, 119, 255, 0.06);
-}
+.bn-math:hover { background: var(--accent-soft); }
 .bn-math-input {
   width: 100%;
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
   font-size: 14px;
   padding: 8px 10px;
-  border: 1px solid #1677ff;
-  border-radius: 6px;
-  background: rgba(22, 119, 255, 0.04);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--bg);
   resize: vertical;
   outline: none;
   line-height: 1.5;
 }
 
-.notes-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* BlockNote — убрать лишние внешние отступы внутри нашей колонки */
-.notes-editor__body .bn-container {
-  background: transparent;
-}
+/* BlockNote — прозрачный фон внутри нашего «листа» */
+.notes-editor__body .bn-container { background: transparent; }
+.notes-editor__body .bn-editor { background: transparent; }
 
 /* Мобильно: список сверху, редактор снизу */
 @media (max-width: 768px) {
@@ -209,9 +328,12 @@
   }
   .notes-sidebar {
     width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-    padding-right: 0;
-    max-height: 240px;
   }
+  .notes-sidebar__list { max-height: 300px; }
+  .notes-editor { min-height: 60vh; }
+  .notes-editor__header { padding: 12px 16px 0; }
+  .notes-editor__meta { padding: 6px 16px 10px; }
+  .note-att { margin: 10px 16px 0; }
+  /* на узком экране уменьшаем поля BlockNote (44px слева — под боковое меню блока) */
+  .notes-editor__body .bn-editor { padding-inline: 44px 16px; }
 }

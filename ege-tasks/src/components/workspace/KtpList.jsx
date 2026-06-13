@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  App, Button, Empty, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography,
+  App, Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography,
 } from 'antd';
 import {
   DeleteOutlined, EditOutlined, InboxOutlined, PlusOutlined, ScheduleOutlined,
@@ -188,7 +188,7 @@ export default function KtpList() {
         pagination={false}
         locale={{
           emptyText: showArchived ? (
-            <Empty description="Архив пуст" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <EmptyState title="Архив пуст" description="Сюда попадают планы, отправленные в архив" />
           ) : (
             <EmptyState
               title="Пока нет планов"

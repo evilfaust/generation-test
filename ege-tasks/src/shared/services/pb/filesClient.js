@@ -121,6 +121,19 @@ export const materialsApi = {
     return pbFiles.collection('materials').update(id, data);
   },
 
+  // Массовое перемещение файлов в папку ('' = корень). Параллельные update'ы;
+  // autoCancellation уже выключен глобально, поэтому запросы не глушат друг друга.
+  // Возвращает { ok, failed } — id успешно перемещённых и упавших.
+  async moveMaterials(ids, folder = '') {
+    const results = await Promise.allSettled(
+      (ids || []).map((id) => pbFiles.collection('materials').update(id, { folder: folder || '' })),
+    );
+    const ok = [];
+    const failed = [];
+    results.forEach((r, i) => (r.status === 'fulfilled' ? ok : failed).push(ids[i]));
+    return { ok, failed };
+  },
+
   async deleteMaterial(id) {
     return pbFiles.collection('materials').delete(id);
   },

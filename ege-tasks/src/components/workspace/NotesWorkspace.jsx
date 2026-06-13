@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  App, Button, DatePicker, Input, List, Popconfirm, Segmented, Select, Space, Tooltip, Typography,
+  App, Button, DatePicker, Input, Popconfirm, Segmented, Select, Spin, Tooltip,
 } from 'antd';
 import {
-  ContainerOutlined, DeleteOutlined, InboxOutlined, PaperClipOutlined, PlusOutlined,
-  PushpinFilled, PushpinOutlined, SearchOutlined, UndoOutlined,
+  ContainerOutlined, DeleteOutlined, FileTextOutlined, InboxOutlined, PaperClipOutlined,
+  PlusOutlined, PushpinFilled, PushpinOutlined, SearchOutlined, UndoOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import NoteAttachments from './NoteAttachments';
-import { EmptyState, Chip, GroupChip } from './ui';
+import { WorkspacePageHeader, EmptyState, Chip, GroupChip } from './ui';
 import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems } from '@blocknote/core';
@@ -23,12 +23,20 @@ import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import './NotesWorkspace.css';
 
-const { Text } = Typography;
-
 // Схема BlockNote с кастомным блоком-формулой (LaTeX → KaTeX).
 const noteSchema = BlockNoteSchema.create({
   blockSpecs: { ...defaultBlockSpecs, math: MathBlock },
 });
+
+// Компактная дата для списка: сегодня → ЧЧ:ММ, вчера, в этом году → ДД.ММ.
+function shortDate(iso) {
+  if (!iso) return '';
+  const d = dayjs(iso);
+  if (d.isSame(dayjs(), 'day')) return d.format('HH:mm');
+  if (d.isSame(dayjs().subtract(1, 'day'), 'day')) return 'вчера';
+  if (d.isSame(dayjs(), 'year')) return d.format('DD.MM');
+  return d.format('DD.MM.YY');
+}
 
 // Редактор одной заметки. Ключуется по note.id в родителе (полный remount при смене).
 function NoteEditor({ note, onSaveBody, editable }) {
@@ -137,12 +145,22 @@ export default function NotesWorkspace() {
 
   const groupName = (n) => n?.expand?.group?.name;
 
-  // Поисковый индекс: id → "заголовок + плоский текст тела" (lowercase).
-  const textIndex = useMemo(() => {
-    const m = new Map();
-    notes.forEach((n) => m.set(n.id, `${n.title || ''} ${extractNoteText(n.body)}`.toLowerCase()));
-    return m;
+  // Один проход по заметкам: поисковый индекс (lowercase) + сниппет для списка.
+  const { textIndex, snippets } = useMemo(() => {
+    const idx = new Map();
+    const snip = new Map();
+    notes.forEach((n) => {
+      const body = extractNoteText(n.body);
+      idx.set(n.id, `${n.title || ''} ${body}`.toLowerCase());
+      snip.set(n.id, body.slice(0, 160));
+    });
+    return { textIndex: idx, snippets: snip };
   }, [notes]);
+
+  const inboxCount = useMemo(
+    () => notes.filter((n) => !n.is_archived && n.is_inbox).length,
+    [notes],
+  );
 
   const visibleNotes = useMemo(() => {
     let list = notes;
@@ -184,7 +202,7 @@ export default function NotesWorkspace() {
     return out;
   }, [visibleNotes, view, groupFilter, searchQ]);
 
-  // Плоский dataSource для List: маркеры секций вперемешку с заметками.
+  // Плоский список для рендера: маркеры секций вперемешку с заметками.
   const flatList = useMemo(
     () => sections.flatMap((s) => [
       ...(s.title ? [{ __section: s.title, id: `__s_${s.key}` }] : []),
@@ -292,8 +310,10 @@ export default function NotesWorkspace() {
 
   const renderNoteItem = (n) => {
     if (n.__section) {
-      return <li key={n.id} className="notes-section-header">{n.__section}</li>;
+      return <div key={n.id} className="notes-section-header">{n.__section}</div>;
     }
+    const title = n.title?.trim();
+    const snippet = snippets.get(n.id);
     const actions = view === 'archive'
       ? [
         ...(canEdit ? [
@@ -323,172 +343,199 @@ export default function NotesWorkspace() {
       ] : []);
 
     return (
-      <List.Item
+      <div
+        key={n.id}
         className={`notes-item ${n.id === activeId ? 'notes-item--active' : ''}`}
         onClick={() => setActiveId(n.id)}
-        actions={actions}
       >
-        <Space direction="vertical" size={2} style={{ width: '100%' }}>
-          <Space size={6}>
-            {n.is_inbox && !n.is_archived && <InboxOutlined style={{ color: 'var(--c-amber)' }} />}
-            {n.lesson && <Chip tone="violet" dot={false}>урок</Chip>}
-            <span className="notes-item__title">{n.title?.trim() || 'Без названия'}</span>
-            {hasFiles(n) && <PaperClipOutlined style={{ color: 'var(--ant-color-text-tertiary, #999)', fontSize: 12 }} />}
-          </Space>
-          {(groupName(n) || n.note_date) && (
-            <Space size={6}>
-              {groupName(n) && <GroupChip id={n.group} name={groupName(n)} />}
-              {n.note_date && <Text type="secondary" style={{ fontSize: 11 }}>{dayjs(n.note_date).format('DD.MM.YY')}</Text>}
-            </Space>
-          )}
-        </Space>
-      </List.Item>
+        <div className="notes-item__titlerow">
+          {n.is_pinned && view !== 'archive' && <PushpinFilled className="notes-item__flag" />}
+          {n.is_inbox && !n.is_archived && <InboxOutlined className="notes-item__flag" />}
+          <span className={`notes-item__title${title ? '' : ' notes-item__title--untitled'}`}>
+            {title || 'Без названия'}
+          </span>
+          {hasFiles(n) && <PaperClipOutlined className="notes-item__clip" />}
+        </div>
+        {snippet && <div className="notes-item__snippet">{snippet}</div>}
+        <div className="notes-item__meta">
+          {n.lesson && <Chip tone="violet" dot={false}>урок</Chip>}
+          {groupName(n) && <GroupChip id={n.group} name={groupName(n)} />}
+          <span className="notes-item__date" title={n.note_date ? `Дата заметки: ${dayjs(n.note_date).format('DD.MM.YYYY')}` : undefined}>
+            {n.note_date ? dayjs(n.note_date).format('DD.MM.YY') : shortDate(n.updated)}
+          </span>
+        </div>
+        {actions.length > 0 && <div className="notes-item__actions">{actions}</div>}
+      </div>
     );
   };
 
   const allLinks = Array.isArray(active?.links) ? active.links : [];
   const noteFiles = allLinks.filter((l) => l.type === 'material');
 
+  const segmentedOptions = [
+    { value: 'all', label: 'Все' },
+    {
+      value: 'inbox',
+      label: (
+        <span>
+          Инбокс
+          {inboxCount > 0 && <span className="notes-seg-count">{inboxCount}</span>}
+        </span>
+      ),
+    },
+    { value: 'archive', label: 'Архив' },
+  ];
+
   return (
-    <div className="notes-workspace">
-      {/* Левая колонка — список */}
-      <div className="notes-sidebar">
-        <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
-          <Segmented
-            size="small"
-            value={view}
-            onChange={setView}
-            options={[
-              { value: 'all', label: 'Все' },
-              { value: 'inbox', label: 'Инбокс' },
-              { value: 'archive', label: 'Архив' },
-            ]}
-          />
-          {canEdit && (
-            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={handleNew}>
-              Новая
-            </Button>
-          )}
-        </Space>
-        <Input
-          allowClear
-          size="small"
-          style={{ marginBottom: 8 }}
-          prefix={<SearchOutlined style={{ color: 'var(--ant-color-text-tertiary, #999)' }} />}
-          placeholder="Поиск по заметкам"
-          value={searchQ}
-          onChange={(e) => setSearchQ(e.target.value)}
-        />
-        <Select
-          allowClear
-          size="small"
-          style={{ width: '100%', marginBottom: 8 }}
-          placeholder="Все классы"
-          value={groupFilter}
-          onChange={setGroupFilter}
-          options={groups.map((g) => ({ value: g.id, label: g.name }))}
-        />
+    <div>
+      <WorkspacePageHeader
+        icon={<FileTextOutlined />}
+        accent="amber"
+        title="Заметки"
+        subtitle="Быстрые мысли, планы и заметки уроков — с формулами и вложениями"
+        extra={canEdit && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleNew}>
+            Новая заметка
+          </Button>
+        )}
+      />
 
-        <List
-          size="small"
-          loading={loading}
-          dataSource={flatList}
-          locale={{
-            emptyText: view === 'archive'
-              ? <EmptyState title="Архив пуст" description="Сюда попадают заметки вместо удаления" />
-              : <EmptyState title="Нет заметок" description={canEdit ? 'Нажмите «Новая», чтобы начать' : undefined} />,
-          }}
-          renderItem={renderNoteItem}
-        />
-      </div>
-
-      {/* Правая колонка — редактор */}
-      <div className="notes-editor">
-        {!active ? (
-          <div className="notes-empty">
-            <EmptyState
-              title="Ничего не выбрано"
-              description="Выберите заметку слева или создайте новую"
-              cta={canEdit ? 'Новая заметка' : undefined}
-              ctaIcon={<PlusOutlined />}
-              onCta={handleNew}
+      <div className="notes-workspace">
+        {/* Левая панель — список */}
+        <div className="notes-sidebar">
+          <div className="notes-sidebar__tools">
+            <Input
+              allowClear
+              prefix={<SearchOutlined style={{ color: 'var(--ink-4)' }} />}
+              placeholder="Поиск по заметкам"
+              value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)}
             />
-          </div>
-        ) : (
-          <>
-            <div className="notes-editor__header">
-              <Input
-                variant="borderless"
-                className="notes-title-input"
-                placeholder="Заголовок заметки"
-                value={active.title}
-                onChange={handleTitleChange}
-                disabled={!canEdit}
-                maxLength={200}
-              />
-              <Space>
-                {savedTick > 0 && <Text type="secondary" style={{ fontSize: 12 }}>сохранено</Text>}
-                <Tooltip title={active.is_pinned ? 'Открепить' : 'Закрепить сверху'}>
-                  <Button
-                    size="small"
-                    type={active.is_pinned ? 'primary' : 'default'}
-                    icon={active.is_pinned ? <PushpinFilled /> : <PushpinOutlined />}
-                    onClick={() => togglePin(active)}
-                    disabled={!canEdit}
-                  />
-                </Tooltip>
-                <Tooltip title={active.is_inbox ? 'Убрать из инбокса' : 'В инбокс'}>
-                  <Button
-                    size="small"
-                    type={active.is_inbox ? 'primary' : 'default'}
-                    icon={<InboxOutlined />}
-                    onClick={() => patchActive({ is_inbox: !active.is_inbox })}
-                    disabled={!canEdit}
-                  />
-                </Tooltip>
-                <Tooltip title={active.is_archived ? 'Вернуть из архива' : 'В архив'}>
-                  <Button
-                    size="small"
-                    icon={active.is_archived ? <UndoOutlined /> : <ContainerOutlined />}
-                    onClick={() => archiveNote(active, !active.is_archived)}
-                    disabled={!canEdit}
-                  />
-                </Tooltip>
-              </Space>
-            </div>
-            <div className="notes-editor__meta">
+            <Segmented block size="small" value={view} onChange={setView} options={segmentedOptions} />
+            {groups.length > 0 && (
               <Select
                 allowClear
                 size="small"
-                style={{ minWidth: 160 }}
-                placeholder="Класс / группа"
-                value={active.group || undefined}
-                onChange={changeGroup}
-                disabled={!canEdit}
+                style={{ width: '100%' }}
+                placeholder="Все классы"
+                value={groupFilter}
+                onChange={setGroupFilter}
                 options={groups.map((g) => ({ value: g.id, label: g.name }))}
               />
-              <DatePicker
-                size="small"
-                format="DD.MM.YYYY"
-                placeholder="Дата"
-                value={active.note_date ? dayjs(active.note_date) : null}
-                onChange={changeDate}
-                disabled={!canEdit}
+            )}
+          </div>
+
+          <div className="notes-sidebar__list">
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>
+            ) : flatList.length === 0 ? (
+              <div className="notes-sidebar__empty">
+                {view === 'archive'
+                  ? <EmptyState title="Архив пуст" description="Сюда попадают заметки вместо удаления" />
+                  : (
+                    <EmptyState
+                      title="Нет заметок"
+                      description={canEdit ? 'Создайте первую — она появится здесь' : undefined}
+                      cta={canEdit ? 'Новая заметка' : undefined}
+                      ctaIcon={<PlusOutlined />}
+                      onCta={handleNew}
+                    />
+                  )}
+              </div>
+            ) : (
+              flatList.map(renderNoteItem)
+            )}
+          </div>
+        </div>
+
+        {/* Правая панель — «лист» заметки */}
+        <div className="notes-editor">
+          {!active ? (
+            <div className="notes-empty">
+              <EmptyState
+                title="Ничего не выбрано"
+                description="Выберите заметку слева или создайте новую"
+                cta={canEdit ? 'Новая заметка' : undefined}
+                ctaIcon={<PlusOutlined />}
+                onCta={handleNew}
               />
-              {active.lesson && <Chip tone="violet" dot={false}>заметка урока</Chip>}
-              {active.is_archived && <Chip tone="neutral" dot={false}>в архиве</Chip>}
             </div>
-            <NoteAttachments
-              noteFiles={noteFiles}
-              lessonFiles={lessonFiles}
-              canEdit={canEdit}
-              onSave={(next) => patchActive({ links: [...allLinks.filter((l) => l.type !== 'material'), ...next] })}
-            />
-            <div className="notes-editor__body">
-              <NoteEditor key={active.id} note={active} onSaveBody={saveBody} editable={canEdit} />
-            </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="notes-editor__header">
+                <Input
+                  variant="borderless"
+                  className="notes-title-input"
+                  placeholder="Заголовок заметки"
+                  value={active.title}
+                  onChange={handleTitleChange}
+                  disabled={!canEdit}
+                  maxLength={200}
+                />
+                <div className="notes-editor__tools">
+                  {savedTick > 0 && <span key={savedTick} className="notes-saved">✓ сохранено</span>}
+                  <Tooltip title={active.is_pinned ? 'Открепить' : 'Закрепить сверху'}>
+                    <Button
+                      type="text"
+                      icon={active.is_pinned
+                        ? <PushpinFilled style={{ color: 'var(--c-amber)' }} />
+                        : <PushpinOutlined />}
+                      onClick={() => togglePin(active)}
+                      disabled={!canEdit}
+                    />
+                  </Tooltip>
+                  <Tooltip title={active.is_inbox ? 'Убрать из инбокса' : 'В инбокс'}>
+                    <Button
+                      type="text"
+                      icon={<InboxOutlined style={active.is_inbox ? { color: 'var(--c-amber)' } : undefined} />}
+                      onClick={() => patchActive({ is_inbox: !active.is_inbox })}
+                      disabled={!canEdit}
+                    />
+                  </Tooltip>
+                  <Tooltip title={active.is_archived ? 'Вернуть из архива' : 'В архив'}>
+                    <Button
+                      type="text"
+                      icon={active.is_archived ? <UndoOutlined /> : <ContainerOutlined />}
+                      onClick={() => archiveNote(active, !active.is_archived)}
+                      disabled={!canEdit}
+                    />
+                  </Tooltip>
+                </div>
+              </div>
+              <div className="notes-editor__meta">
+                <Select
+                  allowClear
+                  size="small"
+                  style={{ minWidth: 160 }}
+                  placeholder="Класс / группа"
+                  value={active.group || undefined}
+                  onChange={changeGroup}
+                  disabled={!canEdit}
+                  options={groups.map((g) => ({ value: g.id, label: g.name }))}
+                />
+                <DatePicker
+                  size="small"
+                  format="DD.MM.YYYY"
+                  placeholder="Дата"
+                  value={active.note_date ? dayjs(active.note_date) : null}
+                  onChange={changeDate}
+                  disabled={!canEdit}
+                />
+                {active.lesson && <Chip tone="violet" dot={false}>заметка урока</Chip>}
+                {active.is_archived && <Chip tone="neutral" dot={false}>в архиве</Chip>}
+              </div>
+              <NoteAttachments
+                noteFiles={noteFiles}
+                lessonFiles={lessonFiles}
+                canEdit={canEdit}
+                onSave={(next) => patchActive({ links: [...allLinks.filter((l) => l.type !== 'material'), ...next] })}
+              />
+              <div className="notes-editor__body">
+                <NoteEditor key={active.id} note={active} onSaveBody={saveBody} editable={canEdit} />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

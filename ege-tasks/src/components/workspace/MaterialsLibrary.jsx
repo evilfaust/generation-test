@@ -8,22 +8,22 @@
  * MVP: загрузка с компьютера (drag-drop), поиск, фильтр по категории, удаление.
  * Прикрепление к урокам/заметкам — отдельная фаза (через lessons.materials / links).
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card, Button, Input, Select, Upload, Popconfirm, Spin, App,
-  Row, Col, Typography, Space, Alert, Tooltip, Breadcrumb, Modal, Form,
+  Row, Col, Typography, Space, Alert, Tooltip, Breadcrumb, Modal, Form, Checkbox, TreeSelect,
 } from 'antd';
 import {
   InboxOutlined, FileOutlined, FilePdfOutlined, DeleteOutlined, DownloadOutlined,
   SearchOutlined, CloudServerOutlined, DisconnectOutlined, ReloadOutlined, EditOutlined,
-  EyeOutlined, CopyOutlined, FolderOutlined, FolderAddOutlined, HomeOutlined,
+  EyeOutlined, CopyOutlined, FolderOutlined, FolderAddOutlined, HomeOutlined, FolderOpenOutlined,
 } from '@ant-design/icons';
 import { materialsApi, CATEGORY_LABELS } from '../../shared/services/pb/filesClient';
 import { useAuth } from '../../contexts/AuthContext';
 import ConnectForm from './StorageConnect';
 import MaterialEditModal from './MaterialEditModal';
 import FilePreviewModal from './FilePreviewModal';
-import { childFolders, folderChain } from './folderTree';
+import { childFolders, folderChain, buildFolderTree } from './folderTree';
 import { WorkspacePageHeader, EmptyState, Chip } from './ui';
 
 const { Text } = Typography;
@@ -71,6 +71,40 @@ export default function MaterialsLibrary() {
   const foldersEnabled = Array.isArray(folders);
   // Поиск/фильтр категории работают по всей библиотеке, навигация — внутри папки.
   const globalMode = !!(search || category);
+
+  // Множественный выбор файлов (массовое перемещение / удаление).
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState('');
+  const [moving, setMoving] = useState(false);
+  const selectedCount = selectedIds.size;
+  const canBulkMove = foldersEnabled && canEdit;
+  const canBulkDelete = canDelete;
+  const selectable = canBulkMove || canBulkDelete;
+
+  const folderTreeData = useMemo(
+    () => (foldersEnabled
+      ? [{ value: '', title: '📁 Корень библиотеки', children: buildFolderTree(folders) }]
+      : []),
+    [folders, foldersEnabled],
+  );
+
+  const toggleSelect = (id, checked) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+  const allVisibleSelected = items.length > 0 && items.every((r) => selectedIds.has(r.id));
+  const toggleSelectAll = (checked) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      items.forEach((r) => (checked ? next.add(r.id) : next.delete(r.id)));
+      return next;
+    });
+  };
 
   // Копировать прямой адрес файла в буфер обмена.
   const copyUrl = async (rec) => {
@@ -128,6 +162,43 @@ export default function MaterialsLibrary() {
   useEffect(() => {
     if (connected) load();
   }, [connected, load]);
+
+  // Смена папки / поиска / фильтра меняет видимый набор — сбрасываем выделение,
+  // чтобы массовые действия не затронули скрытые файлы.
+  useEffect(() => { clearSelection(); }, [currentFolder, search, category]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleBulkMove = async () => {
+    setMoving(true);
+    try {
+      const ids = [...selectedIds];
+      const { ok, failed } = await materialsApi.moveMaterials(ids, moveTarget);
+      if (ok.length) message.success(`Перемещено файлов: ${ok.length}`);
+      if (failed.length) message.warning(`Не удалось переместить: ${failed.length}`);
+      setMoveModalOpen(false);
+      clearSelection();
+      load();
+    } catch (e) {
+      message.error(e?.message || 'Не удалось переместить файлы');
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds];
+    try {
+      const results = await Promise.allSettled(ids.map((id) => materialsApi.deleteMaterial(id)));
+      const okIds = new Set(ids.filter((_, i) => results[i].status === 'fulfilled'));
+      setItems((prev) => prev.filter((x) => !okIds.has(x.id)));
+      const failed = ids.length - okIds.size;
+      message.success(`Удалено файлов: ${okIds.size}`);
+      if (failed) message.warning(`Не удалось удалить: ${failed}`);
+      clearSelection();
+    } catch (e) {
+      message.error('Не удалось удалить файлы');
+      load();
+    }
+  };
 
   const reloadFolders = async () => {
     try { setFolders(await materialsApi.listFolders()); } catch { /* тихо */ }
@@ -270,7 +341,7 @@ export default function MaterialsLibrary() {
                   <Card size="small" hoverable styles={{ body: { padding: '8px 12px' } }}
                     onClick={() => setCurrentFolder(f.id)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <FolderOutlined style={{ fontSize: 20, color: 'var(--c-amber, #d48806)', flexShrink: 0 }} />
+                      <FolderOutlined style={{ fontSize: 20, color: 'var(--c-amber)', flexShrink: 0 }} />
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={f.name}>
                         {f.name}
                       </span>
@@ -301,6 +372,44 @@ export default function MaterialsLibrary() {
           message="Поиск и фильтр категорий работают по всей библиотеке (вне папок)" />
       )}
 
+      {/* Панель массовых действий: выбрать все + перемещение / удаление выбранных */}
+      {selectable && items.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          minHeight: 40, marginBottom: 12, padding: selectedCount ? '6px 12px' : '0 2px',
+          borderRadius: 'var(--radius-lg)',
+          background: selectedCount ? 'var(--accent-soft)' : 'transparent',
+          border: selectedCount ? '1px solid var(--accent)' : '1px solid transparent',
+          transition: 'background .15s ease, border-color .15s ease',
+        }}>
+          <Checkbox
+            checked={allVisibleSelected}
+            indeterminate={selectedCount > 0 && !allVisibleSelected}
+            onChange={(e) => toggleSelectAll(e.target.checked)}
+          >
+            {selectedCount > 0 ? `Выбрано: ${selectedCount}` : 'Выбрать все'}
+          </Checkbox>
+          {selectedCount > 0 && (
+            <>
+              {canBulkMove && (
+                <Button size="small" type="primary" icon={<FolderOpenOutlined />}
+                  onClick={() => { setMoveTarget(currentFolder || ''); setMoveModalOpen(true); }}>
+                  Переместить в папку
+                </Button>
+              )}
+              {canBulkDelete && (
+                <Popconfirm title={`Удалить выбранные файлы (${selectedCount})?`}
+                  okText="Удалить" cancelText="Отмена" okButtonProps={{ danger: true }}
+                  onConfirm={handleBulkDelete}>
+                  <Button size="small" danger icon={<DeleteOutlined />}>Удалить</Button>
+                </Popconfirm>
+              )}
+              <Button size="small" type="text" onClick={clearSelection}>Снять</Button>
+            </>
+          )}
+        </div>
+      )}
+
       <Spin spinning={loading}>
         {items.length === 0 ? (
           <EmptyState
@@ -315,6 +424,9 @@ export default function MaterialsLibrary() {
               <Col xs={24} sm={12} md={8} lg={6} key={rec.id}>
                 <Card size="small" hoverable
                   styles={{ body: { padding: 12 } }}
+                  style={selectedIds.has(rec.id)
+                    ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 1px var(--accent-soft)' }
+                    : undefined}
                   actions={[
                     <Tooltip title="Просмотр" key="prev">
                       <EyeOutlined onClick={() => setPreviewRec(rec)} />
@@ -341,10 +453,18 @@ export default function MaterialsLibrary() {
                   ]}>
                   {/* flex + minWidth:0 — иначе длинные имена не обрезаются ellipsis */}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    {selectable && (
+                      <Checkbox
+                        checked={selectedIds.has(rec.id)}
+                        onChange={(e) => toggleSelect(rec.id, e.target.checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ marginTop: 2, flexShrink: 0 }}
+                      />
+                    )}
                     <div style={{ flexShrink: 0, lineHeight: 1 }}>
                       {isPdf(rec)
-                        ? <FilePdfOutlined style={{ fontSize: 26, color: '#d4380d' }} />
-                        : <FileOutlined style={{ fontSize: 26, color: '#1677ff' }} />}
+                        ? <FilePdfOutlined style={{ fontSize: 26, color: 'var(--c-rose)' }} />
+                        : <FileOutlined style={{ fontSize: 26, color: 'var(--c-blue)' }} />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <Tooltip title={`${rec.title || rec.original_name || ''} — нажмите для просмотра`}>
@@ -403,6 +523,30 @@ export default function MaterialsLibrary() {
             <Input maxLength={200} autoFocus placeholder="Например: 10 класс / Стереометрия" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Массовое перемещение выбранных файлов в папку */}
+      <Modal
+        open={moveModalOpen}
+        title={`Переместить файлов: ${selectedCount}`}
+        onCancel={() => setMoveModalOpen(false)}
+        onOk={handleBulkMove}
+        okText="Переместить"
+        cancelText="Отмена"
+        confirmLoading={moving}
+        destroyOnHidden
+      >
+        <Text type="secondary">Папка назначения:</Text>
+        <TreeSelect
+          style={{ width: '100%', marginTop: 8 }}
+          treeData={folderTreeData}
+          value={moveTarget}
+          onChange={setMoveTarget}
+          treeDefaultExpandAll
+          showSearch
+          treeNodeFilterProp="title"
+          placeholder="Выберите папку"
+        />
       </Modal>
 
       <FilePreviewModal

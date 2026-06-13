@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   App,
   Button,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -301,7 +300,7 @@ export default function GroupManager() {
         pagination={false}
         locale={{
           emptyText: showArchived ? (
-            <Empty description="Архив пуст" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <EmptyState title="Архив пуст" description="Сюда попадают группы, отправленные в архив" />
           ) : (
             <EmptyState
               title="Пока нет групп"
