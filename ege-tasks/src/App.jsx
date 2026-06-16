@@ -32,6 +32,8 @@ const KtpEditor = lazy(() => import('./components/workspace/KtpEditor'));
 const TeacherCalendar = lazy(() => import('./components/workspace/TeacherCalendar'));
 const NotesWorkspace = lazy(() => import('./components/workspace/NotesWorkspace'));
 const MaterialsLibrary = lazy(() => import('./components/workspace/MaterialsLibrary'));
+const SummerProgramList = lazy(() => import('./components/workspace/summer/SummerProgramList'));
+const StudentProgramEditor = lazy(() => import('./components/workspace/summer/StudentProgramEditor'));
 const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
 const TestWorkGenerator = lazy(() => import('./components/TestWorkGenerator'));
 const EgeVariantGenerator = lazy(() => import('./components/EgeVariantGenerator'));
@@ -117,6 +119,8 @@ export const R = {
   CALENDAR:            '/app/calendar',
   NOTES:               '/app/notes',
   MATERIALS:           '/app/materials',
+  SUMMER:              '/app/summer',
+  SUMMER_STUDENT:      '/app/summer/:studentId',
   TASKS:               '/app/tasks',
   STATS:               '/app/stats',
   CATALOG:             '/app/catalog',
@@ -210,6 +214,8 @@ const ROUTE_META = [
   { re: /^\/app\/calendar$/,      menuKey: 'calendar', menuGroup: 'workspace-group', title: 'Календарь' },
   { re: /^\/app\/notes$/,         menuKey: 'notes', menuGroup: 'workspace-group', title: 'Заметки' },
   { re: /^\/app\/materials$/,     menuKey: 'materials', menuGroup: 'workspace-group', title: 'Библиотека материалов' },
+  { re: /^\/app\/summer\/[^/]+$/, menuKey: 'summer', menuGroup: 'workspace-group', title: 'Каникулярное задание ученика' },
+  { re: /^\/app\/summer$/,        menuKey: 'summer', menuGroup: 'workspace-group', title: 'Каникулярное задание' },
   // Работы (detail)
   { re: /^\/app\/works\/[^/]+\/edit/, menuKey: 'work-editor',        title: 'Редактор работ' },
   // Ученики (detail + sub-pages)
@@ -290,6 +296,7 @@ const MENU_KEY_PATH = {
   calendar:                 R.CALENDAR,
   notes:                    R.NOTES,
   materials:                R.MATERIALS,
+  summer:                   R.SUMMER,
   tasks:                    R.TASKS,
   stats:                    R.STATS,
   generator:                R.GENERATOR,
@@ -600,6 +607,7 @@ function AppLayout() {
         { key: 'journal', icon: <SolutionOutlined />, label: 'Журнал сдачи' },
         { key: 'notes', icon: <FileTextOutlined />, label: 'Заметки' },
         { key: 'materials', icon: <FolderOutlined />, label: 'Библиотека' },
+        { key: 'summer', icon: <CalendarOutlined />, label: 'Каникулярное задание', editOnly: true },
       ],
     },
     { key: 'tasks',  icon: <FileTextOutlined />,  label: 'Все задачи', section: 'tasks' },
@@ -943,6 +951,8 @@ function App() {
                 <Route path={R.THEORY_NEW}       element={<TheoryEditorRoute />} />
                 <Route path={R.THEORY_EDIT}      element={<TheoryEditorRoute />} />
                 <Route path={R.THEORY_CATEGORIES} element={<TheoryCategoryManager />} />
+                <Route path={R.SUMMER}           element={<SummerProgramList />} />
+                <Route path={R.SUMMER_STUDENT}   element={<StudentProgramEditor />} />
               </Route>
             </Route>
 

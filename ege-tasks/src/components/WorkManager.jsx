@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Button, Tag, Empty, Spin, Modal, Typography, Tabs, Input, Select, Progress, Tooltip, App } from 'antd';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import { Button, Tag, Empty, Spin, Modal, Typography, Tabs, Input, Select, Progress, Tooltip, AutoComplete, App } from 'antd';
 import {
   DeleteOutlined, SendOutlined, ReloadOutlined, EyeOutlined, EditOutlined,
   RightOutlined, InboxOutlined, SolutionOutlined, TeamOutlined,
   ClockCircleOutlined, SearchOutlined, SortAscendingOutlined, FormOutlined,
+  PushpinOutlined, PushpinFilled, FolderOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
@@ -61,6 +62,9 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   const [statusFilter, setStatusFilter] = useState('active');
   const [topicFilter, setTopicFilter] = useState(null);
   const [sortBy, setSortBy] = useState('date_desc');
+  const [folderFilter, setFolderFilter] = useState(null);     // null=все, '__none__'=без папки, иначе имя папки
+  const [folderModalWork, setFolderModalWork] = useState(null); // работа, которой задаём папку
+  const [folderInput, setFolderInput] = useState('');
 
   // Load works
   const loadWorks = useCallback(async () => {
@@ -237,6 +241,38 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   };
 
   // Archive/unarchive
+  const handlePinToggle = async (e, work) => {
+    e.stopPropagation();
+    const next = !work.is_pinned;
+    setWorks(prev => prev.map(w => (w.id === work.id ? { ...w, is_pinned: next } : w)));
+    try {
+      await api.updateWork(work.id, { is_pinned: next });
+    } catch (error) {
+      message.error('Не удалось изменить закрепление');
+      setWorks(prev => prev.map(w => (w.id === work.id ? { ...w, is_pinned: !next } : w)));
+    }
+  };
+
+  const openFolderModal = (e, work) => {
+    e.stopPropagation();
+    setFolderInput(work.folder || '');
+    setFolderModalWork(work);
+  };
+
+  const handleSaveFolder = async () => {
+    if (!folderModalWork) return;
+    const folder = (folderInput || '').trim();
+    const id = folderModalWork.id;
+    setWorks(prev => prev.map(w => (w.id === id ? { ...w, folder } : w)));
+    setFolderModalWork(null);
+    try {
+      await api.updateWork(id, { folder });
+      message.success(folder ? `Работа в папке «${folder}»` : 'Работа убрана из папки');
+    } catch {
+      message.error('Не удалось сохранить папку');
+    }
+  };
+
   const handleArchiveToggle = async (e, work) => {
     e.stopPropagation();
     try {
@@ -281,6 +317,13 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
       result = result.filter(w => (workStats[w.id]?.attempts || 0) > 0);
     }
 
+    // Filter by folder
+    if (folderFilter === '__none__') {
+      result = result.filter(w => !w.folder);
+    } else if (folderFilter) {
+      result = result.filter(w => w.folder === folderFilter);
+    }
+
     // Sort
     switch (sortBy) {
       case 'date_desc':
@@ -299,8 +342,26 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         break;
     }
 
+    // Закреплённые — наверх (стабильная сортировка сохраняет порядок внутри групп).
+    result.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+
     return result;
-  }, [works, statusFilter, sortBy, workStats]);
+  }, [works, statusFilter, sortBy, folderFilter, workStats]);
+
+  // Список существующих папок (для фильтра и подсказок).
+  const folderOptions = useMemo(() => {
+    const set = new Set(works.map(w => w.folder).filter(Boolean));
+    return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [works]);
+
+  // Для показа «всех» — группируем по папкам (именованные по алфавиту, «без папки» в конце).
+  const displayWorks = useMemo(() => {
+    if (folderFilter != null || folderOptions.length === 0) return filteredWorks;
+    const rank = new Map(folderOptions.map((f, i) => [f, i]));
+    return [...filteredWorks].sort(
+      (a, b) => (a.folder ? rank.get(a.folder) : 1e6) - (b.folder ? rank.get(b.folder) : 1e6),
+    );
+  }, [filteredWorks, folderFilter, folderOptions]);
 
   // Get session for a work (first one)
   const getSessionForWork = useCallback((workId) => {
@@ -435,6 +496,21 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
             <Option key={t.id} value={t.id}>{t.ege_number ? `№${t.ege_number} — ` : ''}{t.title}</Option>
           ))}
         </Select>
+        {folderOptions.length > 0 && (
+          <Select
+            allowClear
+            placeholder="Папка"
+            value={folderFilter}
+            onChange={v => setFolderFilter(v || null)}
+            style={{ minWidth: 160 }}
+            suffixIcon={<FolderOutlined />}
+          >
+            <Option value="__none__">Без папки</Option>
+            {folderOptions.map(f => (
+              <Option key={f} value={f}>{f}</Option>
+            ))}
+          </Select>
+        )}
         <Select
           value={sortBy}
           onChange={setSortBy}
@@ -462,7 +538,17 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         </div>
       ) : (
         <div className="wm-work-list">
-          {filteredWorks.map(work => {
+          {(() => {
+            let lastFolder = undefined;
+            const showHeaders = folderFilter == null && folderOptions.length > 0;
+            return displayWorks.map(work => {
+            const folderKey = work.folder || '__none__';
+            const folderHeader = showHeaders && folderKey !== lastFolder ? (
+              <div className="wm-folder-header" key={`fh-${folderKey}`}>
+                <FolderOutlined /> {work.folder || 'Без папки'}
+              </div>
+            ) : null;
+            lastFolder = folderKey;
             const isExpanded = expandedWorkId === work.id;
             const stats = workStats[work.id] || {};
             const session = getSessionForWork(work.id);
@@ -470,8 +556,9 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
             const hasPositiveTimeLimit = Number.isFinite(timeLimit) && timeLimit > 0;
 
             return (
+              <Fragment key={work.id}>
+              {folderHeader}
               <div
-                key={work.id}
                 className={`wm-work-card ${isExpanded ? 'wm-work-card--expanded' : ''} ${work.archived ? 'wm-work-card--archived' : ''}`}
               >
                 {/* Card Header */}
@@ -482,6 +569,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
 
                   <div className="wm-work-card-main">
                     <div className="wm-work-card-title">
+                      {work.is_pinned && <PushpinFilled style={{ color: '#faad14', marginRight: 6 }} />}
                       {work.title || 'Без названия'}
                       {work.archived && (
                         <span className="wm-status-badge wm-status-badge--archived">Архив</span>
@@ -536,6 +624,26 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
 
                   {/* Actions */}
                   <div className="wm-work-card-actions" onClick={e => e.stopPropagation()}>
+                    {canEdit && (
+                      <Tooltip title={work.is_pinned ? 'Открепить' : 'Закрепить наверху'}>
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={work.is_pinned ? <PushpinFilled style={{ color: '#faad14' }} /> : <PushpinOutlined />}
+                          onClick={e => handlePinToggle(e, work)}
+                        />
+                      </Tooltip>
+                    )}
+                    {canEdit && (
+                      <Tooltip title={work.folder ? `Папка: ${work.folder}` : 'Положить в папку'}>
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<FolderOutlined style={work.folder ? { color: '#5b5bd6' } : undefined} />}
+                          onClick={e => openFolderModal(e, work)}
+                        />
+                      </Tooltip>
+                    )}
                     <Tooltip title="Просмотр вариантов">
                       <Button
                         type="text"
@@ -645,10 +753,33 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                   );
                 })()}
               </div>
+              </Fragment>
             );
-          })}
+            });
+          })()}
         </div>
       )}
+
+      <Modal
+        open={!!folderModalWork}
+        title="Папка работы"
+        onCancel={() => setFolderModalWork(null)}
+        onOk={handleSaveFolder}
+        okText="Сохранить"
+      >
+        <Typography.Paragraph type="secondary" style={{ fontSize: 13 }}>
+          Папка — простой ярлык для группировки работ. Очистите поле, чтобы убрать из папки.
+        </Typography.Paragraph>
+        <AutoComplete
+          style={{ width: '100%' }}
+          placeholder="Например: Каникулы 10А, Устный счёт, Контрольные…"
+          value={folderInput}
+          onChange={setFolderInput}
+          options={folderOptions.map(f => ({ value: f }))}
+          filterOption={(input, opt) => (opt?.value || '').toLowerCase().includes(input.toLowerCase())}
+          allowClear
+        />
+      </Modal>
     </>
   );
 

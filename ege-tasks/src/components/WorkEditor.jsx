@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Tabs, Form, Input, InputNumber, Select, Button, Space, Switch, Typography, Tooltip, Alert, Empty, Tag, Popconfirm, Modal, App } from 'antd';
 import { SaveOutlined, CopyOutlined, EditOutlined, SwapOutlined, DeleteOutlined, PlusOutlined, ExportOutlined, FileMarkdownOutlined, NodeIndexOutlined, PrinterOutlined, RetweetOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
+import TaskStatementRenderer from './TaskStatementRenderer';
+import { api } from '../services/pocketbase';
 import TaskReplaceModal from './TaskReplaceModal';
 import TaskEditModal from './TaskEditModal';
 import TaskSelectModal from './TaskSelectModal';
@@ -23,6 +25,33 @@ const PB_URL = PB_BASE_URL;
 
 const { Text } = Typography;
 const { Option } = Select;
+
+// Условие задачи в составе работы. Для задач из «Решу ЕГЭ» чертёж вшит в
+// statement_md как ![image](внешний_url) — sdamgia блокирует прямой fetch из
+// браузера, поэтому такие URL нужно подменить на локальные task_images.
+// task_images грузим лениво и только если в условии реально есть inline-картинка
+// (большинство задач её не имеют → лишних запросов нет).
+const WorkTaskStatement = ({ task }) => {
+  const needsImages = /!\[[^\]]*\]\(/.test(task.statement_md || '');
+  const [conditionImages, setConditionImages] = useState([]);
+
+  useEffect(() => {
+    if (!needsImages) {
+      setConditionImages([]);
+      return;
+    }
+    let alive = true;
+    api.getTaskImages(task.id)
+      .then(imgs => { if (alive) setConditionImages(imgs.condition || []); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [task.id, needsImages]);
+
+  if (!needsImages) {
+    return <MathRenderer text={task.statement_md} />;
+  }
+  return <TaskStatementRenderer text={task.statement_md} images={conditionImages} />;
+};
 
 const WorkEditor = ({
   work,
@@ -512,7 +541,7 @@ const WorkEditor = ({
                                     </div>
                                   </div>
                                   <div className="task-content">
-                                    <MathRenderer text={task.statement_md} />
+                                    <WorkTaskStatement task={task} />
                                     {(task.image_url || task.image) && (
                                       <div className="task-image">
                                         <img

@@ -1,6 +1,44 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ConfigProvider, Button, notification, theme } from 'antd';
-import { ArrowLeftOutlined, TrophyOutlined, LogoutOutlined, QrcodeOutlined, LinkOutlined, BarChartOutlined, SunOutlined, MoonOutlined, LoginOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, TrophyOutlined, LogoutOutlined, QrcodeOutlined, LinkOutlined, BarChartOutlined, CalendarOutlined, HomeOutlined, SunOutlined, MoonOutlined, LoginOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
+
+// Нижнее меню кабинета ученика (показывается залогиненному на всех экранах, кроме теста).
+// go(key) — навигация: в кабинете меняет homeView, на странице сессии ведёт на /student/.
+function StudentBottomNav({ active, go, onLogout }) {
+  const Item = ({ k, icon, label, onClick }) => (
+    <button
+      type="button"
+      className={`student-bnav-item${active === k ? ' is-active' : ''}`}
+      onClick={onClick}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+  return (
+    <nav className="student-bnav">
+      <Item k="home" icon={<HomeOutlined />} label="Главная" onClick={() => go('home')} />
+      <Item k="program" icon={<CalendarOutlined />} label="Задание" onClick={() => go('program')} />
+      <Item k="progress" icon={<BarChartOutlined />} label="Прогресс" onClick={() => go('progress')} />
+      <Item k="gallery" icon={<TrophyOutlined />} label="Достижения" onClick={() => go('gallery')} />
+      <Item k="logout" icon={<LogoutOutlined />} label="Выйти" onClick={onLogout} />
+    </nav>
+  );
+}
+
+// Кнопка смены темы в правом верхнем углу (на всех экранах ученика).
+function ThemeCornerBtn({ isDark, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="student-theme-toggle student-theme-corner"
+      onClick={onToggle}
+      title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+    >
+      {isDark ? <SunOutlined /> : <MoonOutlined />}
+    </button>
+  );
+}
 import { useStudentSession } from './hooks/useStudentSession';
 import StudentAuthPage from './components/student/StudentAuthPage';
 import StudentEntryPage from './components/student/StudentEntryPage';
@@ -9,6 +47,7 @@ import StudentMCTestPage from './components/student/StudentMCTestPage';
 import StudentResultPage from './components/student/StudentResultPage';
 import AchievementGallery from './components/student/AchievementGallery';
 import StudentProgressPage from './components/student/StudentProgressPage';
+import StudentSummerProgram from './components/student/StudentSummerProgram';
 import { api } from './services/pocketbase';
 import { useVersionSync } from './shared/version/useVersionSync';
 import MarathonLiveBoard from './components/marathon/MarathonLiveBoard';
@@ -17,7 +56,10 @@ import './StudentApp.css';
 
 function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAuthSuccess, onLogout }) {
   const [sessionCode, setSessionCode] = useState('');
-  const [homeView, setHomeView] = useState(null); // null | 'login' | 'register' | 'progress' | 'gallery'
+  const [homeView, setHomeView] = useState(() => {
+    const v = new URLSearchParams(window.location.search).get('v');
+    return ['program', 'progress', 'gallery'].includes(v) ? v : null;
+  });
 
   // Минимальный псевдо-session для страниц прогресса/галереи
   const homeStudentSession = useMemo(() => ({ student, attempt: null, session: null }), [student]);
@@ -33,15 +75,9 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
     setHomeView(null);
   };
 
-  const themeToggleBtn = (
-    <button
-      className="student-theme-toggle"
-      onClick={onToggleTheme}
-      title={isDark ? 'Светлая тема' : 'Тёмная тема'}
-    >
-      {isDark ? <SunOutlined /> : <MoonOutlined />}
-    </button>
-  );
+  const go = (k) => setHomeView(k === 'home' ? null : k);
+  const navBar = <StudentBottomNav active={homeView || 'home'} go={go} onLogout={onLogout} />;
+  const themeCorner = <ThemeCornerBtn isDark={isDark} onToggle={onToggleTheme} />;
 
   // ---- Страница авторизации ----
   if (homeView === 'login' || homeView === 'register') {
@@ -58,11 +94,20 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
               <span className="student-top-bar-back-label">Назад</span>
             </button>
           </div>
-          <div className="student-top-bar-right">
-            {themeToggleBtn}
-          </div>
+          <div className="student-top-bar-right">{themeCorner}</div>
         </div>
         <StudentAuthPage onAuthSuccess={handleAuthSuccess} initialTab={homeView} />
+      </div>
+    );
+  }
+
+  // ---- Каникулярное задание ----
+  if (homeView === 'program') {
+    return (
+      <div className={`student-app student-has-bnav${isDark ? ' student-theme-dark' : ''}`}>
+        {themeCorner}
+        <StudentSummerProgram student={student} />
+        {navBar}
       </div>
     );
   }
@@ -70,37 +115,10 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
   // ---- Страница прогресса ----
   if (homeView === 'progress') {
     return (
-      <div className={`student-app${isDark ? ' student-theme-dark' : ''}`}>
-        <div className="student-top-bar">
-          <div className="student-top-bar-left">
-            <button
-              className="student-theme-toggle student-top-bar-back"
-              onClick={() => setHomeView(null)}
-              title="Назад"
-            >
-              <ArrowLeftOutlined />
-              <span className="student-top-bar-back-label">Назад</span>
-            </button>
-          </div>
-          <div className="student-top-bar-right">
-            <button
-              className="student-theme-toggle student-theme-toggle--trophy"
-              onClick={() => setHomeView('gallery')}
-              title="Мои достижения"
-            >
-              <TrophyOutlined />
-            </button>
-            {themeToggleBtn}
-            <button
-              className="student-theme-toggle"
-              onClick={onLogout}
-              title="Выйти"
-            >
-              <LogoutOutlined />
-            </button>
-          </div>
-        </div>
+      <div className={`student-app student-has-bnav${isDark ? ' student-theme-dark' : ''}`}>
+        {themeCorner}
         <StudentProgressPage studentSession={homeStudentSession} />
+        {navBar}
       </div>
     );
   }
@@ -108,44 +126,18 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
   // ---- Страница достижений ----
   if (homeView === 'gallery') {
     return (
-      <div className={`student-app${isDark ? ' student-theme-dark' : ''}`}>
-        <div className="student-top-bar">
-          <div className="student-top-bar-left">
-            <button
-              className="student-theme-toggle student-top-bar-back"
-              onClick={() => setHomeView(null)}
-              title="Назад"
-            >
-              <ArrowLeftOutlined />
-              <span className="student-top-bar-back-label">Назад</span>
-            </button>
-          </div>
-          <div className="student-top-bar-right">
-            {themeToggleBtn}
-            <button
-              className="student-theme-toggle"
-              onClick={onLogout}
-              title="Выйти"
-            >
-              <LogoutOutlined />
-            </button>
-          </div>
-        </div>
+      <div className={`student-app student-has-bnav${isDark ? ' student-theme-dark' : ''}`}>
+        {themeCorner}
         <AchievementGallery studentSession={homeStudentSession} />
+        {navBar}
       </div>
     );
   }
 
-  // ---- Главная карточка ----
+  // ---- Главная карточка / личный кабинет ----
   return (
-    <div className={`student-home${isDark ? ' student-theme-dark' : ''}`}>
-      <button
-        className="student-theme-toggle student-theme-toggle--home"
-        onClick={onToggleTheme}
-        title={isDark ? 'Светлая тема' : 'Тёмная тема'}
-      >
-        {isDark ? <SunOutlined /> : <MoonOutlined />}
-      </button>
+    <div className={`student-home${student ? ' student-has-bnav' : ''}${isDark ? ' student-theme-dark' : ''}`}>
+      {themeCorner}
       <div className="student-home-card">
 
         {/* Логотип Леммы */}
@@ -225,28 +217,18 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
               <UserOutlined />
               <span>{student.name}</span>
             </div>
-            <div className="student-home-nav-btns">
-              <Button
-                className="student-home-nav-btn"
-                icon={<BarChartOutlined />}
-                onClick={() => setHomeView('progress')}
-              >
-                Мой прогресс
-              </Button>
-              <Button
-                className="student-home-nav-btn student-home-nav-btn--trophy"
-                icon={<TrophyOutlined />}
-                onClick={() => setHomeView('gallery')}
-              >
-                Достижения
-              </Button>
-            </div>
-            <button className="student-home-logout-btn" onClick={onLogout}>
-              <LogoutOutlined /> Выйти
-            </button>
+            <Button
+              type="primary" block
+              className="student-home-nav-btn"
+              icon={<CalendarOutlined />}
+              onClick={() => setHomeView('program')}
+            >
+              Открыть каникулярное задание
+            </Button>
           </div>
         )}
       </div>
+      {student && navBar}
     </div>
   );
 }
@@ -370,14 +352,20 @@ function StudentApp() {
     );
   }
 
+  const showSessionNav = !!student && !['test', 'auth'].includes(currentView);
+  const sessionNavActive = currentView === 'progress' ? 'progress' : currentView === 'gallery' ? 'gallery' : null;
+  const goCabinet = (k) => {
+    const map = { home: '/student/', program: '/student/?v=program', progress: '/student/?v=progress', gallery: '/student/?v=gallery' };
+    window.location.href = map[k] || '/student/';
+  };
+
   return (
     <ConfigProvider theme={antdTheme}>
-      <div className={`student-app${isDark ? ' student-theme-dark' : ''}`}>
-        {/* Верхняя панель навигации */}
-        {student && currentView !== 'auth' && (
+      <div className={`student-app${showSessionNav ? ' student-has-bnav' : ''}${isDark ? ' student-theme-dark' : ''}`}>
+        {/* Верхняя панель: «Назад» (для прогресса/галереи) + тема в углу */}
+        {currentView !== 'auth' && (
           <div className="student-top-bar">
             <div className="student-top-bar-left">
-              {/* Кнопка "Назад" на экранах галереи и прогресса */}
               {(currentView === 'gallery' || currentView === 'progress') && (
                 <button
                   className="student-theme-toggle student-top-bar-back"
@@ -390,44 +378,12 @@ function StudentApp() {
               )}
             </div>
             <div className="student-top-bar-right">
-              {/* Кнопка "Мой прогресс" */}
-              {currentView !== 'progress' && currentView !== 'gallery' && (
-                <button
-                  className="student-theme-toggle"
-                  onClick={() => setViewOverride('progress')}
-                  title="Мой прогресс"
-                >
-                  <BarChartOutlined />
-                </button>
-              )}
-
-              {/* Кнопка "Достижения" */}
-              {canOpenAchievements && currentView !== 'gallery' && currentView !== 'progress' && (
-                <button
-                  className="student-theme-toggle student-theme-toggle--trophy"
-                  onClick={() => setViewOverride('gallery')}
-                  title="Мои достижения"
-                >
-                  <TrophyOutlined />
-                </button>
-              )}
-
-              {/* Кнопка переключения темы */}
               <button
                 className="student-theme-toggle"
                 onClick={toggleTheme}
                 title={isDark ? 'Светлая тема' : 'Тёмная тема'}
               >
                 {isDark ? <SunOutlined /> : <MoonOutlined />}
-              </button>
-
-              {/* Кнопка выхода */}
-              <button
-                className="student-theme-toggle"
-                onClick={handleLogout}
-                title="Выйти"
-              >
-                <LogoutOutlined />
               </button>
             </div>
           </div>
@@ -473,6 +429,10 @@ function StudentApp() {
           <StudentProgressPage
             studentSession={studentSession}
           />
+        )}
+
+        {showSessionNav && (
+          <StudentBottomNav active={sessionNavActive} go={goCabinet} onLogout={handleLogout} />
         )}
       </div>
     </ConfigProvider>

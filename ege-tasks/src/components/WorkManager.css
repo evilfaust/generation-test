@@ -320,3 +320,17 @@
 @media print {
   .wm-dashboard { display: none; }
 }
+
+/* Заголовок папки-ярлыка в списке работ */
+.wm-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.wm-folder-header:first-child { margin-top: 0; }

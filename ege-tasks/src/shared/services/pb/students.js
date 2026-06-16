@@ -228,6 +228,21 @@ export const studentsApi = {
     }
   },
 
+  // Полная запись одного ученика (включая telegram_id — нужен для матча профиля слабостей).
+  // Через getFullList с фильтром по id: getOne у students блокируется viewRule
+  // (self-only) → учитель получал бы 404. listRule же разрешает чтение.
+  async getStudent(id) {
+    try {
+      const list = await pb.collection('students').getFullList({
+        filter: `id = "${escapeFilter(id)}"`,
+      });
+      return list[0] || null;
+    } catch (error) {
+      console.error('Error fetching student:', error);
+      return null;
+    }
+  },
+
   async updateStudent(id, data) {
     try {
       return await pb.collection('students').update(id, data);

@@ -2874,3 +2874,119 @@
     gap: 12px;
   }
 }
+
+/* ---- Моя летняя программа (кабинет ученика) ---- */
+.student-summer {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.student-summer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  margin: 8px 0 16px;
+}
+.student-summer-group {
+  margin-bottom: 16px;
+  border: 1px solid var(--srp-border, #e8e8ef);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.student-summer-group--weekly {
+  border-color: #b37feb;
+}
+.student-summer-group-head {
+  background: #f6f5fb;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.student-summer-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid #f0f0f4;
+  flex-wrap: wrap;
+}
+.student-summer-item:first-child { border-top: none; }
+.student-summer-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.student-summer-item-title { font-size: 14px; }
+.student-summer-item-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.student-theme-dark .student-summer-group { border-color: #333; }
+.student-theme-dark .student-summer-group-head { background: #26262e; }
+.student-theme-dark .student-summer-item { border-top-color: #2a2a32; }
+
+.student-summer-hint {
+  color: #666;
+  font-size: 13px;
+  margin: -8px 0 16px;
+}
+.student-summer-week-dates {
+  font-weight: 400;
+  color: #888;
+}
+.student-theme-dark .student-summer-hint { color: #aaa; }
+.student-theme-dark .student-summer-week-dates { color: #999; }
+
+/* ---- Нижнее меню кабинета ученика ---- */
+.student-has-bnav { padding-bottom: 72px; }
+.student-bnav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: #ffffff;
+  border-top: 1px solid #e8e8ef;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  padding: 4px 0 max(4px, env(safe-area-inset-bottom));
+}
+.student-bnav-item {
+  flex: 1;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  font-size: 11px;
+  color: #8a8a99;
+  transition: color 0.15s;
+}
+.student-bnav-item .anticon { font-size: 20px; }
+.student-bnav-item:hover { color: #5b5bd6; }
+.student-bnav-item.is-active { color: #5b5bd6; font-weight: 600; }
+.student-theme-dark .student-bnav {
+  background: #1f1f27;
+  border-top-color: #333;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.4);
+}
+.student-theme-dark .student-bnav-item { color: #9a9aa8; }
+.student-theme-dark .student-bnav-item.is-active,
+.student-theme-dark .student-bnav-item:hover { color: #b9b9ff; }
+
+/* Кнопка темы в углу (на всех экранах ученика) */
+.student-theme-corner {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 60;
+}
