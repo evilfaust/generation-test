@@ -4,7 +4,7 @@ import {
   DeleteOutlined, SendOutlined, ReloadOutlined, EyeOutlined, EditOutlined,
   RightOutlined, InboxOutlined, SolutionOutlined, TeamOutlined,
   ClockCircleOutlined, SearchOutlined, SortAscendingOutlined, FormOutlined,
-  PushpinOutlined, PushpinFilled, FolderOutlined,
+  PushpinOutlined, PushpinFilled, FolderOutlined, DownOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
@@ -65,6 +65,18 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   const [folderFilter, setFolderFilter] = useState(null);     // null=все, '__none__'=без папки, иначе имя папки
   const [folderModalWork, setFolderModalWork] = useState(null); // работа, которой задаём папку
   const [folderInput, setFolderInput] = useState('');
+  const [collapsedFolders, setCollapsedFolders] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('wm.collapsedFolders') || '[]')); }
+    catch { return new Set(); }
+  });
+  const toggleFolderCollapse = (key) => {
+    setCollapsedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { localStorage.setItem('wm.collapsedFolders', JSON.stringify([...next])); } catch { /* noop */ }
+      return next;
+    });
+  };
 
   // Load works
   const loadWorks = useCallback(async () => {
@@ -354,14 +366,6 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
     return [...set].sort((a, b) => a.localeCompare(b, 'ru'));
   }, [works]);
 
-  // Для показа «всех» — группируем по папкам (именованные по алфавиту, «без папки» в конце).
-  const displayWorks = useMemo(() => {
-    if (folderFilter != null || folderOptions.length === 0) return filteredWorks;
-    const rank = new Map(folderOptions.map((f, i) => [f, i]));
-    return [...filteredWorks].sort(
-      (a, b) => (a.folder ? rank.get(a.folder) : 1e6) - (b.folder ? rank.get(b.folder) : 1e6),
-    );
-  }, [filteredWorks, folderFilter, folderOptions]);
 
   // Get session for a work (first one)
   const getSessionForWork = useCallback((workId) => {
@@ -539,16 +543,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
       ) : (
         <div className="wm-work-list">
           {(() => {
-            let lastFolder = undefined;
-            const showHeaders = folderFilter == null && folderOptions.length > 0;
-            return displayWorks.map(work => {
-            const folderKey = work.folder || '__none__';
-            const folderHeader = showHeaders && folderKey !== lastFolder ? (
-              <div className="wm-folder-header" key={`fh-${folderKey}`}>
-                <FolderOutlined /> {work.folder || 'Без папки'}
-              </div>
-            ) : null;
-            lastFolder = folderKey;
+            const renderWorkCard = (work) => {
             const isExpanded = expandedWorkId === work.id;
             const stats = workStats[work.id] || {};
             const session = getSessionForWork(work.id);
@@ -556,9 +551,8 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
             const hasPositiveTimeLimit = Number.isFinite(timeLimit) && timeLimit > 0;
 
             return (
-              <Fragment key={work.id}>
-              {folderHeader}
               <div
+                key={work.id}
                 className={`wm-work-card ${isExpanded ? 'wm-work-card--expanded' : ''} ${work.archived ? 'wm-work-card--archived' : ''}`}
               >
                 {/* Card Header */}
@@ -753,8 +747,45 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                   );
                 })()}
               </div>
-              </Fragment>
             );
+            };
+
+            // Конкретная папка/без-папки или папок нет — плоский список (закреплённые уже наверху).
+            if (folderFilter != null || folderOptions.length === 0) {
+              return filteredWorks.map(renderWorkCard);
+            }
+
+            // Иначе — секции: 📌 Закреплённые (над всеми), затем папки, затем «Без папки».
+            const pinned = filteredWorks.filter(w => w.is_pinned);
+            const rest = filteredWorks.filter(w => !w.is_pinned);
+            const byFolder = new Map();
+            for (const w of rest) {
+              const k = w.folder || '__none__';
+              if (!byFolder.has(k)) byFolder.set(k, []);
+              byFolder.get(k).push(w);
+            }
+            const groups = [];
+            if (pinned.length) groups.push({ key: '__pinned__', label: 'Закреплённые', pinned: true, works: pinned });
+            for (const f of folderOptions) if (byFolder.has(f)) groups.push({ key: f, label: f, works: byFolder.get(f) });
+            if (byFolder.has('__none__')) groups.push({ key: '__none__', label: 'Без папки', works: byFolder.get('__none__') });
+
+            return groups.map(g => {
+              const collapsed = collapsedFolders.has(g.key);
+              return (
+                <Fragment key={g.key}>
+                  <div
+                    className="wm-folder-header wm-folder-header--toggle"
+                    onClick={() => toggleFolderCollapse(g.key)}
+                    role="button"
+                  >
+                    {collapsed ? <RightOutlined /> : <DownOutlined />}
+                    {g.pinned ? <PushpinFilled style={{ color: '#faad14' }} /> : <FolderOutlined />}
+                    <span className="wm-folder-header-label">{g.label}</span>
+                    <span className="wm-folder-count">{g.works.length}</span>
+                  </div>
+                  {!collapsed && g.works.map(renderWorkCard)}
+                </Fragment>
+              );
             });
           })()}
         </div>
