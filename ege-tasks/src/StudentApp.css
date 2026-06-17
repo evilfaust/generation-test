@@ -465,6 +465,16 @@
   font-size: 16px;
   background: linear-gradient(180deg, #f8f9ff 0%, #f0f2f5 100%);
   position: relative;
+
+  /* Кнопочная система: один индиго-бренд, мягкие тени, без муторных градиентов */
+  --st-brand: #4361ee;
+  --st-brand-hover: #3a52d8;
+  --st-brand-active: #2f43c0;
+  --st-brand-soft: rgba(67, 97, 238, 0.1);
+  --st-shadow-sm: 0 1px 2px rgba(31, 41, 95, 0.08);
+  --st-shadow-brand: 0 2px 8px rgba(67, 97, 238, 0.28);
+  --st-shadow-brand-hover: 0 6px 16px rgba(67, 97, 238, 0.32);
+  --st-radius: 12px;
 }
 
 .student-app::before {
@@ -818,16 +828,34 @@
 }
 
 .student-app .ant-btn-primary {
-  background: linear-gradient(135deg, #4361ee, #3a0ca3);
+  background: var(--st-brand);
   border: none;
-  box-shadow: 0 4px 14px rgba(67, 97, 238, 0.35);
-  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: var(--st-shadow-brand);
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.1s ease;
 }
 
 .student-app .ant-btn-primary:hover {
-  background: linear-gradient(135deg, #3a54d4, #2f0a8a);
-  box-shadow: 0 6px 20px rgba(67, 97, 238, 0.45);
+  background: var(--st-brand-hover) !important;
+  box-shadow: var(--st-shadow-brand-hover);
   transform: translateY(-1px);
+}
+
+.student-app .ant-btn-primary:active {
+  background: var(--st-brand-active) !important;
+  box-shadow: var(--st-shadow-brand);
+  transform: translateY(0);
+}
+
+/* Вторичные/контурные кнопки — спокойная плоская заливка вместо тяжёлых теней */
+.student-app .ant-btn-default {
+  border-color: #d9ddf0;
+  box-shadow: var(--st-shadow-sm);
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+.student-app .ant-btn-default:hover {
+  border-color: var(--st-brand);
+  color: var(--st-brand);
 }
 
 .student-app .ant-input {
@@ -1007,16 +1035,17 @@
   height: 56px !important;
   font-size: 18px !important;
   font-weight: 700 !important;
-  border-radius: 16px !important;
-  background: linear-gradient(135deg, #4361ee, #3a0ca3) !important;
+  border-radius: 14px !important;
+  background: var(--st-brand) !important;
   border: none !important;
-  box-shadow: 0 8px 24px rgba(67, 97, 238, 0.35) !important;
-  transition: all 0.3s ease !important;
+  box-shadow: var(--st-shadow-brand) !important;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.1s ease !important;
 }
 
 .student-entry-start-btn .ant-btn:hover {
-  box-shadow: 0 12px 32px rgba(67, 97, 238, 0.45) !important;
-  transform: translateY(-2px) !important;
+  background: var(--st-brand-hover) !important;
+  box-shadow: var(--st-shadow-brand-hover) !important;
+  transform: translateY(-1px) !important;
 }
 
 /* ============================================
@@ -2889,45 +2918,85 @@
   margin: 8px 0 16px;
 }
 .student-summer-group {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   border: 1px solid var(--srp-border, #e8e8ef);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(31, 41, 95, 0.05);
 }
 .student-summer-group--weekly {
   border-color: #b37feb;
 }
 .student-summer-group-head {
-  background: #f6f5fb;
-  padding: 8px 14px;
-  font-weight: 600;
-  font-size: 14px;
+  background: #f4f4fb;
+  padding: 11px 16px;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #3a3a52;
+  border-bottom: 1px solid #eeeef6;
 }
+.student-theme-dark .student-summer-group { background: #1c1c26; box-shadow: none; }
+.student-theme-dark .student-summer-group-head { color: #cfcfe0; border-bottom-color: #2a2a36; }
 .student-summer-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 14px;
+  padding: 12px 16px;
   border-top: 1px solid #f0f0f4;
-  flex-wrap: wrap;
+  transition: background 0.15s ease;
 }
+.student-summer-item:hover { background: #fafbff; }
 .student-summer-item:first-child { border-top: none; }
 .student-summer-item-main {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
-}
-.student-summer-item-title { font-size: 14px; }
-.student-summer-item-actions {
-  display: flex;
-  gap: 6px;
   flex-wrap: wrap;
 }
+.student-summer-item-title {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #2b2b3c;
+  line-height: 1.4;
+}
+.student-summer-item-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Кнопки внутри строк задания — единый аккуратный размер, без блобов */
+.student-summer-item-actions .ant-btn {
+  min-height: 38px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: none;
+  max-width: 220px;
+}
+.student-summer-item-actions .ant-btn > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.student-summer-item-actions .ant-btn-primary {
+  box-shadow: var(--st-shadow-brand);
+}
+.student-summer-item-actions .ant-btn-primary:hover {
+  box-shadow: var(--st-shadow-brand-hover);
+}
+
 .student-theme-dark .student-summer-group { border-color: #333; }
 .student-theme-dark .student-summer-group-head { background: #26262e; }
 .student-theme-dark .student-summer-item { border-top-color: #2a2a32; }
+.student-theme-dark .student-summer-item:hover { background: rgba(255, 255, 255, 0.03); }
+.student-theme-dark .student-summer-item-title { color: #e6e6ee; }
 
 .student-summer-hint {
   color: #666;
@@ -2940,6 +3009,15 @@
 }
 .student-theme-dark .student-summer-hint { color: #aaa; }
 .student-theme-dark .student-summer-week-dates { color: #999; }
+
+.student-summer-group--extra { border-color: #faad14; }
+.student-summer-group--extra .student-summer-group-head { background: #fff7e6; color: #ad6800; }
+.student-theme-dark .student-summer-group--extra { border-color: #8c6d1f; }
+.student-theme-dark .student-summer-group--extra .student-summer-group-head { background: #2b2410; color: #f0c869; }
+.student-summer-extra-text { white-space: pre-wrap; display: block; line-height: 1.5; color: #333; }
+.student-theme-dark .student-summer-extra-text { color: #ddd; }
+.student-summer-file-note { color: #888; font-weight: 400; }
+.student-theme-dark .student-summer-file-note { color: #999; }
 
 /* ---- Нижнее меню кабинета ученика ---- */
 .student-has-bnav { padding-bottom: 72px; }

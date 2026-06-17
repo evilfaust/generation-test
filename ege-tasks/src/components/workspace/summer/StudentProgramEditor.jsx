@@ -74,6 +74,8 @@ export default function StudentProgramEditor() {
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [building, setBuilding] = useState(false);
   const [pickerItem, setPickerItem] = useState(null); // элемент, к которому прикрепляем файлы
+  const [weekPicker, setWeekPicker] = useState(null);  // неделя, к которой прикрепляем файлы
+  const [extraPicker, setExtraPicker] = useState(false); // прикрепление файлов к доп. заданию
   const [addWeek, setAddWeek] = useState(null);        // неделя, в которую добавляем работу
   const [preview, setPreview] = useState(false);       // drawer предпросмотра ученического вида
   const [memoOpen, setMemoOpen] = useState(false);     // модал «памятка ученику»
@@ -181,6 +183,55 @@ export default function StudentProgramEditor() {
     });
     setProgram(prog);
     return prog;
+  };
+
+  // Сохранить патч в program.config (создаёт программу при необходимости). Возвращает новый config.
+  const patchConfig = async (patch) => {
+    const prog = await ensureProgram();
+    const nextConfig = { ...config, ...patch };
+    await api.updateStudyProgram(prog.id, { config: nextConfig });
+    setProgram((p) => (p ? { ...p, config: nextConfig } : p));
+    setConfig(nextConfig);
+    return nextConfig;
+  };
+
+  // ── Файлы недели (config.weekFiles[week]) ──
+  const handleWeekPickFiles = async (picked) => {
+    const wk = weekPicker;
+    if (wk == null) return;
+    const cur = config.weekFiles?.[wk] || [];
+    const merged = [...cur, ...picked.filter((p) => !cur.some((a) => a.id === p.id))];
+    try {
+      await patchConfig({ weekFiles: { ...(config.weekFiles || {}), [wk]: merged } });
+      message.success('Файлы прикреплены к неделе');
+    } catch { message.error('Не удалось прикрепить файлы'); }
+    setWeekPicker(null);
+  };
+
+  const removeWeekFile = async (wk, id) => {
+    const next = (config.weekFiles?.[wk] || []).filter((a) => a.id !== id);
+    try { await patchConfig({ weekFiles: { ...(config.weekFiles || {}), [wk]: next } }); }
+    catch { message.error('Не удалось открепить файл'); }
+  };
+
+  const setWeekFileNote = async (wk, id, note) => {
+    const cur = config.weekFiles?.[wk] || [];
+    if (!cur.some((a) => a.id === id && (a.note || '') !== (note || ''))) return;
+    const next = cur.map((a) => (a.id === id ? { ...a, note } : a));
+    try { await patchConfig({ weekFiles: { ...(config.weekFiles || {}), [wk]: next } }); }
+    catch { message.error('Не удалось сохранить пояснение'); }
+  };
+
+  // ── Дополнительное задание (config.extra = { text, files, links }) ──
+  const extra = config.extra || { text: '', files: [], links: [] };
+  const patchExtra = (patch) => patchConfig({ extra: { text: '', files: [], links: [], ...extra, ...patch } });
+
+  const handleExtraPickFiles = async (picked) => {
+    const cur = extra.files || [];
+    const merged = [...cur, ...picked.filter((p) => !cur.some((a) => a.id === p.id))];
+    try { await patchExtra({ files: merged }); message.success('Файлы прикреплены'); }
+    catch { message.error('Не удалось прикрепить файлы'); }
+    setExtraPicker(false);
   };
 
   const handleBuild = async () => {
@@ -516,14 +567,25 @@ export default function StudentProgramEditor() {
                 key={w.week}
                 size="small"
                 title={<Space><Chip tone="blue" dot={false}>Неделя {w.week}</Chip><Text type="secondary">{w.label}</Text></Space>}
-                extra={<Button size="small" icon={<PlusOutlined />} onClick={() => setAddWeek(w.week)}>Добавить работу</Button>}
-                styles={{ body: { padding: list.length ? 0 : 16 } }}
+                extra={
+                  <Space size={4}>
+                    <Button size="small" icon={<PaperClipOutlined />} onClick={() => setWeekPicker(w.week)}>Файл недели</Button>
+                    <Button size="small" icon={<PlusOutlined />} onClick={() => setAddWeek(w.week)}>Добавить работу</Button>
+                  </Space>
+                }
+                styles={{ body: { padding: 12 } }}
               >
                 {list.length ? (
-                  <Table size="small" rowKey="id" columns={itemColumns} dataSource={list} pagination={false} showHeader={false} />
+                  <Table size="small" rowKey="id" columns={itemColumns} dataSource={list} pagination={false} showHeader={false}
+                    style={{ marginLeft: -12, marginRight: -12 }} />
                 ) : (
                   <Text type="secondary">Пусто — добавьте работу или соберите по слабым темам.</Text>
                 )}
+                <WeekFiles
+                  files={config.weekFiles?.[w.week] || []}
+                  onRemove={(id) => removeWeekFile(w.week, id)}
+                  onNote={(id, note) => setWeekFileNote(w.week, id, note)}
+                />
               </Card>
             );
           })}
@@ -536,11 +598,36 @@ export default function StudentProgramEditor() {
         </Space>
       )}
 
+      {/* Дополнительное (творческое) задание вне недель */}
+      <Divider orientation="left" style={{ marginTop: 24 }}>Дополнительное задание</Divider>
+      <ExtraTaskEditor
+        extra={extra}
+        onSaveText={(text) => patchExtra({ text })}
+        onPickFiles={() => setExtraPicker(true)}
+        onRemoveFile={(id) => patchExtra({ files: (extra.files || []).filter((f) => f.id !== id) })}
+        onFileNote={(id, note) => patchExtra({ files: (extra.files || []).map((f) => (f.id === id ? { ...f, note } : f)) })}
+        onSaveLinks={(links) => patchExtra({ links })}
+      />
+
       <MaterialPickerModal
         open={!!pickerItem}
         onClose={() => setPickerItem(null)}
         existingIds={(pickerItem?.params?.attachments || []).map((a) => a.id)}
         onPick={handlePickFiles}
+      />
+
+      <MaterialPickerModal
+        open={weekPicker != null}
+        onClose={() => setWeekPicker(null)}
+        existingIds={(config.weekFiles?.[weekPicker] || []).map((a) => a.id)}
+        onPick={handleWeekPickFiles}
+      />
+
+      <MaterialPickerModal
+        open={extraPicker}
+        onClose={() => setExtraPicker(false)}
+        existingIds={(extra.files || []).map((a) => a.id)}
+        onPick={handleExtraPickFiles}
       />
 
       <AddWorkModal
@@ -558,7 +645,7 @@ export default function StudentProgramEditor() {
         onClose={() => setPreview(false)}
         width={520}
       >
-        <StudentPreview weeksInfo={weeksInfo} byWeek={byWeek} />
+        <StudentPreview weeksInfo={weeksInfo} byWeek={byWeek} weekFiles={config.weekFiles || {}} extra={extra} />
       </Drawer>
 
       <ShareMemoModal
@@ -581,13 +668,15 @@ export default function StudentProgramEditor() {
 }
 
 // ─── Предпросмотр ученического вида (read-only, без зависимости от student-CSS) ───
-function StudentPreview({ weeksInfo, byWeek }) {
-  if (!weeksInfo.length) return <EmptyState title="Нет недель" />;
+function StudentPreview({ weeksInfo, byWeek, weekFiles = {}, extra }) {
+  const hasExtra = extra && (extra.text?.trim() || (extra.files || []).length || (extra.links || []).length);
+  if (!weeksInfo.length && !hasExtra) return <EmptyState title="Нет недель" />;
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Text type="secondary">Так план выглядит у ученика: по неделям, порциями.</Text>
       {weeksInfo.map((w) => {
         const list = byWeek.get(w.week) || [];
+        const files = weekFiles[w.week] || [];
         return (
           <Card key={w.week} size="small" title={<>Неделя {w.week} · <Text type="secondary">{w.label}</Text></>}>
             {list.length ? (
@@ -604,10 +693,139 @@ function StudentPreview({ weeksInfo, byWeek }) {
                 )}
               />
             ) : <Text type="secondary">На эту неделю заданий нет</Text>}
+            {files.map((f) => (
+              <div key={f.id} style={{ marginTop: 6 }}>
+                <a href={f.url} target="_blank" rel="noreferrer"><PaperClipOutlined /> {f.title || 'файл'}</a>
+                {f.note && <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{f.note}</Text>}
+              </div>
+            ))}
           </Card>
         );
       })}
+      {hasExtra && (
+        <Card size="small" title="✨ Дополнительное задание">
+          {extra.text?.trim() && <div style={{ whiteSpace: 'pre-wrap', marginBottom: 8 }}>{extra.text}</div>}
+          {(extra.files || []).map((f) => (
+            <div key={f.id} style={{ marginTop: 4 }}>
+              <a href={f.url} target="_blank" rel="noreferrer"><PaperClipOutlined /> {f.title || 'файл'}</a>
+              {f.note && <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{f.note}</Text>}
+            </div>
+          ))}
+          {(extra.links || []).map((l, i) => (
+            <div key={i} style={{ marginTop: 4 }}>
+              <a href={l.url} target="_blank" rel="noreferrer"><ExportOutlined /> {l.label || l.url}</a>
+            </div>
+          ))}
+        </Card>
+      )}
     </Space>
+  );
+}
+
+// ─── Файлы недели (учительский редактор) ───
+function WeekFiles({ files, onRemove, onNote }) {
+  if (!files.length) return null;
+  return (
+    <div style={{ marginTop: 8, borderTop: '1px dashed #eee', paddingTop: 8 }}>
+      <Text type="secondary" style={{ fontSize: 12 }}><PaperClipOutlined /> Файлы недели</Text>
+      <Space direction="vertical" size={6} style={{ width: '100%', marginTop: 6 }}>
+        {files.map((f) => (
+          <FileRow key={f.id} file={f} onRemove={() => onRemove(f.id)} onNote={(note) => onNote(f.id, note)} />
+        ))}
+      </Space>
+    </div>
+  );
+}
+
+// Строка файла с inline-пояснением (персист на blur).
+function FileRow({ file, onRemove, onNote }) {
+  const [note, setNote] = useState(file.note || '');
+  useEffect(() => { setNote(file.note || ''); }, [file.note]);
+  return (
+    <Space size={6} align="start" style={{ width: '100%' }}>
+      <a href={file.url} target="_blank" rel="noreferrer" style={{ whiteSpace: 'nowrap' }}>
+        <PaperClipOutlined /> {file.title || 'файл'}
+      </a>
+      <Input
+        size="small" placeholder="пояснение к файлу (необязательно)"
+        value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => onNote(note)}
+        style={{ flex: 1, minWidth: 140 }}
+      />
+      <Tooltip title="Открепить"><DeleteOutlined style={{ color: '#bbb' }} onClick={onRemove} /></Tooltip>
+    </Space>
+  );
+}
+
+// ─── Редактор дополнительного (творческого) задания ───
+function ExtraTaskEditor({ extra, onSaveText, onPickFiles, onRemoveFile, onFileNote, onSaveLinks }) {
+  const [text, setText] = useState(extra.text || '');
+  const [links, setLinks] = useState(extra.links || []);
+  useEffect(() => { setText(extra.text || ''); }, [extra.text]);
+  useEffect(() => { setLinks(extra.links || []); }, [extra.links]);
+
+  const updateLink = (i, patch) => setLinks((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const addLink = () => setLinks((ls) => [...ls, { url: '', label: '' }]);
+  const removeLink = (i) => { const next = links.filter((_, idx) => idx !== i); setLinks(next); onSaveLinks(next); };
+
+  return (
+    <Card size="small">
+      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <div>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Необязательное задание (например, творческое или проектное). Появится у ученика отдельным блоком, если заполнено.
+          </Text>
+          <Input.TextArea
+            rows={4} value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onSaveText(text)}
+            placeholder="Текст задания. Например: придумай и оформи задачу из жизни на тему «проценты»…"
+            style={{ marginTop: 6 }}
+          />
+        </div>
+
+        <div>
+          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+            <Text strong style={{ fontSize: 13 }}>Файлы</Text>
+            <Button size="small" type="link" icon={<PaperClipOutlined />} onClick={onPickFiles} style={{ paddingLeft: 0 }}>
+              Прикрепить
+            </Button>
+          </Space>
+          {(extra.files || []).length ? (
+            <Space direction="vertical" size={6} style={{ width: '100%', marginTop: 4 }}>
+              {extra.files.map((f) => (
+                <FileRow key={f.id} file={f} onRemove={() => onRemoveFile(f.id)} onNote={(note) => onFileNote(f.id, note)} />
+              ))}
+            </Space>
+          ) : <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Файлы не прикреплены</Text>}
+        </div>
+
+        <div>
+          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+            <Text strong style={{ fontSize: 13 }}>Ссылки</Text>
+            <Button size="small" type="link" icon={<PlusOutlined />} onClick={addLink} style={{ paddingLeft: 0 }}>
+              Добавить ссылку
+            </Button>
+          </Space>
+          {links.length ? (
+            <Space direction="vertical" size={6} style={{ width: '100%', marginTop: 4 }}>
+              {links.map((l, i) => (
+                <Space key={i} size={6} style={{ width: '100%' }}>
+                  <Input
+                    size="small" placeholder="https://…" value={l.url}
+                    onChange={(e) => updateLink(i, { url: e.target.value })} onBlur={() => onSaveLinks(links)}
+                    style={{ flex: 1, minWidth: 160 }}
+                  />
+                  <Input
+                    size="small" placeholder="подпись" value={l.label}
+                    onChange={(e) => updateLink(i, { label: e.target.value })} onBlur={() => onSaveLinks(links)}
+                    style={{ width: 160 }}
+                  />
+                  <Tooltip title="Удалить"><DeleteOutlined style={{ color: '#bbb' }} onClick={() => removeLink(i)} /></Tooltip>
+                </Space>
+              ))}
+            </Space>
+          ) : <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Ссылки не добавлены</Text>}
+        </div>
+      </Space>
+    </Card>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse, Row, Col } from 'antd';
-import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined, ClearOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined, ClearOutlined, DashOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import TaskStatementRenderer from './TaskStatementRenderer';
 import RefreshFromSdamgiaModal from './RefreshFromSdamgiaModal';
@@ -8,6 +8,7 @@ import SimilarTasksPanel from './SimilarTasksPanel';
 import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
 import LatexField from './shared/LatexField';
+import NumberLineModal from './shared/NumberLineModal';
 import { generateTaskCode } from '../utils/taskCodeGenerator';
 import { dataUrlToFile } from '../utils/cropImage';
 import { api } from '../services/pocketbase';
@@ -75,6 +76,9 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   const [imageDeleted, setImageDeleted] = useState(false);
   const [convertingTable, setConvertingTable] = useState(false);
   const statementTextAreaRef = useRef(null);
+  const solutionTextAreaRef = useRef(null);
+  // Конструктор числовой прямой: открыт + целевое поле ('statement_md'|'solution_md')
+  const [numlineTarget, setNumlineTarget] = useState(null);
 
   // Картинки задачи из коллекции task_images, сгруппированы по ролям.
   // Используются для подмены ![image](внешний_url) на локальный в превью.
@@ -453,6 +457,29 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
     form.setFieldValue('statement_md', newValue);
     setPreviewStatement(newValue);
   }, [form]);
+
+  // Вставка готового сниппета числовой прямой (блок ```numline или inline-код
+  // `numline: …` для ячеек таблиц) в поле по курсору. Если поле не сфокусировано
+  // (или редактор в code-режиме без нативного textarea) — дописываем в конец.
+  const insertNumline = useCallback((snippet) => {
+    const fieldName = numlineTarget;
+    if (!fieldName) return;
+    const refObj = fieldName === 'solution_md' ? solutionTextAreaRef : statementTextAreaRef;
+    const setter = fieldName === 'solution_md' ? setPreviewSolution : setPreviewStatement;
+    const cur = form.getFieldValue(fieldName) || '';
+    const el = refObj.current?.resizableTextArea?.textArea;
+    let next;
+    if (el && document.activeElement === el) {
+      const s = el.selectionStart ?? cur.length;
+      const e = el.selectionEnd ?? cur.length;
+      next = cur.slice(0, s) + snippet + cur.slice(e);
+    } else {
+      next = cur ? `${cur}${snippet}` : snippet.replace(/^\n/, '');
+    }
+    form.setFieldValue(fieldName, next);
+    setter(next);
+    setNumlineTarget(null);
+  }, [numlineTarget, form]);
 
   // Кнопка 1: эвристика
   const handleConvertHeuristic = useCallback(() => {
@@ -1038,6 +1065,16 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   🧹 Ответ+решение
                 </Button>
               </Tooltip>
+              <Tooltip title="Вставить числовую прямую со штриховкой (конструктор)">
+                <Button
+                  size="small"
+                  icon={<DashOutlined />}
+                  onClick={() => setNumlineTarget('statement_md')}
+                  style={{ fontWeight: 400 }}
+                >
+                  Числовая прямая
+                </Button>
+              </Tooltip>
             </span>
           }
           rules={[{ required: isCreateMode, message: 'Введите текст задания' }]}
@@ -1103,10 +1140,20 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   🧹 Корни
                 </Button>
               </Tooltip>
+              <Tooltip title="Вставить числовую прямую со штриховкой (конструктор)">
+                <Button
+                  size="small"
+                  icon={<DashOutlined />}
+                  onClick={() => setNumlineTarget('solution_md')}
+                  style={{ fontWeight: 400 }}
+                >
+                  Числовая прямая
+                </Button>
+              </Tooltip>
             </span>
           }
         >
-          <LatexField mode={fieldMode} rows={5} placeholder="Введите решение задачи..." onTextChange={setPreviewSolution} />
+          <LatexField ref={solutionTextAreaRef} mode={fieldMode} rows={5} placeholder="Введите решение задачи..." onTextChange={setPreviewSolution} />
         </Form.Item>
 
         {previewSolution && (
@@ -1194,6 +1241,14 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         onApplied={() => { onClose?.(); }}
       />
     )}
+
+    {/* Конструктор числовой прямой — вне основного Modal (focus-trap). */}
+    <NumberLineModal
+      open={!!numlineTarget}
+      onCancel={() => setNumlineTarget(null)}
+      onInsert={insertNumline}
+      defaultFormat="inline"
+    />
     </>
   );
 };

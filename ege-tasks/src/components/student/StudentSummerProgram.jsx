@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Empty, Spin, Tag } from 'antd';
-import { CalendarOutlined, FileTextOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { CalendarOutlined, FileTextOutlined, LinkOutlined, PlayCircleOutlined, StarOutlined } from '@ant-design/icons';
 import { api } from '../../shared/services/pocketbase';
 import { summerWeeks } from '../../shared/utils/summerWeeks';
 
@@ -49,8 +49,12 @@ export default function StudentSummerProgram({ student }) {
     return { calWeeks: weeksList, byWeek: map, weekly: every };
   }, [items, program]);
 
+  const weekFiles = program?.config?.weekFiles || {};
+  const extra = program?.config?.extra || null;
+  const hasExtra = extra && (extra.text?.trim() || (extra.files || []).length || (extra.links || []).length);
+
   if (loading) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
-  if (!program || !items.length) {
+  if (!program || (!items.length && !hasExtra)) {
     return (
       <div style={{ padding: 24 }}>
         <Empty description="Каникулярного задания пока нет. Загляни позже — учитель его соберёт." />
@@ -67,6 +71,7 @@ export default function StudentSummerProgram({ student }) {
 
       {calWeeks.map((w) => {
         const examItems = byWeek.get(w.week) || [];
+        const files = weekFiles[w.week] || [];
         return (
           <div key={w.week} className="student-summer-group">
             <div className="student-summer-group-head">
@@ -74,12 +79,51 @@ export default function StudentSummerProgram({ student }) {
             </div>
             {examItems.map((it) => <ProgramItem key={it.id} item={it} />)}
             {weekly.map((it) => <ProgramItem key={`${w.week}-${it.id}`} item={it} weekly />)}
-            {!examItems.length && !weekly.length && (
+            {files.map((f) => <FileItem key={f.id} file={f} />)}
+            {!examItems.length && !weekly.length && !files.length && (
               <div className="student-summer-item"><span style={{ color: '#999' }}>На эту неделю заданий нет</span></div>
             )}
           </div>
         );
       })}
+
+      {hasExtra && (
+        <div className="student-summer-group student-summer-group--extra">
+          <div className="student-summer-group-head"><StarOutlined /> Дополнительное задание</div>
+          {extra.text?.trim() && (
+            <div className="student-summer-item student-summer-extra-text">{extra.text}</div>
+          )}
+          {(extra.files || []).map((f) => <FileItem key={f.id} file={f} />)}
+          {(extra.links || []).map((l, i) => (
+            <div key={i} className="student-summer-item">
+              <div className="student-summer-item-main">
+                <span className="student-summer-item-title">{l.label || l.url}</span>
+              </div>
+              <div className="student-summer-item-actions">
+                <Button icon={<LinkOutlined />} href={l.url} target="_blank">Открыть</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Прикреплённый файл (к неделе или доп. заданию) с опциональным пояснением.
+function FileItem({ file }) {
+  return (
+    <div className="student-summer-item">
+      <div className="student-summer-item-main">
+        <Tag color="blue"><FileTextOutlined /> файл</Tag>
+        <span className="student-summer-item-title">
+          {file.title || 'файл'}
+          {file.note && <span className="student-summer-file-note"> — {file.note}</span>}
+        </span>
+      </div>
+      <div className="student-summer-item-actions">
+        <Button icon={<FileTextOutlined />} href={file.url} target="_blank">Открыть</Button>
+      </div>
     </div>
   );
 }
@@ -95,13 +139,13 @@ function ProgramItem({ item, weekly }) {
       </div>
       <div className="student-summer-item-actions">
         {item.session && (
-          <Button type="primary" size="small" icon={<PlayCircleOutlined />}
+          <Button type="primary" icon={<PlayCircleOutlined />}
             href={`/student/${item.session}`}>
             Решать
           </Button>
         )}
         {atts.map((a) => (
-          <Button key={a.id} size="small" icon={<FileTextOutlined />} href={a.url} target="_blank">
+          <Button key={a.id} icon={<FileTextOutlined />} href={a.url} target="_blank">
             {a.title || 'файл'}
           </Button>
         ))}

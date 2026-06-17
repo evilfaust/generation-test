@@ -218,7 +218,7 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
               <span>{student.name}</span>
             </div>
             <Button
-              type="primary" block
+              block
               className="student-home-nav-btn"
               icon={<CalendarOutlined />}
               onClick={() => setHomeView('program')}

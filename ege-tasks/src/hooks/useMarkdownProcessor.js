@@ -7,6 +7,18 @@ import remarkRehype from 'remark-rehype'
 import rehypeKatex from 'rehype-katex'
 import rehypeStringify from 'rehype-stringify'
 import DOMPurify from 'dompurify'
+import { numberLineSvgFromSpec } from '../utils/numberLine'
+import { autofixTableDelimiters } from '../utils/markdownTables'
+
+// Декодирование HTML-сущностей внутри <code> (rehype экранирует < & " > ).
+function decodeEntities(s) {
+  return String(s)
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+}
 
 // Debounce delay in ms
 const DEBOUNCE_DELAY = 150
@@ -107,7 +119,7 @@ function parseGeoGebraConfig(rawConfig = '') {
 const INLINE_GEO_RE = /^:::geogebra\s+(\S+)\s*:::$/
 
 function preprocess(md) {
-  const normalized = md.replace(/\r\n/g, '\n')
+  const normalized = autofixTableDelimiters(md.replace(/\r\n/g, '\n'))
   const lines = normalized.split('\n')
   const outLines = []
   const geogebraBlocks = []
@@ -223,6 +235,25 @@ function postprocess(html, columns, geogebraBlocks = [], callouts = []) {
     '</div>',
   )
 
+  // Числовая прямая: fenced-блок ```numline → <pre><code class="language-numline">
+  // → инлайновый <svg> со штриховкой (общая сборка numberLineSvgFromSpec).
+  result = result.replace(
+    /<pre><code class="language-numline">([\s\S]*?)<\/code><\/pre>/g,
+    (_, body) => {
+      const spec = decodeEntities(body)
+      return `<div class="numline-block" style="text-align:center;margin:10px 0">${numberLineSvgFromSpec(spec)}</div>`
+    },
+  )
+
+  // Inline-форма для ячеек таблиц: <code>numline: …</code> → компактный <svg>.
+  result = result.replace(
+    /<code>numline:\s*([\s\S]*?)<\/code>/gi,
+    (_, body) => {
+      const spec = decodeEntities(body)
+      return `<span class="numline-inline" style="display:inline-block;vertical-align:middle">${numberLineSvgFromSpec(spec, { width: 200 })}</span>`
+    },
+  )
+
   // Размер картинки: ![alt](url){S|M|L|XL} → class на <img>, токен убираем.
   result = result.replace(
     /<img\b([^>]*?)\s*\/?>\s*\{(s|m|l|xl)\}/gi,
@@ -283,8 +314,12 @@ export function useMarkdownProcessor(markdown, columns = 1) {
         ADD_TAGS: ['math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub',
           'mfrac', 'mroot', 'msqrt', 'munder', 'mover', 'mtable', 'mtr',
           'mtd', 'annotation', 'div', 'table', 'thead', 'tbody', 'tr',
-          'th', 'td', 'caption', 'colgroup', 'col'],
-        ADD_ATTR: ['class', 'style', 'encoding', 'xmlns', 'aria-hidden'],
+          'th', 'td', 'caption', 'colgroup', 'col',
+          'svg', 'g', 'line', 'rect', 'circle', 'path', 'text'],
+        ADD_ATTR: ['class', 'style', 'encoding', 'xmlns', 'aria-hidden',
+          'viewBox', 'role', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r',
+          'd', 'fill', 'stroke', 'stroke-width', 'width', 'height', 'transform',
+          'font-size', 'font-style', 'text-anchor'],
         ALLOW_DATA_ATTR: true,
       })
       setHtml(cleanHtml)

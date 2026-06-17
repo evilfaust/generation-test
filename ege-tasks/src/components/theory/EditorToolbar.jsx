@@ -5,11 +5,13 @@ import {
   OrderedListOutlined, UnorderedListOutlined,
   CodeOutlined, PictureOutlined, LinkOutlined,
   MinusOutlined, FunctionOutlined, ContainerOutlined, DownOutlined,
-  InboxOutlined, ScissorOutlined, ReloadOutlined, BorderHorizontalOutlined
+  InboxOutlined, ScissorOutlined, ReloadOutlined, BorderHorizontalOutlined,
+  DashOutlined
 } from '@ant-design/icons';
 import TableInsertPopover from './TableInsertPopover';
 import FormulaPalette from './FormulaPalette';
 import CropModal from '../shared/CropModal';
+import NumberLineModal from '../shared/NumberLineModal';
 import { materialsApi } from '../../shared/services/pb/filesClient';
 import { dataUrlToFile } from '../../utils/cropImage';
 import './EditorToolbar.css';
@@ -49,6 +51,7 @@ export default function EditorToolbar({ editorRef }) {
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
+  const [numlineOpen, setNumlineOpen] = useState(false);
 
   const insert = useCallback((opts) => {
     insertIntoEditor(editorRef.current, opts);
@@ -246,6 +249,10 @@ export default function EditorToolbar({ editorRef }) {
           <Button size="small" type="text" className="tf-btn" icon={<PictureOutlined />}
             onClick={() => setImageModalOpen(true)} />
         </Tooltip>
+        <Tooltip title="Числовая прямая со штриховкой">
+          <Button size="small" type="text" className="tf-btn" icon={<DashOutlined />}
+            onClick={() => setNumlineOpen(true)} />
+        </Tooltip>
         <Tooltip title="Ссылка">
           <Button size="small" type="text" className="tf-btn" icon={<LinkOutlined />}
             onClick={() => setLinkModalOpen(true)} />
@@ -360,6 +367,16 @@ export default function EditorToolbar({ editorRef }) {
         imageUrl={localDataUrl}
         title="Кадрирование картинки"
         messageApi={message}
+      />
+
+      {/* Modal: конструктор числовой прямой */}
+      <NumberLineModal
+        open={numlineOpen}
+        onCancel={() => setNumlineOpen(false)}
+        onInsert={(snippet) => {
+          insertIntoEditor(editorRef.current, { text: snippet });
+          setNumlineOpen(false);
+        }}
       />
 
       {/* Modal: Вставка ссылки */}
