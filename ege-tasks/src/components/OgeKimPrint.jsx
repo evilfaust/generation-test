@@ -242,18 +242,20 @@ const KimOgeVariantPrint = ({ variant, kimMeta }) => {
  * Лист ответов варианта ОГЭ (обычная печать):
  * часть 1 (1–19) — краткие ответы, часть 2 (20–25) — развёрнутые решения с баллами.
  */
-const OgeAnswersPage = ({ variants }) => {
+const OgeAnswersPage = ({ variants, title = '' }) => {
   if (variants.length === 0) return null;
+  const showVariantHeading = variants.length > 1 || !title;
   return (
     <div className="answers-page">
-      <h2>Ответы и решения</h2>
+      <h2>{title || 'Ответы и решения'}</h2>
+      {title && <div className="answers-page-subtitle">Лист ответов для учителя</div>}
       {variants.map((variant) => {
         const tasks = (variant.tasks || []).map((t, i) => ({ ...t, kimNumber: i + 1 }));
         const part1 = tasks.filter(t => t.kimNumber <= PART1_LAST);
         const part2 = tasks.filter(t => t.kimNumber > PART1_LAST);
         return (
           <div key={variant.number} className="variant-answers">
-            <h3>Вариант {variant.number}</h3>
+            {showVariantHeading && <h3>Вариант {variant.number}</h3>}
 
             {part1.length > 0 && (
               <>

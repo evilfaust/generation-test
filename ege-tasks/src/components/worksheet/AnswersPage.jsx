@@ -16,12 +16,20 @@ const AnswersPage = ({
   show = true,
   cryptogramEnabled = false,
   cryptogramPhrase = '',
+  title = '',
 }) => {
   if (!show || variants.length === 0) return null;
 
+  const defaultHeading = cryptogramEnabled ? 'Ответы и ключ шифровки' : 'Ответы';
+  // Заголовок листа ответов — название работы (если задано), иначе дефолт.
+  // «Вариант N» в подзаголовках показываем, только когда вариантов несколько
+  // (или название не задано) — для одиночной работы он лишний.
+  const showVariantHeading = variants.length > 1 || !title;
+
   return (
     <div className="answers-page">
-      <h2>{cryptogramEnabled ? 'Ответы и ключ шифровки' : 'Ответы'}</h2>
+      <h2>{title || defaultHeading}</h2>
+      {title && <div className="answers-page-subtitle">Лист ответов для учителя</div>}
       {variants.map(variant => (
         (() => {
           const cryptogram = cryptogramEnabled
@@ -30,9 +38,11 @@ const AnswersPage = ({
 
           return (
             <div key={variant.number} className="variant-answers">
-              <h3>
-                {variantLabel} {variant.number}
-              </h3>
+              {showVariantHeading && (
+                <h3>
+                  {variantLabel} {variant.number}
+                </h3>
+              )}
 
               {cryptogramEnabled && cryptogram?.valid && (
                 <div className="answers-cryptogram-box">

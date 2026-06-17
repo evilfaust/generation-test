@@ -26,6 +26,7 @@ import {
 } from '../hooks';
 import MathRenderer from './MathRenderer';
 import { kimImageBoxStyle, kimImageImgStyle } from '../utils/kimImageSize';
+import { printKimAnswers } from '../utils/printKimAnswers';
 import VariantRenderer from './worksheet/VariantRenderer';
 import AnswersPage from './worksheet/AnswersPage';
 import ActionButtons from './worksheet/ActionButtons';
@@ -926,6 +927,15 @@ const EgeVariantGenerator = () => {
                 Распечатать КИМ
               </Button>
             )}
+            {kimStyle && (
+              <Button
+                icon={<PrinterOutlined />}
+                size="large"
+                onClick={printKimAnswers}
+              >
+                Лист ответов (учителю)
+              </Button>
+            )}
             {variants[0]?.tasks?.length > 0 && (
               <Button onClick={() => setParallelOpen(true)}>
                 🧬 Параллельные варианты (по образцу)
@@ -1014,6 +1024,13 @@ const EgeVariantGenerator = () => {
 
             {/* Страница ответов — только для обычного стиля */}
             {!kimStyle && <AnswersPage variants={variants} variantLabel="Вариант" />}
+
+            {/* Лист ответов учителю в режиме КИМ — скрыт, печатается кнопкой */}
+            {kimStyle && (
+              <div className="kim-answers-sheet">
+                <AnswersPage variants={variants} variantLabel="Вариант" title={currentWork?.title} />
+              </div>
+            )}
           </div>
 
           {/* Онлайн-выдача */}

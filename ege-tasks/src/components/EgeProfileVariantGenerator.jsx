@@ -33,6 +33,7 @@ import TaskReplaceModal from './TaskReplaceModal';
 import TaskEditModal from './TaskEditModal';
 import { api } from '../services/pocketbase';
 import { KimProfileVariantPrint, ProfileAnswersPage, PART1_LAST } from './EgeProfileKimPrint';
+import { printKimAnswers } from '../utils/printKimAnswers';
 import './TaskWorksheet.css';
 import './EgeVariantGenerator.css';
 import './EgeProfileVariantGenerator.css';
@@ -680,6 +681,15 @@ const EgeProfileVariantGenerator = () => {
                 Распечатать КИМ
               </Button>
             )}
+            {kimStyle && (
+              <Button
+                icon={<PrinterOutlined />}
+                size="large"
+                onClick={printKimAnswers}
+              >
+                Лист ответов (учителю)
+              </Button>
+            )}
             {variants[0]?.tasks?.length > 0 && (
               <Button onClick={() => setParallelOpen(true)}>
                 🧬 Параллельные варианты (по образцу)
@@ -765,6 +775,13 @@ const EgeProfileVariantGenerator = () => {
 
             {/* Лист ответов и решений — только для обычного стиля */}
             {!kimStyle && <ProfileAnswersPage variants={variants} />}
+
+            {/* Лист ответов учителю в режиме КИМ — скрыт, печатается кнопкой */}
+            {kimStyle && (
+              <div className="kim-answers-sheet">
+                <ProfileAnswersPage variants={variants} title={currentWork?.title} />
+              </div>
+            )}
           </div>
 
           {/* Онлайн-выдача */}
