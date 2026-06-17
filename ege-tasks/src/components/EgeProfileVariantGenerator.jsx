@@ -216,6 +216,18 @@ const EgeProfileVariantGenerator = () => {
 
   const handleReset = () => { reset(); setCurrentWork(null); };
 
+  // Размер чертежа в КИМ-печати per-задача (S/M/L/XL) → task.kimImageSize.
+  const handleSetImageSize = (vIdx, tIdx, size) => {
+    setVariants(prev => prev.map((variant, vi) => (
+      vi !== vIdx ? variant : {
+        ...variant,
+        tasks: variant.tasks.map((task, ti) => (
+          ti !== tIdx ? task : { ...task, kimImageSize: size }
+        )),
+      }
+    )));
+  };
+
   // Печать КИМ-варианта с правильными полями A4
   const handleKimPrint = () => {
     const styleId = 'kim-print-page-style';
@@ -740,6 +752,7 @@ const EgeProfileVariantGenerator = () => {
                         dragDropHandlers={dragDropHandlers}
                         onEditTask={taskEditing.handleEditTask}
                         onReplaceTask={taskEditing.handleReplaceTask}
+                        onSetImageSize={handleSetImageSize}
                       />
                     </div>
                     <KimProfileVariantPrint variant={variant} kimMeta={kimMeta} />

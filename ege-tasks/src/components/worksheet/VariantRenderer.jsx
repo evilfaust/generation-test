@@ -1,9 +1,15 @@
-import { Button, Tooltip } from 'antd';
+import { Button, Tooltip, Segmented } from 'antd';
 import { EditOutlined, SwapOutlined } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
 import { filterTaskText } from '../../utils/filterTaskText';
 import { api } from '../../services/pocketbase';
 import { buildCryptogramForVariant } from '../../utils/cryptogram';
+import {
+  KIM_IMAGE_SIZE_OPTIONS,
+  DEFAULT_KIM_IMAGE_SIZE,
+  kimImageBoxStyle,
+  kimImageImgStyle,
+} from '../../utils/kimImageSize';
 
 /**
  * Компонент рендеринга одного варианта (компактный и обычный режимы).
@@ -38,6 +44,7 @@ const VariantRenderer = ({
   dragDropHandlers,
   onEditTask,
   onReplaceTask,
+  onSetImageSize,
   cryptogramEnabled = false,
   cryptogramPhrase = '',
 }) => {
@@ -167,7 +174,17 @@ const VariantRenderer = ({
               <div className="task-header">
                 <span className="task-number">{taskIndex + 1}.</span>
                 <span className="task-code">{task.code}</span>
-                <div className="no-print" style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+                <div className="no-print" style={{ marginLeft: 'auto', display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  {onSetImageSize && task.has_image && taskImageUrl && (
+                    <Tooltip title="Размер чертежа в печати (КИМ)">
+                      <Segmented
+                        size="small"
+                        options={KIM_IMAGE_SIZE_OPTIONS}
+                        value={task.kimImageSize || DEFAULT_KIM_IMAGE_SIZE}
+                        onChange={(val) => onSetImageSize(variantIndex, taskIndex, val)}
+                      />
+                    </Tooltip>
+                  )}
                   <Tooltip title="Редактировать задачу">
                     <Button
                       type="text"
@@ -192,8 +209,15 @@ const VariantRenderer = ({
                 <MathRenderer text={applyTextFilter(task.statement_md)} />
 
                 {task.has_image && taskImageUrl && (
-                  <div className="task-image">
-                    <img src={taskImageUrl} alt="" />
+                  <div
+                    className="task-image"
+                    style={task.kimImageSize ? kimImageBoxStyle(task.kimImageSize) : undefined}
+                  >
+                    <img
+                      src={taskImageUrl}
+                      alt=""
+                      style={task.kimImageSize ? kimImageImgStyle(task.kimImageSize) : undefined}
+                    />
                   </div>
                 )}
               </div>

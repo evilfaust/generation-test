@@ -25,6 +25,7 @@ import {
   useTaskEditing,
 } from '../hooks';
 import MathRenderer from './MathRenderer';
+import { kimImageBoxStyle, kimImageImgStyle } from '../utils/kimImageSize';
 import VariantRenderer from './worksheet/VariantRenderer';
 import AnswersPage from './worksheet/AnswersPage';
 import ActionButtons from './worksheet/ActionButtons';
@@ -53,25 +54,31 @@ const KIM_GAP_PX = 2.5 * MM_TO_PX; // 2.5mm gap
  * Простой жадный алгоритм: кладём задачу на текущую страницу если влезает,
  * иначе — на следующую.
  *
- * Размеры A5-страницы (148.5mm × 210mm):
- *   padding: 5mm top/bottom, 5mm left/right
- *   content area: 138.5mm × 200mm
+ * Печатная высота страницы — 206mm (а не физические 210mm A5): футер прижат
+ * к низу через margin-top:auto, и на 210mm округления печати уносили его на
+ * пустой следующий лист вместе с контентом последней страницы (задачи 18–21).
+ *
+ * Размеры печатной A5-страницы (≈148mm × 206mm, padding 5mm со всех сторон):
+ *   content area: ≈138mm × 196mm
  *
  * Вычет "служебных" зон:
  *   header (text ~3mm + margin-bottom 4mm) ≈ 7mm
  *   footer (padding-top 2mm + text 3mm) ≈ 5mm
- *   → для задач: 200 - 7 - 5 = 188mm
+ *   → для задач: 196 - 7 - 5 = 184mm (берём 182 с небольшим запасом)
  *
  * Первая страница задач (стр.2) дополнительно имеет note-box:
  *   padding 1.5mm×2 + text 11px×3×1.18 ≈ 13mm + margin-bottom 2mm ≈ 18mm
- *   → для задач: 188 - 15 = 173mm (берём 172 с небольшим запасом)
+ *   → для задач: 182 - 16 = 166mm
  */
 const paginateKimByHeight = (tasks, heights) => {
   const withNumbers = tasks.map((task, i) => ({ ...task, kimNumber: i + 1 }));
   if (withNumbers.length === 0) return [];
 
-  const PAGE_HEIGHT_PX = 188 * MM_TO_PX;
-  const FIRST_PAGE_HEIGHT_PX = 172 * MM_TO_PX;
+  // Высота печатной страницы КИМ — 206mm (см. .kim-page в print-CSS, ужата с
+  // 210mm ради запаса под футер). Полезная зона для задач = 206 − 10 (padding)
+  // − 7 (header) − 5 (footer) ≈ 184mm; берём 182 с небольшим запасом.
+  const PAGE_HEIGHT_PX = 182 * MM_TO_PX;
+  const FIRST_PAGE_HEIGHT_PX = 166 * MM_TO_PX;
 
   const pages = [];
   let current = [];
@@ -153,8 +160,8 @@ const KimTaskPage = ({ variant, pageNumber, tasks, kimMeta }) => (
               <div className="kim-book-task-content">
                 <MathRenderer text={task.statement_md} />
                 {task.has_image && taskImageUrl && (
-                  <div className="kim-book-task-image">
-                    <img src={taskImageUrl} alt="" />
+                  <div className="kim-book-task-image" style={kimImageBoxStyle(task.kimImageSize)}>
+                    <img src={taskImageUrl} alt="" style={kimImageImgStyle(task.kimImageSize)} />
                   </div>
                 )}
               </div>
@@ -194,7 +201,7 @@ const KimVariantPrint = ({ variant, kimMeta }) => {
   // задачи через редактор (id не меняется) не триггерит перерасчёт пагинации
   // и КИМ печатает устаревший текст из закэшированных страниц.
   const taskKey = tasks
-    .map((t) => `${t.id}|${t.statement_md || ''}|${t.image || ''}|${t.has_image ? 1 : 0}`)
+    .map((t) => `${t.id}|${t.statement_md || ''}|${t.image || ''}|${t.has_image ? 1 : 0}|${t.kimImageSize || 'm'}`)
     .join('§');
   const needsMeasure = state.taskKey !== taskKey;
 
@@ -229,8 +236,8 @@ const KimVariantPrint = ({ variant, kimMeta }) => {
                     <div className="kim-book-task-content">
                       <MathRenderer text={task.statement_md} />
                       {task.has_image && taskImageUrl && (
-                        <div className="kim-book-task-image">
-                          <img src={taskImageUrl} alt="" />
+                        <div className="kim-book-task-image" style={kimImageBoxStyle(task.kimImageSize)}>
+                          <img src={taskImageUrl} alt="" style={kimImageImgStyle(task.kimImageSize)} />
                         </div>
                       )}
                     </div>
@@ -350,6 +357,23 @@ const EgeVariantGenerator = () => {
     );
   }, [egeBaseTopics]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Пока активен стиль КИМ — держим @page A5 с НУЛЕВЫМИ полями последним
+  // правилом в <head>. Иначе глобальный `@page { margin: 10mm 8mm }` из
+  // TaskWorksheet.css (безымянные @page решаются по ПОРЯДКУ, а не специфичности;
+  // именованные @page Chrome для полей игнорирует) даёт поля ~10мм: печатная
+  // область становится МЕНЬШЕ страницы → футер обложки уезжает на пустой
+  // 2-й лист, вся вёрстка сдвигается и последние задачи (18–21) пропадают.
+  // Инъекция в конец <head> перебивает его при ЛЮБОМ способе печати (кнопка/Cmd+P).
+  // Тот же приём, что и в OgeVariantGenerator.
+  useEffect(() => {
+    if (!kimStyle) return undefined;
+    const style = document.createElement('style');
+    style.setAttribute('data-kim-page', 'ege-base');
+    style.textContent = '@page { size: A5 portrait; margin: 0; }';
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, [kimStyle]);
+
   // Подтемы, сгруппированные по теме
   const subtopicsByTopic = useMemo(() => {
     const map = {};
@@ -436,6 +460,19 @@ const EgeVariantGenerator = () => {
   }, [variants.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleReset = () => { reset(); setCurrentWork(null); };
+
+  // Размер чертежа в КИМ-печати per-задача (S/M/L/XL). Пишем в task.kimImageSize
+  // конкретной позиции варианта; сохраняется в работе (variants.order.imageSize).
+  const handleSetImageSize = (vIdx, tIdx, size) => {
+    setVariants(prev => prev.map((variant, vi) => (
+      vi !== vIdx ? variant : {
+        ...variant,
+        tasks: variant.tasks.map((task, ti) => (
+          ti !== tIdx ? task : { ...task, kimImageSize: size }
+        )),
+      }
+    )));
+  };
 
   // Печать КИМ-варианта с правильными полями A4
   const handleKimPrint = () => {
@@ -962,6 +999,7 @@ const EgeVariantGenerator = () => {
                         dragDropHandlers={dragDropHandlers}
                         onEditTask={taskEditing.handleEditTask}
                         onReplaceTask={taskEditing.handleReplaceTask}
+                        onSetImageSize={handleSetImageSize}
                       />
                     </div>
                     {/* Печатный КИМ-вид — вне print-only, чтобы measure-фаза (offsetHeight)

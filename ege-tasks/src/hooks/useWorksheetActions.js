@@ -97,7 +97,11 @@ export const useWorksheetActions = () => {
 
       for (const variant of variants) {
         const taskIds = variant.tasks.map(t => t.id);
-        const order = variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx }));
+        const order = variant.tasks.map((t, idx) => ({
+          taskId: t.id,
+          position: idx,
+          ...(t.kimImageSize ? { imageSize: t.kimImageSize } : {}),
+        }));
 
         await api.createVariant({
           work: work.id,
@@ -136,7 +140,11 @@ export const useWorksheetActions = () => {
 
       for (const variant of variants) {
         const taskIds = variant.tasks.map(t => t.id);
-        const order = variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx }));
+        const order = variant.tasks.map((t, idx) => ({
+          taskId: t.id,
+          position: idx,
+          ...(t.kimImageSize ? { imageSize: t.kimImageSize } : {}),
+        }));
         const payload = {
           work: workId,
           number: variant.number,
@@ -200,7 +208,9 @@ export const useWorksheetActions = () => {
         for (const taskId of tasksIds) {
           const task = await api.getTask(taskId);
           if (task) {
-            tasks.push(task);
+            // Восстанавливаем сохранённый размер картинки в КИМ (см. order.imageSize)
+            const imageSize = order.find(o => o.taskId === task.id)?.imageSize;
+            tasks.push(imageSize ? { ...task, kimImageSize: imageSize } : task);
           }
         }
 

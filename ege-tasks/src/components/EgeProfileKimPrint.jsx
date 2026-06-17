@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo, useLayoutEffect } from 'react';
 import { Typography } from 'antd';
 import MathRenderer from './MathRenderer';
 import { api } from '../services/pocketbase';
+import { kimImageBoxStyle, kimImageImgStyle } from '../utils/kimImageSize';
 
 const { Text } = Typography;
 
@@ -94,8 +95,8 @@ const KimProfileTask = ({ task, withAnswer }) => {
         <div className="kim-book-task-content">
           <MathRenderer text={task.statement_md} />
           {task.has_image && taskImageUrl && (
-            <div className="kim-book-task-image">
-              <img src={taskImageUrl} alt="" />
+            <div className="kim-book-task-image" style={kimImageBoxStyle(task.kimImageSize)}>
+              <img src={taskImageUrl} alt="" style={kimImageImgStyle(task.kimImageSize)} />
             </div>
           )}
         </div>
@@ -169,7 +170,7 @@ const KimProfileVariantPrint = ({ variant, kimMeta }) => {
   // задачи через редактор (id не меняется) не триггерит перерасчёт пагинации
   // и КИМ печатает устаревший текст. solution_md важен для части 2.
   const taskKey = allTasks
-    .map((t) => `${t.id}|${t.statement_md || ''}|${t.solution_md || ''}|${t.image || ''}|${t.has_image ? 1 : 0}`)
+    .map((t) => `${t.id}|${t.statement_md || ''}|${t.solution_md || ''}|${t.image || ''}|${t.has_image ? 1 : 0}|${t.kimImageSize || 'm'}`)
     .join('§');
   const needsMeasure = state.taskKey !== taskKey;
 
