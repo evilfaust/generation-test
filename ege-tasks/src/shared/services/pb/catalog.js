@@ -126,7 +126,7 @@ export const catalogApi = {
   async getTasksStatsSnapshot() {
     try {
       const records = await pb.collection('tasks').getFullList({
-        fields: 'id,topic,subtopic,tags,difficulty,has_image,source,year,success_rate',
+        fields: 'id,topic,subtopic,tags,difficulty,has_image,source,year',
         batch: 500,
       });
       return records;

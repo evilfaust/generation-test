@@ -22,7 +22,10 @@ import {
   useTaskDragDrop,
   useWorksheetActions,
   useTaskEditing,
+  useTaskStats,
 } from '../hooks';
+import { poolStatsDetailed } from '../utils/successStats';
+import SuccessRateCell from './worksheet/SuccessRateCell';
 import VariantRenderer from './worksheet/VariantRenderer';
 import ActionButtons from './worksheet/ActionButtons';
 import ParallelVariantsModal from './worksheet/ParallelVariantsModal';
@@ -183,22 +186,17 @@ const OgeVariantGenerator = () => {
     return map;
   }, [subtopics]);
 
-  // Средний success_rate по каждому слоту (из tasksSnapshot)
+  // Решаемость по теме из реальных ответов учеников (attempt_answers), пулинг
+  // Σверных/Σвсего. Значение = { rate, c, n, lower } | { rate:null }.
+  const { statsByTask, prior } = useTaskStats();
   const successRateByTopic = useMemo(() => {
     const map = {};
     orderedTopics.forEach(topic => {
-      const tested = tasksSnapshot.filter(
-        t => t.topic === topic.id && t.success_rate != null && t.success_rate >= 0
-      );
-      if (tested.length === 0) {
-        map[topic.id] = null;
-      } else {
-        const avg = tested.reduce((s, t) => s + t.success_rate, 0) / tested.length;
-        map[topic.id] = avg;
-      }
+      const ids = tasksSnapshot.filter(t => t.topic === topic.id).map(t => t.id);
+      map[topic.id] = poolStatsDetailed(ids, statsByTask);
     });
     return map;
-  }, [orderedTopics, tasksSnapshot]);
+  }, [orderedTopics, tasksSnapshot, statsByTask]);
 
   // Подсчёт зафиксированных слотов
   const pinnedCount = useMemo(() => slots.filter(s => s.pinnedTask).length, [slots]);
@@ -379,29 +377,10 @@ const OgeVariantGenerator = () => {
     setSavedWorks(prev => prev.filter(w => w.id !== workId));
   };
 
-  // Рендер индикатора success_rate
-  const renderSuccessRate = (topicId) => {
-    const rate = successRateByTopic[topicId];
-    if (rate === null || rate === undefined) {
-      return <Text type="secondary" style={{ fontSize: 11 }}>нет данных</Text>;
-    }
-    const pct = Math.round(rate * 100);
-    const color = pct >= 70 ? '#52c41a' : pct >= 40 ? '#faad14' : '#ff4d4f';
-    return (
-      <Tooltip title={`Средний процент правильных ответов по задачам этой темы: ${pct}%`}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Progress
-            percent={pct}
-            size="small"
-            strokeColor={color}
-            showInfo={false}
-            style={{ width: 60, margin: 0 }}
-          />
-          <Text style={{ fontSize: 12, color, fontWeight: 600 }}>{pct}%</Text>
-        </div>
-      </Tooltip>
-    );
-  };
+  // Индикатор решаемости (измерено / оценка-усадка) — общий компонент.
+  const renderSuccessRate = (topicId) => (
+    <SuccessRateCell st={successRateByTopic[topicId]} prior={prior} />
+  );
 
   // Колонки таблицы структуры
   const tableColumns = [

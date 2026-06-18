@@ -71,6 +71,30 @@ export const answersApi = {
     }
   },
 
+  // Внутренняя статистика решаемости по каждой задаче (для колонки «Успеваемость»).
+  // Один лёгкий проход по всем attempt_answers (fields task,is_correct) →
+  // { [taskId]: { c: верных, n: всего } }. Задачи без ответов в карту не попадают
+  // (на фронте это трактуется как «нет данных», в отличие от фейкового success_rate=0).
+  async getInternalTaskStats() {
+    try {
+      const records = await pb.collection('attempt_answers').getFullList({
+        fields: 'task,is_correct',
+        batch: 500,
+      });
+      const byTask = {};
+      for (const r of records) {
+        if (!r.task) continue;
+        const s = byTask[r.task] || (byTask[r.task] = { c: 0, n: 0 });
+        s.n += 1;
+        if (r.is_correct) s.c += 1;
+      }
+      return byTask;
+    } catch (error) {
+      console.error('Error fetching internal task stats:', error);
+      return {};
+    }
+  },
+
   async updateAttemptAnswer(id, data) {
     try {
       return await pb.collection('attempt_answers').update(id, data);
