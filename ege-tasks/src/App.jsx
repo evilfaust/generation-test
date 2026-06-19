@@ -465,6 +465,7 @@ function StudentDetailRoute() {
       studentId={studentId}
       onBack={() => navigate(R.STUDENTS)}
       onOpenWork={(workId) => navigate(route(R.WORK_EDITOR, { workId }))}
+      onOpenNote={(noteId) => navigate(`${R.NOTES}?note=${noteId}`)}
     />
   );
 }

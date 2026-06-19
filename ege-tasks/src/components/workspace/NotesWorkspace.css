@@ -337,3 +337,19 @@
   /* на узком экране уменьшаем поля BlockNote (44px слева — под боковое меню блока) */
   .notes-editor__body .bn-editor { padding-inline: 44px 16px; }
 }
+
+/* Тулбар редактора заметки (кнопка «Ученики группы») */
+.note-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.note-editor-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}

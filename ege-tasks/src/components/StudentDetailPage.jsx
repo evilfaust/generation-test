@@ -4,7 +4,7 @@ import { CheckCircleOutlined, CopyOutlined, FileAddOutlined } from '@ant-design/
 import {
   ArrowLeftOutlined, LineChartOutlined, BookOutlined,
   WarningOutlined, HistoryOutlined, TrophyOutlined, LoadingOutlined,
-  CalendarOutlined,
+  CalendarOutlined, FileTextOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { ATT_STATUSES } from './workspace/AttendanceRoster';
@@ -56,11 +56,12 @@ const ATT_BY_VALUE = Object.fromEntries(ATT_STATUSES.map(s => [s.value, s]));
 // ============================================
 // MAIN COMPONENT
 // ============================================
-function StudentDetailPage({ studentId, onBack, onOpenWork }) {
+function StudentDetailPage({ studentId, onBack, onOpenWork, onOpenNote }) {
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState(null);
   const [attempts, setAttempts] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [lessonNotes, setLessonNotes] = useState([]);
   const [achievements, setAchievements] = useState([]);
   const [allAnswers, setAllAnswers] = useState(null);
   const [answersLoading, setAnswersLoading] = useState(false);
@@ -93,11 +94,12 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
     const load = async () => {
       setLoading(true);
       try {
-        const [students, attemptsData, achievementsData, attendanceData] = await Promise.all([
+        const [students, attemptsData, achievementsData, attendanceData, notesData] = await Promise.all([
           api.getStudents(),
           api.getAttemptsByStudentAllWithWorks(studentId),
           api.getAchievements(),
           api.getAttendanceByStudent(studentId),
+          api.getNotesByStudent(studentId),
         ]);
 
         const studentRecord = students.find(s => s.id === studentId);
@@ -108,6 +110,7 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
         setAttempts(finished);
         setAchievements(achievementsData);
         setAttendance(attendanceData);
+        setLessonNotes(notesData);
       } catch (err) {
         console.error('Error loading student detail:', err);
       }
@@ -366,6 +369,18 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
     attendanceList.forEach(r => { if (acc[r.status] != null) acc[r.status] += 1; });
     return acc;
   }, [attendanceList]);
+
+  const lessonNotesList = useMemo(() => {
+    return lessonNotes
+      .map(n => ({
+        id: n.id,
+        title: n.title?.trim() || n.expand?.lesson?.title || 'Заметка урока',
+        groupName: n.expand?.group?.name || '',
+        date: n.note_date ? new Date(n.note_date)
+          : (n.expand?.lesson?.date_plan ? new Date(n.expand.lesson.date_plan) : new Date(n.updated)),
+      }))
+      .sort((a, b) => b.date - a.date);
+  }, [lessonNotes]);
 
   const achievementsById = useMemo(() => new Map(achievements.map(a => [a.id, a])), [achievements]);
 
@@ -755,6 +770,34 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* S5c: Lesson notes mentioning this student */}
+      {lessonNotesList.length > 0 && (
+        <div className="sdp-section">
+          <Title level={4} className="sdp-section-title">
+            <FileTextOutlined /> Заметки уроков
+            <Text type="secondary" style={{ fontSize: 14, fontWeight: 400, marginLeft: 8 }}>
+              ({lessonNotesList.length})
+            </Text>
+          </Title>
+          <div className="sdp-attendance-list">
+            {lessonNotesList.map(n => (
+              <div key={n.id} className="sdp-attendance-row">
+                <Text type="secondary" style={{ width: 110, flexShrink: 0 }}>
+                  {n.date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+                <Text style={{ flex: 1, minWidth: 0 }} ellipsis>{n.title}</Text>
+                {n.groupName && <Tag style={{ marginInlineEnd: 0 }}>{n.groupName}</Tag>}
+                {onOpenNote && (
+                  <Button size="small" type="link" style={{ padding: 0 }} onClick={() => onOpenNote(n.id)}>
+                    Открыть
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

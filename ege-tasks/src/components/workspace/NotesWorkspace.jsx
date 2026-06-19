@@ -5,10 +5,11 @@ import {
 } from 'antd';
 import {
   ContainerOutlined, DeleteOutlined, FileTextOutlined, InboxOutlined, PaperClipOutlined,
-  PlusOutlined, PushpinFilled, PushpinOutlined, SearchOutlined, UndoOutlined,
+  PlusOutlined, PushpinFilled, PushpinOutlined, SearchOutlined, UndoOutlined, TeamOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import NoteAttachments from './NoteAttachments';
+import InsertStudentsModal from './InsertStudentsModal';
 import { WorkspacePageHeader, EmptyState, Chip, GroupChip } from './ui';
 import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
@@ -39,8 +40,9 @@ function shortDate(iso) {
 }
 
 // Редактор одной заметки. Ключуется по note.id в родителе (полный remount при смене).
-function NoteEditor({ note, onSaveBody, editable }) {
+function NoteEditor({ note, onSaveBody, editable, onTagStudents }) {
   const { message } = App.useApp();
+  const [studentsModalOpen, setStudentsModalOpen] = useState(false);
   const initialContent = useMemo(
     () => (Array.isArray(note.body) && note.body.length ? note.body : undefined),
     [note.id], // eslint-disable-line react-hooks/exhaustive-deps
@@ -84,23 +86,62 @@ function NoteEditor({ note, onSaveBody, editable }) {
     timer.current = setTimeout(flush, 800);
   };
 
+  // Вставка разделов-траекторий по выбранным ученикам + тег в links заметки.
+  const insertStudents = (selected) => {
+    setStudentsModalOpen(false);
+    if (!selected.length) return;
+    const blocks = [];
+    selected.forEach((s) => {
+      blocks.push({ type: 'heading', props: { level: 3 }, content: s.name || s.username });
+      blocks.push({ type: 'paragraph', content: '' });
+    });
+    const doc = editor.document;
+    const ref = doc[doc.length - 1];
+    editor.insertBlocks(blocks, ref, 'after');
+    onSaveBody(editor.document); // персист тела сразу (программная вставка)
+    onTagStudents?.(selected);   // тег учеников в links
+    message.success(`Добавлено учеников: ${selected.length}`);
+  };
+
   return (
-    <BlockNoteView
-      editor={editor}
-      editable={editable}
-      onChange={editable ? handleChange : undefined}
-      slashMenu={false}
-    >
-      <SuggestionMenuController
-        triggerCharacter="/"
-        getItems={async (query) =>
-          filterSuggestionItems(
-            [...getDefaultReactSlashMenuItems(editor), mathSlashItem(editor)],
-            query,
-          )
-        }
+    <div className="note-editor-wrap">
+      {editable && (
+        <div className="note-editor-toolbar">
+          <Tooltip title={note.group ? 'Вставить разделы по ученикам группы' : 'У заметки не указана группа'}>
+            <Button
+              size="small"
+              icon={<TeamOutlined />}
+              disabled={!note.group}
+              onClick={() => setStudentsModalOpen(true)}
+            >
+              Ученики группы
+            </Button>
+          </Tooltip>
+        </div>
+      )}
+      <BlockNoteView
+        editor={editor}
+        editable={editable}
+        onChange={editable ? handleChange : undefined}
+        slashMenu={false}
+      >
+        <SuggestionMenuController
+          triggerCharacter="/"
+          getItems={async (query) =>
+            filterSuggestionItems(
+              [...getDefaultReactSlashMenuItems(editor), mathSlashItem(editor)],
+              query,
+            )
+          }
+        />
+      </BlockNoteView>
+      <InsertStudentsModal
+        open={studentsModalOpen}
+        groupId={note.group}
+        onCancel={() => setStudentsModalOpen(false)}
+        onConfirm={insertStudents}
       />
-    </BlockNoteView>
+    </div>
   );
 }
 
@@ -278,6 +319,18 @@ export default function NotesWorkspace() {
       message.error('Не удалось сохранить заметку');
     }
   }, [activeId, message]);
+
+  // Тег учеников в links активной заметки (для секции «Заметки уроков» в карточке).
+  const tagStudents = useCallback((students) => {
+    if (!active) return;
+    const existing = Array.isArray(active.links) ? active.links : [];
+    const seen = new Set(existing.filter((l) => l.type === 'student').map((l) => l.id));
+    const additions = students
+      .filter((s) => !seen.has(s.id))
+      .map((s) => ({ type: 'student', id: s.id, name: s.name || s.username }));
+    if (!additions.length) return;
+    patchNote(active.id, { links: [...existing, ...additions] });
+  }, [active, patchNote]);
 
   // Заголовок — debounce.
   const titleTimer = useRef();
@@ -531,7 +584,7 @@ export default function NotesWorkspace() {
                 onSave={(next) => patchActive({ links: [...allLinks.filter((l) => l.type !== 'material'), ...next] })}
               />
               <div className="notes-editor__body">
-                <NoteEditor key={active.id} note={active} onSaveBody={saveBody} editable={canEdit} />
+                <NoteEditor key={active.id} note={active} onSaveBody={saveBody} editable={canEdit} onTagStudents={tagStudents} />
               </div>
             </>
           )}

@@ -93,4 +93,23 @@ export const notesApi = {
       throw error;
     }
   },
+
+  // Заметки, где ученик отмечен в links ({type:'student', id}) — для секции
+  // «Заметки уроков» в карточке ученика. `~` ловит подстроку id в сериализованном
+  // json, дальше уточняем в JS (чтобы не словить ложное совпадение с file id).
+  async getNotesByStudent(studentId) {
+    try {
+      if (!studentId) return [];
+      const all = await pb.collection('teacher_notes').getFullList({
+        filter: `links ~ "${escapeFilter(studentId)}"`,
+        sort: '-updated',
+        expand: 'group,lesson',
+      });
+      return all.filter((n) => Array.isArray(n.links)
+        && n.links.some((l) => l.type === 'student' && l.id === studentId));
+    } catch (error) {
+      console.error('Error fetching notes by student:', error);
+      return [];
+    }
+  },
 };
