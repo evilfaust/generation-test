@@ -216,32 +216,17 @@ export default function NotesWorkspace() {
     return list;
   }, [notes, view, groupFilter, searchQ, textIndex]);
 
-  // Секции сайдбара: Закреплённые → Инбокс → по классам → Без класса.
-  // При поиске/фильтре по классу/в инбоксе и архиве — плоский список (после пина).
+  // Секции сайдбара: только «Закреплённые» сверху, остальное — единым
+  // хронологическим списком (по -updated). Группировки по классам нет.
   const sections = useMemo(() => {
     if (view === 'archive') return visibleNotes.length ? [{ key: 'arch', title: null, items: visibleNotes }] : [];
     const out = [];
     const pinned = visibleNotes.filter((n) => n.is_pinned);
     const rest = visibleNotes.filter((n) => !n.is_pinned);
     if (pinned.length) out.push({ key: 'pinned', title: 'Закреплённые', items: pinned });
-    if (view === 'inbox' || groupFilter || searchQ.trim()) {
-      if (rest.length) out.push({ key: 'rest', title: null, items: rest });
-      return out;
-    }
-    const inbox = rest.filter((n) => n.is_inbox);
-    if (inbox.length) out.push({ key: 'inbox', title: 'Инбокс', items: inbox });
-    const byGroup = new Map();
-    const none = [];
-    rest.filter((n) => !n.is_inbox).forEach((n) => {
-      if (n.group) {
-        if (!byGroup.has(n.group)) byGroup.set(n.group, { name: groupName(n) || 'Группа', items: [] });
-        byGroup.get(n.group).items.push(n);
-      } else none.push(n);
-    });
-    [...byGroup.entries()].forEach(([gid, g]) => out.push({ key: gid, title: g.name, items: g.items }));
-    if (none.length) out.push({ key: 'none', title: out.length ? 'Без класса' : null, items: none });
+    if (rest.length) out.push({ key: 'rest', title: null, items: rest });
     return out;
-  }, [visibleNotes, view, groupFilter, searchQ]);
+  }, [visibleNotes, view]);
 
   // Плоский список для рендера: маркеры секций вперемешку с заметками.
   const flatList = useMemo(
