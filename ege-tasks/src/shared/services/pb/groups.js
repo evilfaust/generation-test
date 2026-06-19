@@ -122,7 +122,8 @@ export const groupsApi = {
   // «ученик × выдача». Лёгкий expand (без achievements).
   async getGroupJournal(groupId) {
     try {
-      const students = await this.getStudentsByGroup(groupId);
+      // Внешних (вписанных вручную, без тестов) в журнал сдачи не показываем.
+      const students = (await this.getStudentsByGroup(groupId)).filter((s) => !s.external);
       const perStudent = await Promise.all(
         students.map(async (s) => {
           let attempts = [];

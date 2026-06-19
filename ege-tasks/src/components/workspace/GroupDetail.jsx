@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Descriptions,
+  Input,
   List,
   Modal,
   Select,
@@ -18,6 +19,7 @@ import {
   PlusOutlined,
   TeamOutlined,
   ThunderboltOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
@@ -39,6 +41,8 @@ export default function GroupDetail() {
   const [addOpen, setAddOpen] = useState(false);
   const [picked, setPicked] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualText, setManualText] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +107,24 @@ export default function GroupDetail() {
       load();
     } catch {
       message.error('Не удалось привязать');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Вписать учеников «без аккаунта» (по одному имени на строку).
+  const handleAddManual = async () => {
+    const names = manualText.split('\n').map((s) => s.trim()).filter(Boolean);
+    if (!names.length) return;
+    setBusy(true);
+    try {
+      await Promise.all(names.map((name) => api.createManualStudent({ name, groupId })));
+      message.success(`Вписано: ${names.length}`);
+      setManualOpen(false);
+      setManualText('');
+      load();
+    } catch {
+      message.error('Не удалось вписать учеников');
     } finally {
       setBusy(false);
     }
@@ -195,6 +217,14 @@ export default function GroupDetail() {
               )}
               <Button
                 size="small"
+                icon={<UserAddOutlined />}
+                onClick={() => setManualOpen(true)}
+                title="Вписать ученика без аккаунта (для заметок и посещаемости)"
+              >
+                Вписать вручную
+              </Button>
+              <Button
+                size="small"
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => setAddOpen(true)}
@@ -219,8 +249,16 @@ export default function GroupDetail() {
             dataSource={students}
             renderItem={(s) => (
               <List.Item
-                actions={
-                  canEdit
+                actions={[
+                  <Button
+                    key="profile"
+                    size="small"
+                    type="link"
+                    onClick={() => navigate(`/app/students/${s.id}`)}
+                  >
+                    профиль
+                  </Button>,
+                  ...(canEdit
                     ? [
                         <Button
                           key="unlink"
@@ -230,17 +268,19 @@ export default function GroupDetail() {
                           icon={<DisconnectOutlined />}
                           onClick={() => handleUnlink(s)}
                         >
-                          отвязать
+                          {s.external ? 'убрать' : 'отвязать'}
                         </Button>,
                       ]
-                    : []
-                }
+                    : []),
+                ]}
               >
                 <List.Item.Meta
                   title={s.name || '—'}
                   description={
                     <Space size={6}>
-                      {s.username && <Text type="secondary">@{s.username}</Text>}
+                      {s.external
+                        ? <Chip tone="amber" dot={false}>без аккаунта</Chip>
+                        : (s.username && <Text type="secondary">@{s.username}</Text>)}
                       {s.student_class && <Chip tone="neutral" dot={false}>{s.student_class}</Chip>}
                     </Space>
                   }
@@ -278,6 +318,30 @@ export default function GroupDetail() {
               s.student_class ? ` · ${s.student_class}` : ''
             }`,
           }))}
+        />
+      </Modal>
+
+      <Modal
+        open={manualOpen}
+        title="Вписать учеников вручную"
+        onCancel={() => { setManualOpen(false); setManualText(''); }}
+        onOk={handleAddManual}
+        confirmLoading={busy}
+        okText="Вписать"
+        cancelText="Отмена"
+        okButtonProps={{ disabled: !manualText.trim() }}
+      >
+        <Text type="secondary">
+          Ученики без аккаунта — только для заметок и фиксации продвижения
+          (тесты и ДЗ им не выдаются, в журнале и прогрессе не показываются).
+          По одному на строку: Фамилия Имя.
+        </Text>
+        <Input.TextArea
+          value={manualText}
+          onChange={(e) => setManualText(e.target.value)}
+          rows={6}
+          placeholder={'Иванов Иван\nПетрова Мария'}
+          style={{ marginTop: 8 }}
         />
       </Modal>
     </div>

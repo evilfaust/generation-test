@@ -515,8 +515,9 @@ function StudentDetailPage({ studentId, onBack, onOpenWork, onOpenNote }) {
         <div className="sdp-student-info">
           <Title level={3} className="sdp-student-name">{student.name || student.username}</Title>
           <div className="sdp-student-meta">
+            {student.external && <Tag color="orange">без аккаунта</Tag>}
             {student.student_class && <Tag color="geekblue">{student.student_class} класс</Tag>}
-            <Tag>@{student.username}</Tag>
+            {!student.external && <Tag>@{student.username}</Tag>}
             <Text type="secondary">
               Регистрация: {new Date(student.created).toLocaleDateString('ru-RU')}
             </Text>

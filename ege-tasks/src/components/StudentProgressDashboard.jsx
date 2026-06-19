@@ -86,7 +86,8 @@ const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
         api.getWorks({ includeArchived: true }),
         api.getAchievements(),
       ]);
-      setStudents(studentsData);
+      // Внешних (вписанных вручную, без тестов) в дашборде прогресса не показываем.
+      setStudents(studentsData.filter((s) => !s.external));
       setAttempts(attemptsData);
       setWorks(worksData);
       setAchievements(achievementsData);

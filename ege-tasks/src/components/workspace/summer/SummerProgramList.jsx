@@ -29,7 +29,7 @@ export default function SummerProgramList() {
     setLoading(true);
     Promise.all([api.getStudentsByGroup(groupId), api.getStudyPrograms({ group: groupId })])
       .then(([st, progs]) => {
-        setStudents(st);
+        setStudents(st.filter((s) => !s.external)); // внешним летнее ДЗ не выдаём
         setPrograms(Object.fromEntries(progs.map((p) => [p.student, p])));
       })
       .catch(() => message.error('Не удалось загрузить учеников'))

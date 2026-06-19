@@ -220,12 +220,43 @@ export const studentsApi = {
     try {
       return await pb.collection('students').getFullList({
         sort: '-created',
-        fields: 'id,username,name,student_class,created,updated',
+        fields: 'id,username,name,student_class,external,created,updated',
       });
     } catch (error) {
       console.error('Error fetching students:', error);
       return [];
     }
+  },
+
+  // Ученик «без аккаунта» — вписанный вручную для разовых/внешних занятий.
+  // Создаём обычную students-запись с external=true + авто-логином/паролем
+  // (ими ученик не пользуется). Привязываем к группе. createRule students
+  // открыт (само-регистрация), поэтому учитель может создавать.
+  async createManualStudent({ name, groupId } = {}) {
+    const nm = (name || '').trim();
+    if (!nm) throw new Error('Имя обязательно');
+    const password = `x${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+    let lastErr;
+    for (let i = 0; i < 3; i += 1) {
+      try {
+        const rec = await pb.collection('students').create({
+          name: nm,
+          username: `ext_${Math.random().toString(36).slice(2, 10)}`,
+          password,
+          passwordConfirm: password,
+          external: true,
+          ...(groupId ? { teaching_group: groupId } : {}),
+        });
+        _logAudit('create', 'students', rec.id, `внешний: ${nm}`);
+        return rec;
+      } catch (e) {
+        lastErr = e;
+        // повтор только при коллизии username, иначе сразу наружу
+        if (!String(e?.message || '').toLowerCase().includes('username')) break;
+      }
+    }
+    console.error('Error creating manual student:', lastErr);
+    throw lastErr;
   },
 
   // Полная запись одного ученика (включая telegram_id — нужен для матча профиля слабостей).
