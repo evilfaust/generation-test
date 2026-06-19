@@ -7,6 +7,7 @@ import {
 import { CalendarOutlined, FileTextOutlined, LinkOutlined, PlusOutlined, PaperClipOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import MaterialPickerModal from './MaterialPickerModal';
+import AttendanceRoster from './AttendanceRoster';
 import { WorkspacePageHeader, Chip, groupHex } from './ui';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -118,6 +119,7 @@ function endForLesson(l, start) {
 function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel, onOpenNote, onOpenMaterial, saving, canEdit }) {
   const [form] = Form.useForm();
   const materialIds = Form.useWatch('materials', form) || [];
+  const watchedGroup = Form.useWatch('group', form);
   const worksMap = useMemo(() => new Map((works || []).map((w) => [w.id, w.title])), [works]);
   // Файлы из Библиотеки (type:'material') живут отдельно от работ (type:'work').
   const [fileMaterials, setFileMaterials] = useState([]);
@@ -323,6 +325,17 @@ function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel,
           />
         </Form.Item>
       </Form>
+
+      {/* Посещаемость: ученики из группы урока, состояние на конкретный урок */}
+      <div style={{ margin: '4px 0 12px', paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
+        {editingExisting ? (
+          <AttendanceRoster lessonId={initial.id} groupId={watchedGroup} canEdit={canEdit} />
+        ) : (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Сохраните урок, чтобы отметить посещаемость.
+          </Typography.Text>
+        )}
+      </div>
 
       {/* Файлы из Библиотеки (pb-files) */}
       <div style={{ marginBottom: 12 }}>

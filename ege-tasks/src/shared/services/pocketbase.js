@@ -25,6 +25,7 @@ import { lessonsApi } from './pb/lessons.js';
 import { notesApi } from './pb/notes.js';
 import { extJournalApi } from './pb/extjournal.js';
 import { programsApi } from './pb/programs.js';
+import { attendanceApi } from './pb/attendance.js';
 
 export const api = {
   ...extrasApi,
@@ -46,6 +47,7 @@ export const api = {
   ...notesApi,
   ...extJournalApi,
   ...programsApi,
+  ...attendanceApi,
 };
 
 export default pb;

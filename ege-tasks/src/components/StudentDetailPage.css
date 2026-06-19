@@ -713,3 +713,22 @@
     flex-wrap: wrap;
   }
 }
+
+/* Лента посещаемости (S5b) */
+.sdp-attendance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.sdp-attendance-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  background: #fafafa;
+}

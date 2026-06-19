@@ -4,8 +4,10 @@ import { CheckCircleOutlined, CopyOutlined, FileAddOutlined } from '@ant-design/
 import {
   ArrowLeftOutlined, LineChartOutlined, BookOutlined,
   WarningOutlined, HistoryOutlined, TrophyOutlined, LoadingOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
+import { ATT_STATUSES } from './workspace/AttendanceRoster';
 import MathRenderer from './MathRenderer';
 import { AttemptDetails, ScoreChart } from './StudentDetailCharts';
 import './StudentDetailPage.css';
@@ -49,6 +51,8 @@ const PERIOD_OPTIONS = [
 
 const SECTION_ORDER = ['Алгебра', 'Геометрия'];
 
+const ATT_BY_VALUE = Object.fromEntries(ATT_STATUSES.map(s => [s.value, s]));
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -56,6 +60,7 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState(null);
   const [attempts, setAttempts] = useState([]);
+  const [attendance, setAttendance] = useState([]);
   const [achievements, setAchievements] = useState([]);
   const [allAnswers, setAllAnswers] = useState(null);
   const [answersLoading, setAnswersLoading] = useState(false);
@@ -88,10 +93,11 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
     const load = async () => {
       setLoading(true);
       try {
-        const [students, attemptsData, achievementsData] = await Promise.all([
+        const [students, attemptsData, achievementsData, attendanceData] = await Promise.all([
           api.getStudents(),
           api.getAttemptsByStudentAllWithWorks(studentId),
           api.getAchievements(),
+          api.getAttendanceByStudent(studentId),
         ]);
 
         const studentRecord = students.find(s => s.id === studentId);
@@ -101,6 +107,7 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
         finished.sort((a, b) => new Date(b.created) - new Date(a.created));
         setAttempts(finished);
         setAchievements(achievementsData);
+        setAttendance(attendanceData);
       } catch (err) {
         console.error('Error loading student detail:', err);
       }
@@ -341,6 +348,24 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
       .map(t => ({ ...t, errorRate: Math.round((t.wrongAttempts / t.totalAttempts) * 100) }))
       .sort((a, b) => b.errorRate !== a.errorRate ? b.errorRate - a.errorRate : b.wrongAttempts - a.wrongAttempts);
   }, [filteredAnswers]);
+
+  const attendanceList = useMemo(() => {
+    return attendance
+      .filter(r => r.status)
+      .map(r => ({
+        id: r.id,
+        status: r.status,
+        title: r.expand?.lesson?.title || 'Урок',
+        date: r.expand?.lesson?.date_plan ? new Date(r.expand.lesson.date_plan) : new Date(r.created),
+      }))
+      .sort((a, b) => b.date - a.date);
+  }, [attendance]);
+
+  const attendanceStats = useMemo(() => {
+    const acc = { present: 0, late: 0, excused: 0, absent: 0, total: attendanceList.length };
+    attendanceList.forEach(r => { if (acc[r.status] != null) acc[r.status] += 1; });
+    return acc;
+  }, [attendanceList]);
 
   const achievementsById = useMemo(() => new Map(achievements.map(a => [a.id, a])), [achievements]);
 
@@ -698,6 +723,41 @@ function StudentDetailPage({ studentId, onBack, onOpenWork }) {
           <div className="sdp-empty-section">Нет ошибок — ученик отвечает на все задачи правильно!</div>
         )}
       </div>
+
+      {/* S5b: Attendance */}
+      {attendanceList.length > 0 && (
+        <div className="sdp-section">
+          <Title level={4} className="sdp-section-title">
+            <CalendarOutlined /> Посещаемость
+            <Text type="secondary" style={{ fontSize: 14, fontWeight: 400, marginLeft: 8 }}>
+              был {attendanceStats.present + attendanceStats.late} из {attendanceStats.total}
+            </Text>
+            <Space style={{ marginLeft: 'auto' }} size={4}>
+              {ATT_STATUSES.map(s => (
+                attendanceStats[s.value] > 0 && (
+                  <Tag key={s.value} color={s.color} style={{ marginInlineEnd: 0 }}>
+                    {s.label}: {attendanceStats[s.value]}
+                  </Tag>
+                )
+              ))}
+            </Space>
+          </Title>
+          <div className="sdp-attendance-list">
+            {attendanceList.map(r => {
+              const cfg = ATT_BY_VALUE[r.status];
+              return (
+                <div key={r.id} className="sdp-attendance-row">
+                  <Text type="secondary" style={{ width: 110, flexShrink: 0 }}>
+                    {r.date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </Text>
+                  <Text style={{ flex: 1, minWidth: 0 }} ellipsis>{r.title}</Text>
+                  <Tag color={cfg?.color} style={{ marginInlineEnd: 0 }}>{cfg?.label || r.status}</Tag>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* S6: Attempt History */}
       <div className="sdp-section sdp-history" ref={historySectionRef}>
