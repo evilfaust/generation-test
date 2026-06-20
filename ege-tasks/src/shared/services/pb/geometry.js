@@ -224,6 +224,12 @@ export const geometryApi = {
         formData.append('code', task.code + '-копия');
       }
 
+      // Вложения решения (json-массив ссылок на pb-files) — сериализуем явно,
+      // иначе FormData.append превратит массив в "[object Object]".
+      if (Array.isArray(task.solution_files) && task.solution_files.length) {
+        formData.append('solution_files', JSON.stringify(task.solution_files));
+      }
+
       // Файл чертежа: скачиваем из PocketBase и перезаливаем
       const drawingFileName = task.drawing_image || task.geogebra_image_base64 || '';
       if (drawingFileName && !String(drawingFileName).startsWith('data:image/')) {

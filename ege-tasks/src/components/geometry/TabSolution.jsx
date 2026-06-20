@@ -1,10 +1,14 @@
-import { Card, Form, Space, Typography } from 'antd';
+import { Card, Divider, Form, Space, Typography } from 'antd';
 import MathRenderer from '../MathRenderer';
 import LatexField from '../shared/LatexField';
+import SolutionAttachments from './SolutionAttachments';
 
 const { Text } = Typography;
 
-export default function TabSolution({ fieldMode = 'plain', previewSolution, onSolutionChange }) {
+export default function TabSolution({
+  fieldMode = 'plain', previewSolution, onSolutionChange,
+  solutionFiles = [], onSolutionFilesChange,
+}) {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%', padding: '16px 0' }}>
       <Form.Item
@@ -20,6 +24,11 @@ export default function TabSolution({ fieldMode = 'plain', previewSolution, onSo
           onTextChange={onSolutionChange}
         />
       </Form.Item>
+
+      <Divider style={{ margin: 0 }} orientation="left" plain>
+        <Text type="secondary" style={{ fontSize: 12 }}>Вложения (фото решения)</Text>
+      </Divider>
+      <SolutionAttachments files={solutionFiles} onChange={onSolutionFilesChange} />
 
       {previewSolution && (
         <Card

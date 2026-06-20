@@ -93,6 +93,12 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
   const [previewStatement, setPreviewStatement] = useState(task?.statement_md || '');
   const [previewSolution, setPreviewSolution] = useState(task?.solution_md || '');
 
+  // ── Вложения к решению (фото с бумаги, ссылки на pb-files) ─────────────────
+  const [solutionFiles, setSolutionFiles] = useState(() => {
+    const raw = task?.solution_files;
+    return Array.isArray(raw) ? raw : [];
+  });
+
   // ── Состояние сохранения/удаления ─────────────────────────────────────────
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -273,6 +279,7 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
         statement_md: values.statement_md || '',
         answer: values.answer || '',
         solution_md: values.solution_md || '',
+        solution_files: solutionFiles,
         geogebra_base64: finalGgbBase64,
         geogebra_appname: appName,
         drawing_view: drawingView,
@@ -414,6 +421,8 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
         fieldMode={fieldMode}
         previewSolution={previewSolution}
         onSolutionChange={setPreviewSolution}
+        solutionFiles={solutionFiles}
+        onSolutionFilesChange={setSolutionFiles}
       />,
     },
   ];

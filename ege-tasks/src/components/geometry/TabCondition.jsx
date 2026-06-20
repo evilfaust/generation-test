@@ -7,7 +7,9 @@ const { Text } = Typography;
 const DIFFICULTY_OPTIONS = [
   { value: 1, label: '1 — Базовый' },
   { value: 2, label: '2 — Средний' },
-  { value: 3, label: '3 — Сложный' },
+  { value: 3, label: '3 — Повышенный' },
+  { value: 4, label: '4 — Высокий' },
+  { value: 5, label: '5 — Олимпиадный' },
 ];
 
 export default function TabCondition({
