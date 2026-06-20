@@ -42,6 +42,20 @@ const PRINT_LAYOUTS = [
 
 const DEFAULT_PRINT_LAYOUT_ID = 'a5-6';
 
+// Поля печатного листа «Просмотра» (мм). Уже, чем были (5мм) — листы компактнее,
+// свободное место используется рациональнее. Завязано на getGridLines (ниже).
+const SHEET_PADDING_MM = 3;
+
+// Глобальный размер текста карточек (множитель к mm/px-шрифту условия). Единый
+// стиль с «Размер текста S/M/L» в рабочих листах (WorksheetGridPrint). M = текущий
+// размер (1.0); S — мельче (для задач с большим объёмом текста); L — крупнее.
+export const TEXT_SIZE_OPTIONS = [
+  { label: 'S', value: 's' },
+  { label: 'M', value: 'm' },
+  { label: 'L', value: 'l' },
+];
+export const TEXT_SIZE_SCALE = { s: 0.82, m: 1, l: 1.2 };
+
 const getPrintLayout = (id) => PRINT_LAYOUTS.find((l) => l.id === id) || PRINT_LAYOUTS[0];
 
 // Сохранённый лист хранит page_size + tasks_per_page → подбираем раскладку.
@@ -57,8 +71,9 @@ const matchPrintLayout = (printTest) => {
 // габаритам ячейки — лишние линии при печати масштабируют страницу (см. CLAUDE.md).
 const getGridLines = (layout) => {
   const dims = PAGE_DIMS[layout.page] || PAGE_DIMS.A5;
-  const cellW = (dims.w - 10) / layout.cols;
-  const cellH = (dims.h - 10) / layout.rows;
+  const pad = SHEET_PADDING_MM * 2;
+  const cellW = (dims.w - pad) / layout.cols;
+  const cellH = (dims.h - pad) / layout.rows;
   return { vLines: Math.ceil(cellW / 5), hLines: Math.ceil(cellH / 5) };
 };
 
@@ -164,11 +179,16 @@ export function GeometryPreviewCard({
   hLines = 15,
   vLines = 15,
   fontK = 1,
+  textScale = 1,
   showGrid = true,
 }) {
   // Приоритет: файловое поле (drawing_image) → legacy base64 → пусто
   const imageValue = getTaskImageSrc(task);
   const showImage = drawingMode === 'image' || drawingMode === 'task';
+  const hasImage = !isPlaceholder && showImage && !!imageValue;
+  // Без чертежа белый блок image-слоя закрывал клетку пустым пятном. Рисуем слой
+  // только когда есть картинка; в режиме правки — прозрачную рамку (позиционирование).
+  const showImageLayer = hasImage || (editable && !isPlaceholder);
 
   const stageRef = useRef(null);
   const interactionRef = useRef(null);
@@ -263,9 +283,9 @@ export function GeometryPreviewCard({
   }, [editable, handlePointerMove, isPlaceholder, layout, stopInteraction]);
 
   const textFontSize = useMemo(() => {
-    if (mode === 'print') return `${(2.05 * fontK * layout.text.fontScale).toFixed(2)}mm`;
-    return `${Math.round(17 * layout.text.fontScale)}px`;
-  }, [layout.text.fontScale, mode, fontK]);
+    if (mode === 'print') return `${(2.05 * fontK * layout.text.fontScale * textScale).toFixed(2)}mm`;
+    return `${Math.round(17 * layout.text.fontScale * textScale)}px`;
+  }, [layout.text.fontScale, mode, fontK, textScale]);
 
   return (
     <article
@@ -299,38 +319,40 @@ export function GeometryPreviewCard({
           </>
         )}
 
-        <div
-          className={`geometry-preview-layer geometry-preview-layer-image ${editable ? 'editable' : ''}`}
-          style={toLayerStyle(layout.image, 1)}
-          onPointerDown={(e) => startInteraction(e, 'image', 'move')}
-        >
-          {!isPlaceholder && showImage && imageValue ? (
-            <img
-              className="geometry-preview-image"
-              src={imageValue}
-              alt={`Чертёж ${task.code || index + 1}`}
-              draggable={false}
-            />
-          ) : null}
+        {showImageLayer && (
+          <div
+            className={`geometry-preview-layer geometry-preview-layer-image ${editable ? 'editable' : ''} ${hasImage ? '' : 'is-empty'}`}
+            style={toLayerStyle(layout.image, 1)}
+            onPointerDown={(e) => startInteraction(e, 'image', 'move')}
+          >
+            {hasImage ? (
+              <img
+                className="geometry-preview-image"
+                src={imageValue}
+                alt={`Чертёж ${task.code || index + 1}`}
+                draggable={false}
+              />
+            ) : null}
 
-          {editable && !isPlaceholder && (
-            <>
-              <div className="geometry-preview-layer-tag">Чертёж</div>
-              <div
-                className="geometry-preview-resize-handle"
-                onPointerDown={(e) => startInteraction(e, 'image', 'resize')}
-              />
-              <div
-                className="geometry-preview-resize-handle geometry-preview-resize-handle-x"
-                onPointerDown={(e) => startInteraction(e, 'image', 'resize-x')}
-              />
-              <div
-                className="geometry-preview-resize-handle geometry-preview-resize-handle-y"
-                onPointerDown={(e) => startInteraction(e, 'image', 'resize-y')}
-              />
-            </>
-          )}
-        </div>
+            {editable && !isPlaceholder && (
+              <>
+                <div className="geometry-preview-layer-tag">Чертёж</div>
+                <div
+                  className="geometry-preview-resize-handle"
+                  onPointerDown={(e) => startInteraction(e, 'image', 'resize')}
+                />
+                <div
+                  className="geometry-preview-resize-handle geometry-preview-resize-handle-x"
+                  onPointerDown={(e) => startInteraction(e, 'image', 'resize-x')}
+                />
+                <div
+                  className="geometry-preview-resize-handle geometry-preview-resize-handle-y"
+                  onPointerDown={(e) => startInteraction(e, 'image', 'resize-y')}
+                />
+              </>
+            )}
+          </div>
+        )}
 
         <div
           className={`geometry-preview-layer geometry-preview-layer-text ${editable ? 'editable' : ''}`}
@@ -375,6 +397,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
   const [mode, setMode] = useState('print');
   const [showAnswers, setShowAnswers] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
+  const [textSize, setTextSize] = useState('m');
   const [drawingMode, setDrawingMode] = useState('task');
   const [printLayoutId, setPrintLayoutId] = useState(() => matchPrintLayout(initialPrintTest));
   const [layoutEdit, setLayoutEdit] = useState(false);
@@ -732,7 +755,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
             <Text>Редактировать макет</Text>
           </Space>
           {!layoutEdit && (
-            <Tag color="blue">Перетаскивайте карточки для смены порядка</Tag>
+            <Tag>Перетаскивайте карточки для смены порядка</Tag>
           )}
           {layoutEdit && (
             <Button icon={<UndoOutlined />} onClick={resetLayout}>
@@ -746,6 +769,10 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
           <Space size={8}>
             <Switch checked={showGrid} onChange={setShowGrid} />
             <Text>Клетка</Text>
+          </Space>
+          <Space size={6}>
+            <Text>Текст</Text>
+            <Segmented size="small" value={textSize} onChange={setTextSize} options={TEXT_SIZE_OPTIONS} />
           </Space>
           {mode === 'print' && (
             <Space size={8}>
@@ -810,7 +837,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
             <div
               className="geometry-preview-sheet is-print"
               key={`page-${pageIndex + 1}`}
-              style={{ width: `${pageDims.w}mm`, height: `${pageDims.h}mm`, padding: '5mm' }}
+              style={{ width: `${pageDims.w}mm`, height: `${pageDims.h}mm`, padding: `${SHEET_PADDING_MM}mm` }}
             >
               {(headerTopic || headerSubtopic) && (
                 <div className="geometry-preview-sheet-header">
@@ -841,6 +868,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
                       hLines={gridLines.hLines}
                       vLines={gridLines.vLines}
                       fontK={printLayout.fontK}
+                      textScale={TEXT_SIZE_SCALE[textSize]}
                       showGrid={showGrid}
                       onLayoutChange={(layerName, patch) => handleLayoutChange(taskKey, layerName, patch)}
                       draggable={!layoutEdit && !!task}
@@ -886,6 +914,7 @@ export default function GeometryTaskPreview({ tasks, onBack, initialPrintTest = 
                   drawingMode={drawingMode}
                   editable={layoutEdit}
                   layout={layout}
+                  textScale={TEXT_SIZE_SCALE[textSize]}
                   showGrid={showGrid}
                   onLayoutChange={(layerName, patch) => handleLayoutChange(taskKey, layerName, patch)}
                   draggable={!layoutEdit && !!task}

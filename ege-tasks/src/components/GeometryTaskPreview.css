@@ -21,9 +21,9 @@
   align-items: center;
   margin-bottom: 12px;
   padding: 8px 12px;
-  background: #f0f5ff;
+  background: #f7f7f7;
   border-radius: 8px;
-  border: 1px solid #adc6ff;
+  border: 1px solid #e0e0e0;
 }
 
 .geometry-preview-sheet {
@@ -58,7 +58,7 @@
 
 .geometry-preview-sheet-header {
   text-align: center;
-  padding: 3mm 4mm 2mm;
+  padding: 1.8mm 3mm 1.4mm;
   border-bottom: 1.5px solid var(--line);
 }
 
@@ -113,7 +113,8 @@
 .geometry-preview-grid.a5 .geometry-preview-cell,
 .geometry-preview-grid.is-print .geometry-preview-cell {
   min-height: 0;
-  padding: 7mm 2mm 1.8mm;
+  /* Компактнее: меньше верхнее поле под бейдж (он уменьшен) + уже боковые. */
+  padding: 5.5mm 1.2mm 1mm;
   border-color: #c0c0c0;
 }
 
@@ -156,14 +157,15 @@
   position: absolute;
   top: 0;
   left: 0;
-  min-width: 56px;
-  height: 48px;
-  background: #3b82f6;
+  min-width: 48px;
+  height: 40px;
+  /* Чёрный (не синий): печать ч/б — синий выходит бледным, чёрный — плотным. */
+  background: #1f1f1f;
   color: #fff;
-  border-bottom-right-radius: 10px;
+  border-bottom-right-radius: 8px;
   display: grid;
   place-items: center;
-  font-size: 32px;
+  font-size: 28px;
   line-height: 1;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -172,11 +174,11 @@
 
 .geometry-preview-grid.a5 .geometry-preview-number,
 .geometry-preview-grid.is-print .geometry-preview-number {
-  min-width: 9mm;
-  height: 7.5mm;
-  font-size: 4.2mm;
-  letter-spacing: 0.08mm;
-  border-bottom-right-radius: 2mm;
+  min-width: 6.5mm;
+  height: 5.5mm;
+  font-size: 3.4mm;
+  letter-spacing: 0.06mm;
+  border-bottom-right-radius: 1.5mm;
 }
 
 .geometry-preview-code {
@@ -245,6 +247,12 @@
 
 .geometry-preview-layer-image {
   background: #fff;
+}
+
+/* Пустой image-слой (нет чертежа, режим правки) — прозрачный, чтобы не закрывать
+   клетку белым пятном; виден только по dashed-рамке слоя .editable. */
+.geometry-preview-layer-image.is-empty {
+  background: transparent;
 }
 
 .geometry-preview-layer-text {

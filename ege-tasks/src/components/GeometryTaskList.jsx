@@ -39,7 +39,7 @@ import { api } from '../shared/services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import GeometryTaskEditor from './GeometryTaskEditor';
-import GeometryTaskPreview, { GeometryPreviewCard, normalizeLayout, PRINT_CELL_ASPECT_RATIO, safeParseLayout } from './GeometryTaskPreview';
+import GeometryTaskPreview, { GeometryPreviewCard, normalizeLayout, PRINT_CELL_ASPECT_RATIO, safeParseLayout, TEXT_SIZE_OPTIONS, TEXT_SIZE_SCALE } from './GeometryTaskPreview';
 import GeometryWorksheetPrint from './GeometryWorksheetPrint';
 import LoadGeometryPrintModal from './geometry/LoadGeometryPrintModal';
 import MathRenderer from './MathRenderer';
@@ -83,6 +83,7 @@ export default function GeometryTaskList() {
   const [quickPreviewLayout, setQuickPreviewLayout] = useState(() => normalizeLayout(null, 'print'));
   const [quickPreviewShowAnswers, setQuickPreviewShowAnswers] = useState(false);
   const [quickPreviewEditMode, setQuickPreviewEditMode] = useState(true);
+  const [quickPreviewTextSize, setQuickPreviewTextSize] = useState('m');
   const [worksheetOpen, setWorksheetOpen] = useState(false);
   const [worksheetTasks, setWorksheetTasks] = useState([]);
   const [worksheetTopicLabel, setWorksheetTopicLabel] = useState('');
@@ -867,6 +868,10 @@ export default function GeometryTaskList() {
                 <Switch checked={quickPreviewShowAnswers} onChange={setQuickPreviewShowAnswers} />
                 <Text>Показывать ответ</Text>
               </Space>
+              <Space size={6}>
+                <Text>Текст</Text>
+                <Segmented size="small" value={quickPreviewTextSize} onChange={setQuickPreviewTextSize} options={TEXT_SIZE_OPTIONS} />
+              </Space>
               <Tag>Карточка A5</Tag>
             </Space>
             {/* Индикатор автосохранения */}
@@ -903,6 +908,7 @@ export default function GeometryTaskList() {
                   drawingMode="task"
                   editable={quickPreviewEditMode}
                   layout={quickPreviewLayout}
+                  textScale={TEXT_SIZE_SCALE[quickPreviewTextSize]}
                   onLayoutChange={handleQuickLayoutChange}
                 />
               )}
