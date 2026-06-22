@@ -16,6 +16,7 @@ import {
 import {
   ArrowLeftOutlined,
   DisconnectOutlined,
+  EditOutlined,
   PlusOutlined,
   TeamOutlined,
   ThunderboltOutlined,
@@ -43,6 +44,8 @@ export default function GroupDetail() {
   const [busy, setBusy] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualText, setManualText] = useState('');
+  const [editStudent, setEditStudent] = useState(null);
+  const [editName, setEditName] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,6 +128,24 @@ export default function GroupDetail() {
       load();
     } catch {
       message.error('Не удалось вписать учеников');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Переименование ученика (имя/фамилия). updateStudent — правила students публичны.
+  const handleSaveName = async () => {
+    const name = editName.trim();
+    if (!editStudent || !name) return;
+    setBusy(true);
+    try {
+      await api.updateStudent(editStudent.id, { name });
+      message.success('Имя обновлено');
+      setEditStudent(null);
+      setEditName('');
+      load();
+    } catch {
+      message.error('Не удалось обновить имя');
     } finally {
       setBusy(false);
     }
@@ -261,6 +282,14 @@ export default function GroupDetail() {
                   ...(canEdit
                     ? [
                         <Button
+                          key="edit"
+                          size="small"
+                          type="text"
+                          icon={<EditOutlined />}
+                          onClick={() => { setEditStudent(s); setEditName(s.name || ''); }}
+                          title="Переименовать"
+                        />,
+                        <Button
                           key="unlink"
                           size="small"
                           type="text"
@@ -341,6 +370,28 @@ export default function GroupDetail() {
           onChange={(e) => setManualText(e.target.value)}
           rows={6}
           placeholder={'Иванов Иван\nПетрова Мария'}
+          style={{ marginTop: 8 }}
+        />
+      </Modal>
+
+      <Modal
+        open={!!editStudent}
+        title="Переименовать ученика"
+        onCancel={() => { setEditStudent(null); setEditName(''); }}
+        onOk={handleSaveName}
+        confirmLoading={busy}
+        okText="Сохранить"
+        cancelText="Отмена"
+        okButtonProps={{ disabled: !editName.trim() }}
+        destroyOnHidden
+      >
+        <Text type="secondary">Фамилия Имя:</Text>
+        <Input
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onPressEnter={handleSaveName}
+          placeholder="Иванов Иван"
+          autoFocus
           style={{ marginTop: 8 }}
         />
       </Modal>
