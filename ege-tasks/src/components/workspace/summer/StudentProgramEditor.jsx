@@ -16,6 +16,7 @@ import { WEAK_STATUS } from '../../../shared/utils/weaknessProfile';
 import { summerWeeks, defaultSummerRange } from '../../../shared/utils/summerWeeks';
 import { WorkspacePageHeader, EmptyState, Chip } from '../ui';
 import MaterialPickerModal from '../MaterialPickerModal';
+import SummerProgramPrintView from './SummerProgramPrintView';
 import { assembleSummerProgram, addExistingWorkItem, generateWorkItem } from './buildProgram';
 
 const { Text } = Typography;
@@ -79,6 +80,7 @@ export default function StudentProgramEditor() {
   const [addWeek, setAddWeek] = useState(null);        // неделя, в которую добавляем работу
   const [preview, setPreview] = useState(false);       // drawer предпросмотра ученического вида
   const [memoOpen, setMemoOpen] = useState(false);     // модал «памятка ученику»
+  const [printOpen, setPrintOpen] = useState(false);   // полноэкранная печать «красивого PDF»
   const [doneSessions, setDoneSessions] = useState(() => new Set()); // сессии со сданной попыткой
 
   const { profile, loading: loadingProfile } = useStudentWeaknessProfile(student);
@@ -446,6 +448,22 @@ export default function StudentProgramEditor() {
   if (loadingMeta) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
   if (!student) return <EmptyState title="Ученик не найден" />;
 
+  if (printOpen) {
+    return (
+      <SummerProgramPrintView
+        student={student}
+        group={group}
+        program={program}
+        weeksInfo={weeksInfo}
+        byWeek={byWeek}
+        doneSessions={doneSessions}
+        extra={extra}
+        leftover={leftover}
+        onClose={() => setPrintOpen(false)}
+      />
+    );
+  }
+
   return (
     <div>
       <WorkspacePageHeader
@@ -656,9 +674,10 @@ export default function StudentProgramEditor() {
         weeksInfo={weeksInfo}
         byWeek={byWeek}
         doneSessions={doneSessions}
-        onSaveIntro={async (intro) => {
+        onPrint={() => { setMemoOpen(false); setPrintOpen(true); }}
+        onSaveConfig={async (patch) => {
           if (!program) return;
-          const cfg = { ...(program.config || {}), intro };
+          const cfg = { ...(program.config || {}), ...patch };
           await api.updateStudyProgram(program.id, { config: cfg });
           setProgram((p) => ({ ...p, config: cfg }));
         }}
@@ -830,10 +849,16 @@ function ExtraTaskEditor({ extra, onSaveText, onPickFiles, onRemoveFile, onFileN
 }
 
 // ─── Модал «Памятка ученику» (страница со ссылками + прогресс + напутствие) ───
-function ShareMemoModal({ open, onClose, student, program, weeksInfo, byWeek, doneSessions, onSaveIntro }) {
+function ShareMemoModal({ open, onClose, student, program, weeksInfo, byWeek, doneSessions, onSaveConfig, onPrint }) {
   const { message } = App.useApp();
   const [intro, setIntro] = useState('');
-  useEffect(() => { if (open) setIntro(program?.config?.intro || ''); }, [open, program]);
+  const [printNote, setPrintNote] = useState('');
+  useEffect(() => {
+    if (open) {
+      setIntro(program?.config?.intro || '');
+      setPrintNote(program?.config?.printNote || '');
+    }
+  }, [open, program]);
 
   const studentName = student?.name || '';
   const period = useMemo(() => {
@@ -865,33 +890,15 @@ function ShareMemoModal({ open, onClose, student, program, weeksInfo, byWeek, do
   };
 
   const handleCopy = async () => {
-    await onSaveIntro?.(intro);
+    await onSaveConfig?.({ intro, printNote });
     try { await navigator.clipboard.writeText(buildText()); message.success('Скопировано — вставьте в сообщение ученику'); }
     catch { message.error('Не удалось скопировать'); }
   };
 
-  const handlePrint = async () => {
-    await onSaveIntro?.(intro);
-    const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const weeksHtml = weeksInfo.map((w) => {
-      const list = byWeek.get(w.week) || [];
-      if (!list.length) return '';
-      const items = list.map((it) => `<li>${esc(it.title)}${it.session ? ` — <a href="${buildStudentUrl(it.session)}">${buildStudentUrl(it.session)}</a>` : ''}</li>`).join('');
-      return `<h3>Неделя ${w.week} · ${esc(w.label)}</h3><ul>${items}</ul>`;
-    }).join('');
-    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Каникулярное задание — ${esc(studentName)}</title>
-      <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;color:#222}
-      h1{font-size:22px;margin:0 0 4px}h3{margin:18px 0 6px;color:#5b5bd6}ul{margin:0;padding-left:20px}li{margin:4px 0}
-      a{color:#3a3ad6;word-break:break-all}.intro{white-space:pre-wrap;background:#f6f5fb;border-radius:10px;padding:12px 14px;margin-bottom:16px}
-      .muted{color:#888;margin-bottom:8px}</style></head><body>
-      ${intro.trim() ? `<div class="intro">${esc(intro.trim())}</div>` : ''}
-      <h1>Каникулярное задание — ${esc(studentName)}</h1>
-      <div class="muted">${esc(period)} · выполнено ${done} из ${total}</div>
-      ${weeksHtml}</body></html>`;
-    const wnd = window.open('', '_blank');
-    if (!wnd) { message.error('Разрешите всплывающие окна для печати'); return; }
-    wnd.document.write(html); wnd.document.close(); wnd.focus();
-    setTimeout(() => wnd.print(), 300);
+  // Открыть полноэкранный красивый вид для печати/PDF (сначала сохранив тексты).
+  const handleOpenPrint = async () => {
+    await onSaveConfig?.({ intro, printNote });
+    onPrint?.();
   };
 
   return (
@@ -899,8 +906,8 @@ function ShareMemoModal({ open, onClose, student, program, weeksInfo, byWeek, do
       open={open} onCancel={onClose} width={640}
       title={`Памятка ученику · ${studentName}`}
       footer={[
-        <Button key="print" icon={<PrinterOutlined />} onClick={handlePrint}>Печать</Button>,
-        <Button key="copy" type="primary" icon={<CopyOutlined />} onClick={handleCopy}>Скопировать текст</Button>,
+        <Button key="copy" icon={<CopyOutlined />} onClick={handleCopy}>Скопировать текст</Button>,
+        <Button key="print" type="primary" icon={<PrinterOutlined />} onClick={handleOpenPrint}>Красивый PDF / печать</Button>,
       ]}
     >
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
@@ -909,6 +916,13 @@ function ShareMemoModal({ open, onClose, student, program, weeksInfo, byWeek, do
           <Input.TextArea
             rows={3} value={intro} onChange={(e) => setIntro(e.target.value)}
             placeholder="Например: Привет! Вот задание на каникулы — делай по чуть-чуть каждую неделю 💪"
+          />
+        </div>
+        <div>
+          <Text type="secondary" style={{ fontSize: 12 }}>Текст в памятке (под напутствием, в PDF):</Text>
+          <Input.TextArea
+            rows={3} value={printNote} onChange={(e) => setPrintNote(e.target.value)}
+            placeholder="Например: как сдавать работу, дедлайны, что делать при трудностях…"
           />
         </div>
         <div>

@@ -14,6 +14,8 @@ import {
   Typography,
 } from 'antd';
 import {
+  ArrowDownOutlined,
+  ArrowUpOutlined,
   DeleteOutlined,
   EditOutlined,
   InboxOutlined,
@@ -106,6 +108,7 @@ export default function GroupManager() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,6 +155,25 @@ export default function GroupManager() {
       message.error('Не удалось сохранить группу');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Переместить группу вверх/вниз в списке (dir = -1 | +1).
+  const handleMove = async (index, dir) => {
+    const target = index + dir;
+    if (target < 0 || target >= groups.length) return;
+    const prev = groups;
+    const next = [...groups];
+    [next[index], next[target]] = [next[target], next[index]];
+    setGroups(next); // оптимистично
+    setReordering(true);
+    try {
+      await api.reorderTeachingGroups(next.map((g) => g.id), prev);
+    } catch {
+      message.error('Не удалось изменить порядок');
+      setGroups(prev); // откат
+    } finally {
+      setReordering(false);
     }
   };
 
@@ -225,9 +247,27 @@ export default function GroupManager() {
     {
       title: '',
       key: 'actions',
-      width: 130,
-      render: (_, g) => (
+      width: 190,
+      render: (_, g, index) => (
         <Space>
+          {canEdit && (
+            <Button.Group>
+              <Button
+                size="small"
+                icon={<ArrowUpOutlined />}
+                disabled={reordering || index === 0}
+                title="Выше"
+                onClick={() => handleMove(index, -1)}
+              />
+              <Button
+                size="small"
+                icon={<ArrowDownOutlined />}
+                disabled={reordering || index === groups.length - 1}
+                title="Ниже"
+                onClick={() => handleMove(index, 1)}
+              />
+            </Button.Group>
+          )}
           {canEdit && (
             <Button
               size="small"

@@ -10,7 +10,8 @@ export const groupsApi = {
       const filter = includeArchived ? '' : 'archived != true';
       return await pb.collection('teaching_groups').getFullList({
         ...(filter ? { filter } : {}),
-        sort: '-created',
+        // Ручной порядок (sort_order), затем — новые сверху для одинакового sort_order.
+        sort: 'sort_order,-created',
       });
     } catch (error) {
       console.error('Error fetching teaching groups:', error);
@@ -47,6 +48,24 @@ export const groupsApi = {
       return await pb.collection('teaching_groups').update(id, rest);
     } catch (error) {
       console.error('Error updating teaching group:', error);
+      throw error;
+    }
+  },
+
+  // Переупорядочить группы: orderedIds — желаемый порядок (сверху вниз).
+  // Пишем sort_order = индекс*10 только тем, у кого значение изменилось.
+  async reorderTeachingGroups(orderedIds = [], current = []) {
+    try {
+      const byId = new Map(current.map((g) => [g.id, g]));
+      await Promise.all(
+        orderedIds.map((id, idx) => {
+          const want = idx * 10;
+          if (byId.get(id)?.sort_order === want) return null;
+          return pb.collection('teaching_groups').update(id, { sort_order: want });
+        }),
+      );
+    } catch (error) {
+      console.error('Error reordering teaching groups:', error);
       throw error;
     }
   },
