@@ -1,6 +1,8 @@
 /* ═══════════════════════════════════════════════════
-   WorkPrintPreview — предпросмотр печати работы
-   (полноэкранный оверлей поверх редактора)
+   WorkPrintPreview — предпросмотр печати работы.
+   Стилистика «Рабочего листа», но без клетки. Всё чёрным
+   (без синего — лучше смотрится при печати).
+   Полноэкранный оверлей поверх редактора.
 ═══════════════════════════════════════════════════ */
 
 .wpv-overlay {
@@ -19,22 +21,280 @@
   margin-bottom: 16px;
 }
 
-/* Белый «лист» предпросмотра */
-.wpv-sheet {
-  background: #fff;
-  max-width: 210mm;
-  margin: 0 auto 24px;
-  padding: 12mm 10mm;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.12);
-  box-sizing: border-box;
+/* Стол с листами (как .wgp-pages у рабочего листа) */
+.wpv-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  padding: 24px 16px;
+  background: #dcdcdc;
 }
 
-/* Кнопки правки задач из VariantRenderer в предпросмотре не нужны */
+/* Кнопки правки задач (если просочатся) в предпросмотре не нужны */
 .wpv-print-root .no-print {
   display: none !important;
 }
 
-/* ── Печать: scoped print по канону проекта ── */
+/* ── Лист A4 ─────────────────────────────────────── */
+
+.wcp-sheet {
+  width: 210mm;
+  height: 297mm;
+  padding: 6mm;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  border: 1px solid #c8c8c8;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  font-family: KaTeX_Main, "Latin Modern Roman", "CMU Serif", Georgia, serif;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.wcp-sheet--compact .wcp-divider {
+  margin: 0.6mm 0;
+}
+
+/* ── Шапка листа ─────────────────────────────────── */
+
+.wcp-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 1pt solid #000;
+  margin-bottom: 2.5mm;
+  flex-shrink: 0;
+}
+
+.wcp-sheet-header--compact {
+  padding-bottom: 0.8mm;
+  margin-bottom: 1.5mm;
+  border-bottom-width: 0.5pt;
+}
+
+.wcp-sheet-title {
+  font-size: 3.6mm;
+  font-weight: 700;
+  color: #000;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wcp-sheet-variant {
+  font-size: 3.2mm;
+  font-style: italic;
+  font-weight: 400;
+  color: #000;
+  white-space: nowrap;
+}
+
+/* ── Поля для заполнения ─────────────────────────── */
+
+.wcp-fields {
+  display: flex;
+  gap: 8mm;
+  margin-bottom: 2.5mm;
+  flex-shrink: 0;
+}
+
+.wcp-field {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  flex: 1;
+}
+
+.wcp-field-label {
+  font-size: 2.8mm;
+  white-space: nowrap;
+  color: #000;
+}
+
+.wcp-field-line {
+  flex: 1;
+  border-bottom: 0.5pt solid #000;
+  min-width: 12mm;
+}
+
+/* ── Разделитель между задачами ──────────────────── */
+
+.wcp-divider {
+  height: 0;
+  border-top: 0.4pt solid #000;
+  margin: 1.5mm 0;
+  flex-shrink: 0;
+}
+
+/* ── Wrap для задачи (flex + divider) ────────────── */
+
+.wcp-task-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Задача ──────────────────────────────────────── */
+
+.wcp-task {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.wcp-task-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 2mm;
+  margin-bottom: 1.5mm;
+  flex-shrink: 0;
+}
+
+.wcp-task-badge {
+  color: #000;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.25;
+}
+
+.wcp-task-statement {
+  line-height: 1.3;
+  flex: 1;
+  text-wrap: pretty;
+  overflow: hidden;
+  color: #000;
+}
+
+.wcp-task-statement p {
+  margin: 0 0 0.6mm;
+}
+
+.wcp-task-statement .katex {
+  font-size: 0.97em;
+}
+
+.wcp-task-statement table {
+  border-collapse: collapse;
+  margin: 1mm 0;
+}
+
+.wcp-task-statement th,
+.wcp-task-statement td {
+  border: 0.4pt solid #000;
+  padding: 0.5mm 1.5mm;
+}
+
+/* ── Тело задачи (поле для решения + чертёж) ──────── */
+
+.wcp-task-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.wcp-task-body--boxed {
+  border: 0.5pt solid #888;
+  border-radius: 1mm;
+}
+
+.wcp-task-drawing {
+  position: absolute;
+  top: 2mm;
+  left: 2mm;
+  padding: 1mm;
+  z-index: 1;
+}
+
+.wcp-task-drawing img {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* ── Лист ответов учителя ────────────────────────── */
+
+.wcp-key-page {
+  width: 210mm;
+  padding: 8mm;
+  box-sizing: border-box;
+  background: #fff;
+  color: #000;
+  border: 1px solid #c8c8c8;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  font-family: KaTeX_Main, "Latin Modern Roman", Georgia, serif;
+}
+
+.wcp-key-title {
+  font-size: 12pt;
+  font-weight: 700;
+  margin-bottom: 4mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 0.6mm solid #000;
+}
+
+.wcp-key-variant-block {
+  margin-bottom: 4mm;
+}
+
+.wcp-key-variant {
+  font-size: 10pt;
+  font-weight: 700;
+  margin: 3mm 0 1.5mm;
+}
+
+.wcp-key-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60mm, 1fr));
+  gap: 1mm 4mm;
+}
+
+.wcp-key-item {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  padding: 0.8mm 0;
+  border-bottom: 0.2mm solid #ccc;
+  font-size: 9.5pt;
+  line-height: 1.3;
+}
+
+.wcp-key-num {
+  font-weight: 700;
+  min-width: 6mm;
+  color: #000;
+}
+
+.wcp-key-answer {
+  flex: 1;
+  font-weight: 700;
+  color: #000;
+}
+
+.wcp-key-no-answer {
+  color: #999;
+  font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════════════
+   Печать — scoped print по канону проекта
+═══════════════════════════════════════════════════ */
+
 @media print {
   body:has(.wpv-overlay) {
     visibility: hidden;
@@ -54,7 +314,7 @@
     display: none !important;
   }
 
-  /* fixed при печати кладёт все страницы друг на друга → нейтрализуем */
+  /* fixed/overflow оверлея кладёт страницы друг на друга → нейтрализуем */
   body:has(.wpv-overlay) .wpv-overlay {
     position: static !important;
     overflow: visible !important;
@@ -62,20 +322,47 @@
     background: #fff !important;
   }
 
-  body:has(.wpv-overlay) .wpv-sheet {
-    max-width: none;
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
+  body:has(.wpv-overlay) .wpv-stage {
+    display: block;
+    padding: 0 !important;
+    background: #fff !important;
   }
 
   body:has(.wpv-overlay) .wpv-print-root {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
+    right: 0;
+    width: auto;
     margin: 0;
     padding: 0;
     background: #fff;
+  }
+
+  /* Лист тянется по ширине печатной области (210mm задаёт @page) —
+     фиксированные 210mm + margin auto при печати вылезали вправо. */
+  .wcp-sheet,
+  .wcp-key-page {
+    width: 100% !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+
+  .wcp-sheet {
+    height: 297mm;
+    min-height: 297mm;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .wpv-print-root .wcp-sheet:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .wcp-key-page {
+    break-before: page;
+    page-break-before: always;
   }
 }
