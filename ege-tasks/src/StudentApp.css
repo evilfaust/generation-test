@@ -3014,8 +3014,12 @@
 .student-summer-group--extra .student-summer-group-head { background: #fff7e6; color: #ad6800; }
 .student-theme-dark .student-summer-group--extra { border-color: #8c6d1f; }
 .student-theme-dark .student-summer-group--extra .student-summer-group-head { background: #2b2410; color: #f0c869; }
-.student-summer-extra-text { white-space: pre-wrap; display: block; line-height: 1.5; color: #333; }
+.student-summer-extra-text { display: block; line-height: 1.5; color: #333; }
+.student-summer-extra-text p { margin: 0 0 6px; }
+.student-summer-extra-text p:last-child { margin-bottom: 0; }
+.student-summer-extra-text a { color: #1677ff; text-decoration: none; word-break: break-word; }
 .student-theme-dark .student-summer-extra-text { color: #ddd; }
+.student-theme-dark .student-summer-extra-text a { color: #69b1ff; }
 .student-summer-file-note { color: #888; font-weight: 400; }
 .student-theme-dark .student-summer-file-note { color: #999; }
 

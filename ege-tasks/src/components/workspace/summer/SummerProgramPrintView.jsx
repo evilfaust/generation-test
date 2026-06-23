@@ -3,6 +3,7 @@ import { App, Button, Card, Space, Switch, Tooltip } from 'antd';
 import { ArrowLeftOutlined, PrinterOutlined, FilePdfOutlined } from '@ant-design/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import html2pdf from 'html2pdf.js';
+import MathRenderer from '../../MathRenderer';
 import './SummerProgramPrintView.css';
 
 const buildStudentUrl = (sessionId) => {
@@ -249,7 +250,9 @@ export default function SummerProgramPrintView({
                 </div>
               </div>
 
-              {ex.text?.trim() && <div className="spp-extra-text">{ex.text.trim()}</div>}
+              {ex.text?.trim() && (
+                <div className="spp-extra-text"><MathRenderer text={ex.text.trim()} inline={false} /></div>
+              )}
 
               {leftover.length > 0 && (
                 <ul className="spp-tasks">{leftover.map(renderTaskRow)}</ul>

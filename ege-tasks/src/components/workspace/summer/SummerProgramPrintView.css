@@ -271,9 +271,11 @@
 .spp-extra-text {
   padding: 10px 14px;
   font-size: 10.5pt;
-  white-space: pre-wrap;
   border-bottom: 1px solid #f0f0f6;
 }
+.spp-extra-text a { color: var(--spp-accent); text-decoration: none; word-break: break-all; }
+.spp-extra-text p { margin: 0 0 4px; }
+.spp-extra-text p:last-child { margin-bottom: 0; }
 .spp-links {
   list-style: none;
   margin: 0;

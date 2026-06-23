@@ -3,6 +3,7 @@ import { Button, Empty, Spin, Tag } from 'antd';
 import { CalendarOutlined, FileTextOutlined, LinkOutlined, PlayCircleOutlined, StarOutlined } from '@ant-design/icons';
 import { api } from '../../shared/services/pocketbase';
 import { summerWeeks } from '../../shared/utils/summerWeeks';
+import MathRenderer from '../MathRenderer';
 
 const BLOCK_LABEL = { algebra: 'Алгебра', geometry: 'Геометрия', custom: 'Работа', oral: 'Устный счёт', extra: 'Тригонометрия' };
 
@@ -91,7 +92,9 @@ export default function StudentSummerProgram({ student }) {
         <div className="student-summer-group student-summer-group--extra">
           <div className="student-summer-group-head"><StarOutlined /> Дополнительное задание</div>
           {extra.text?.trim() && (
-            <div className="student-summer-item student-summer-extra-text">{extra.text}</div>
+            <div className="student-summer-item student-summer-extra-text">
+              <MathRenderer text={extra.text} inline={false} />
+            </div>
           )}
           {(extra.files || []).map((f) => <FileItem key={f.id} file={f} />)}
           {(extra.links || []).map((l, i) => (

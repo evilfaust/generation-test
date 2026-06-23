@@ -92,6 +92,13 @@ const MathRenderer = ({ text, content, inline = true, answerBoxes = false }) => 
         {children}
       </p>
     ),
+    // Ссылки markdown ([текст](url) и автолинки gfm) — настоящие <a>,
+    // открываются в новой вкладке (rel для безопасности).
+    a: ({ children, ...props }) => (
+      <a {...props} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    ),
     table: ({ children, ...props }) => (
       <table {...props} style={{
         borderCollapse: 'collapse',

@@ -16,6 +16,8 @@ import { WEAK_STATUS } from '../../../shared/utils/weaknessProfile';
 import { summerWeeks, defaultSummerRange } from '../../../shared/utils/summerWeeks';
 import { WorkspacePageHeader, EmptyState, Chip } from '../ui';
 import MaterialPickerModal from '../MaterialPickerModal';
+import MathRenderer from '../../MathRenderer';
+import LatexField from '../../shared/LatexField';
 import SummerProgramPrintView from './SummerProgramPrintView';
 import { assembleSummerProgram, addExistingWorkItem, generateWorkItem } from './buildProgram';
 
@@ -723,7 +725,7 @@ function StudentPreview({ weeksInfo, byWeek, weekFiles = {}, extra }) {
       })}
       {hasExtra && (
         <Card size="small" title="✨ Дополнительное задание">
-          {extra.text?.trim() && <div style={{ whiteSpace: 'pre-wrap', marginBottom: 8 }}>{extra.text}</div>}
+          {extra.text?.trim() && <div style={{ marginBottom: 8 }}><MathRenderer text={extra.text} inline={false} /></div>}
           {(extra.files || []).map((f) => (
             <div key={f.id} style={{ marginTop: 4 }}>
               <a href={f.url} target="_blank" rel="noreferrer"><PaperClipOutlined /> {f.title || 'файл'}</a>
@@ -789,15 +791,23 @@ function ExtraTaskEditor({ extra, onSaveText, onPickFiles, onRemoveFile, onFileN
   return (
     <Card size="small">
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
-        <div>
+        <div onBlur={() => { if (text !== (extra.text || '')) onSaveText(text); }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Необязательное задание (например, творческое или проектное). Появится у ученика отдельным блоком, если заполнено.
+            Поддерживается Markdown: <Text code>[текст](https://…)</Text> — ссылка, <Text code>**жирный**</Text>, списки, формулы <Text code>$x^2$</Text>.
           </Text>
-          <Input.TextArea
-            rows={4} value={text} onChange={(e) => setText(e.target.value)} onBlur={() => onSaveText(text)}
-            placeholder="Текст задания. Например: придумай и оформи задачу из жизни на тему «проценты»…"
-            style={{ marginTop: 6 }}
-          />
+          <div style={{ marginTop: 6 }}>
+            <LatexField
+              mode="code" rows={4} value={text} onChange={(val) => setText(val)}
+              placeholder="Текст задания. Markdown: ссылки на долги — [Тест по производной](https://…)"
+            />
+          </div>
+          {text.trim() && (
+            <div style={{ marginTop: 8, padding: '8px 10px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+              <Text type="secondary" style={{ fontSize: 11 }}>Предпросмотр:</Text>
+              <div style={{ marginTop: 2 }}><MathRenderer text={text} inline={false} /></div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -889,21 +899,34 @@ function ShareMemoModal({ open, onClose, student, program, weeksInfo, byWeek, do
     return lines.join('\n').trim();
   };
 
+  // Сохранить тексты, если они изменились (чтобы не писать лишний раз в БД).
+  const persist = async () => {
+    if (intro !== (program?.config?.intro || '') || printNote !== (program?.config?.printNote || '')) {
+      await onSaveConfig?.({ intro, printNote });
+    }
+  };
+
   const handleCopy = async () => {
-    await onSaveConfig?.({ intro, printNote });
+    await persist();
     try { await navigator.clipboard.writeText(buildText()); message.success('Скопировано — вставьте в сообщение ученику'); }
     catch { message.error('Не удалось скопировать'); }
   };
 
   // Открыть полноэкранный красивый вид для печати/PDF (сначала сохранив тексты).
   const handleOpenPrint = async () => {
-    await onSaveConfig?.({ intro, printNote });
+    await persist();
     onPrint?.();
+  };
+
+  // Закрытие модалки (крестик/«Отмена»/клик вне) — тоже сохраняем, чтобы текст не пропал.
+  const handleClose = async () => {
+    await persist();
+    onClose?.();
   };
 
   return (
     <Modal
-      open={open} onCancel={onClose} width={640}
+      open={open} onCancel={handleClose} width={640}
       title={`Памятка ученику · ${studentName}`}
       footer={[
         <Button key="copy" icon={<CopyOutlined />} onClick={handleCopy}>Скопировать текст</Button>,
