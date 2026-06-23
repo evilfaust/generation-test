@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Card, Button, Spin, Empty, Form, Select, Row, Col, Input, Space, Tag } from 'antd';
+import { Modal, Card, Button, Spin, Empty, Form, Select, Row, Col, Input, Space, Tag, Image } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import { api } from '../services/pocketbase';
@@ -51,12 +51,14 @@ const TaskSelectModal = ({
     if (f.subtopic)                obj.subtopic   = f.subtopic;
     if (f.tags && f.tags.length)   obj.tags       = f.tags;
     if (f.difficulty)              obj.difficulty = f.difficulty;
+    if (f.search && f.search.trim()) obj.search   = f.search.trim();
     return obj;
   };
 
   const hasFilters = (f) => !!(
     f.exam_type || f.topic || f.subtopic ||
-    (f.tags && f.tags.length) || f.difficulty
+    (f.tags && f.tags.length) || f.difficulty ||
+    (f.search && f.search.trim())
   );
 
   const loadTasks = useCallback(async (currentFilters) => {
@@ -115,7 +117,7 @@ const TaskSelectModal = ({
 
     setLoadingMore(true);
     try {
-      const result = await api.getTasksPage({ page: nextPage, perPage: PER_PAGE, filters: buildFilterObj(filters) });
+      const result = await api.getTasksPage({ page: nextPage, perPage: PER_PAGE, filters: buildFilterObj({ ...filters, search }) });
       if (controller.signal.aborted) return;
 
       const merged = [...cacheRef.current.tasks, ...result.items];
@@ -130,17 +132,17 @@ const TaskSelectModal = ({
     } finally {
       if (!controller.signal.aborted) setLoadingMore(false);
     }
-  }, [filters, excludeIds]);
+  }, [filters, search, excludeIds]);
 
   useEffect(() => {
     if (!visible) {
       abortRef.current?.abort();
       return;
     }
-    // Дебаунс 300 мс: при cascade exam_type→topic→subtopic отправляем 1 запрос, не 3
-    const timer = setTimeout(() => loadTasks(filters), 300);
+    // Дебаунс 300 мс: cascade exam_type→topic→subtopic + ввод текста поиска → 1 запрос
+    const timer = setTimeout(() => loadTasks({ ...filters, search }), 300);
     return () => clearTimeout(timer);
-  }, [visible, filters, loadTasks]);
+  }, [visible, filters, search, loadTasks]);
 
   const filteredTopics = useMemo(() => {
     if (!filters.exam_type) return allTopics;
@@ -150,17 +152,6 @@ const TaskSelectModal = ({
   const filteredSubtopics = filters.topic
     ? allSubtopics.filter(st => st.topic === filters.topic)
     : [];
-
-  const visibleTasks = useMemo(() => {
-    if (!search) return tasks;
-    const q = search.trim().toLowerCase();
-    if (!q) return tasks;
-    return tasks.filter(t => {
-      const code = (t.code || '').toLowerCase();
-      const statement = (t.statement_md || '').toLowerCase();
-      return code.includes(q) || statement.includes(q);
-    });
-  }, [tasks, search]);
 
   const handleReset = () => {
     form.resetFields();
@@ -190,6 +181,7 @@ const TaskSelectModal = ({
       width={920}
       style={{ top: 20 }}
     >
+      <style>{`.tsm-statement img { max-width: 220px; max-height: 180px; object-fit: contain; display: block; margin-top: 8px; }`}</style>
       <Card size="small" style={{ marginBottom: 16 }} title="Фильтры">
         <Form
           form={form}
@@ -306,24 +298,38 @@ const TaskSelectModal = ({
           <Spin size="large" />
         </div>
       ) : tasks.length === 0 ? (
-        <Empty description="Выберите фильтры, чтобы загрузить задачи" />
-      ) : visibleTasks.length === 0 ? (
-        <Empty description="Нет задач по заданным условиям" />
+        <Empty description={
+          hasFilters({ ...filters, search })
+            ? 'Нет задач по заданным условиям'
+            : 'Выберите контекст/фильтры или введите запрос, чтобы найти задачи'
+        } />
       ) : (
         <>
           <div style={{ marginBottom: 8, color: '#888', fontSize: 13 }}>
             Показано {tasks.length} из {totalItems} задач
-            {search && ` (фильтр: ${visibleTasks.length})`}
           </div>
           <div style={{ maxHeight: 420, overflowY: 'auto' }}>
-            {visibleTasks.map(task => (
+            {tasks.map(task => {
+              const imageUrl = api.getTaskImageUrl(task);
+              return (
               <Card key={task.id} size="small" style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, marginBottom: 6 }}>
                       {task.code || 'Без кода'}
                     </div>
-                    <MathRenderer text={task.statement_md} />
+                    <div className="tsm-statement">
+                      <MathRenderer text={task.statement_md} />
+                    </div>
+                    {task.has_image && imageUrl && (
+                      <div style={{ marginTop: 8 }}>
+                        <Image
+                          src={imageUrl}
+                          alt="Чертёж задачи"
+                          style={{ maxWidth: 220, maxHeight: 180, objectFit: 'contain' }}
+                        />
+                      </div>
+                    )}
                     {task.answer && (
                       <div style={{ marginTop: 6 }}>
                         <Tag color="green">Ответ: {task.answer}</Tag>
@@ -337,7 +343,8 @@ const TaskSelectModal = ({
                   </div>
                 </div>
               </Card>
-            ))}
+              );
+            })}
             {tasks.length < totalItems && (
               <div style={{ textAlign: 'center', padding: '12px 0' }}>
                 <Button onClick={loadMore} loading={loadingMore}>
