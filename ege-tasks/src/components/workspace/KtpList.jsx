@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  App, Button, Form, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Typography,
+  App, Button, Form, Input, Modal, Popconfirm, Select, Space, Spin, Switch, Tag, Typography,
 } from 'antd';
 import {
   DeleteOutlined, EditOutlined, InboxOutlined, PlusOutlined, ScheduleOutlined,
@@ -8,7 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
-import { WorkspacePageHeader, EmptyState, GroupChip } from './ui';
+import { WorkspacePageHeader, EmptyState, GroupChip, groupHex, TONE_HEX } from './ui';
 
 const { Text } = Typography;
 
@@ -128,38 +128,42 @@ export default function KtpList() {
     } catch { message.error('Не удалось удалить'); }
   };
 
-  const columns = [
-    {
-      title: 'КТП', dataIndex: 'title', key: 'title',
-      render: (t, c) => (
-        <Button type="link" style={{ padding: 0, fontWeight: 600 }} onClick={() => navigate(`/app/ktp/${c.id}`)}>
-          {t}{c.archived && <Tag style={{ marginLeft: 8 }}>архив</Tag>}
-        </Button>
-      ),
-    },
-    {
-      title: 'Группа', key: 'group', width: 160,
-      render: (_, c) => c.expand?.group?.name ? <GroupChip id={c.group} name={c.expand.group.name} /> : '—',
-    },
-    { title: 'Год', dataIndex: 'year', key: 'year', width: 120, render: (y) => y || '—' },
-    {
-      title: '', key: 'actions', width: 130,
-      render: (_, c) => (
-        <Space>
-          {canEdit && <Button size="small" icon={<EditOutlined />} onClick={() => { setEditing(c); setModalOpen(true); }} />}
-          {canEdit && <Button size="small" icon={<InboxOutlined />} title={c.archived ? 'Восстановить' : 'В архив'} onClick={() => handleArchive(c)} />}
-          {canDelete && (
-            <Popconfirm title="Удалить КТП?" description="Все строки плана будут удалены." okText="Удалить" cancelText="Отмена" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(c)}>
-              <Button size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
+  const stop = (e) => e.stopPropagation();
+
+  const renderCard = (c) => {
+    const hex = c.expand?.group?.name ? groupHex(c.group || c.expand.group.name) : TONE_HEX.violet;
+    return (
+      <div key={c.id} className={`ws-tile${c.archived ? ' ws-tile--muted' : ''}`} onClick={() => navigate(`/app/ktp/${c.id}`)}>
+        <div className="ws-tile__top">
+          <span className="ws-tile__badge" style={{ color: hex.base, background: hex.soft }}><ScheduleOutlined /></span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="ws-tile__name">{c.title}{c.archived && <Tag style={{ marginLeft: 6 }}>архив</Tag>}</div>
+            <div className="ws-tile__sub">{c.year || 'без года'}</div>
+          </div>
+        </div>
+
+        <div className="ws-tile__foot">
+          {c.expand?.group?.name
+            ? <GroupChip id={c.group} name={c.expand.group.name} />
+            : <span className="lemma-chip lemma-chip-neutral lemma-chip--nodot">без группы</span>}
+          {(canEdit || canDelete) && (
+            <div className="ws-tile__actions" onClick={stop}>
+              {canEdit && <Button size="small" type="text" icon={<EditOutlined />} title="Редактировать" onClick={() => { setEditing(c); setModalOpen(true); }} />}
+              {canEdit && <Button size="small" type="text" icon={<InboxOutlined />} title={c.archived ? 'Восстановить' : 'В архив'} onClick={() => handleArchive(c)} />}
+              {canDelete && (
+                <Popconfirm title="Удалить КТП?" description="Все строки плана будут удалены." okText="Удалить" cancelText="Отмена" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(c)}>
+                  <Button size="small" type="text" danger icon={<DeleteOutlined />} title="Удалить" />
+                </Popconfirm>
+              )}
+            </div>
           )}
-        </Space>
-      ),
-    },
-  ];
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1100 }}>
       <WorkspacePageHeader
         icon={<ScheduleOutlined />}
         accent="violet"
@@ -180,26 +184,21 @@ export default function KtpList() {
         )}
       />
 
-      <Table
-        rowKey="id"
-        loading={loading}
-        columns={columns}
-        dataSource={courses}
-        pagination={false}
-        locale={{
-          emptyText: showArchived ? (
-            <EmptyState title="Архив пуст" description="Сюда попадают планы, отправленные в архив" />
-          ) : (
-            <EmptyState
-              title="Пока нет планов"
-              description="Создайте КТП: распишите темы по неделям и часам, выгрузите в Word или PDF"
-              cta={canEdit ? 'Новое КТП' : undefined}
-              ctaIcon={<PlusOutlined />}
-              onCta={() => { setEditing(null); setModalOpen(true); }}
-            />
-          ),
-        }}
-      />
+      {loading && !courses.length ? (
+        <div style={{ textAlign: 'center', padding: 64 }}><Spin /></div>
+      ) : courses.length ? (
+        <div className="ws-grid">{courses.map(renderCard)}</div>
+      ) : showArchived ? (
+        <EmptyState title="Архив пуст" description="Сюда попадают планы, отправленные в архив" />
+      ) : (
+        <EmptyState
+          title="Пока нет планов"
+          description="Создайте КТП: распишите темы по неделям и часам, выгрузите в Word или PDF"
+          cta={canEdit ? 'Новое КТП' : undefined}
+          ctaIcon={<PlusOutlined />}
+          onCta={() => { setEditing(null); setModalOpen(true); }}
+        />
+      )}
 
       <CourseModal
         open={modalOpen}

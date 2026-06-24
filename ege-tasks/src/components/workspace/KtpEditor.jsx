@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  App, Button, Card, DatePicker, Form, Input, InputNumber, Modal, Popconfirm,
+  App, Button, DatePicker, Form, Input, InputNumber, Modal, Popconfirm,
   Select, Space, Spin, Switch, Table, Tooltip, Typography,
 } from 'antd';
 import {
@@ -297,7 +297,7 @@ export default function KtpEditor() {
         )}
       />
 
-      <Card size="small" styles={{ body: { padding: 0 } }}>
+      <div className="ws-card" style={{ overflow: 'hidden' }}>
         <Table
           rowKey="id"
           size="small"
@@ -318,7 +318,7 @@ export default function KtpEditor() {
             ),
           }}
         />
-      </Card>
+      </div>
 
       <EntryModal
         open={modalOpen}

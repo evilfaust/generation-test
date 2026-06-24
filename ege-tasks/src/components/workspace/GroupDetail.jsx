@@ -2,10 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   App,
   Button,
-  Card,
-  Descriptions,
   Input,
-  List,
   Modal,
   Select,
   Space,
@@ -17,6 +14,7 @@ import {
   ArrowLeftOutlined,
   DisconnectOutlined,
   EditOutlined,
+  InfoCircleOutlined,
   PlusOutlined,
   TeamOutlined,
   ThunderboltOutlined,
@@ -25,7 +23,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
-import { WorkspacePageHeader, EmptyState, Chip, groupTone } from './ui';
+import { WorkspacePageHeader, EmptyState, SectionCard, Chip, groupTone, groupHex } from './ui';
 
 const { Text } = Typography;
 
@@ -202,59 +200,48 @@ export default function GroupDetail() {
         extra={group.archived ? <Tag>архив</Tag> : null}
       />
 
-      <Card size="small" style={{ marginBottom: 16 }}>
-        <Descriptions column={{ xs: 1, sm: 2, md: 3 }} size="small">
-          <Descriptions.Item label="Предмет">{group.subject || '—'}</Descriptions.Item>
-          <Descriptions.Item label="Класс">{group.grade ? `${group.grade} кл.` : '—'}</Descriptions.Item>
-          <Descriptions.Item label="Часов/нед">
-            {group.hours_per_week != null ? group.hours_per_week : '—'}
-          </Descriptions.Item>
-          <Descriptions.Item label="УМК">{group.umk || '—'}</Descriptions.Item>
-          <Descriptions.Item label="Учебный год">{group.year || '—'}</Descriptions.Item>
-        </Descriptions>
-      </Card>
+      <div style={{ marginBottom: 16 }}>
+        <SectionCard icon={<InfoCircleOutlined />} iconColor="var(--ink-3)" title="Сведения о группе">
+          <div className="ws-tile__meta" style={{ margin: '2px 8px 6px', gap: '8px 22px' }}>
+            <span>Предмет: <b>{group.subject || '—'}</b></span>
+            <span>Класс: <b>{group.grade ? `${group.grade} кл.` : '—'}</b></span>
+            <span>Часов/нед: <b>{group.hours_per_week != null ? group.hours_per_week : '—'}</b></span>
+            <span>УМК: <b>{group.umk || '—'}</b></span>
+            <span>Год: <b>{group.year || '—'}</b></span>
+          </div>
+        </SectionCard>
+      </div>
 
-      <Card
-        size="small"
-        title={
-          <Space>
-            <TeamOutlined />
-            <span>Ученики ({students.length})</span>
+      <SectionCard
+        icon={<TeamOutlined />}
+        iconColor={groupHex(group.id || group.name).base}
+        title={`Ученики (${students.length})`}
+        extra={canEdit && (
+          <Space size={6} style={{ marginLeft: 'auto' }}>
+            {matchByName.length > 0 && (
+              <Button
+                size="small"
+                icon={<ThunderboltOutlined />}
+                loading={busy}
+                onClick={handleLinkByName}
+                title={`Привязать ${matchByName.length} учеников с классом «${group.name}»`}
+              >
+                По совпадению ({matchByName.length})
+              </Button>
+            )}
+            <Button
+              size="small"
+              icon={<UserAddOutlined />}
+              onClick={() => setManualOpen(true)}
+              title="Вписать ученика без аккаунта (для заметок и посещаемости)"
+            >
+              Вручную
+            </Button>
+            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>
+              Добавить
+            </Button>
           </Space>
-        }
-        extra={
-          canEdit && (
-            <Space>
-              {matchByName.length > 0 && (
-                <Button
-                  size="small"
-                  icon={<ThunderboltOutlined />}
-                  loading={busy}
-                  onClick={handleLinkByName}
-                  title={`Привязать ${matchByName.length} учеников с классом «${group.name}»`}
-                >
-                  Привязать по совпадению ({matchByName.length})
-                </Button>
-              )}
-              <Button
-                size="small"
-                icon={<UserAddOutlined />}
-                onClick={() => setManualOpen(true)}
-                title="Вписать ученика без аккаунта (для заметок и посещаемости)"
-              >
-                Вписать вручную
-              </Button>
-              <Button
-                size="small"
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setAddOpen(true)}
-              >
-                Добавить
-              </Button>
-            </Space>
-          )
-        }
+        )}
       >
         {students.length === 0 ? (
           <EmptyState
@@ -265,60 +252,35 @@ export default function GroupDetail() {
             onCta={() => setAddOpen(true)}
           />
         ) : (
-          <List
-            size="small"
-            dataSource={students}
-            renderItem={(s) => (
-              <List.Item
-                actions={[
-                  <Button
-                    key="profile"
-                    size="small"
-                    type="link"
-                    onClick={() => navigate(`/app/students/${s.id}`)}
-                  >
-                    профиль
-                  </Button>,
-                  ...(canEdit
-                    ? [
-                        <Button
-                          key="edit"
-                          size="small"
-                          type="text"
-                          icon={<EditOutlined />}
-                          onClick={() => { setEditStudent(s); setEditName(s.name || ''); }}
-                          title="Переименовать"
-                        />,
-                        <Button
-                          key="unlink"
-                          size="small"
-                          type="text"
-                          danger
-                          icon={<DisconnectOutlined />}
-                          onClick={() => handleUnlink(s)}
-                        >
-                          {s.external ? 'убрать' : 'отвязать'}
-                        </Button>,
-                      ]
-                    : []),
-                ]}
-              >
-                <List.Item.Meta
-                  title={s.name || '—'}
-                  description={
-                    <Space size={6}>
-                      {s.external
-                        ? <Chip tone="amber" dot={false}>без аккаунта</Chip>
-                        : (s.username && <Text type="secondary">@{s.username}</Text>)}
-                      {s.student_class && <Chip tone="neutral" dot={false}>{s.student_class}</Chip>}
-                    </Space>
-                  }
-                />
-              </List.Item>
-            )}
-          />
+          students.map((s) => {
+            const hex = groupHex(s.id || s.name);
+            const initials = (s.name || '?').replace(/[«»"]/g, '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+            return (
+              <div key={s.id} className="ws-roster__item">
+                <span className="ws-roster__avatar" style={{ color: hex.base, background: hex.soft }}>{initials || '?'}</span>
+                <div className="ws-roster__main">
+                  <div className="ws-roster__name">{s.name || '—'}</div>
+                  <div className="ws-roster__sub">
+                    {s.external
+                      ? <Chip tone="amber" dot={false}>без аккаунта</Chip>
+                      : (s.username && <Text type="secondary" style={{ fontSize: 12 }}>@{s.username}</Text>)}
+                    {s.student_class && <Chip tone="neutral" dot={false}>{s.student_class}</Chip>}
+                  </div>
+                </div>
+                <div className="ws-roster__actions">
+                  <Button size="small" type="link" onClick={() => navigate(`/app/students/${s.id}`)}>профиль</Button>
+                  {canEdit && (
+                    <>
+                      <Button size="small" type="text" icon={<EditOutlined />} title="Переименовать" onClick={() => { setEditStudent(s); setEditName(s.name || ''); }} />
+                      <Button size="small" type="text" danger icon={<DisconnectOutlined />} title={s.external ? 'Убрать' : 'Отвязать'} onClick={() => handleUnlink(s)} />
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })
         )}
-      </Card>
+      </SectionCard>
 
       <Modal
         open={addOpen}

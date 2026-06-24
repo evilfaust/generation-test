@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Segmented, Select, Space, Spin, Table, Tooltip, Typography } from 'antd';
+import { App, Segmented, Select, Space, Spin, Table, Tooltip, Typography } from 'antd';
 import { SolutionOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { api } from '../../shared/services/pocketbase';
 import ExternalJournal from './ExternalJournal';
-import { WorkspacePageHeader, EmptyState, Chip, SubmitChip } from './ui';
+import { WorkspacePageHeader, EmptyState, Chip, SubmitChip, groupHex } from './ui';
+
+const initialsOf = (name) => (name || '?').replace(/[«»"]/g, '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
 
 const { Text } = Typography;
 
@@ -152,15 +154,20 @@ export default function GradeJournal() {
       title: 'Ученик',
       key: 'student',
       fixed: 'left',
-      width: 200,
-      render: (_, row) => (
-        <Space direction="vertical" size={0}>
-          <Text strong>{row.student.name || '—'}</Text>
-          {row.student.username && (
-            <Text type="secondary" style={{ fontSize: 12 }}>@{row.student.username}</Text>
-          )}
-        </Space>
-      ),
+      width: 210,
+      render: (_, row) => {
+        const s = row.student;
+        const hex = groupHex(s.id || s.name);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span className="ws-roster__avatar" style={{ width: 30, height: 30, color: hex.base, background: hex.soft }}>{initialsOf(s.name)}</span>
+            <div style={{ minWidth: 0 }}>
+              <Text strong style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name || '—'}</Text>
+              {s.username && <Text type="secondary" style={{ fontSize: 12 }}>@{s.username}</Text>}
+            </div>
+          </div>
+        );
+      },
     };
 
     const sessCols = sessions.map((s) => ({
@@ -255,7 +262,7 @@ export default function GradeJournal() {
           onCta={() => navigate('/app/worksheets/test')}
         />
       ) : (
-        <Card size="small" styles={{ body: { padding: 0 } }}>
+        <div className="ws-card" style={{ overflow: 'hidden' }}>
           <Table
             size="small"
             columns={columns}
@@ -263,7 +270,7 @@ export default function GradeJournal() {
             pagination={false}
             scroll={{ x: 'max-content' }}
           />
-        </Card>
+        </div>
       )}
 
       {view === 'lemma' && !!sessions.length && (

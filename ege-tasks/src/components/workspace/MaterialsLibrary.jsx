@@ -10,7 +10,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Card, Button, Input, Select, Upload, Popconfirm, Spin, App,
+  Button, Input, Select, Upload, Popconfirm, Spin, App,
   Row, Col, Typography, Space, Alert, Tooltip, Breadcrumb, Modal, Form, Checkbox, TreeSelect,
 } from 'antd';
 import {
@@ -24,7 +24,7 @@ import ConnectForm from './StorageConnect';
 import MaterialEditModal from './MaterialEditModal';
 import FilePreviewModal from './FilePreviewModal';
 import { childFolders, folderChain, buildFolderTree } from './folderTree';
-import { WorkspacePageHeader, EmptyState, Chip } from './ui';
+import { WorkspacePageHeader, EmptyState, Chip, groupHex } from './ui';
 
 const { Text } = Typography;
 const { Dragger } = Upload;
@@ -282,7 +282,7 @@ export default function MaterialsLibrary() {
       />
 
       {canEdit && (
-        <Card size="small" style={{ marginBottom: 16 }}>
+        <div className="ws-card" style={{ padding: 14, marginBottom: 16 }}>
           <Space align="center" style={{ marginBottom: 8 }}>
             <Text>Категория при загрузке:</Text>
             <Select size="small" value={uploadCategory} onChange={setUploadCategory}
@@ -296,7 +296,7 @@ export default function MaterialsLibrary() {
               PDF, учебники, методички — до 500 МБ. {uploading > 0 ? `Загружается: ${uploading}…` : ''}
             </p>
           </Dragger>
-        </Card>
+        </div>
       )}
 
       <Space style={{ marginBottom: 16, width: '100%' }} wrap>
@@ -338,29 +338,30 @@ export default function MaterialsLibrary() {
             <Row gutter={[12, 12]}>
               {childFolders(folders, currentFolder).map((f) => (
                 <Col xs={24} sm={12} md={8} lg={6} key={f.id}>
-                  <Card size="small" hoverable styles={{ body: { padding: '8px 12px' } }}
+                  <div className="ws-tile" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 12px' }}
                     onClick={() => setCurrentFolder(f.id)}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <FolderOutlined style={{ fontSize: 20, color: 'var(--c-amber)', flexShrink: 0 }} />
-                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }} title={f.name}>
-                        {f.name}
-                      </span>
+                    <span className="ws-tile__badge" style={{ width: 30, height: 30, color: groupHex(f.id || f.name).base, background: groupHex(f.id || f.name).soft }}>
+                      <FolderOutlined />
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600, fontSize: 14 }} title={f.name}>
+                      {f.name}
+                    </span>
+                    <div className="ws-tile__actions" onClick={(e) => e.stopPropagation()} style={{ margin: 0 }}>
                       {canEdit && (
                         <Tooltip title="Переименовать">
                           <Button size="small" type="text" icon={<EditOutlined />}
-                            onClick={(e) => { e.stopPropagation(); folderForm.setFieldsValue({ name: f.name }); setFolderModal({ mode: 'rename', folder: f }); }} />
+                            onClick={() => { folderForm.setFieldsValue({ name: f.name }); setFolderModal({ mode: 'rename', folder: f }); }} />
                         </Tooltip>
                       )}
                       {canDelete && (
                         <Popconfirm title="Удалить папку?" description="Файлы и подпапки окажутся в корне"
                           okText="Удалить" cancelText="Отмена" okButtonProps={{ danger: true }}
-                          onConfirm={(e) => { e?.stopPropagation?.(); handleDeleteFolder(f); }}
-                          onCancel={(e) => e?.stopPropagation?.()}>
-                          <Button size="small" type="text" danger icon={<DeleteOutlined />} onClick={(e) => e.stopPropagation()} />
+                          onConfirm={() => handleDeleteFolder(f)}>
+                          <Button size="small" type="text" danger icon={<DeleteOutlined />} />
                         </Popconfirm>
                       )}
                     </div>
-                  </Card>
+                  </div>
                 </Col>
               ))}
             </Row>
@@ -422,55 +423,27 @@ export default function MaterialsLibrary() {
           <Row gutter={[12, 12]}>
             {items.map((rec) => (
               <Col xs={24} sm={12} md={8} lg={6} key={rec.id}>
-                <Card size="small" hoverable
-                  styles={{ body: { padding: 12 } }}
-                  style={selectedIds.has(rec.id)
-                    ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 1px var(--accent-soft)' }
-                    : undefined}
-                  actions={[
-                    <Tooltip title="Просмотр" key="prev">
-                      <EyeOutlined onClick={() => setPreviewRec(rec)} />
-                    </Tooltip>,
-                    <Tooltip title="Открыть / скачать" key="dl">
-                      <a href={materialsApi.fileUrl(rec)} target="_blank" rel="noreferrer">
-                        <DownloadOutlined />
-                      </a>
-                    </Tooltip>,
-                    <Tooltip title="Копировать адрес файла" key="copy">
-                      <CopyOutlined onClick={() => copyUrl(rec)} />
-                    </Tooltip>,
-                    ...(canEdit ? [
-                      <Tooltip title="Редактировать" key="edit">
-                        <EditOutlined onClick={() => setEditing(rec)} />
-                      </Tooltip>,
-                    ] : []),
-                    ...(canDelete ? [
-                      <Popconfirm key="del" title="Удалить файл?" okText="Удалить" cancelText="Отмена"
-                        okButtonProps={{ danger: true }} onConfirm={() => handleDelete(rec)}>
-                        <DeleteOutlined />
-                      </Popconfirm>,
-                    ] : []),
-                  ]}>
+                <div className="ws-tile" style={{
+                  cursor: 'default', padding: 12,
+                  ...(selectedIds.has(rec.id) ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 1px var(--accent-soft)' } : {}),
+                }}>
                   {/* flex + minWidth:0 — иначе длинные имена не обрезаются ellipsis */}
                   <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                     {selectable && (
                       <Checkbox
                         checked={selectedIds.has(rec.id)}
                         onChange={(e) => toggleSelect(rec.id, e.target.checked)}
-                        onClick={(e) => e.stopPropagation()}
                         style={{ marginTop: 2, flexShrink: 0 }}
                       />
                     )}
-                    <div style={{ flexShrink: 0, lineHeight: 1 }}>
-                      {isPdf(rec)
-                        ? <FilePdfOutlined style={{ fontSize: 26, color: 'var(--c-rose)' }} />
-                        : <FileOutlined style={{ fontSize: 26, color: 'var(--c-blue)' }} />}
-                    </div>
+                    <span className="ws-tile__badge" style={{ flexShrink: 0, color: isPdf(rec) ? 'var(--c-rose)' : 'var(--c-blue)', background: isPdf(rec) ? 'var(--c-rose-soft)' : 'var(--c-blue-soft)' }}>
+                      {isPdf(rec) ? <FilePdfOutlined /> : <FileOutlined />}
+                    </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <Tooltip title={`${rec.title || rec.original_name || ''} — нажмите для просмотра`}>
                         <div
                           onClick={() => setPreviewRec(rec)}
-                          style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                          style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
                         >
                           {rec.title || rec.original_name || 'Без названия'}
                         </div>
@@ -483,7 +456,21 @@ export default function MaterialsLibrary() {
                       </Space>
                     </div>
                   </div>
-                </Card>
+
+                  <div className="ws-tile__foot" style={{ justifyContent: 'space-around', gap: 2 }}>
+                    <Tooltip title="Просмотр"><Button size="small" type="text" icon={<EyeOutlined />} onClick={() => setPreviewRec(rec)} /></Tooltip>
+                    <Tooltip title="Открыть / скачать">
+                      <Button size="small" type="text" icon={<DownloadOutlined />} href={materialsApi.fileUrl(rec)} target="_blank" rel="noreferrer" />
+                    </Tooltip>
+                    <Tooltip title="Копировать адрес"><Button size="small" type="text" icon={<CopyOutlined />} onClick={() => copyUrl(rec)} /></Tooltip>
+                    {canEdit && <Tooltip title="Редактировать"><Button size="small" type="text" icon={<EditOutlined />} onClick={() => setEditing(rec)} /></Tooltip>}
+                    {canDelete && (
+                      <Popconfirm title="Удалить файл?" okText="Удалить" cancelText="Отмена" okButtonProps={{ danger: true }} onConfirm={() => handleDelete(rec)}>
+                        <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    )}
+                  </div>
+                </div>
               </Col>
             ))}
           </Row>

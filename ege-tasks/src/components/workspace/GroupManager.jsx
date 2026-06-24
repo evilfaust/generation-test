@@ -8,8 +8,8 @@ import {
   Modal,
   Popconfirm,
   Space,
+  Spin,
   Switch,
-  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -197,111 +197,70 @@ export default function GroupManager() {
     }
   };
 
-  const columns = [
-    {
-      title: 'Группа',
-      dataIndex: 'name',
-      key: 'name',
-      render: (name, g) => (
-        <Space size={8}>
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-            background: groupHex(g.id || name).base, display: 'inline-block',
-          }}
-          />
-          <Button type="link" style={{ padding: 0, fontWeight: 600 }} onClick={() => navigate(`/app/groups/${g.id}`)}>
-            {name}
-          </Button>
-          {g.archived && <Tag style={{ margin: 0 }}>архив</Tag>}
-        </Space>
-      ),
-    },
-    { title: 'Предмет', dataIndex: 'subject', key: 'subject', responsive: ['md'] },
-    {
-      title: 'Класс',
-      dataIndex: 'grade',
-      key: 'grade',
-      width: 80,
-      render: (g) => (g ? `${g} кл.` : '—'),
-    },
-    {
-      title: 'Часов/нед',
-      dataIndex: 'hours_per_week',
-      key: 'hours_per_week',
-      width: 100,
-      responsive: ['lg'],
-      render: (h) => (h != null ? h : '—'),
-    },
-    { title: 'УМК', dataIndex: 'umk', key: 'umk', responsive: ['lg'], render: (u) => u || '—' },
-    { title: 'Год', dataIndex: 'year', key: 'year', width: 110, responsive: ['md'], render: (y) => y || '—' },
-    {
-      title: 'Учеников',
-      key: 'students',
-      width: 100,
-      render: (_, g) => (
-        <Chip tone={counts[g.id] ? 'blue' : 'neutral'} dot={false}>
-          <TeamOutlined style={{ marginRight: 4 }} />{counts[g.id] ?? 0}
-        </Chip>
-      ),
-    },
-    {
-      title: '',
-      key: 'actions',
-      width: 190,
-      render: (_, g, index) => (
-        <Space>
-          {canEdit && (
-            <Button.Group>
-              <Button
-                size="small"
-                icon={<ArrowUpOutlined />}
-                disabled={reordering || index === 0}
-                title="Выше"
-                onClick={() => handleMove(index, -1)}
-              />
-              <Button
-                size="small"
-                icon={<ArrowDownOutlined />}
-                disabled={reordering || index === groups.length - 1}
-                title="Ниже"
-                onClick={() => handleMove(index, 1)}
-              />
-            </Button.Group>
+  const stop = (e) => e.stopPropagation();
+
+  const renderCard = (g, index) => {
+    const hex = groupHex(g.id || g.name);
+    const n = counts[g.id] ?? 0;
+    const initials = (g.name || '?').replace(/[«»"]/g, '').trim().slice(0, 2).toUpperCase();
+    const meta = [
+      g.grade != null && <span key="grade"><b>{g.grade}</b> кл.</span>,
+      g.hours_per_week != null && <span key="hpw"><b>{g.hours_per_week}</b> ч/нед</span>,
+      g.umk && <span key="umk">{g.umk}</span>,
+      g.year && <span key="year">{g.year}</span>,
+    ].filter(Boolean);
+    return (
+      <div
+        key={g.id}
+        className={`ws-tile${g.archived ? ' ws-tile--muted' : ''}`}
+        onClick={() => navigate(`/app/groups/${g.id}`)}
+      >
+        <div className="ws-tile__top">
+          <span className="ws-tile__badge" style={{ color: hex.base, background: hex.soft }}>{initials}</span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="ws-tile__name">{g.name}{g.archived && <Tag style={{ marginLeft: 6 }}>архив</Tag>}</div>
+            {g.subject && <div className="ws-tile__sub">{g.subject}</div>}
+          </div>
+        </div>
+
+        {meta.length > 0 && <div className="ws-tile__meta">{meta}</div>}
+
+        <div className="ws-tile__foot">
+          <Chip tone={n ? 'blue' : 'neutral'} dot={false}>
+            <TeamOutlined style={{ marginRight: 4 }} />{n}
+          </Chip>
+          {(canEdit || canDelete) && (
+            <div className="ws-tile__actions" onClick={stop}>
+              {canEdit && (
+                <Button.Group>
+                  <Button size="small" type="text" icon={<ArrowUpOutlined />} disabled={reordering || index === 0} title="Выше" onClick={() => handleMove(index, -1)} />
+                  <Button size="small" type="text" icon={<ArrowDownOutlined />} disabled={reordering || index === groups.length - 1} title="Ниже" onClick={() => handleMove(index, 1)} />
+                </Button.Group>
+              )}
+              {canEdit && (
+                <Button size="small" type="text" icon={<EditOutlined />} title="Редактировать" onClick={() => { setEditing(g); setModalOpen(true); }} />
+              )}
+              {canEdit && (
+                <Button size="small" type="text" icon={<InboxOutlined />} title={g.archived ? 'Восстановить' : 'В архив'} onClick={() => handleArchive(g)} />
+              )}
+              {canDelete && (
+                <Popconfirm
+                  title="Удалить группу?"
+                  description="Ученики не удаляются, только отвязываются."
+                  okText="Удалить"
+                  cancelText="Отмена"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDelete(g)}
+                >
+                  <Button size="small" type="text" danger icon={<DeleteOutlined />} title="Удалить" />
+                </Popconfirm>
+              )}
+            </div>
           )}
-          {canEdit && (
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => {
-                setEditing(g);
-                setModalOpen(true);
-              }}
-            />
-          )}
-          {canEdit && (
-            <Button
-              size="small"
-              icon={<InboxOutlined />}
-              title={g.archived ? 'Восстановить' : 'В архив'}
-              onClick={() => handleArchive(g)}
-            />
-          )}
-          {canDelete && (
-            <Popconfirm
-              title="Удалить группу?"
-              description="Ученики не удаляются, только отвязываются."
-              okText="Удалить"
-              cancelText="Отмена"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDelete(g)}
-            >
-              <Button size="small" danger icon={<DeleteOutlined />} />
-            </Popconfirm>
-          )}
-        </Space>
-      ),
-    },
-  ];
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div style={{ maxWidth: 1100 }}>
@@ -332,26 +291,21 @@ export default function GroupManager() {
         )}
       />
 
-      <Table
-        rowKey="id"
-        loading={loading}
-        columns={columns}
-        dataSource={groups}
-        pagination={false}
-        locale={{
-          emptyText: showArchived ? (
-            <EmptyState title="Архив пуст" description="Сюда попадают группы, отправленные в архив" />
-          ) : (
-            <EmptyState
-              title="Пока нет групп"
-              description="Создайте первый класс — к нему привяжутся ученики, журнал и планирование"
-              cta={canEdit ? 'Новая группа' : undefined}
-              ctaIcon={<PlusOutlined />}
-              onCta={() => { setEditing(null); setModalOpen(true); }}
-            />
-          ),
-        }}
-      />
+      {loading && !groups.length ? (
+        <div style={{ textAlign: 'center', padding: 64 }}><Spin /></div>
+      ) : groups.length ? (
+        <div className="ws-grid">{groups.map(renderCard)}</div>
+      ) : showArchived ? (
+        <EmptyState title="Архив пуст" description="Сюда попадают группы, отправленные в архив" />
+      ) : (
+        <EmptyState
+          title="Пока нет групп"
+          description="Создайте первый класс — к нему привяжутся ученики, журнал и планирование"
+          cta={canEdit ? 'Новая группа' : undefined}
+          ctaIcon={<PlusOutlined />}
+          onCta={() => { setEditing(null); setModalOpen(true); }}
+        />
+      )}
 
       <GroupModal
         open={modalOpen}

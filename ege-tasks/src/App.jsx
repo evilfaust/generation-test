@@ -212,7 +212,7 @@ const ROUTE_META = [
   { re: /^\/app\/ktp\/[^/]+$/,    menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП' },
   { re: /^\/app\/ktp$/,           menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП — планирование' },
   { re: /^\/app\/calendar$/,      menuKey: 'calendar', menuGroup: 'workspace-group', title: 'Календарь' },
-  { re: /^\/app\/notes$/,         menuKey: 'notes', menuGroup: 'workspace-group', title: 'Заметки' },
+  { re: /^\/app\/notes$/,         menuKey: 'notes', menuGroup: 'workspace-group', title: 'Заметки', noMargin: true },
   { re: /^\/app\/materials$/,     menuKey: 'materials', menuGroup: 'workspace-group', title: 'Библиотека материалов' },
   { re: /^\/app\/summer\/[^/]+$/, menuKey: 'summer', menuGroup: 'workspace-group', title: 'Каникулярное задание ученика' },
   { re: /^\/app\/summer$/,        menuKey: 'summer', menuGroup: 'workspace-group', title: 'Каникулярное задание' },

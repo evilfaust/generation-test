@@ -425,7 +425,7 @@ export default function NotesWorkspace() {
   ];
 
   return (
-    <div>
+    <div className="notes-page">
       <WorkspacePageHeader
         icon={<FileTextOutlined />}
         accent="amber"

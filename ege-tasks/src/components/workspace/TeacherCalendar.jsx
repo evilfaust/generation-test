@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import MaterialPickerModal from './MaterialPickerModal';
 import AttendanceRoster from './AttendanceRoster';
 import { WorkspacePageHeader, Chip, groupHex } from './ui';
+import { PAIRS, guessSlot, slotRangeFromCode, endForLesson } from './lessonTime';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import localeData from 'dayjs/plugin/localeData';
@@ -39,82 +40,6 @@ const RU_MESSAGES = {
 };
 
 const STATUS_LABEL = { planned: 'запланирован', done: 'проведён', cancelled: 'отменён' };
-
-// Расписание пар школы. full = [старт, конец] целой пары; halves = [[1-я пол.], [2-я пол.]].
-// Нулевая пара — единый блок без полупар.
-const PAIRS = [
-  { key: '0', label: 'Нулевая', full: ['09:00', '10:00'], halves: null },
-  { key: '1', label: '1-я пара', full: ['10:15', '11:45'], halves: [['10:15', '11:00'], ['11:05', '11:45']] },
-  { key: '2', label: '2-я пара', full: ['12:00', '13:45'], halves: [['12:00', '12:45'], ['12:50', '13:45']] },
-  { key: '3', label: '3-я пара', full: ['14:05', '15:40'], halves: [['14:05', '14:50'], ['14:55', '15:40']] },
-  { key: '4', label: '4-я пара', full: ['16:00', '17:35'], halves: [['16:00', '16:45'], ['16:50', '17:35']] },
-  { key: '5', label: '5-я пара', full: ['17:45', '19:20'], halves: [['17:45', '18:30'], ['18:35', '19:20']] },
-];
-
-const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
-// Карта старт→конец для длительности на календаре. На пересечении старта целой и
-// 1-й полупары приоритет у ЦЕЛОЙ (частый случай); 2-я полупара различима по старту.
-const START_TO_END = (() => {
-  const m = {};
-  for (const p of PAIRS) {
-    m[p.full[0]] = p.full[1];
-    if (p.halves) m[p.halves[1][0]] = p.halves[1][1];
-  }
-  return m;
-})();
-
-// Конец события: по таблице расписания, иначе дефолт 45 мин.
-function endForStart(start) {
-  const endStr = START_TO_END[hhmm(start)];
-  if (!endStr) return new Date(start.getTime() + 45 * 60 * 1000);
-  const [h, m] = endStr.split(':').map(Number);
-  const end = new Date(start);
-  end.setHours(h, m, 0, 0);
-  return end;
-}
-
-// Угадать пару/часть по времени старта (для инициализации селектора). Для старта,
-// совпадающего с целой/1-й полупарой, по умолчанию 'full'.
-function guessSlot(start) {
-  const t = hhmm(start);
-  for (const p of PAIRS) {
-    if (p.full[0] === t) return { pair: p.key, part: 'full' };
-    if (p.halves && p.halves[1][0] === t) return { pair: p.key, part: '2' };
-  }
-  return { pair: null, part: 'full' };
-}
-
-// Диапазон [старт,конец] по коду time_slot: "0"|"N"|"Na"/"Nb"|"N-M" (интенсив).
-function slotRangeFromCode(code) {
-  if (!code) return null;
-  const inten = /^(\d)-(\d)$/.exec(code);
-  if (inten) {
-    const a = PAIRS.find((p) => p.key === inten[1]);
-    const b = PAIRS.find((p) => p.key === inten[2]);
-    return a && b ? [a.full[0], b.full[1]] : null;
-  }
-  const half = /^(\d)([ab])$/.exec(code);
-  if (half) {
-    const p = PAIRS.find((x) => x.key === half[1]);
-    return p && p.halves ? (half[2] === 'a' ? p.halves[0] : p.halves[1]) : null;
-  }
-  const p = PAIRS.find((x) => x.key === code);
-  return p ? p.full : null;
-}
-
-// Конец события: приоритет у сохранённого time_slot (интенсивы/полупары), иначе по
-// времени старта (обратная совместимость со старыми уроками), иначе 45 мин.
-function endForLesson(l, start) {
-  const r = slotRangeFromCode(l.time_slot);
-  if (r) {
-    const [h, m] = r[1].split(':').map(Number);
-    const end = new Date(start);
-    end.setHours(h, m, 0, 0);
-    return end;
-  }
-  return endForStart(start);
-}
 
 function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel, onOpenNote, onOpenMaterial, saving, canEdit }) {
   const [form] = Form.useForm();
