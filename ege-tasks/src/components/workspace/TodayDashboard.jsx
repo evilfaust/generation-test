@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { App, Spin } from 'antd';
+import { App, Checkbox, Spin } from 'antd';
 import {
-  CalendarOutlined, CheckOutlined, ClockCircleOutlined, EditOutlined, FileTextOutlined, InboxOutlined,
-  PlusOutlined, PushpinFilled, ToolOutlined, WarningOutlined,
+  CalendarOutlined, CheckOutlined, CheckSquareOutlined, ClockCircleOutlined, EditOutlined,
+  FileTextOutlined, InboxOutlined, PlusOutlined, PushpinFilled, ToolOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -56,6 +56,7 @@ export default function TodayDashboard() {
   const [thisWeekLessons, setThisWeekLessons] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
   const [notes, setNotes] = useState([]);
+  const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const now = useMemo(() => new Date(nowTick), [nowTick]);
@@ -73,7 +74,8 @@ export default function TodayDashboard() {
     Promise.all([
       api.getSessionsWithDeadline().catch(() => []),
       api.getNotes().catch(() => []),
-    ]).then(([d, n]) => { setDeadlines(d); setNotes(n); });
+      api.getTodos().catch(() => []),
+    ]).then(([d, n, t]) => { setDeadlines(d); setNotes(n); setTodos(t); });
   }, []);
 
   // Уроки видимой недели (+ снимок текущей недели для KPI/бэклога).
@@ -176,6 +178,31 @@ export default function TodayDashboard() {
       .slice(0, 6),
     [notes],
   );
+
+  // Дела на сегодня и просроченные (открытые, со сроком ≤ конца дня).
+  const todayTodos = useMemo(
+    () => todos
+      .filter((t) => !t.done && t.due_date && dayjs(t.due_date).isBefore(today.endOf('day')))
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+      .slice(0, 6),
+    [todos, today],
+  );
+
+  // Отметить дело сделанным прямо с дашборда (с учётом повтора).
+  const completeTodo = async (t) => {
+    setTodos((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: true } : x)));
+    try {
+      const { updated, next } = await api.completeTodo(t);
+      setTodos((prev) => {
+        let list = prev.map((x) => (x.id === t.id ? updated : x));
+        if (next) list = [next, ...list];
+        return list;
+      });
+    } catch {
+      setTodos((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: false } : x)));
+      message.error('Не удалось сохранить');
+    }
+  };
 
   const inboxCount = useMemo(
     () => notes.filter((n) => n.is_inbox && !n.is_archived).length,
@@ -415,6 +442,32 @@ export default function TodayDashboard() {
             }) : (
               <div className="ws-card__empty">Все выданные работы под контролем.</div>
             )}
+          </SectionCard>
+
+          <SectionCard
+            icon={<CheckSquareOutlined />}
+            iconColor="var(--c-teal)"
+            title="Дела на сегодня"
+            actionLabel="Все →"
+            onAction={() => navigate('/app/todos')}
+          >
+            {todayTodos.length ? todayTodos.map((t) => {
+              const overdue = dayjs(t.due_date).isBefore(today, 'day');
+              return (
+                <div key={t.id} className="td-todo">
+                  <Checkbox checked={false} onChange={() => completeTodo(t)} disabled={!canEdit} />
+                  <span className="td-todo__title" onClick={() => navigate('/app/todos')}>{t.title}</span>
+                  <span className="td-todo__due" style={overdue ? { color: 'var(--c-rose)' } : undefined}>
+                    {overdue ? dayjs(t.due_date).format('DD.MM') : 'сегодня'}
+                  </span>
+                </div>
+              );
+            }) : (
+              <div className="ws-card__empty">На сегодня дел нет.</div>
+            )}
+            <button type="button" className="td-note__inbox" onClick={() => navigate('/app/todos')}>
+              <PlusOutlined /> Новое дело
+            </button>
           </SectionCard>
 
           <SectionCard

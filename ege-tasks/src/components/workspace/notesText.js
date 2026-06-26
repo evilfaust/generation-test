@@ -44,3 +44,28 @@ export function extractNoteText(body) {
     return '';
   }
 }
+
+// Сбор чек-айтемов (BlockNote checkListItem) из тела заметки для секции «Задачи из
+// заметки». Возвращает [{ blockId, text, checked }] в порядке документа, включая
+// вложенные. Текст — плоский (инлайны блока, без вложенных блоков).
+function collectChecks(blocks, out) {
+  if (!Array.isArray(blocks)) return;
+  for (const b of blocks) {
+    if (b && b.type === 'checkListItem') {
+      const text = Array.isArray(b.content) ? b.content.map(inlineText).join('').trim() : '';
+      out.push({ blockId: b.id || '', text, checked: !!(b.props && b.props.checked) });
+    }
+    if (b && Array.isArray(b.children)) collectChecks(b.children, out);
+  }
+}
+
+export function extractCheckItems(body) {
+  if (!Array.isArray(body)) return [];
+  const out = [];
+  try {
+    collectChecks(body, out);
+  } catch {
+    return [];
+  }
+  return out;
+}

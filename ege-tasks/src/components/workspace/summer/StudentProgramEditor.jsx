@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   App, Button, Card, Col, DatePicker, Divider, Drawer, Input, InputNumber, List, Modal,
   Popconfirm, Progress, Radio, Row, Select, Space, Spin, Switch, Table, Tag, Tooltip, Typography,
@@ -65,6 +65,8 @@ const trendIcon = (t) =>
 
 export default function StudentProgramEditor() {
   const { studentId } = useParams();
+  const [searchParams] = useSearchParams();
+  const campaignId = searchParams.get('campaign') || null;
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { topics, subtopics } = useReferenceData();
@@ -112,7 +114,9 @@ export default function StudentProgramEditor() {
           const g = await api.getTeachingGroup(s.teaching_group).catch(() => null);
           if (!cancelled) setGroup(g);
         }
-        const prog = await api.getStudyProgramForStudent(studentId, { season: 'summer', year });
+        const prog = campaignId
+          ? await api.getStudyProgramForCampaign(studentId, campaignId)
+          : await api.getStudyProgramForStudent(studentId, { season: 'summer', year });
         if (cancelled) return;
         if (prog) {
           setProgram(prog);
@@ -184,6 +188,7 @@ export default function StudentProgramEditor() {
       title: `Каникулярное задание · ${student.name}`,
       year, season: 'summer', exam_type: 'ege_base',
       config, profile_snapshot: profile, status: 'issued',
+      ...(campaignId ? { campaign: campaignId } : {}),
     });
     setProgram(prog);
     return prog;

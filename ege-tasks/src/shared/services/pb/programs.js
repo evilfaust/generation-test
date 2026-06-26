@@ -43,6 +43,20 @@ export const programsApi = {
     }
   },
 
+  // Программа конкретного ученика в рамках кампании. null если нет.
+  async getStudyProgramForCampaign(studentId, campaignId) {
+    try {
+      const list = await pb.collection('study_programs').getList(1, 1, {
+        filter: `student = "${escapeFilter(studentId)}" && campaign = "${escapeFilter(campaignId)}"`,
+        sort: '-created',
+      });
+      return list.items[0] || null;
+    } catch (error) {
+      console.error('Error fetching campaign program for student:', error);
+      return null;
+    }
+  },
+
   async createStudyProgram(data) {
     const owner = pb.authStore.model?.id;
     const rec = await pb.collection('study_programs').create({ owner, season: 'summer', ...data });

@@ -23,8 +23,10 @@ import { groupsApi } from './pb/groups.js';
 import { ktpApi } from './pb/ktp.js';
 import { lessonsApi } from './pb/lessons.js';
 import { notesApi } from './pb/notes.js';
+import { todosApi, todoFoldersApi } from './pb/todos.js';
 import { extJournalApi } from './pb/extjournal.js';
 import { programsApi } from './pb/programs.js';
+import { campaignsApi } from './pb/campaigns.js';
 import { attendanceApi } from './pb/attendance.js';
 
 export const api = {
@@ -45,8 +47,11 @@ export const api = {
   ...ktpApi,
   ...lessonsApi,
   ...notesApi,
+  ...todosApi,
+  ...todoFoldersApi,
   ...extJournalApi,
   ...programsApi,
+  ...campaignsApi,
   ...attendanceApi,
 };
 

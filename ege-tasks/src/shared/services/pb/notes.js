@@ -94,6 +94,24 @@ export const notesApi = {
     }
   },
 
+  // Бэклинки: заметки, ссылающиеся на текущую через links ({type:'note', id}).
+  // `~` грубо ловит подстроку id в сериализованном json, уточняем в JS.
+  async getNoteBacklinks(noteId) {
+    try {
+      if (!noteId) return [];
+      const all = await pb.collection('teacher_notes').getFullList({
+        filter: `links ~ "${escapeFilter(noteId)}"`,
+        sort: '-updated',
+        expand: 'group',
+      });
+      return all.filter((n) => n.id !== noteId && Array.isArray(n.links)
+        && n.links.some((l) => l.type === 'note' && l.id === noteId));
+    } catch (error) {
+      console.error('Error fetching note backlinks:', error);
+      return [];
+    }
+  },
+
   // Заметки, где ученик отмечен в links ({type:'student', id}) — для секции
   // «Заметки уроков» в карточке ученика. `~` ловит подстроку id в сериализованном
   // json, дальше уточняем в JS (чтобы не словить ложное совпадение с file id).

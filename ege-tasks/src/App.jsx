@@ -9,7 +9,7 @@ import {
   FileTextOutlined, FileSearchOutlined, BookOutlined, FileAddOutlined,
   UploadOutlined, PieChartOutlined, SolutionOutlined, EditOutlined,
   TeamOutlined, TrophyOutlined, BarChartOutlined, ReadOutlined,
-  SnippetsOutlined, FolderOutlined, CompassOutlined, UnorderedListOutlined,
+  SnippetsOutlined, FolderOutlined, CompassOutlined, UnorderedListOutlined, CheckSquareOutlined,
   FormOutlined, QrcodeOutlined, PictureOutlined, HeatMapOutlined,
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
@@ -31,7 +31,10 @@ const KtpList = lazy(() => import('./components/workspace/KtpList'));
 const KtpEditor = lazy(() => import('./components/workspace/KtpEditor'));
 const TeacherCalendar = lazy(() => import('./components/workspace/TeacherCalendar'));
 const NotesWorkspace = lazy(() => import('./components/workspace/NotesWorkspace'));
+const TodosPage = lazy(() => import('./components/workspace/TodosPage'));
 const MaterialsLibrary = lazy(() => import('./components/workspace/MaterialsLibrary'));
+const VacationCampaignList = lazy(() => import('./components/workspace/summer/VacationCampaignList'));
+const VacationCampaignDetail = lazy(() => import('./components/workspace/summer/VacationCampaignDetail'));
 const SummerProgramList = lazy(() => import('./components/workspace/summer/SummerProgramList'));
 const StudentProgramEditor = lazy(() => import('./components/workspace/summer/StudentProgramEditor'));
 const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
@@ -118,8 +121,11 @@ export const R = {
   KTP_EDITOR:          '/app/ktp/:courseId',
   CALENDAR:            '/app/calendar',
   NOTES:               '/app/notes',
+  TODOS:               '/app/todos',
   MATERIALS:           '/app/materials',
   SUMMER:              '/app/summer',
+  SUMMER_CAMPAIGN:     '/app/summer/campaign/:campaignId',
+  SUMMER_INDIVIDUAL:   '/app/summer/individual',
   SUMMER_STUDENT:      '/app/summer/:studentId',
   TASKS:               '/app/tasks',
   STATS:               '/app/stats',
@@ -213,9 +219,12 @@ const ROUTE_META = [
   { re: /^\/app\/ktp$/,           menuKey: 'ktp', menuGroup: 'workspace-group', title: 'КТП — планирование' },
   { re: /^\/app\/calendar$/,      menuKey: 'calendar', menuGroup: 'workspace-group', title: 'Календарь' },
   { re: /^\/app\/notes$/,         menuKey: 'notes', menuGroup: 'workspace-group', title: 'Заметки', noMargin: true },
+  { re: /^\/app\/todos$/,         menuKey: 'todos', menuGroup: 'workspace-group', title: 'Дела' },
   { re: /^\/app\/materials$/,     menuKey: 'materials', menuGroup: 'workspace-group', title: 'Библиотека материалов' },
-  { re: /^\/app\/summer\/[^/]+$/, menuKey: 'summer', menuGroup: 'workspace-group', title: 'Каникулярное задание ученика' },
-  { re: /^\/app\/summer$/,        menuKey: 'summer', menuGroup: 'workspace-group', title: 'Каникулярное задание' },
+  { re: /^\/app\/summer\/campaign\/[^/]+$/, menuKey: 'summer', menuGroup: 'workspace-group', title: 'Кампания' },
+  { re: /^\/app\/summer\/individual$/,     menuKey: 'summer', menuGroup: 'workspace-group', title: 'Индивидуальные программы' },
+  { re: /^\/app\/summer\/[^/]+$/,          menuKey: 'summer', menuGroup: 'workspace-group', title: 'Программа ученика' },
+  { re: /^\/app\/summer$/,                 menuKey: 'summer', menuGroup: 'workspace-group', title: 'Каникулярные задания' },
   // Работы (detail)
   { re: /^\/app\/works\/[^/]+\/edit/, menuKey: 'work-editor',        title: 'Редактор работ' },
   // Ученики (detail + sub-pages)
@@ -295,6 +304,7 @@ const MENU_KEY_PATH = {
   ktp:                      R.KTP,
   calendar:                 R.CALENDAR,
   notes:                    R.NOTES,
+  todos:                    R.TODOS,
   materials:                R.MATERIALS,
   summer:                   R.SUMMER,
   tasks:                    R.TASKS,
@@ -607,6 +617,7 @@ function AppLayout() {
         { key: 'ktp', icon: <SnippetsOutlined />, label: 'КТП' },
         { key: 'journal', icon: <SolutionOutlined />, label: 'Журнал сдачи' },
         { key: 'notes', icon: <FileTextOutlined />, label: 'Заметки' },
+        { key: 'todos', icon: <CheckSquareOutlined />, label: 'Дела' },
         { key: 'materials', icon: <FolderOutlined />, label: 'Библиотека' },
         { key: 'summer', icon: <CalendarOutlined />, label: 'Каникулярное задание', editOnly: true },
       ],
@@ -862,6 +873,7 @@ function App() {
               <Route path={R.KTP_EDITOR}    element={<KtpEditor />} />
               <Route path={R.CALENDAR}      element={<TeacherCalendar />} />
               <Route path={R.NOTES}         element={<NotesWorkspace />} />
+              <Route path={R.TODOS}         element={<TodosPage />} />
               <Route path={R.MATERIALS}     element={<MaterialsLibrary />} />
 
               {/* Задачи */}
@@ -952,8 +964,10 @@ function App() {
                 <Route path={R.THEORY_NEW}       element={<TheoryEditorRoute />} />
                 <Route path={R.THEORY_EDIT}      element={<TheoryEditorRoute />} />
                 <Route path={R.THEORY_CATEGORIES} element={<TheoryCategoryManager />} />
-                <Route path={R.SUMMER}           element={<SummerProgramList />} />
-                <Route path={R.SUMMER_STUDENT}   element={<StudentProgramEditor />} />
+                <Route path={R.SUMMER}             element={<VacationCampaignList />} />
+                <Route path={R.SUMMER_CAMPAIGN}   element={<VacationCampaignDetail />} />
+                <Route path={R.SUMMER_INDIVIDUAL} element={<SummerProgramList />} />
+                <Route path={R.SUMMER_STUDENT}    element={<StudentProgramEditor />} />
               </Route>
             </Route>
 

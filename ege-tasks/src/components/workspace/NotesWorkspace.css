@@ -21,7 +21,7 @@
 
 /* ── Левая панель — список заметок ── */
 .notes-sidebar {
-  width: 304px;
+  width: 312px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -352,15 +352,18 @@
     width: 100%;
   }
   .notes-sidebar__list { max-height: 300px; }
-  .notes-editor { min-height: 60vh; }
+  .notes-editor { min-height: 60vh; min-width: 0; }
   .notes-editor__header { padding: 12px 16px 0; }
   .notes-editor__meta { padding: 6px 16px 10px; }
+  .note-editor-toolbar { padding-left: 16px; }
   .note-att { margin: 10px 16px 0; }
+  /* контекст-панель уходит вниз на всю ширину */
+  .notes-context { width: 100%; }
   /* на узком экране уменьшаем поля BlockNote (44px слева — под боковое меню блока) */
   .notes-editor__body .bn-editor { padding-inline: 44px 16px; }
 }
 
-/* Тулбар редактора заметки (кнопка «Ученики группы») */
+/* Тулбар редактора заметки (форматирование + ученики + счётчик слов) */
 .note-editor-wrap {
   display: flex;
   flex-direction: column;
@@ -369,9 +372,247 @@
 }
 .note-editor-toolbar {
   display: flex;
-  gap: 8px;
-  padding: 0 0 8px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px 8px 54px;
   margin-bottom: 4px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--rule-soft);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.note-editor-toolbar__sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--rule);
+}
+.note-editor-toolbar__count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Быстрый захват мысли (amber-поле над поиском) ── */
+.notes-quick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #FFFBEB;
+  border: 1px solid #FDE9C8;
+  border-radius: 8px;
+}
+.notes-quick__icon { color: var(--c-amber); font-size: 13px; flex-shrink: 0; }
+.notes-quick__input { flex: 1; padding: 2px 0 !important; font-size: 13px; }
+.notes-quick__input::placeholder { color: #B98A4B; }
+.notes-quick__hint {
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  color: #C39A5E;
+}
+
+/* ── Чипы типов (фильтр) ── */
+.notes-typechips {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.notes-typechips::-webkit-scrollbar { display: none; }
+.notes-typechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--ink-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.notes-typechip:hover { background: var(--bg-hover); }
+.notes-typechip--active {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+.notes-typechip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* иконка типа в карточке списка */
+.notes-item__typeicon { flex-shrink: 0; font-size: 13px; }
+
+/* подсветка только что захваченной мысли */
+.notes-item--flash { animation: notes-flash 1.6s ease; }
+@keyframes notes-flash {
+  0% { background: var(--c-amber-soft); }
+  100% { background: transparent; }
+}
+
+/* ── Пилюля типа в шапке редактора ── */
+.notes-type-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.notes-type-pill[disabled] { cursor: default; }
+.notes-type-pill[data-tone='violet'] { background: var(--c-violet-soft); color: var(--c-violet); }
+.notes-type-pill[data-tone='blue']   { background: var(--c-blue-soft);   color: var(--c-blue); }
+.notes-type-pill[data-tone='amber']  { background: var(--c-amber-soft);  color: var(--c-amber); }
+.notes-type-pill[data-tone='rose']   { background: var(--c-rose-soft);   color: var(--c-rose); }
+.notes-type-pill[data-tone='teal']   { background: var(--c-teal-soft);   color: var(--c-teal); }
+
+/* ── Панель 3 — Контекст ── */
+.notes-context {
+  width: 296px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.notes-context__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 10px 8px 14px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.notes-context__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.notes-context__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 14px 16px;
+}
+
+.nc-section { padding: 12px 0; border-bottom: 1px solid var(--rule-soft); }
+.nc-section:last-child { border-bottom: none; }
+.nc-eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.nc-eyebrow .ant-btn,
+.nc-eyebrow .nc-progress-label { text-transform: none; letter-spacing: 0; }
+.nc-muted { font-size: 12.5px; color: var(--ink-4); }
+
+/* урок */
+.nc-lesson {
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #FBF9FE;
+  border: 1px solid #E5D4FB;
+}
+.nc-lesson__date {
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.nc-lesson__open { padding: 4px 0 0 !important; height: auto; }
+
+/* ученики */
+.nc-students { display: flex; flex-wrap: wrap; gap: 6px; }
+.nc-student {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  font-size: 12px;
+  color: var(--ink-2);
+  max-width: 100%;
+}
+.nc-student__ava {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--c-violet-soft);
+  color: var(--c-violet);
+  font-size: 9px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.nc-student__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* задачи из заметки */
+.nc-progress-label { font-size: 11px; font-weight: 600; color: var(--c-teal); letter-spacing: 0; }
+.nc-tasks { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.nc-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 3px 2px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.nc-task__text { line-height: 1.4; }
+.nc-task--done .nc-task__text { text-decoration: line-through; color: var(--ink-4); }
+.nc-tasks__export { margin-top: 8px; }
+
+.nc-section--attach .note-att { margin: 0; }
+/* узкая панель: заголовок «Вложения» на отдельную строку, кнопки — под ним
+   (иначе текст зажимается кнопками и переносится по буквам) */
+.nc-section--attach .note-att__head { flex-wrap: wrap; row-gap: 2px; }
+.nc-section--attach .note-att__head > .ant-typography {
+  flex: 1 1 100%;
+  white-space: nowrap;
+}
+
+/* связанные / бэклинки */
+.nc-links { display: flex; flex-direction: column; gap: 3px; }
+.nc-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 3px 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.nc-link:hover { background: var(--bg-hover); color: var(--accent); }
+
+/* история */
+.nc-history { font-size: 12px; color: var(--ink-3); line-height: 1.7; }

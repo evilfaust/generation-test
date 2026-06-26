@@ -1,35 +1,42 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import {
-  App, Button, DatePicker, Input, Popconfirm, Segmented, Select, Spin, Tooltip,
+  forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
+} from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  App, Button, DatePicker, Dropdown, Input, Popconfirm, Segmented, Select, Spin, Tooltip,
 } from 'antd';
 import {
   ContainerOutlined, DeleteOutlined, FileTextOutlined, InboxOutlined, PaperClipOutlined,
   PlusOutlined, PushpinFilled, PushpinOutlined, SearchOutlined, UndoOutlined, TeamOutlined,
+  ThunderboltOutlined, DownOutlined, BoldOutlined, FontSizeOutlined, UnorderedListOutlined,
+  CheckSquareOutlined, FunctionOutlined, PictureOutlined, TableOutlined, ExportOutlined,
+  MenuFoldOutlined, MenuUnfoldOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import NoteAttachments from './NoteAttachments';
 import InsertStudentsModal from './InsertStudentsModal';
 import { WorkspacePageHeader, EmptyState, Chip, GroupChip } from './ui';
 import { useCreateBlockNote, SuggestionMenuController, getDefaultReactSlashMenuItems } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
-import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems } from '@blocknote/core';
+import { BlockNoteSchema, defaultBlockSpecs, filterSuggestionItems, insertOrUpdateBlock } from '@blocknote/core';
 import { ru as bnRu } from '@blocknote/core/locales';
 import { api } from '../../shared/services/pocketbase';
 import { materialsApi } from '../../shared/services/pb/filesClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { MathBlock, mathSlashItem } from './notesMathBlock';
-import { extractNoteText } from './notesText';
+import { extractNoteText, extractCheckItems } from './notesText';
+import { NOTE_TYPES, noteTypeMeta } from './notes/noteTypes';
+import NoteContextPanel from './notes/NoteContextPanel';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import './NotesWorkspace.css';
 
-// Схема BlockNote с кастомным блоком-формулой (LaTeX → KaTeX).
 const noteSchema = BlockNoteSchema.create({
   blockSpecs: { ...defaultBlockSpecs, math: MathBlock },
 });
 
-// Компактная дата для списка: сегодня → ЧЧ:ММ, вчера, в этом году → ДД.ММ.
+const RAIL_KEY = 'notes.railCollapsed';
+
+// Компактная дата для списка.
 function shortDate(iso) {
   if (!iso) return '';
   const d = dayjs(iso);
@@ -39,8 +46,50 @@ function shortDate(iso) {
   return d.format('DD.MM.YY');
 }
 
-// Редактор одной заметки. Ключуется по note.id в родителе (полный remount при смене).
-function NoteEditor({ note, onSaveBody, editable, onTagStudents }) {
+// Стартовый шаблон тела по типу заметки (для split-button «Новая заметка»).
+function starterBody(type) {
+  if (type === 'plan') {
+    return [
+      { type: 'heading', props: { level: 3 }, content: 'План' },
+      { type: 'checkListItem', props: { checked: false }, content: 'Первый пункт' },
+    ];
+  }
+  if (type === 'call') {
+    return [
+      { type: 'heading', props: { level: 3 }, content: 'Кому' },
+      { type: 'paragraph', content: '' },
+      { type: 'heading', props: { level: 3 }, content: 'Итог' },
+      { type: 'paragraph', content: '' },
+    ];
+  }
+  return undefined;
+}
+
+// Рекурсивная инверсия checked у чек-айтема по id (иммутабельно).
+function flipCheck(blocks, blockId) {
+  if (!Array.isArray(blocks)) return blocks;
+  return blocks.map((b) => {
+    if (b.id === blockId && b.type === 'checkListItem') {
+      return { ...b, props: { ...(b.props || {}), checked: !b.props?.checked } };
+    }
+    if (Array.isArray(b.children)) {
+      const children = flipCheck(b.children, blockId);
+      if (children !== b.children) return { ...b, children };
+    }
+    return b;
+  });
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"]/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+  ));
+}
+
+// ── Редактор одной заметки (BlockNote) + тулбар форматирования. ──
+const NoteEditor = forwardRef(function NoteEditor(
+  { note, onSaveBody, editable, onTagStudents, wordCount, readMin }, ref,
+) {
   const { message } = App.useApp();
   const [studentsModalOpen, setStudentsModalOpen] = useState(false);
   const initialContent = useMemo(
@@ -51,17 +100,13 @@ function NoteEditor({ note, onSaveBody, editable, onTagStudents }) {
     schema: noteSchema,
     initialContent,
     dictionary: bnRu,
-    // Картинки/файлы, вставленные в текст (drag-drop / paste / слеш-меню),
-    // уходят в Библиотеку материалов (pb-files) — в body хранится только URL.
     uploadFile: async (file) => {
       if (!materialsApi.isConnected()) {
         message.warning('Хранилище не подключено — войдите в «Библиотеку материалов», чтобы вставлять файлы');
         throw new Error('pb-files not connected');
       }
       const rec = await materialsApi.uploadMaterial({
-        file,
-        title: file.name.replace(/\.[^.]+$/, ''),
-        category: 'other',
+        file, title: file.name.replace(/\.[^.]+$/, ''), category: 'other',
       });
       return materialsApi.fileUrl(rec);
     },
@@ -77,7 +122,6 @@ function NoteEditor({ note, onSaveBody, editable, onTagStudents }) {
     }
   }, [onSaveBody]);
 
-  // Флаш при размонтировании (смена заметки/уход со страницы).
   useEffect(() => () => { clearTimeout(timer.current); flush(); }, [flush]);
 
   const handleChange = () => {
@@ -86,7 +130,17 @@ function NoteEditor({ note, onSaveBody, editable, onTagStudents }) {
     timer.current = setTimeout(flush, 800);
   };
 
-  // Вставка разделов-траекторий по выбранным ученикам + тег в links заметки.
+  // Вставка/конвертация блока по позиции курсора.
+  const insert = (spec, convertIfEmpty = true) => {
+    if (!editor) return;
+    const cur = editor.getTextCursorPosition().block;
+    const isEmpty = cur.type === 'paragraph'
+      && (!cur.content || (Array.isArray(cur.content) && cur.content.length === 0));
+    if (convertIfEmpty && isEmpty) editor.updateBlock(cur, spec);
+    else editor.insertBlocks([spec], cur, 'after');
+    editor.focus();
+  };
+
   const insertStudents = (selected) => {
     setStudentsModalOpen(false);
     if (!selected.length) return;
@@ -96,27 +150,81 @@ function NoteEditor({ note, onSaveBody, editable, onTagStudents }) {
       blocks.push({ type: 'paragraph', content: '' });
     });
     const doc = editor.document;
-    const ref = doc[doc.length - 1];
-    editor.insertBlocks(blocks, ref, 'after');
-    onSaveBody(editor.document); // персист тела сразу (программная вставка)
-    onTagStudents?.(selected);   // тег учеников в links
+    const refBlock = doc[doc.length - 1];
+    editor.insertBlocks(blocks, refBlock, 'after');
+    onSaveBody(editor.document);
+    onTagStudents?.(selected);
     message.success(`Добавлено учеников: ${selected.length}`);
   };
+
+  // API наружу — для контекст-панели (отметить учеников) и шапки (экспорт PDF).
+  useImperativeHandle(ref, () => ({
+    requestInsertStudents: () => setStudentsModalOpen(true),
+    exportPdf: async () => {
+      try {
+        const html = await editor.blocksToHTMLLossy(editor.document);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'padding:24px;max-width:780px;font-family:Geist,system-ui,sans-serif;color:#0D1321';
+        wrap.innerHTML = `<h1 style="font-size:24px">${escapeHtml(note.title || 'Заметка')}</h1>${html}`;
+        const mod = await import('html2pdf.js');
+        const html2pdf = mod.default || mod;
+        await html2pdf().set({
+          margin: 12,
+          filename: `${(note.title || 'note').slice(0, 40) || 'note'}.pdf`,
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        }).from(wrap).save();
+      } catch {
+        message.error('Не удалось экспортировать заметку');
+      }
+    },
+  }), [editor, note.title]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="note-editor-wrap">
       {editable && (
         <div className="note-editor-toolbar">
-          <Tooltip title={note.group ? 'Вставить разделы по ученикам группы' : 'У заметки не указана группа'}>
-            <Button
-              size="small"
-              icon={<TeamOutlined />}
-              disabled={!note.group}
-              onClick={() => setStudentsModalOpen(true)}
-            >
-              Ученики группы
+          <Tooltip title="Подзаголовок">
+            <Button size="small" type="text" icon={<FontSizeOutlined />}
+              onClick={() => insert({ type: 'heading', props: { level: 2 } })} />
+          </Tooltip>
+          <Tooltip title="Жирный">
+            <Button size="small" type="text" icon={<BoldOutlined />}
+              onClick={() => { editor.toggleStyles({ bold: true }); editor.focus(); }} />
+          </Tooltip>
+          <Tooltip title="Список">
+            <Button size="small" type="text" icon={<UnorderedListOutlined />}
+              onClick={() => insert({ type: 'bulletListItem' })} />
+          </Tooltip>
+          <Tooltip title="Чек-лист">
+            <Button size="small" type="text" icon={<CheckSquareOutlined />}
+              onClick={() => insert({ type: 'checkListItem', props: { checked: false } })} />
+          </Tooltip>
+          <Tooltip title="Формула (LaTeX)">
+            <Button size="small" type="text" icon={<FunctionOutlined />}
+              onClick={() => { insertOrUpdateBlock(editor, { type: 'math', props: { formula: '' } }); editor.focus(); }} />
+          </Tooltip>
+          <Tooltip title="Изображение">
+            <Button size="small" type="text" icon={<PictureOutlined />}
+              onClick={() => insert({ type: 'image' })} />
+          </Tooltip>
+          <Tooltip title="Таблица">
+            <Button size="small" type="text" icon={<TableOutlined />}
+              onClick={() => insert({
+                type: 'table',
+                content: { type: 'tableContent', rows: [{ cells: [[], []] }, { cells: [[], []] }] },
+              }, false)} />
+          </Tooltip>
+          <span className="note-editor-toolbar__sep" />
+          <Tooltip title={note.group ? 'Разделы по ученикам группы' : 'У заметки не указана группа'}>
+            <Button size="small" type="text" icon={<TeamOutlined />} disabled={!note.group}
+              onClick={() => setStudentsModalOpen(true)}>
+              Ученики
             </Button>
           </Tooltip>
+          <span className="note-editor-toolbar__count">
+            {wordCount} слов · ~{readMin} мин · «/» команды
+          </span>
         </div>
       )}
       <BlockNoteView
@@ -143,22 +251,39 @@ function NoteEditor({ note, onSaveBody, editable, onTagStudents }) {
       />
     </div>
   );
-}
+});
 
 export default function NotesWorkspace() {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const { canEdit, canDelete } = useAuth();
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [notes, setNotes] = useState([]);
   const [groups, setGroups] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [view, setView] = useState('all'); // all | inbox | archive
+  const [typeFilter, setTypeFilter] = useState('all');
   const [searchQ, setSearchQ] = useState('');
   const [groupFilter, setGroupFilter] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savedTick, setSavedTick] = useState(0);
-  const [lessonFiles, setLessonFiles] = useState([]); // файлы, прикреплённые к уроку заметки
+  const [lessonFiles, setLessonFiles] = useState([]);
+  const [lessonObj, setLessonObj] = useState(null);
+  const [backlinks, setBacklinks] = useState([]);
+  const [quickDraft, setQuickDraft] = useState('');
+  const [flashId, setFlashId] = useState(null);
+  const [editorRev, setEditorRev] = useState(0);
+  const [railCollapsed, setRailCollapsed] = useState(
+    () => localStorage.getItem(RAIL_KEY) === '1',
+  );
+  const editorRef = useRef(null);
+
+  const toggleRail = () => setRailCollapsed((v) => {
+    const next = !v;
+    localStorage.setItem(RAIL_KEY, next ? '1' : '0');
+    return next;
+  });
 
   const load = useCallback(async (selectId) => {
     setLoading(true);
@@ -178,7 +303,6 @@ export default function NotesWorkspace() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Если пришли с ?note=<id> из календаря — выбрать эту заметку.
   useEffect(() => {
     const wanted = searchParams.get('note');
     if (wanted && notes.some((n) => n.id === wanted)) setActiveId(wanted);
@@ -186,7 +310,6 @@ export default function NotesWorkspace() {
 
   const groupName = (n) => n?.expand?.group?.name;
 
-  // Один проход по заметкам: поисковый индекс (lowercase) + сниппет для списка.
   const { textIndex, snippets } = useMemo(() => {
     const idx = new Map();
     const snip = new Map();
@@ -211,24 +334,22 @@ export default function NotesWorkspace() {
       if (view === 'inbox') list = list.filter((n) => n.is_inbox);
     }
     if (groupFilter) list = list.filter((n) => n.group === groupFilter);
+    if (typeFilter !== 'all') list = list.filter((n) => noteTypeMeta(n).value === typeFilter);
     const q = searchQ.trim().toLowerCase();
     if (q) list = list.filter((n) => (textIndex.get(n.id) || '').includes(q));
     return list;
-  }, [notes, view, groupFilter, searchQ, textIndex]);
+  }, [notes, view, groupFilter, typeFilter, searchQ, textIndex]);
 
-  // Секции сайдбара: только «Закреплённые» сверху, остальное — единым
-  // хронологическим списком (по -updated). Группировки по классам нет.
   const sections = useMemo(() => {
     if (view === 'archive') return visibleNotes.length ? [{ key: 'arch', title: null, items: visibleNotes }] : [];
     const out = [];
     const pinned = visibleNotes.filter((n) => n.is_pinned);
     const rest = visibleNotes.filter((n) => !n.is_pinned);
     if (pinned.length) out.push({ key: 'pinned', title: 'Закреплённые', items: pinned });
-    if (rest.length) out.push({ key: 'rest', title: null, items: rest });
+    if (rest.length) out.push({ key: 'rest', title: pinned.length ? 'Недавние' : null, items: rest });
     return out;
   }, [visibleNotes, view]);
 
-  // Плоский список для рендера: маркеры секций вперемешку с заметками.
   const flatList = useMemo(
     () => sections.flatMap((s) => [
       ...(s.title ? [{ __section: s.title, id: `__s_${s.key}` }] : []),
@@ -239,25 +360,46 @@ export default function NotesWorkspace() {
 
   const active = useMemo(() => notes.find((n) => n.id === activeId) || null, [notes, activeId]);
 
-  // Если заметка привязана к уроку — подтянуть файлы, прикреплённые к самому уроку
-  // (lesson.materials, тип 'material'). Read-only список рядом с файлами заметки.
+  const checkItems = useMemo(() => extractCheckItems(active?.body), [active?.body]);
+  const wordCount = useMemo(() => {
+    const t = extractNoteText(active?.body);
+    return t ? t.split(/\s+/).filter(Boolean).length : 0;
+  }, [active?.body]);
+  const readMin = Math.max(1, Math.round(wordCount / 180));
+
+  // Файлы + объект привязанного урока (для контекст-панели).
   useEffect(() => {
     let cancelled = false;
     const lessonId = active?.lesson;
-    if (!lessonId) { setLessonFiles([]); return undefined; }
+    if (!lessonId) { setLessonFiles([]); setLessonObj(null); return undefined; }
     api.getLesson(lessonId)
       .then((l) => {
         if (cancelled) return;
         const mats = Array.isArray(l.materials) ? l.materials.filter((m) => m.type === 'material') : [];
         setLessonFiles(mats);
+        setLessonObj({ ...l, _groupName: groups.find((g) => g.id === l.group)?.name });
       })
-      .catch(() => { if (!cancelled) setLessonFiles([]); });
+      .catch(() => { if (!cancelled) { setLessonFiles([]); setLessonObj(null); } });
     return () => { cancelled = true; };
-  }, [active?.lesson]);
+  }, [active?.lesson, groups]);
 
-  const handleNew = async () => {
+  // Бэклинки активной заметки.
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeId) { setBacklinks([]); return undefined; }
+    api.getNoteBacklinks(activeId)
+      .then((b) => { if (!cancelled) setBacklinks(b); })
+      .catch(() => { if (!cancelled) setBacklinks([]); });
+    return () => { cancelled = true; };
+  }, [activeId]);
+
+  const handleNew = async (type) => {
     try {
-      const rec = await api.createNote({ title: '', is_inbox: view === 'inbox' });
+      const rec = await api.createNote({
+        title: '',
+        is_inbox: type === 'idea' ? true : view === 'inbox',
+        ...(type ? { type, body: starterBody(type) } : {}),
+      });
       setNotes((prev) => [rec, ...prev]);
       setActiveId(rec.id);
       if (view === 'archive') setView('all');
@@ -266,7 +408,20 @@ export default function NotesWorkspace() {
     }
   };
 
-  // Точечный патч любой заметки (оптимистично).
+  const handleQuickCapture = async () => {
+    const text = quickDraft.trim();
+    if (!text) return;
+    try {
+      const rec = await api.createNote({ title: text, type: 'idea', is_inbox: true });
+      setNotes((prev) => [rec, ...prev]);
+      setQuickDraft('');
+      setFlashId(rec.id);
+      setTimeout(() => setFlashId((id) => (id === rec.id ? null : id)), 1600);
+    } catch {
+      message.error('Не удалось записать мысль');
+    }
+  };
+
   const patchNote = useCallback(async (id, patch) => {
     setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
     try {
@@ -282,7 +437,6 @@ export default function NotesWorkspace() {
     if (archived && activeId === n.id && view !== 'archive') setActiveId(null);
   };
 
-  // Окончательное удаление — только из архива.
   const handleDeleteForever = async (id) => {
     try {
       await api.deleteNote(id);
@@ -293,7 +447,6 @@ export default function NotesWorkspace() {
     }
   };
 
-  // Сохранение тела (из BlockNote).
   const saveBody = useCallback(async (body) => {
     if (!activeId) return;
     try {
@@ -305,7 +458,6 @@ export default function NotesWorkspace() {
     }
   }, [activeId, message]);
 
-  // Тег учеников в links активной заметки (для секции «Заметки уроков» в карточке).
   const tagStudents = useCallback((students) => {
     if (!active) return;
     const existing = Array.isArray(active.links) ? active.links : [];
@@ -317,7 +469,29 @@ export default function NotesWorkspace() {
     patchNote(active.id, { links: [...existing, ...additions] });
   }, [active, patchNote]);
 
-  // Заголовок — debounce.
+  // Тоггл чек-айтема из контекст-панели → правка тела + ремоунт редактора.
+  const toggleCheck = useCallback((blockId) => {
+    if (!active) return;
+    const newBody = flipCheck(active.body || [], blockId);
+    setNotes((prev) => prev.map((n) => (n.id === active.id ? { ...n, body: newBody } : n)));
+    setEditorRev((r) => r + 1);
+    api.updateNote(active.id, { body: newBody })
+      .then(() => setSavedTick((t) => t + 1))
+      .catch(() => message.error('Не удалось сохранить'));
+  }, [active, message]);
+
+  const exportTasks = useCallback(async () => {
+    if (!active) return;
+    const open = extractCheckItems(active.body).filter((c) => !c.checked);
+    if (!open.length) return;
+    try {
+      const created = await api.exportNoteTasks(active, open);
+      message.success(created.length ? `В «Дела» добавлено: ${created.length}` : 'Все пункты уже выгружены');
+    } catch {
+      message.error('Не удалось выгрузить в «Дела»');
+    }
+  }, [active, message]);
+
   const titleTimer = useRef();
   const handleTitleChange = (e) => {
     const title = e.target.value;
@@ -331,7 +505,6 @@ export default function NotesWorkspace() {
     }, 600);
   };
 
-  // Правка метаданных активной заметки (класс/дата/инбокс/пин).
   const patchActive = (patch, optimisticExtra = {}) => {
     if (!active) return;
     setNotes((prev) => prev.map((n) => (n.id === active.id ? { ...n, ...optimisticExtra } : n)));
@@ -352,6 +525,7 @@ export default function NotesWorkspace() {
     }
     const title = n.title?.trim();
     const snippet = snippets.get(n.id);
+    const m = noteTypeMeta(n);
     const actions = view === 'archive'
       ? [
         ...(canEdit ? [
@@ -383,10 +557,11 @@ export default function NotesWorkspace() {
     return (
       <div
         key={n.id}
-        className={`notes-item ${n.id === activeId ? 'notes-item--active' : ''}`}
+        className={`notes-item ${n.id === activeId ? 'notes-item--active' : ''}${n.id === flashId ? ' notes-item--flash' : ''}`}
         onClick={() => setActiveId(n.id)}
       >
         <div className="notes-item__titlerow">
+          <m.Icon className="notes-item__typeicon" style={{ color: `var(--c-${m.tone})` }} />
           {n.is_pinned && view !== 'archive' && <PushpinFilled className="notes-item__flag" />}
           {n.is_inbox && !n.is_archived && <InboxOutlined className="notes-item__flag" />}
           <span className={`notes-item__title${title ? '' : ' notes-item__title--untitled'}`}>
@@ -396,9 +571,9 @@ export default function NotesWorkspace() {
         </div>
         {snippet && <div className="notes-item__snippet">{snippet}</div>}
         <div className="notes-item__meta">
-          {n.lesson && <Chip tone="violet" dot={false}>урок</Chip>}
+          <Chip tone={m.tone} dot={false}>{m.label}</Chip>
           {groupName(n) && <GroupChip id={n.group} name={groupName(n)} />}
-          <span className="notes-item__date" title={n.note_date ? `Дата заметки: ${dayjs(n.note_date).format('DD.MM.YYYY')}` : undefined}>
+          <span className="notes-item__date">
             {n.note_date ? dayjs(n.note_date).format('DD.MM.YY') : shortDate(n.updated)}
           </span>
         </div>
@@ -424,6 +599,12 @@ export default function NotesWorkspace() {
     { value: 'archive', label: 'Архив' },
   ];
 
+  const typeChips = [{ value: 'all', label: 'Все', tone: 'neutral' }, ...NOTE_TYPES];
+
+  const newMenuItems = NOTE_TYPES.map((t) => ({ key: t.value, icon: <t.Icon />, label: `${t.label}` }));
+
+  const activeMeta = active ? noteTypeMeta(active) : null;
+
   return (
     <div className="notes-page">
       <WorkspacePageHeader
@@ -432,16 +613,35 @@ export default function NotesWorkspace() {
         title="Заметки"
         subtitle="Быстрые мысли, планы и заметки уроков — с формулами и вложениями"
         extra={canEdit && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleNew}>
-            Новая заметка
-          </Button>
+          <Dropdown.Button
+            type="primary"
+            icon={<DownOutlined />}
+            onClick={() => handleNew()}
+            menu={{ items: newMenuItems, onClick: ({ key }) => handleNew(key) }}
+          >
+            <PlusOutlined /> Новая заметка
+          </Dropdown.Button>
         )}
       />
 
       <div className="notes-workspace">
-        {/* Левая панель — список */}
+        {/* ── Панель 1 — список ── */}
         <div className="notes-sidebar">
           <div className="notes-sidebar__tools">
+            {canEdit && (
+              <div className="notes-quick">
+                <ThunderboltOutlined className="notes-quick__icon" />
+                <Input
+                  variant="borderless"
+                  className="notes-quick__input"
+                  placeholder="Быстро записать мысль…"
+                  value={quickDraft}
+                  onChange={(e) => setQuickDraft(e.target.value)}
+                  onPressEnter={handleQuickCapture}
+                />
+                <span className="notes-quick__hint">↵ инбокс</span>
+              </div>
+            )}
             <Input
               allowClear
               prefix={<SearchOutlined style={{ color: 'var(--ink-4)' }} />}
@@ -450,6 +650,19 @@ export default function NotesWorkspace() {
               onChange={(e) => setSearchQ(e.target.value)}
             />
             <Segmented block size="small" value={view} onChange={setView} options={segmentedOptions} />
+            <div className="notes-typechips">
+              {typeChips.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  className={`notes-typechip${typeFilter === t.value ? ' notes-typechip--active' : ''}`}
+                  onClick={() => setTypeFilter(t.value)}
+                >
+                  {t.value !== 'all' && <span className="notes-typechip__dot" style={{ background: `var(--c-${t.tone})` }} />}
+                  {t.label}
+                </button>
+              ))}
+            </div>
             {groups.length > 0 && (
               <Select
                 allowClear
@@ -476,7 +689,7 @@ export default function NotesWorkspace() {
                       description={canEdit ? 'Создайте первую — она появится здесь' : undefined}
                       cta={canEdit ? 'Новая заметка' : undefined}
                       ctaIcon={<PlusOutlined />}
-                      onCta={handleNew}
+                      onCta={() => handleNew()}
                     />
                   )}
               </div>
@@ -486,7 +699,7 @@ export default function NotesWorkspace() {
           </div>
         </div>
 
-        {/* Правая панель — «лист» заметки */}
+        {/* ── Панель 2 — редактор ── */}
         <div className="notes-editor">
           {!active ? (
             <div className="notes-empty">
@@ -495,7 +708,7 @@ export default function NotesWorkspace() {
                 description="Выберите заметку слева или создайте новую"
                 cta={canEdit ? 'Новая заметка' : undefined}
                 ctaIcon={<PlusOutlined />}
-                onCta={handleNew}
+                onCta={() => handleNew()}
               />
             </div>
           ) : (
@@ -513,67 +726,97 @@ export default function NotesWorkspace() {
                 <div className="notes-editor__tools">
                   {savedTick > 0 && <span key={savedTick} className="notes-saved">✓ сохранено</span>}
                   <Tooltip title={active.is_pinned ? 'Открепить' : 'Закрепить сверху'}>
-                    <Button
-                      type="text"
-                      icon={active.is_pinned
-                        ? <PushpinFilled style={{ color: 'var(--c-amber)' }} />
-                        : <PushpinOutlined />}
-                      onClick={() => togglePin(active)}
-                      disabled={!canEdit}
-                    />
+                    <Button type="text"
+                      icon={active.is_pinned ? <PushpinFilled style={{ color: 'var(--c-amber)' }} /> : <PushpinOutlined />}
+                      onClick={() => togglePin(active)} disabled={!canEdit} />
                   </Tooltip>
                   <Tooltip title={active.is_inbox ? 'Убрать из инбокса' : 'В инбокс'}>
-                    <Button
-                      type="text"
+                    <Button type="text"
                       icon={<InboxOutlined style={active.is_inbox ? { color: 'var(--c-amber)' } : undefined} />}
-                      onClick={() => patchActive({ is_inbox: !active.is_inbox })}
-                      disabled={!canEdit}
-                    />
+                      onClick={() => patchActive({ is_inbox: !active.is_inbox })} disabled={!canEdit} />
+                  </Tooltip>
+                  <Tooltip title="Экспорт в PDF">
+                    <Button type="text" icon={<ExportOutlined />}
+                      onClick={() => editorRef.current?.exportPdf()} />
                   </Tooltip>
                   <Tooltip title={active.is_archived ? 'Вернуть из архива' : 'В архив'}>
-                    <Button
-                      type="text"
+                    <Button type="text"
                       icon={active.is_archived ? <UndoOutlined /> : <ContainerOutlined />}
-                      onClick={() => archiveNote(active, !active.is_archived)}
-                      disabled={!canEdit}
-                    />
+                      onClick={() => archiveNote(active, !active.is_archived)} disabled={!canEdit} />
+                  </Tooltip>
+                  <Tooltip title={railCollapsed ? 'Показать контекст' : 'Скрыть контекст'}>
+                    <Button type="text"
+                      icon={railCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                      onClick={toggleRail} />
                   </Tooltip>
                 </div>
               </div>
               <div className="notes-editor__meta">
+                {activeMeta && (
+                  <Dropdown
+                    trigger={['click']}
+                    disabled={!canEdit}
+                    menu={{
+                      items: NOTE_TYPES.map((t) => ({ key: t.value, icon: <t.Icon />, label: t.label })),
+                      onClick: ({ key }) => patchActive({ type: key }),
+                    }}
+                  >
+                    <button type="button" className="notes-type-pill" data-tone={activeMeta.tone} disabled={!canEdit}>
+                      <activeMeta.Icon /> {activeMeta.label} <DownOutlined style={{ fontSize: 9 }} />
+                    </button>
+                  </Dropdown>
+                )}
                 <Select
-                  allowClear
-                  size="small"
-                  style={{ minWidth: 160 }}
+                  allowClear size="small" style={{ minWidth: 160 }}
                   placeholder="Класс / группа"
                   value={active.group || undefined}
-                  onChange={changeGroup}
-                  disabled={!canEdit}
+                  onChange={changeGroup} disabled={!canEdit}
                   options={groups.map((g) => ({ value: g.id, label: g.name }))}
                 />
                 <DatePicker
-                  size="small"
-                  format="DD.MM.YYYY"
-                  placeholder="Дата"
+                  size="small" format="DD.MM.YYYY" placeholder="Дата"
                   value={active.note_date ? dayjs(active.note_date) : null}
-                  onChange={changeDate}
-                  disabled={!canEdit}
+                  onChange={changeDate} disabled={!canEdit}
                 />
-                {active.lesson && <Chip tone="violet" dot={false}>заметка урока</Chip>}
                 {active.is_archived && <Chip tone="neutral" dot={false}>в архиве</Chip>}
               </div>
-              <NoteAttachments
-                noteFiles={noteFiles}
-                lessonFiles={lessonFiles}
-                canEdit={canEdit}
-                onSave={(next) => patchActive({ links: [...allLinks.filter((l) => l.type !== 'material'), ...next] })}
-              />
               <div className="notes-editor__body">
-                <NoteEditor key={active.id} note={active} onSaveBody={saveBody} editable={canEdit} onTagStudents={tagStudents} />
+                <NoteEditor
+                  key={`${active.id}:${editorRev}`}
+                  ref={editorRef}
+                  note={active}
+                  onSaveBody={saveBody}
+                  editable={canEdit}
+                  onTagStudents={tagStudents}
+                  wordCount={wordCount}
+                  readMin={readMin}
+                />
               </div>
             </>
           )}
         </div>
+
+        {/* ── Панель 3 — контекст ── */}
+        {active && !railCollapsed && (
+          <NoteContextPanel
+            note={active}
+            lesson={lessonObj}
+            lessonFiles={lessonFiles}
+            noteFiles={noteFiles}
+            backlinks={backlinks}
+            checkItems={checkItems}
+            canEdit={canEdit}
+            wordCount={wordCount}
+            readMin={readMin}
+            onCollapse={toggleRail}
+            onOpenLesson={() => navigate('/app/calendar')}
+            onAddStudents={() => editorRef.current?.requestInsertStudents()}
+            onToggleCheck={toggleCheck}
+            onExportTasks={exportTasks}
+            onSaveAttachments={(next) => patchActive({ links: [...allLinks.filter((l) => l.type !== 'material'), ...next] })}
+            onOpenNote={(id) => setActiveId(id)}
+          />
+        )}
       </div>
     </div>
   );
