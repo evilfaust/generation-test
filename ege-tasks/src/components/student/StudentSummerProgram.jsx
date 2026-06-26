@@ -12,6 +12,7 @@ const BLOCK_LABEL = { algebra: 'Алгебра', geometry: 'Геометрия',
 export default function StudentSummerProgram({ student }) {
   const [items, setItems] = useState([]);
   const [program, setProgram] = useState(null);
+  const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const year = new Date().getFullYear();
 
@@ -23,13 +24,22 @@ export default function StudentSummerProgram({ student }) {
         const prog = await api.getStudyProgramForStudent(student.id, { season: 'summer', year });
         if (cancelled) return;
         setProgram(prog);
-        if (prog) setItems(await api.getProgramItems(prog.id));
+        if (prog) {
+          setItems(await api.getProgramItems(prog.id));
+          // Общее задание класса — из кампании, к которой привязана программа.
+          if (prog.campaign) {
+            const camp = await api.getCampaign(prog.campaign).catch(() => null);
+            if (!cancelled) setCampaign(camp);
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
   }, [student.id, year]);
+
+  const campaignBlocks = campaign?.template_config?.blocks || [];
 
   // Календарные недели + распределение. Счётные навыки (week==null) показываем
   // в КАЖДОЙ неделе (делать дозированно, каждую неделю).
@@ -55,7 +65,7 @@ export default function StudentSummerProgram({ student }) {
   const hasExtra = extra && (extra.text?.trim() || (extra.files || []).length || (extra.links || []).length);
 
   if (loading) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
-  if (!program || (!items.length && !hasExtra)) {
+  if (!program || (!items.length && !hasExtra && !campaignBlocks.length)) {
     return (
       <div style={{ padding: 24 }}>
         <Empty description="Каникулярного задания пока нет. Загляни позже — учитель его соберёт." />
@@ -69,6 +79,41 @@ export default function StudentSummerProgram({ student }) {
       <p className="student-summer-hint">
         Здесь весь план на каникулы. Выполняй по неделям — не сразу всё, а порцию каждую неделю.
       </p>
+
+      {campaignBlocks.map((b) => (
+        <div key={b.id} className="student-summer-group student-summer-group--campaign">
+          <div className="student-summer-group-head">📋 {b.title || 'Общее задание класса'}</div>
+          {b.description?.trim() && (
+            <div className="student-summer-item student-summer-extra-text">
+              <MathRenderer text={b.description} inline={false} />
+            </div>
+          )}
+          {b.session_id && (
+            <div className="student-summer-item">
+              <div className="student-summer-item-main">
+                <Tag color="geekblue">Работа</Tag>
+                <span className="student-summer-item-title">{b.work_title || 'Работа'}</span>
+              </div>
+              <div className="student-summer-item-actions">
+                <Button type="primary" icon={<PlayCircleOutlined />} href={`/student/${b.session_id}`}>
+                  Решать
+                </Button>
+              </div>
+            </div>
+          )}
+          {b.url && (
+            <div className="student-summer-item">
+              <div className="student-summer-item-main">
+                <span className="student-summer-item-title">{b.url_label || b.url}</span>
+              </div>
+              <div className="student-summer-item-actions">
+                <Button icon={<LinkOutlined />} href={b.url} target="_blank">Открыть</Button>
+              </div>
+            </div>
+          )}
+          {(b.files || []).map((f) => <FileItem key={f.id} file={f} />)}
+        </div>
+      ))}
 
       {calWeeks.map((w) => {
         const examItems = byWeek.get(w.week) || [];

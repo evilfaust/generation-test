@@ -3014,6 +3014,10 @@
 .student-summer-group--extra .student-summer-group-head { background: #fff7e6; color: #ad6800; }
 .student-theme-dark .student-summer-group--extra { border-color: #8c6d1f; }
 .student-theme-dark .student-summer-group--extra .student-summer-group-head { background: #2b2410; color: #f0c869; }
+.student-summer-group--campaign { border-color: #722ed1; }
+.student-summer-group--campaign .student-summer-group-head { background: #f9f0ff; color: #531dab; }
+.student-theme-dark .student-summer-group--campaign { border-color: #51258f; }
+.student-theme-dark .student-summer-group--campaign .student-summer-group-head { background: #1f1430; color: #b37feb; }
 .student-summer-extra-text { display: block; line-height: 1.5; color: #333; }
 .student-summer-extra-text p { margin: 0 0 6px; }
 .student-summer-extra-text p:last-child { margin-bottom: 0; }
