@@ -39,19 +39,22 @@ async function buildTopicSession({ student, topicId, label, perTopic, gradeNum, 
   return { workId: work.id, sessionId: session.id, taskIds };
 }
 
-export async function assembleSummerProgram({ student, profile, config, group, year, examType = 'ege_base', topicsById = new Map() }) {
+export async function assembleSummerProgram({ student, profile, config, group, year, examType = 'ege_base', topicsById = new Map(), campaignId = null }) {
   const gradeNum = Number(group?.grade) || 10;
   const blocks = config?.blocks || {};
   const weeks = Math.max(1, summerWeeks(config?.startDate, config?.endDate).length || 9);
 
-  // 1. Программа ученика (переиспользуем существующую этого сезона/года).
-  let program = await api.getStudyProgramForStudent(student.id, { season: 'summer', year });
+  // 1. Программа ученика — ищем по кампании (если есть) или по сезону/году.
+  let program = campaignId
+    ? await api.getStudyProgramForCampaign(student.id, campaignId)
+    : await api.getStudyProgramForStudent(student.id, { season: 'summer', year });
   const progData = {
     student: student.id,
     group: group?.id || null,
     title: `Каникулярное задание · ${student.name}`,
     year, season: 'summer', exam_type: examType,
     config, profile_snapshot: profile, status: 'issued',
+    ...(campaignId ? { campaign: campaignId } : {}),
   };
   if (program) {
     await api.updateStudyProgram(program.id, progData);

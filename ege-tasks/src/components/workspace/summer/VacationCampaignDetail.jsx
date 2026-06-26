@@ -390,7 +390,7 @@ export default function VacationCampaignDetail() {
           group: campaign.group || null,
           title: `${campaign.title} · ${s.name}`,
           year: campaign.year || new Date().getFullYear(),
-          season: campaign.season || '',
+          season: 'summer',
           campaign: campaignId,
           status: 'draft',
         });

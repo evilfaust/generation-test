@@ -252,7 +252,7 @@ export default function StudentProgramEditor() {
     if (!student) return;
     setBuilding(true);
     try {
-      const { program: prog } = await assembleSummerProgram({ student, profile, config, group, year, topicsById: topicTitle });
+      const { program: prog } = await assembleSummerProgram({ student, profile, config, group, year, topicsById: topicTitle, campaignId });
       setProgram(prog);
       await loadItems(prog.id);
       message.success('Программа собрана и выдана');
