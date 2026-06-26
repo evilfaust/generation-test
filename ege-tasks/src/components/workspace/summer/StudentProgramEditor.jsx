@@ -115,14 +115,33 @@ export default function StudentProgramEditor() {
           const g = await api.getTeachingGroup(s.teaching_group).catch(() => null);
           if (!cancelled) setGroup(g);
         }
-        const [prog, camp] = await Promise.all([
-          campaignId
-            ? api.getStudyProgramForCampaign(studentId, campaignId)
-            : api.getStudyProgramForStudent(studentId, { season: 'summer', year }),
+        const [campaignProg, seasonProg, camp] = await Promise.all([
+          campaignId ? api.getStudyProgramForCampaign(studentId, campaignId) : Promise.resolve(null),
+          api.getStudyProgramForStudent(studentId, { season: 'summer', year }),
           campaignId ? api.getCampaign(campaignId).catch(() => null) : Promise.resolve(null),
         ]);
         if (!cancelled) setCampaign(camp);
         if (cancelled) return;
+
+        // Выбираем программу: при наличии campaignId предпочитаем не-черновик.
+        // Если campaign вернул пустой черновик, а season нашёл выданную — берём season
+        // и привязываем его к кампании для единообразия.
+        let prog;
+        if (campaignId) {
+          const campaignIsEmpty = campaignProg?.status === 'draft';
+          const seasonHasTasks = seasonProg && seasonProg.status !== 'draft';
+          if (campaignIsEmpty && seasonHasTasks) {
+            prog = seasonProg;
+            if (!seasonProg.campaign) {
+              api.updateStudyProgram(seasonProg.id, { campaign: campaignId }).catch(() => {});
+            }
+          } else {
+            prog = campaignProg || seasonProg;
+          }
+        } else {
+          prog = seasonProg;
+        }
+
         if (prog) {
           setProgram(prog);
           if (prog.config?.blocks) {
