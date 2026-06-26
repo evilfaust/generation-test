@@ -86,6 +86,7 @@ export default function StudentProgramEditor() {
   const [memoOpen, setMemoOpen] = useState(false);     // модал «памятка ученику»
   const [printOpen, setPrintOpen] = useState(false);   // полноэкранная печать «красивого PDF»
   const [doneSessions, setDoneSessions] = useState(() => new Set()); // сессии со сданной попыткой
+  const [campaign, setCampaign] = useState(null);
 
   const { profile, loading: loadingProfile } = useStudentWeaknessProfile(student);
   const year = new Date().getFullYear();
@@ -114,9 +115,13 @@ export default function StudentProgramEditor() {
           const g = await api.getTeachingGroup(s.teaching_group).catch(() => null);
           if (!cancelled) setGroup(g);
         }
-        const prog = campaignId
-          ? await api.getStudyProgramForCampaign(studentId, campaignId)
-          : await api.getStudyProgramForStudent(studentId, { season: 'summer', year });
+        const [prog, camp] = await Promise.all([
+          campaignId
+            ? api.getStudyProgramForCampaign(studentId, campaignId)
+            : api.getStudyProgramForStudent(studentId, { season: 'summer', year }),
+          campaignId ? api.getCampaign(campaignId).catch(() => null) : Promise.resolve(null),
+        ]);
+        if (!cancelled) setCampaign(camp);
         if (cancelled) return;
         if (prog) {
           setProgram(prog);
@@ -455,6 +460,8 @@ export default function StudentProgramEditor() {
   if (loadingMeta) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
   if (!student) return <EmptyState title="Ученик не найден" />;
 
+  const campaignBlocks = campaign?.template_config?.blocks || [];
+
   if (printOpen) {
     return (
       <SummerProgramPrintView
@@ -466,6 +473,7 @@ export default function StudentProgramEditor() {
         doneSessions={doneSessions}
         extra={extra}
         leftover={leftover}
+        campaignBlocks={campaignBlocks}
         onClose={() => setPrintOpen(false)}
       />
     );
@@ -670,7 +678,7 @@ export default function StudentProgramEditor() {
         onClose={() => setPreview(false)}
         width={520}
       >
-        <StudentPreview weeksInfo={weeksInfo} byWeek={byWeek} weekFiles={config.weekFiles || {}} extra={extra} />
+        <StudentPreview weeksInfo={weeksInfo} byWeek={byWeek} weekFiles={config.weekFiles || {}} extra={extra} campaignBlocks={campaignBlocks} />
       </Drawer>
 
       <ShareMemoModal
@@ -694,12 +702,34 @@ export default function StudentProgramEditor() {
 }
 
 // ─── Предпросмотр ученического вида (read-only, без зависимости от student-CSS) ───
-function StudentPreview({ weeksInfo, byWeek, weekFiles = {}, extra }) {
+function StudentPreview({ weeksInfo, byWeek, weekFiles = {}, extra, campaignBlocks = [] }) {
   const hasExtra = extra && (extra.text?.trim() || (extra.files || []).length || (extra.links || []).length);
-  if (!weeksInfo.length && !hasExtra) return <EmptyState title="Нет недель" />;
+  if (!weeksInfo.length && !hasExtra && !campaignBlocks.length) return <EmptyState title="Нет недель" />;
   return (
     <Space direction="vertical" size={12} style={{ width: '100%' }}>
       <Text type="secondary">Так план выглядит у ученика: по неделям, порциями.</Text>
+      {campaignBlocks.map((b) => (
+        <Card key={b.id} size="small" title={`📋 ${b.title || 'Общее задание'}`} style={{ borderColor: '#d3adf7' }}>
+          {b.description && <div style={{ marginBottom: 6 }}><MathRenderer text={b.description} inline={false} /></div>}
+          {b.session_id && (
+            <div style={{ marginBottom: 4 }}>
+              <a href={buildStudentUrl(b.session_id)} target="_blank" rel="noreferrer">
+                🔗 {b.work_title || 'Работа'}
+              </a>
+            </div>
+          )}
+          {b.url && (
+            <div style={{ marginBottom: 4 }}>
+              <a href={b.url} target="_blank" rel="noreferrer">↗ {b.url_label || b.url}</a>
+            </div>
+          )}
+          {(b.files || []).map((f) => (
+            <div key={f.id} style={{ marginTop: 4 }}>
+              <a href={f.url} target="_blank" rel="noreferrer"><PaperClipOutlined /> {f.title || 'файл'}</a>
+            </div>
+          ))}
+        </Card>
+      ))}
       {weeksInfo.map((w) => {
         const list = byWeek.get(w.week) || [];
         const files = weekFiles[w.week] || [];

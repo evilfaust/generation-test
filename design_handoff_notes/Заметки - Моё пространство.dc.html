@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;height:100%}
+    body{background:#FBFBFD;font-family:'Geist','Inter',system-ui,sans-serif;color:#0D1321;-webkit-font-smoothing:antialiased}
+    button{font-family:inherit}
+    ::-webkit-scrollbar{width:9px;height:9px}
+    ::-webkit-scrollbar-thumb{background:#E5E7EB;border-radius:999px;border:2px solid #fff}
+    .ws-scroll::-webkit-scrollbar-thumb{border-color:#FBFBFD}
+    .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 4px}
+    .frac>span:first-child{border-bottom:1.4px solid currentColor;padding:0 6px 2px}
+    .frac>span:last-child{padding:2px 6px 0}
+  </style>
+</helmet>
+
+<div style="display:flex;height:100vh;background:#FBFBFD;overflow:hidden">
+
+  <!-- ░░░ SIDEBAR ░░░ -->
+  <aside style="width:236px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #EEF0F3;display:flex;flex-direction:column;height:100vh">
+    <div style="display:flex;align-items:center;gap:9px;padding:18px 18px 14px">
+      <div style="width:28px;height:28px;border-radius:7px;background:#2B4BFF;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;letter-spacing:-.03em">L</div>
+      <span style="font-weight:700;font-size:16px;letter-spacing:-.02em">Lemma</span>
+    </div>
+    <nav style="flex:1;overflow:auto;padding:4px 10px 16px" class="ws-scroll">
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9AA0AC;padding:10px 10px 6px">Моё пространство</div>
+      <sc-for list="{{ nav }}" as="it" hint-placeholder-count="8">
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;font-size:13.5px;font-weight:{{ it.weight }};color:{{ it.color }};background:{{ it.bg }};cursor:pointer;margin-bottom:1px">
+          <span style="display:inline-flex;width:16px;height:16px;flex-shrink:0">{{ it.icon }}</span>
+          <span style="flex:1">{{ it.label }}</span>
+          <sc-if value="{{ it.badge }}" hint-placeholder-val="">
+            <span style="font-size:11px;font-weight:600;color:#E11D48;background:#FFE4E6;border-radius:999px;padding:0 7px;line-height:18px">{{ it.badge }}</span>
+          </sc-if>
+        </div>
+      </sc-for>
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9AA0AC;padding:16px 10px 6px">Инструменты</div>
+      <sc-for list="{{ navTools }}" as="it" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;font-size:13.5px;font-weight:500;color:#646A76;cursor:pointer;margin-bottom:1px">
+          <span style="display:inline-flex;width:16px;height:16px;flex-shrink:0">{{ it.icon }}</span>
+          <span style="flex:1">{{ it.label }}</span>
+        </div>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid #EEF0F3;padding:12px 14px;display:flex;align-items:center;gap:10px">
+      <div style="width:32px;height:32px;border-radius:50%;background:#E7ECFF;color:#1A34D1;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0">ОЛ</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Олег</div>
+        <div style="font-size:11.5px;color:#9AA0AC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Учитель математики</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ░░░ MAIN ░░░ -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;height:100vh">
+
+    <!-- topbar -->
+    <header style="height:56px;flex-shrink:0;border-bottom:1px solid #EEF0F3;background:rgba(251,251,253,.85);backdrop-filter:saturate(1.4) blur(8px);display:flex;align-items:center;gap:14px;padding:0 22px">
+      <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#9AA0AC">
+        <span>Моё пространство</span><span style="color:#D7DAE0">/</span><span style="color:#2A2F3A;font-weight:600">Заметки</span>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:7px 11px;width:240px;color:#9AA0AC">
+        <span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></span>
+        <span style="font-size:13px">Поиск везде…</span>
+        <span style="margin-left:auto;font-size:11px;font-family:'Geist Mono',monospace;color:#C2C6CE;border:1px solid #EEF0F3;border-radius:4px;padding:0 5px">⌘K</span>
+      </div>
+      <div style="width:32px;height:32px;border-radius:50%;background:#FEF3C7;color:#B45309;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px">ОЛ</div>
+    </header>
+
+    <!-- page header -->
+    <div style="flex-shrink:0;display:flex;align-items:center;gap:14px;padding:18px 24px 14px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:11px;background:#FEF3C7;color:#D97706;flex-shrink:0"><span style="display:inline-flex;width:21px;height:21px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M9 13h6M9 17h4"></path></svg></span></span>
+      <div style="flex:1;min-width:0">
+        <h1 style="margin:0;font-size:24px;font-weight:600;letter-spacing:-.03em;line-height:1.1">Заметки</h1>
+        <div style="font-size:13px;color:#646A76;margin-top:2px">Быстрые мысли, планы и заметки уроков — с формулами, задачами и вложениями</div>
+      </div>
+      <!-- create split button -->
+      <div style="display:flex;align-items:stretch;border-radius:9px;overflow:hidden;box-shadow:0 1px 2px rgba(43,75,255,.3)">
+        <button style="display:inline-flex;align-items:center;gap:8px;background:#2B4BFF;color:#fff;border:none;padding:9px 15px;font-size:13.5px;font-weight:600;cursor:pointer">
+          <span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
+          Новая заметка
+        </button>
+        <button style="background:#2342E6;color:#fff;border:none;border-left:1px solid rgba(255,255,255,.18);padding:0 9px;cursor:pointer;display:inline-flex;align-items:center"><span style="display:inline-flex;width:14px;height:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></button>
+      </div>
+    </div>
+
+    <!-- ░ 3-PANE WORKSPACE ░ -->
+    <div style="flex:1;min-height:0;display:flex;gap:14px;padding:0 24px 20px">
+
+      <!-- ░ PANE 1 — LIST ░ -->
+      <div style="width:312px;flex-shrink:0;display:flex;flex-direction:column;background:#fff;border:1px solid #E5E7EB;border-radius:12px;box-shadow:0 1px 2px rgba(13,19,33,.04);overflow:hidden">
+        <!-- quick capture -->
+        <div style="padding:11px 11px 9px;border-bottom:1px solid #EEF0F3;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;background:#FFFBEB;border:1px solid #FDE9C8;border-radius:8px;padding:8px 10px;cursor:text">
+            <span style="display:inline-flex;width:15px;height:15px;color:#D97706"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg></span>
+            <span style="font-size:13px;color:#B98A4B;flex:1">Быстро записать мысль…</span>
+            <span style="font-size:10.5px;font-family:'Geist Mono',monospace;color:#D6B98A">↵ инбокс</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:7px 10px;color:#9AA0AC">
+            <span style="display:inline-flex;width:15px;height:15px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></span>
+            <span style="font-size:13px">Поиск по заметкам</span>
+          </div>
+          <!-- segmented -->
+          <div style="display:flex;background:#F3F4F6;border-radius:8px;padding:3px;gap:2px">
+            <sc-for list="{{ views }}" as="v" hint-placeholder-count="3">
+              <button style="flex:1;border:none;border-radius:6px;padding:5px 0;font-size:12.5px;font-weight:{{ v.weight }};color:{{ v.fg }};background:{{ v.bg }};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;box-shadow:{{ v.shadow }}">
+                {{ v.label }}
+                <sc-if value="{{ v.count }}" hint-placeholder-val="">
+                  <span style="min-width:16px;padding:0 4px;border-radius:999px;background:#FEF3C7;color:#D97706;font-size:10px;font-weight:600;line-height:16px">{{ v.count }}</span>
+                </sc-if>
+              </button>
+            </sc-for>
+          </div>
+          <!-- type filter chips -->
+          <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:2px" class="ws-scroll">
+            <sc-for list="{{ typeFilters }}" as="t" hint-placeholder-count="6">
+              <button style="flex-shrink:0;display:inline-flex;align-items:center;gap:5px;border:1px solid {{ t.border }};background:{{ t.bg }};color:{{ t.fg }};border-radius:999px;padding:3px 10px;font-size:12px;font-weight:{{ t.weight }};cursor:pointer">
+                <sc-if value="{{ t.dot }}" hint-placeholder-val="">
+                  <span style="width:6px;height:6px;border-radius:50%;background:{{ t.dot }}"></span>
+                </sc-if>
+                {{ t.label }}
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <!-- list -->
+        <div style="flex:1;overflow-y:auto;padding:6px 8px 12px" class="ws-scroll">
+          <sc-for list="{{ list }}" as="n" hint-placeholder-count="8">
+            <sc-if value="{{ n.section }}" hint-placeholder-val="">
+              <div style="padding:12px 8px 4px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9AA0AC">{{ n.section }}</div>
+            </sc-if>
+            <sc-if value="{{ n.isNote }}" hint-placeholder-val="{{ true }}">
+              <div style="position:relative;padding:9px 11px 9px {{ n.padLeft }};border-radius:8px;cursor:pointer;background:{{ n.rowBg }};margin-bottom:2px">
+                <sc-if value="{{ n.active }}" hint-placeholder-val="">
+                  <span style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:2px;background:#2B4BFF"></span>
+                </sc-if>
+                <div style="display:flex;align-items:center;gap:7px;min-width:0">
+                  <span style="display:inline-flex;width:14px;height:14px;flex-shrink:0;color:{{ n.typeFg }}">{{ n.typeIcon }}</span>
+                  <span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#0D1321;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.title }}</span>
+                  <sc-if value="{{ n.pinned }}" hint-placeholder-val="">
+                    <span style="display:inline-flex;width:12px;height:12px;flex-shrink:0;color:#D97706"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 3a1 1 0 0 1 .7 1.7L15 6.4V11l2.6 2.6a1 1 0 0 1-.7 1.7H13v5a1 1 0 0 1-2 0v-5H7.1a1 1 0 0 1-.7-1.7L9 11V6.4L7.3 4.7A1 1 0 0 1 8 3z"></path></svg></span>
+                  </sc-if>
+                  <sc-if value="{{ n.clip }}" hint-placeholder-val="">
+                    <span style="display:inline-flex;width:12px;height:12px;flex-shrink:0;color:#9AA0AC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg></span>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ n.snippet }}" hint-placeholder-val="">
+                  <div style="margin-top:2px;font-size:12px;line-height:1.4;color:#646A76;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.snippet }}</div>
+                </sc-if>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:6px;min-width:0">
+                  <span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:999px;color:{{ n.typeFg }};background:{{ n.typeSoft }}">{{ n.typeLabel }}</span>
+                  <sc-if value="{{ n.g }}" hint-placeholder-val="">
+                    <span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:999px;color:{{ n.groupFg }};background:{{ n.groupSoft }}"><span style="width:5px;height:5px;border-radius:50%;background:{{ n.groupFg }}"></span>{{ n.g }}</span>
+                  </sc-if>
+                  <span style="margin-left:auto;flex-shrink:0;font-size:11px;color:#9AA0AC;font-variant-numeric:tabular-nums">{{ n.date }}</span>
+                </div>
+              </div>
+            </sc-if>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- ░ PANE 2 — EDITOR ░ -->
+      <div style="flex:1;min-width:440px;display:flex;flex-direction:column;background:#fff;border:1px solid #E5E7EB;border-radius:12px;box-shadow:0 1px 2px rgba(13,19,33,.04);overflow:hidden">
+        <!-- header -->
+        <div style="flex-shrink:0;padding:16px 22px 0">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="flex:1;min-width:0">
+              <input value="Стереометрия. Профиль UP" style="width:100%;border:none;outline:none;font-family:inherit;font-size:23px;font-weight:600;letter-spacing:-.02em;color:#0D1321;padding:0;background:transparent" />
+            </div>
+            <div style="display:flex;align-items:center;gap:2px;flex-shrink:0">
+              <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#0D9488;margin-right:8px"><span style="display:inline-flex;width:13px;height:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>сохранено</span>
+              <sc-for list="{{ headerTools }}" as="h" hint-placeholder-count="4">
+                <button style="width:32px;height:32px;border:none;background:transparent;border-radius:7px;color:{{ h.fg }};cursor:pointer;display:inline-flex;align-items:center;justify-content:center" title="{{ h.title }}"><span style="display:inline-flex;width:16px;height:16px">{{ h.icon }}</span></button>
+              </sc-for>
+            </div>
+          </div>
+          <!-- meta row -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0 12px;border-bottom:1px solid #EEF0F3">
+            <button style="display:inline-flex;align-items:center;gap:6px;border:1px solid #E5D4FB;background:#F4EEFE;color:#7C3AED;border-radius:7px;padding:5px 10px;font-size:12.5px;font-weight:600;cursor:pointer">
+              <span style="display:inline-flex;width:13px;height:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></span>
+              Заметка урока
+              <span style="display:inline-flex;width:11px;height:11px;opacity:.6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+            </button>
+            <button style="display:inline-flex;align-items:center;gap:6px;border:1px solid #E5E7EB;background:#fff;color:#2A2F3A;border-radius:7px;padding:5px 10px;font-size:12.5px;font-weight:500;cursor:pointer">
+              <span style="width:7px;height:7px;border-radius:50%;background:#0D9488"></span>10 профиль · UP
+              <span style="display:inline-flex;width:11px;height:11px;color:#9AA0AC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+            </button>
+            <button style="display:inline-flex;align-items:center;gap:6px;border:1px solid #E5E7EB;background:#fff;color:#2A2F3A;border-radius:7px;padding:5px 10px;font-size:12.5px;font-weight:500;cursor:pointer;font-variant-numeric:tabular-nums">
+              <span style="display:inline-flex;width:13px;height:13px;color:#9AA0AC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg></span>
+              19.06.2026
+            </button>
+          </div>
+        </div>
+
+        <!-- format toolbar -->
+        <div style="flex-shrink:0;display:flex;align-items:center;gap:3px;padding:8px 22px;border-bottom:1px solid #EEF0F3;background:#FCFCFD">
+          <sc-for list="{{ fmtTools }}" as="f" hint-placeholder-count="6">
+            <button style="height:30px;min-width:30px;padding:0 7px;border:none;background:transparent;border-radius:6px;color:#646A76;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:12.5px;font-weight:600">
+              <span style="display:inline-flex;width:15px;height:15px">{{ f.icon }}</span>
+              <sc-if value="{{ f.label }}" hint-placeholder-val=""><span>{{ f.label }}</span></sc-if>
+            </button>
+            <sc-if value="{{ f.sep }}" hint-placeholder-val="">
+              <span style="width:1px;height:18px;background:#EEF0F3;margin:0 4px"></span>
+            </sc-if>
+          </sc-for>
+          <span style="margin-left:auto;font-size:11.5px;color:#9AA0AC;font-variant-numeric:tabular-nums">214 слов · ~2 мин · «/» команды</span>
+        </div>
+
+        <!-- body -->
+        <div style="flex:1;overflow-y:auto;padding:20px 54px 48px" class="ws-scroll">
+          <p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#1B2230">Разобрана <strong>6 задача</strong> из марафона + задача №2. Группа активно работала, по подобию вопросов почти нет — переходим к углам и расстояниям.</p>
+
+          <h3 style="margin:20px 0 8px;font-size:16px;font-weight:600;letter-spacing:-.01em">Что разобрали</h3>
+          <ul style="margin:0 0 14px;padding-left:20px;font-size:15px;line-height:1.7;color:#1B2230">
+            <li>Угол между прямой и плоскостью</li>
+            <li>Расстояние от точки до плоскости</li>
+            <li>Объём пирамиды через площадь основания</li>
+          </ul>
+
+          <!-- formula block -->
+          <div style="margin:14px 0;padding:14px 16px;background:#F7F8FA;border:1px solid #EEF0F3;border-radius:9px;display:flex;align-items:center;gap:12px;font-size:18px;color:#0D1321">
+            <span style="font-style:italic">cos&#8201;φ</span>
+            <span>=</span>
+            <span class="frac"><span>|&#8201;<span style="font-weight:600">a</span>&#8201;·&#8201;<span style="font-weight:600">b</span>&#8201;|</span><span>|<span style="font-weight:600">a</span>|&#8201;·&#8201;|<span style="font-weight:600">b</span>|</span></span>
+            <span style="margin-left:auto;font-size:11px;font-family:'Geist Mono',monospace;color:#9AA0AC;background:#fff;border:1px solid #EEF0F3;border-radius:5px;padding:2px 7px">LaTeX</span>
+          </div>
+
+          <h3 style="margin:20px 0 8px;font-size:16px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:8px">Ученики <span style="font-size:11px;font-weight:500;color:#7C3AED;background:#EDE9FE;border-radius:999px;padding:1px 8px">разделы по ученикам</span></h3>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #EEF0F3;border-radius:9px">
+              <span style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:#D1FAE5;color:#0D9488;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">КЭ</span>
+              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Коротеев Эрик</div><div style="font-size:13.5px;color:#646A76;margin-top:1px">Разобрал 1, 2, 6 — уверенно. Выдан вариант на дом.</div></div>
+              <span style="flex-shrink:0;display:inline-flex;width:18px;height:18px;color:#0D9488"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect><path d="m8 12 3 3 5-6"></path></svg></span>
+            </div>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #EEF0F3;border-radius:9px">
+              <span style="flex-shrink:0;width:28px;height:28px;border-radius:50%;background:#FFE4E6;color:#E11D48;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">ХА</span>
+              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">Харламова</div><div style="font-size:13.5px;color:#646A76;margin-top:1px">Не явилась — отправить конспект и вариант.</div></div>
+              <span style="flex-shrink:0;display:inline-flex;width:18px;height:18px;color:#C2C6CE"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"></rect></svg></span>
+            </div>
+          </div>
+
+          <h3 style="margin:20px 0 8px;font-size:16px;font-weight:600;letter-spacing:-.01em">На следующий урок</h3>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <label style="display:flex;align-items:center;gap:10px;font-size:14.5px;color:#1B2230;cursor:pointer"><span style="width:18px;height:18px;border-radius:5px;border:1.8px solid #D7DAE0;flex-shrink:0;display:inline-flex"></span>Прислать вариант Эрику по стереометрии</label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:14.5px;color:#9AA0AC;cursor:pointer;text-decoration:line-through"><span style="width:18px;height:18px;border-radius:5px;background:#0D9488;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;color:#fff"><span style="display:inline-flex;width:12px;height:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></span>Проверить ДЗ §17</label>
+            <label style="display:flex;align-items:center;gap:10px;font-size:14.5px;color:#1B2230;cursor:pointer"><span style="width:18px;height:18px;border-radius:5px;border:1.8px solid #D7DAE0;flex-shrink:0;display:inline-flex"></span>Собрать чертежи в Библиотеку</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░ PANE 3 — CONTEXT RAIL ░ -->
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ true }}">
+      <div style="width:296px;flex-shrink:0;display:flex;flex-direction:column;background:#fff;border:1px solid #E5E7EB;border-radius:12px;box-shadow:0 1px 2px rgba(13,19,33,.04);overflow:hidden">
+        <div style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:13px 15px;border-bottom:1px solid #EEF0F3">
+          <span style="font-size:13px;font-weight:600;letter-spacing:-.01em;color:#2A2F3A">Контекст</span>
+          <span style="margin-left:auto;display:inline-flex;width:15px;height:15px;color:#9AA0AC;cursor:pointer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:16px" class="ws-scroll">
+
+          <!-- linked lesson -->
+          <div>
+            <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9AA0AC;margin-bottom:8px">Урок</div>
+            <div style="border:1px solid #E5D4FB;background:#FBF9FE;border-radius:10px;padding:12px;cursor:pointer">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="display:inline-flex;width:15px;height:15px;color:#7C3AED"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg></span>
+                <span style="font-size:13.5px;font-weight:600">Геометрия · 10 «UP»</span>
+              </div>
+              <div style="font-size:12.5px;color:#646A76;margin-bottom:3px">Чт 19 июня · 12:00–12:45</div>
+              <div style="font-size:12px;color:#9AA0AC">КТП §18 · Признаки подобия</div>
+              <button style="margin-top:10px;width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#fff;border:1px solid #E5D4FB;color:#7C3AED;border-radius:7px;padding:7px;font-size:12.5px;font-weight:600;cursor:pointer">Открыть урок <span style="display:inline-flex;width:13px;height:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span></button>
+            </div>
+          </div>
+
+          <!-- students -->
+          <div>
+            <div style="display:flex;align-items:center;margin-bottom:8px">
+              <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9AA0AC">Ученики группы</span>
+              <span style="margin-left:auto;font-size:11px;color:#9AA0AC">2 отмечено</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ students }}" as="s" hint-placeholder-count="5">
+                <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 9px 3px 3px;border-radius:999px;background:{{ s.bg }};border:1px solid {{ s.border }}">
+                  <span style="width:20px;height:20px;border-radius:50%;background:{{ s.avBg }};color:{{ s.avFg }};display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600">{{ s.ini }}</span>
+                  <span style="font-size:12px;font-weight:500;color:{{ s.nameFg }}">{{ s.name }}</span>
+                </span>
+              </sc-for>
+              <button style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:999px;background:#fff;border:1px dashed #D7DAE0;color:#646A76;font-size:12px;font-weight:500;cursor:pointer"><span style="display:inline-flex;width:12px;height:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>отметить</button>
+            </div>
+          </div>
+
+          <!-- tasks -->
+          <div>
+            <div style="display:flex;align-items:center;margin-bottom:8px">
+              <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9AA0AC">Задачи из заметки</span>
+              <span style="margin-left:auto;font-size:11px;font-weight:600;color:#0D9488">1 / 3</span>
+            </div>
+            <div style="height:5px;border-radius:999px;background:#F3F4F6;overflow:hidden;margin-bottom:9px"><div style="height:100%;width:33%;background:#0D9488;border-radius:999px"></div></div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="3">
+                <div style="display:flex;align-items:flex-start;gap:8px">
+                  <span style="flex-shrink:0;width:16px;height:16px;border-radius:5px;border:1.6px solid {{ t.box }};background:{{ t.boxBg }};display:inline-flex;align-items:center;justify-content:center;color:#fff;margin-top:1px"><sc-if value="{{ t.done }}" hint-placeholder-val=""><span style="display:inline-flex;width:11px;height:11px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span></sc-if></span>
+                  <span style="font-size:12.5px;line-height:1.4;color:{{ t.fg }};text-decoration:{{ t.strike }}">{{ t.text }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <button style="margin-top:9px;width:100%;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#F7F8FA;border:1px solid #EEF0F3;color:#2A2F3A;border-radius:7px;padding:6px;font-size:12px;font-weight:600;cursor:pointer">В «Все задачи»</button>
+          </div>
+
+          <!-- attachments -->
+          <div>
+            <div style="display:flex;align-items:center;margin-bottom:8px">
+              <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9AA0AC">Вложения</span>
+              <span style="margin-left:auto;font-size:11px;color:#2B4BFF;font-weight:600;cursor:pointer">Из Библиотеки</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <sc-for list="{{ files }}" as="f" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:7px;background:{{ f.bg }}">
+                  <span style="display:inline-flex;width:15px;height:15px;flex-shrink:0;color:{{ f.fg }}">{{ f.icon }}</span>
+                  <span style="flex:1;min-width:0;font-size:12.5px;color:#2A2F3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.name }}</span>
+                  <sc-if value="{{ f.tag }}" hint-placeholder-val="">
+                    <span style="flex-shrink:0;font-size:10px;font-weight:500;color:#7C3AED;background:#EDE9FE;border-radius:999px;padding:1px 6px">{{ f.tag }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div style="margin-top:6px;border:1px dashed #D7DAE0;border-radius:8px;padding:9px;text-align:center;font-size:11.5px;color:#9AA0AC">Перетащите файлы — попадут в Библиотеку</div>
+          </div>
+
+          <!-- backlinks -->
+          <div>
+            <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#9AA0AC;margin-bottom:8px">Связанные</div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <sc-for list="{{ links }}" as="l" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 7px;border-radius:7px;cursor:pointer">
+                  <span style="display:inline-flex;width:14px;height:14px;flex-shrink:0;color:#9AA0AC"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg></span>
+                  <span style="flex:1;min-width:0;font-size:12.5px;color:#2A2F3A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ l.title }}</span>
+                  <span style="flex-shrink:0;font-size:10.5px;color:#9AA0AC">{{ l.kind }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <!-- history -->
+          <div style="border-top:1px solid #EEF0F3;padding-top:12px;font-size:11.5px;color:#9AA0AC;line-height:1.6">
+            Изменено сегодня в 14:32<br>Создано 16.06.2026
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1560,&quot;height&quot;:1160},&quot;focusMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const TONE = {
+      blue:['#2B4BFF','#E7ECFF'], teal:['#0D9488','#D1FAE5'], violet:['#7C3AED','#EDE9FE'],
+      amber:['#D97706','#FEF3C7'], rose:['#E11D48','#FFE4E6'], neutral:['#646A76','#F3F4F6'],
+    };
+    const fg=(t)=>(TONE[t]||TONE.neutral)[0], soft=(t)=>(TONE[t]||TONE.neutral)[1];
+    const showRail = !(this.props.focusMode ?? false);
+
+    const S = {
+      home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"></path></svg>',
+      users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path></svg>',
+      cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>',
+      ktp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v5H4zM4 13h10v7H4zM18 13h2v7h-2z"></path></svg>',
+      journal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>',
+      file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M9 13h6M9 17h4"></path></svg>',
+      folder:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"></path></svg>',
+      sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>',
+      list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>',
+      pie:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>',
+      grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
+      bulb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V18h6v-1.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"></path></svg>',
+      pin:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 3a1 1 0 0 1 .7 1.7L15 6.4V11l2.6 2.6a1 1 0 0 1-.7 1.7H13v5a1 1 0 0 1-2 0v-5H7.1a1 1 0 0 1-.7-1.7L9 11V6.4L7.3 4.7A1 1 0 0 1 8 3z"></path></svg>',
+      inbox:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>',
+      arch:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"></rect><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"></path></svg>',
+      bolt:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg>',
+      sigma:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 4H6l6 8-6 8h12"></path></svg>',
+      check2:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="m8 12 3 3 5-6"></path></svg>',
+      listUl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path></svg>',
+      img:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-5-5L5 21"></path></svg>',
+      table:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>',
+      more:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>',
+      share:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"></path></svg>',
+      bold:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z"></path></svg>',
+      heading:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v16M18 4v16M6 12h12"></path></svg>',
+      pdf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>',
+    };
+    const ic = {};
+    Object.keys(S).forEach((k)=>{ ic[k]=React.createElement('span',{dangerouslySetInnerHTML:{__html:S[k]},style:{display:'contents'}}); });
+
+    const nav = [
+      {label:'Сегодня',icon:ic.home},
+      {label:'Классы и группы',icon:ic.users},
+      {label:'Календарь',icon:ic.cal},
+      {label:'КТП',icon:ic.ktp},
+      {label:'Журнал сдачи',icon:ic.journal,badge:'2'},
+      {label:'Заметки',icon:ic.file,active:true},
+      {label:'Библиотека',icon:ic.folder},
+      {label:'Каникулярные',icon:ic.sun},
+    ].map((n)=>({...n,weight:n.active?600:500,color:n.active?'#1A34D1':'#2A2F3A',bg:n.active?'#E7ECFF':'transparent',badge:n.badge||''}));
+    const navTools = [
+      {label:'Все задачи',icon:ic.list},{label:'Аналитика',icon:ic.pie},
+      {label:'Рабочие листы',icon:ic.grid},{label:'Геймификация',icon:ic.bulb},
+    ];
+
+    // views segmented
+    const views = [
+      {key:'all',label:'Все',active:true},
+      {key:'inbox',label:'Инбокс',count:'3'},
+      {key:'archive',label:'Архив'},
+    ].map((v)=>({...v,weight:v.active?600:500,fg:v.active?'#0D1321':'#646A76',bg:v.active?'#fff':'transparent',shadow:v.active?'0 1px 2px rgba(13,19,33,.08)':'none',count:v.count||''}));
+
+    // type filters
+    const TYPE = {
+      lesson:{label:'Заметка урока',tone:'violet'},
+      plan:{label:'План',tone:'blue'},
+      idea:{label:'Идея',tone:'amber'},
+      call:{label:'Звонок',tone:'rose'},
+      obs:{label:'Наблюдение',tone:'teal'},
+    };
+    const typeFilters = [
+      {key:'all',label:'Все',active:true},
+      {key:'lesson',label:'Уроки',tone:'violet'},
+      {key:'plan',label:'Планы',tone:'blue'},
+      {key:'idea',label:'Идеи',tone:'amber'},
+      {key:'call',label:'Звонки',tone:'rose'},
+      {key:'obs',label:'Наблюдения',tone:'teal'},
+    ].map((t)=>({
+      label:t.label,
+      dot:t.tone?fg(t.tone):'',
+      border:t.active?'#2B4BFF':'#E5E7EB',
+      bg:t.active?'#E7ECFF':'#fff',
+      fg:t.active?'#1A34D1':'#646A76',
+      weight:t.active?600:500,
+    }));
+
+    // note list
+    const raw = [
+      {sec:'Закреплённые'},
+      {title:'Щегельская',type:'obs',g:'Инд.',gt:'teal',date:'18.06',pinned:true,snippet:'Темп выше среднего, можно давать профильные №13–14.'},
+      {sec:'Недавние'},
+      {title:'Стереометрия. Профиль UP',type:'lesson',g:'10 проф. UP',gt:'teal',date:'19.06',clip:true,active:true,snippet:'Разобрана 6 задача из марафона + задача №2.'},
+      {title:'Коротеев Эрик',type:'lesson',g:'10 проф. UP',gt:'teal',date:'19.06',snippet:'Из марафона разобраны задачи 1, 2 и 6. Решены…'},
+      {title:'Контрольная №5 — собрать вариант',type:'plan',g:'11 «Б»',gt:'blue',date:'18.06',snippet:'2 части по 6 задач, профильный уровень, КТП §43.'},
+      {title:'Идея: открытый урок по векторам',type:'idea',date:'17.06',snippet:'Через физику — сложение сил, наглядно на GeoGebra.'},
+      {title:'Позвонить родителям Соколова',type:'call',g:'9 «В»',gt:'teal',date:'17.06',snippet:'Пропуски + не сдаёт ДЗ две недели подряд.'},
+      {title:'Харламова Алгебра',type:'lesson',g:'10 кл',gt:'blue',date:'16.06',snippet:'Госпожа Харламова не явилась :('},
+      {title:'10 класс',type:'lesson',g:'10 кл',gt:'blue',date:'16.06',clip:true,snippet:'Профиль 1) разобрать 3, 4, 5; 2) решают 1, 2, 3…'},
+    ];
+    const list = raw.map((r)=>{
+      if (r.sec) return {section:r.sec,isNote:false};
+      const ty = TYPE[r.type];
+      return {
+        isNote:true, section:'',
+        title:r.title, snippet:r.snippet||'', date:r.date,
+        pinned:r.pinned||false, clip:r.clip||false, active:r.active||false,
+        padLeft:r.active?'14px':'11px',
+        rowBg:r.active?'#EEF2FF':'transparent',
+        typeIcon:ic[r.type==='lesson'?'file':r.type==='plan'?'ktp':r.type==='idea'?'bulb':r.type==='call'?'users':'check2'],
+        typeFg:fg(ty.tone), typeSoft:soft(ty.tone), typeLabel:ty.label,
+        g:r.g||'', groupFg:r.gt?fg(r.gt):'', groupSoft:r.gt?soft(r.gt):'',
+      };
+    });
+
+    // editor header tools
+    const headerTools = [
+      {icon:ic.pin,title:'Закрепить',fg:'#D97706'},
+      {icon:ic.inbox,title:'В инбокс',fg:'#646A76'},
+      {icon:ic.share,title:'Экспорт в PDF',fg:'#646A76'},
+      {icon:ic.more,title:'Ещё',fg:'#646A76'},
+    ];
+
+    // format toolbar
+    const fmtTools = [
+      {icon:ic.heading},{icon:ic.bold},{icon:ic.listUl},{icon:ic.check2,sep:true},
+      {icon:ic.sigma,label:'формула'},{icon:ic.img},{icon:ic.table,sep:true},
+      {icon:ic.users,label:'ученики группы'},
+    ];
+
+    // students
+    const students = [
+      {name:'Коротеев Э.',ini:'КЭ',tone:'teal',tagged:true},
+      {name:'Харламова',ini:'ХА',tone:'rose',tagged:true},
+    ].map((s)=>({
+      name:s.name, ini:s.ini,
+      bg:soft(s.tone), border:s.tone==='teal'?'#A7E8D6':'#FBC9D1',
+      avBg:fg(s.tone), avFg:'#fff', nameFg:fg(s.tone),
+    }));
+
+    // tasks
+    const tasks = [
+      {text:'Прислать вариант Эрику по стереометрии',done:false},
+      {text:'Проверить ДЗ §17',done:true},
+      {text:'Собрать чертежи в Библиотеку',done:false},
+    ].map((t)=>({
+      text:t.text, done:t.done,
+      box:t.done?'#0D9488':'#D7DAE0', boxBg:t.done?'#0D9488':'#fff',
+      fg:t.done?'#9AA0AC':'#2A2F3A', strike:t.done?'line-through':'none',
+    }));
+
+    // files
+    const files = [
+      {name:'вариант_стерео_UP.pdf',icon:ic.pdf,fg:'#E11D48',bg:'#fff',tag:''},
+      {name:'чертёж_подобие.png',icon:ic.img,fg:'#0D9488',bg:'#fff',tag:''},
+      {name:'марафон_задачи.pdf',icon:ic.pdf,fg:'#E11D48',bg:'#FBF9FE',tag:'из урока'},
+    ];
+
+    // backlinks
+    const links = [
+      {title:'План: Стереометрия профиль',kind:'заметка'},
+      {title:'КТП §18 · Подобие',kind:'урок'},
+    ];
+
+    return { nav,navTools,views,typeFilters,list,headerTools,fmtTools,students,tasks,files,links,showRail };
+  }
+}
+</script>
+</body>
+</html>

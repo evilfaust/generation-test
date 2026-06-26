@@ -33,7 +33,7 @@ const ACCENTS = [
  * печатается только `.spp-print-root`. PDF — клиентский html2pdf.
  */
 export default function SummerProgramPrintView({
-  student, group, program, weeksInfo = [], byWeek, doneSessions, extra, leftover = [], onClose,
+  student, group, program, weeksInfo = [], byWeek, doneSessions, extra, leftover = [], campaignBlocks = [], onClose,
 }) {
   const { message } = App.useApp();
   const printRef = useRef(null);
@@ -213,6 +213,42 @@ export default function SummerProgramPrintView({
           {printNote && (
             <section className="spp-note">{printNote}</section>
           )}
+
+          {/* ── Общее задание класса (блоки кампании) ── */}
+          {campaignBlocks.map((b) => (
+            <section key={b.id} className="spp-week">
+              <div className="spp-week-head">
+                <div className="spp-week-badge" style={{ background: 'var(--spp-accent)', opacity: 0.75 }}>📋</div>
+                <div className="spp-week-titles">
+                  <div className="spp-week-name">{b.title || 'Общее задание'}</div>
+                  <div className="spp-week-label">Задание для всего класса</div>
+                </div>
+              </div>
+              {b.description?.trim() && (
+                <div className="spp-extra-text"><MathRenderer text={b.description.trim()} inline={false} /></div>
+              )}
+              <ul className="spp-links">
+                {b.session_id && (
+                  <li>
+                    <a href={buildStudentUrl(b.session_id)} target="_blank" rel="noreferrer">
+                      🔗 {b.work_title || 'Работа'}
+                    </a>
+                    {showQR && (
+                      <a className="spp-qr" href={buildStudentUrl(b.session_id)} target="_blank" rel="noreferrer">
+                        <QRCodeSVG value={buildStudentUrl(b.session_id)} size={62} level="M" marginSize={0} />
+                      </a>
+                    )}
+                  </li>
+                )}
+                {b.url && (
+                  <li><a href={b.url} target="_blank" rel="noreferrer">↗ {b.url_label || shortUrl(b.url)}</a></li>
+                )}
+                {(b.files || []).map((f) => (
+                  <li key={f.id}><a href={f.url} target="_blank" rel="noreferrer">📎 {f.title || 'файл'}</a></li>
+                ))}
+              </ul>
+            </section>
+          ))}
 
           {/* ── Недели ── */}
           {filledWeeks.map((w) => {
