@@ -1,0 +1,364 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Редизайн календаря «Моё пространство» (v3.9.108).
+   Поверх react-big-calendar + кастомные виды (неделя по парам), рейл, инспектор.
+   Шрифты Geist / Geist Mono подключены глобально в index.html.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --cal-border: #E5E7EB;
+  --cal-border-thin: #EEF0F3;
+  --cal-ink: #0D1321;
+  --cal-ink-2: #2A2F3A;
+  --cal-ink-3: #646A76;
+  --cal-ink-4: #9AA0AC;
+  --cal-card: #FFFFFF;
+}
+
+/* ── Toolbar ── */
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 4px 0 12px;
+}
+.cal-nav { display: flex; gap: 6px; }
+.cal-period {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+  color: var(--cal-ink);
+  flex: 1;
+}
+
+/* ── Layout: сетка + рейл ── */
+.cal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 16px;
+  align-items: start;
+}
+.cal-layout.no-rail { grid-template-columns: minmax(0, 1fr); }
+
+.cal-main {
+  border: 1px solid var(--cal-border);
+  border-radius: 13px;
+  box-shadow: 0 1px 2px rgba(13, 19, 33, 0.04);
+  padding: 8px;
+  overflow: hidden;
+}
+
+/* ── react-big-calendar: подгонка под дизайн ── */
+.cal-main .rbc-month-view,
+.cal-main .rbc-time-view { border: none; }
+.cal-main .rbc-header {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cal-ink-3);
+  text-align: right;
+  padding: 8px 6px;
+  border-color: var(--cal-border-thin);
+}
+.cal-main .rbc-month-row { min-height: var(--cal-cell-min, 118px); }
+.cal-main .rbc-day-bg + .rbc-day-bg,
+.cal-main .rbc-month-row + .rbc-month-row { border-color: var(--cal-border-thin); }
+.cal-main .rbc-date-cell {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 6px;
+  color: var(--cal-ink-2);
+}
+.cal-main .rbc-off-range-bg { background: #FCFCFD; }
+.cal-main .rbc-off-range { color: var(--cal-ink-4); }
+.cal-main .cal-weekend { background: #FCFCFD; }
+.cal-main .rbc-now .rbc-button-link {
+  background: #2B4BFF;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+/* Кнопка «+» в ячейке месяца */
+.cal-monthcell { position: relative; }
+.cal-cell-add {
+  position: absolute;
+  top: 4px; left: 4px;
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  background: #EEF1F6;
+  color: var(--cal-ink-3);
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  z-index: 3;
+}
+.cal-monthcell:hover .cal-cell-add { opacity: 1; }
+
+/* ── Чипы событий (общие, EventChip) ── */
+.cal-main .rbc-event {
+  border-radius: 6px;
+  padding: 1px 5px;
+  box-shadow: none;
+}
+.cal-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  min-width: 0;
+}
+.cal-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.cal-chip-ico, .cal-chip-tail { font-size: 10px; flex: none; }
+.cal-chip-tail { opacity: 0.85; }
+
+/* Урок — белый текст на цветном фоне группы (фон даёт eventPropGetter) */
+.cal-chip--lesson { color: #fff; }
+
+/* Дедлайн — мягкий янтарный */
+.rbc-evt-deadline-soft {
+  background-color: #FEF3C7 !important;
+  border: 1px solid #FCE3A0 !important;
+  color: #B45309 !important;
+}
+.cal-chip--deadline { color: #B45309; }
+
+/* Дело — белый чип с рамкой */
+.rbc-evt-todo {
+  background-color: #fff !important;
+  border: 1px solid #E8EAEE !important;
+  color: var(--cal-ink-2) !important;
+}
+.cal-chip--todo.is-done .cal-chip-text { text-decoration: line-through; color: #B5BAC4; }
+
+/* Интерактивный чекбокс дела */
+.cal-todo-check {
+  flex: none;
+  width: 14px; height: 14px;
+  border: 1.5px solid #0D9488;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.cal-flag { color: #E11D48; font-size: 10px; flex: none; }
+
+/* «Идёт сейчас» — обводка + пульс */
+.rbc-evt-lesson.is-now {
+  outline: 2px solid #2B4BFF;
+  animation: wsPulse 2s ease-in-out infinite;
+}
+@keyframes wsPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(43, 75, 255, 0.35); }
+  50% { box-shadow: 0 0 0 4px rgba(43, 75, 255, 0); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Кастомный вид «Неделя» по парам
+   ────────────────────────────────────────────────────────────────────────── */
+.cw {
+  font-size: 12px;
+  color: var(--cal-ink-2);
+  max-height: 100%;
+  overflow: auto;
+}
+.cw-row { display: grid; align-items: stretch; }
+.cw-head { position: sticky; top: 0; z-index: 4; background: var(--cal-card); }
+.cw-corner { border-bottom: 1px solid var(--cal-border); }
+.cw-dayhead {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 4px;
+  border-left: 1px solid var(--cal-border-thin);
+  border-bottom: 1px solid var(--cal-border);
+}
+.cw-dayhead.is-weekend { background: #FCFCFD; }
+.cw-dow { font-size: 10.5px; font-weight: 600; text-transform: uppercase; color: var(--cal-ink-3); letter-spacing: 0.06em; }
+.cw-daynum { font-family: 'Geist Mono', monospace; font-size: 15px; font-weight: 600; color: var(--cal-ink); }
+.cw-daynum.is-today { background: #2B4BFF; color: #fff; border-radius: 999px; padding: 1px 8px; }
+
+.cw-allday { min-height: 36px; }
+.cw-timecell {
+  font-family: 'Geist Mono', monospace;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--cal-border-thin);
+}
+.cw-allday-label { font-size: 10px; color: var(--cal-ink-4); text-transform: uppercase; letter-spacing: 0.06em; font-family: inherit; }
+.cw-allday-cell {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 4px;
+  border-left: 1px solid var(--cal-border-thin);
+  border-bottom: 1px solid var(--cal-border-thin);
+}
+.cw-allday-cell.is-weekend { background: #FCFCFD; }
+.cw-ad {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600;
+  border-radius: 6px; padding: 2px 6px;
+  cursor: pointer; min-width: 0;
+}
+.cw-ad .cal-chip-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-ad--deadline { background: #FEF3C7; border: 1px solid #FCE3A0; color: #B45309; }
+.cw-ad--todo { background: #fff; border: 1px solid #E8EAEE; color: var(--cal-ink-2); }
+.cw-ad--todo.is-done .cal-chip-text { text-decoration: line-through; color: #B5BAC4; }
+
+.cw-pairrow { min-height: 74px; }
+.cw-time { font-size: 13px; font-weight: 600; color: var(--cal-ink-2); }
+.cw-pairlabel { font-size: 10.5px; color: var(--cal-ink-4); }
+.cw-cell {
+  border-left: 1px solid var(--cal-border-thin);
+  border-bottom: 1px solid var(--cal-border-thin);
+  padding: 4px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cw-cell.is-weekend { background: #FCFCFD; }
+.cw-cell.is-empty { cursor: pointer; }
+.cw-cell.is-empty:hover { background: #F7F9FF; }
+
+.cw-lesson {
+  border: 1px solid;
+  border-radius: 7px;
+  padding: 5px 7px;
+  cursor: pointer;
+}
+.cw-lesson.is-cancelled .cw-lesson-title { text-decoration: line-through; color: var(--cal-ink-3); }
+.cw-lesson-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cw-lesson-bar { width: 3px; height: 13px; border-radius: 2px; flex: none; }
+.cw-lesson-title { font-size: 12px; font-weight: 600; color: var(--cal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-lesson-meta { font-family: 'Geist Mono', monospace; font-size: 10.5px; color: var(--cal-ink-3); margin-top: 2px; padding-left: 9px; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Правый рейл
+   ────────────────────────────────────────────────────────────────────────── */
+.cal-rail { display: flex; flex-direction: column; gap: 14px; }
+.cr-block {
+  background: var(--cal-card);
+  border: 1px solid var(--cal-border);
+  border-radius: 13px;
+  box-shadow: 0 1px 2px rgba(13, 19, 33, 0.04);
+  padding: 14px;
+}
+.cr-block-title {
+  font-size: 13px; font-weight: 600; color: var(--cal-ink);
+  margin-bottom: 10px;
+}
+.cr-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cr-metric {
+  border: 1px solid var(--cal-border-thin);
+  border-radius: 10px;
+  padding: 10px;
+}
+.cr-metric-val { font-family: 'Geist Mono', monospace; font-size: 22px; font-weight: 700; line-height: 1; }
+.cr-metric-label { font-size: 11px; color: var(--cal-ink-3); margin-top: 4px; }
+
+.cr-filter { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.cr-swatch { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.cr-filter-label { font-size: 13px; color: var(--cal-ink-2); flex: 1; }
+.cr-filter-count { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--cal-ink-4); }
+
+.cr-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cal-border-thin); }
+.cr-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--cal-ink-2);
+  border: 1px solid var(--cal-border); border-radius: 999px;
+  padding: 2px 9px; cursor: pointer;
+}
+.cr-pill.is-active { background: #F7F9FF; border-color: #2B4BFF; color: #1A34D1; }
+.cr-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+
+.cr-todos { display: flex; flex-direction: column; gap: 2px; }
+.cr-todo {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 4px; border-radius: 8px; cursor: pointer;
+}
+.cr-todo:hover { background: #F7F9FF; }
+.cr-todo-title { font-size: 13px; color: var(--cal-ink-2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-todo-title.is-done { text-decoration: line-through; color: #B5BAC4; }
+.cr-todo-tail { display: flex; align-items: center; gap: 4px; flex: none; }
+.cr-empty { font-size: 13px; color: var(--cal-ink-3); padding: 6px 0; }
+.cr-new-todo { margin-top: 8px; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Боковой инспектор (slide-over)
+   ────────────────────────────────────────────────────────────────────────── */
+.cal-scrim {
+  position: fixed; inset: 0;
+  background: rgba(13, 19, 33, 0.28);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 1000;
+}
+.cal-scrim.is-open { opacity: 1; pointer-events: auto; }
+.cal-inspector {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: 380px; max-width: 92vw;
+  background: var(--cal-card);
+  box-shadow: -8px 0 32px rgba(13, 19, 33, 0.12);
+  transform: translateX(24px);
+  opacity: 0; pointer-events: none;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+  z-index: 1001;
+  display: flex; flex-direction: column;
+  overflow: auto;
+}
+.cal-inspector.is-open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+.ci-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 16px 8px;
+}
+.ci-body { padding: 0 18px 20px; }
+.ci-title { font-size: 18px; font-weight: 600; color: var(--cal-ink); letter-spacing: -0.01em; }
+.ci-title.is-done { text-decoration: line-through; color: var(--cal-ink-4); }
+.ci-todo-title-row { display: flex; align-items: flex-start; gap: 10px; }
+.ci-check { width: 22px; height: 22px; border-width: 2px; border-radius: 6px; margin-top: 2px; }
+.ci-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.ci-meta { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--cal-ink-2); }
+.ci-meta .anticon { color: var(--cal-ink-4); margin-right: 6px; }
+.ci-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cal-ink-3); margin: 18px 0 8px; }
+.ci-warn {
+  background: #FEF3C7; border: 1px solid #FCE3A0; color: #B45309;
+  border-radius: 10px; padding: 10px 12px; font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ci-mats { display: flex; flex-direction: column; gap: 6px; }
+.ci-mat { font-size: 13px; color: var(--cal-ink-2); }
+.ci-actions { display: flex; gap: 8px; margin-top: 22px; }
+.ci-actions > .ant-btn-primary { flex: 1; }
+
+/* ── Модалка создания: чипы пар ── */
+.ce-pairs { display: flex; flex-wrap: wrap; gap: 6px; }
+.ce-pair {
+  font-size: 12px; color: var(--cal-ink-2);
+  border: 1px solid var(--cal-border); border-radius: 999px;
+  padding: 3px 11px; cursor: pointer;
+}
+.ce-pair.is-active { background: #E7ECFF; border-color: #2B4BFF; color: #1A34D1; }
+
+/* ── Адаптив ── */
+@media (max-width: 1100px) {
+  .cal-layout { grid-template-columns: minmax(0, 1fr); }
+  .cal-rail { flex-direction: row; flex-wrap: wrap; }
+  .cal-rail .cr-block { flex: 1 1 280px; }
+}
+
+/* ── Тёмная тема ── */
+[data-theme='dark'] .cal-main,
+.dark .cal-main { background: #141414; border-color: #303030; }
+[data-theme='dark'] .cr-block,
+[data-theme='dark'] .cal-inspector,
+.dark .cr-block,
+.dark .cal-inspector { background: #1d1d1d; border-color: #303030; color: rgba(255,255,255,0.85); }
+[data-theme='dark'] .cal-period,
+[data-theme='dark'] .ci-title,
+[data-theme='dark'] .cr-block-title,
+[data-theme='dark'] .cr-metric-val,
+.dark .cal-period { color: rgba(255,255,255,0.88); }
+[data-theme='dark'] .rbc-evt-todo,
+.dark .rbc-evt-todo { background-color: #262626 !important; border-color: #3a3a3a !important; color: rgba(255,255,255,0.85) !important; }

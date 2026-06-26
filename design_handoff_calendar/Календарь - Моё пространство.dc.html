@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{background:#FBFBFD;font-family:'Geist','Inter',system-ui,sans-serif;color:#0D1321;-webkit-font-smoothing:antialiased}
+    button{font-family:inherit}
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-thumb{background:#E5E7EB;border-radius:999px;border:3px solid #FBFBFD}
+    @keyframes wsPulse{0%,100%{opacity:1}50%{opacity:.4}}
+    @keyframes wsSlide{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}
+    @keyframes wsFade{from{opacity:0}to{opacity:1}}
+  </style>
+</helmet>
+
+<div style="display:flex;min-height:100vh;background:#FBFBFD">
+
+  <!-- ░░░ SIDEBAR ░░░ -->
+  <aside style="width:236px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #EEF0F3;display:flex;flex-direction:column;position:sticky;top:0;height:100vh">
+    <div style="display:flex;align-items:center;gap:9px;padding:18px 18px 14px">
+      <div style="width:28px;height:28px;border-radius:7px;background:#2B4BFF;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;letter-spacing:-.03em">L</div>
+      <span style="font-weight:700;font-size:16px;letter-spacing:-.02em">Lemma</span>
+    </div>
+    <nav style="flex:1;overflow:auto;padding:4px 10px 16px">
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9AA0AC;padding:10px 10px 6px">Моё пространство</div>
+      <sc-for list="{{ nav }}" as="it" hint-placeholder-count="9">
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;font-size:13.5px;font-weight:{{ it.weight }};color:{{ it.color }};background:{{ it.bg }};cursor:pointer;margin-bottom:1px">
+          <span style="display:inline-flex;width:16px;height:16px;flex-shrink:0">{{ it.icon }}</span>
+          <span style="flex:1">{{ it.label }}</span>
+          <sc-if value="{{ it.badge }}" hint-placeholder-val="">
+            <span style="font-size:11px;font-weight:600;color:#E11D48;background:#FFE4E6;border-radius:999px;padding:0 7px;line-height:18px">{{ it.badge }}</span>
+          </sc-if>
+        </div>
+      </sc-for>
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#9AA0AC;padding:16px 10px 6px">Инструменты</div>
+      <sc-for list="{{ navTools }}" as="it" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;font-size:13.5px;font-weight:500;color:#646A76;cursor:pointer;margin-bottom:1px">
+          <span style="display:inline-flex;width:16px;height:16px;flex-shrink:0">{{ it.icon }}</span>
+          <span style="flex:1">{{ it.label }}</span>
+        </div>
+      </sc-for>
+    </nav>
+    <div style="border-top:1px solid #EEF0F3;padding:12px 14px;display:flex;align-items:center;gap:10px">
+      <div style="width:32px;height:32px;border-radius:50%;background:#E7ECFF;color:#1A34D1;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0">ОЛ</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Олег Лемов</div>
+        <div style="font-size:11.5px;color:#9AA0AC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Учитель математики</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ░░░ MAIN ░░░ -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;height:100vh">
+
+    <!-- topbar -->
+    <header style="height:56px;flex-shrink:0;border-bottom:1px solid #EEF0F3;background:rgba(251,251,253,.85);backdrop-filter:saturate(1.4) blur(8px);display:flex;align-items:center;gap:14px;padding:0 22px;z-index:6">
+      <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:#9AA0AC">
+        <span>Моё пространство</span>
+        <span style="color:#D7DAE0">/</span>
+        <span style="color:#2A2F3A;font-weight:600">Календарь</span>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:8px;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:7px 11px;width:248px;color:#9AA0AC">
+        <span style="display:inline-flex;width:15px;height:15px">{{ icSearch }}</span>
+        <span style="font-size:13px">Поиск событий…</span>
+        <span style="margin-left:auto;font-size:11px;font-family:'Geist Mono',monospace;color:#C2C6CE;border:1px solid #EEF0F3;border-radius:4px;padding:0 5px">⌘K</span>
+      </div>
+      <button style="width:36px;height:36px;border:1px solid #E5E7EB;background:#fff;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:#646A76;cursor:pointer;position:relative">
+        <span style="display:inline-flex;width:17px;height:17px">{{ icBell }}</span>
+        <span style="position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:#E11D48;border:2px solid #fff"></span>
+      </button>
+      <div style="width:32px;height:32px;border-radius:50%;background:#0D1321;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;cursor:pointer">О</div>
+    </header>
+
+    <!-- content area -->
+    <div style="flex:1;min-width:0;display:flex;position:relative;overflow:hidden">
+
+      <!-- ░ CALENDAR COLUMN ░ -->
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden">
+
+        <!-- page header + toolbar -->
+        <div style="flex-shrink:0;padding:16px 22px 0">
+          <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:#E7ECFF;color:#2B4BFF;flex-shrink:0"><span style="display:inline-flex;width:20px;height:20px">{{ icCal }}</span></span>
+            <div style="min-width:0">
+              <h1 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-.025em;line-height:1.1">Календарь</h1>
+              <div style="font-size:13px;color:#646A76;margin-top:3px">Уроки, дедлайны и дела на одной сетке · перетащите событие, чтобы перенести</div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <div style="display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:7px 11px;cursor:pointer">
+                <span style="display:inline-flex;width:13px;height:13px;color:#9AA0AC">{{ icUsers }}</span>
+                <span style="font-size:13px;color:#2A2F3A;font-weight:500">Все группы</span>
+                <span style="display:inline-flex;width:13px;height:13px;color:#9AA0AC">{{ icChevD }}</span>
+              </div>
+              <button onClick="{{ openCreateDefault }}" style="display:inline-flex;align-items:center;gap:7px;background:#2B4BFF;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(43,75,255,.3)">
+                <span style="display:inline-flex;width:15px;height:15px">{{ icPlus }}</span>Создать
+              </button>
+            </div>
+          </div>
+
+          <!-- toolbar -->
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px">
+            <div style="display:flex;align-items:center;gap:4px;background:#fff;border:1px solid #E5E7EB;border-radius:9px;padding:4px">
+              <button style="display:inline-flex;align-items:center;height:30px;padding:0 12px;border:none;background:transparent;border-radius:6px;font-size:12.5px;font-weight:600;color:#2A2F3A;cursor:pointer">Сегодня</button>
+              <button style="width:30px;height:30px;border:none;background:transparent;border-radius:6px;color:#646A76;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"><span style="display:inline-flex;width:15px;height:15px">{{ icChevL }}</span></button>
+              <button style="width:30px;height:30px;border:none;background:transparent;border-radius:6px;color:#646A76;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"><span style="display:inline-flex;width:15px;height:15px">{{ icChevR }}</span></button>
+            </div>
+            <div style="font-size:18px;font-weight:600;letter-spacing:-.02em;text-transform:capitalize">{{ periodLabel }}</div>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:2px;background:#F3F4F6;border-radius:9px;padding:3px">
+              <sc-for list="{{ views }}" as="v" hint-placeholder-count="4">
+                <button onClick="{{ v.set }}" style="height:30px;padding:0 14px;border:none;background:{{ v.bg }};box-shadow:{{ v.shadow }};border-radius:7px;font-size:12.5px;font-weight:600;color:{{ v.fg }};cursor:pointer">{{ v.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <!-- grid scroll -->
+        <div style="flex:1;overflow:auto;padding:14px 22px 18px">
+
+          <!-- ░ MONTH ░ -->
+          <sc-if value="{{ isMonth }}" hint-placeholder-val="{{ true }}">
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:13px;overflow:hidden;box-shadow:0 1px 2px rgba(13,19,33,.04)">
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid #EEF0F3">
+              <sc-for list="{{ weekdayHeads }}" as="w" hint-placeholder-count="7">
+                <div style="padding:9px 12px;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:{{ w.color }};text-align:right;border-right:1px solid #F4F5F7">{{ w.label }}</div>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(7,1fr)">
+              <sc-for list="{{ monthCells }}" as="c" hint-placeholder-count="35">
+                <div style="{{ c.cellStyle }}">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                    <button onClick="{{ c.add }}" style="opacity:.0;width:18px;height:18px;border:none;background:#EEF1F6;border-radius:5px;color:#646A76;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:opacity .12s" style-hover="opacity:1;background:#E0E5EE"><span style="display:inline-flex;width:11px;height:11px">{{ icPlus }}</span></button>
+                    <div style="flex:1"></div>
+                    <span style="{{ c.numStyle }}">{{ c.dayNum }}</span>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:3px">
+                    <sc-for list="{{ c.events }}" as="ev" hint-placeholder-count="0">
+                      <div onClick="{{ ev.open }}" style="{{ ev.rowStyle }}">
+                        <sc-if value="{{ ev.isLesson }}" hint-placeholder-val="{{ true }}"><span style="{{ ev.markStyle }}"></span></sc-if>
+                        <sc-if value="{{ ev.isDeadline }}" hint-placeholder-val=""><span style="display:inline-flex;width:11px;height:11px;flex-shrink:0;color:#D97706">{{ icClock }}</span></sc-if>
+                        <sc-if value="{{ ev.isTodo }}" hint-placeholder-val=""><span onClick="{{ ev.toggleStop }}" style="{{ ev.cbStyle }}">{{ ev.cbInner }}</span></sc-if>
+                        <span style="{{ ev.titleStyle }}">{{ ev.title }}</span>
+                        <sc-if value="{{ ev.trail }}" hint-placeholder-val="">{{ ev.trail }}</sc-if>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ c.more }}" hint-placeholder-val="">
+                      <div style="font-size:11px;font-weight:600;color:#9AA0AC;padding:1px 6px;cursor:pointer">+ ещё {{ c.more }}</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <!-- ░ WEEK ░ -->
+          <sc-if value="{{ isWeek }}" hint-placeholder-val="">
+          <div style="background:#fff;border:1px solid #E5E7EB;border-radius:13px;overflow:hidden;box-shadow:0 1px 2px rgba(13,19,33,.04)">
+            <!-- header -->
+            <div style="display:grid;grid-template-columns:66px repeat(7,1fr);border-bottom:1px solid #EEF0F3">
+              <div style="border-right:1px solid #F4F5F7"></div>
+              <sc-for list="{{ weekColumns }}" as="col" hint-placeholder-count="7">
+                <div style="{{ col.headStyle }}">
+                  <span style="font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:{{ col.dowColor }}">{{ col.dow }}</span>
+                  <span style="{{ col.dateStyle }}">{{ col.dateNum }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <!-- all-day strip -->
+            <div style="display:grid;grid-template-columns:66px repeat(7,1fr);border-bottom:1px solid #EEF0F3;background:#FCFCFE">
+              <div style="display:flex;align-items:center;justify-content:flex-end;padding:6px 8px;font-size:9.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#B5BAC4;border-right:1px solid #F4F5F7">весь день</div>
+              <sc-for list="{{ weekColumns }}" as="col" hint-placeholder-count="7">
+                <div style="padding:6px 6px;border-right:1px solid #F4F5F7;display:flex;flex-direction:column;gap:3px;min-height:30px;background:{{ col.cellBg }}">
+                  <sc-for list="{{ col.allDay }}" as="ev" hint-placeholder-count="0">
+                    <div onClick="{{ ev.open }}" style="{{ ev.rowStyle }}">
+                      <sc-if value="{{ ev.isDeadline }}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;width:11px;height:11px;flex-shrink:0;color:#D97706">{{ icClock }}</span></sc-if>
+                      <sc-if value="{{ ev.isTodo }}" hint-placeholder-val=""><span onClick="{{ ev.toggleStop }}" style="{{ ev.cbStyle }}">{{ ev.cbInner }}</span></sc-if>
+                      <span style="{{ ev.titleStyle }}">{{ ev.title }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+            <!-- time grid -->
+            <div style="max-height:560px;overflow:auto">
+              <sc-for list="{{ weekRows }}" as="r" hint-placeholder-count="6">
+                <div style="display:grid;grid-template-columns:66px repeat(7,1fr);border-bottom:1px solid #F4F5F7">
+                  <div style="border-right:1px solid #F4F5F7;padding:7px 8px 0;text-align:right">
+                    <div style="font-size:11px;font-weight:600;font-family:'Geist Mono',monospace;color:#2A2F3A">{{ r.time }}</div>
+                    <div style="font-size:9.5px;color:#B5BAC4;font-weight:500">{{ r.label }}</div>
+                  </div>
+                  <sc-for list="{{ r.cells }}" as="cell" hint-placeholder-count="7">
+                    <div onClick="{{ cell.add }}" style="border-right:1px solid #F4F5F7;min-height:74px;padding:5px;display:flex;flex-direction:column;gap:4px;background:{{ cell.bg }};cursor:pointer">
+                      <sc-for list="{{ cell.events }}" as="ev" hint-placeholder-count="0">
+                        <div onClick="{{ ev.openStop }}" style="{{ ev.weekStyle }}">
+                          <div style="display:flex;align-items:center;gap:5px">
+                            <span style="{{ ev.markStyle }}"></span>
+                            <span style="font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ ev.weekFg }};{{ ev.strike }}">{{ ev.title }}</span>
+                            <sc-if value="{{ ev.trail }}" hint-placeholder-val="">{{ ev.trail }}</sc-if>
+                          </div>
+                          <div style="font-size:9.5px;font-family:'Geist Mono',monospace;color:{{ ev.weekMeta }};margin-top:2px">{{ ev.timeRange }} · {{ ev.group }}</div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          </sc-if>
+
+          <!-- legend -->
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;padding:0 2px">
+            <span style="font-size:11.5px;font-weight:600;color:#9AA0AC">Легенда</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#646A76"><span style="width:3px;height:13px;border-radius:2px;background:#2B4BFF"></span>цвет блока = группа</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#646A76"><span style="display:inline-flex;width:12px;height:12px;color:#D97706">{{ icClock }}</span>дедлайн выдачи</span>
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#646A76"><span style="width:12px;height:12px;border:1.5px solid #0D9488;border-radius:4px;display:inline-block"></span>дело</span>
+            <span style="font-size:12px;color:#646A76">проведённый — бледнее · отменённый — зачёркнут</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░ RIGHT RAIL ░ -->
+      <sc-if value="{{ showRail }}" hint-placeholder-val="{{ true }}">
+      <aside style="width:330px;flex-shrink:0;border-left:1px solid #EEF0F3;background:#fff;overflow:auto;display:flex;flex-direction:column">
+
+        <!-- summary -->
+        <div style="padding:16px 16px 14px;border-bottom:1px solid #EEF0F3">
+          <div style="font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9AA0AC;margin-bottom:11px">{{ summaryTitle }}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+            <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+              <div style="border:1px solid #EEF0F3;border-radius:10px;padding:11px 12px;background:{{ s.bg }}">
+                <div style="display:flex;align-items:center;gap:7px">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:7px;background:{{ s.soft }};color:{{ s.fg }}"><span style="display:inline-flex;width:13px;height:13px">{{ s.icon }}</span></span>
+                  <span style="font-size:22px;font-weight:600;letter-spacing:-.03em;color:{{ s.valColor }};margin-left:auto">{{ s.v }}</span>
+                </div>
+                <div style="font-size:11.5px;font-weight:500;color:#646A76;margin-top:7px">{{ s.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- filters -->
+        <div style="padding:14px 16px;border-bottom:1px solid #EEF0F3">
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:11px">
+            <span style="display:inline-flex;width:14px;height:14px;color:#646A76">{{ icFilter }}</span>
+            <span style="font-size:13px;font-weight:600">Показывать на сетке</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <sc-for list="{{ typeFilters }}" as="f" hint-placeholder-count="3">
+              <div onClick="{{ f.toggle }}" style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;background:{{ f.rowBg }};cursor:pointer">
+                <span style="{{ f.swatch }}"></span>
+                <span style="font-size:13px;font-weight:500;color:#2A2F3A;flex:1">{{ f.label }}</span>
+                <span style="font-size:11px;font-weight:600;color:#9AA0AC;font-variant-numeric:tabular-nums">{{ f.count }}</span>
+                <span style="{{ f.track }}"><span style="{{ f.knob }}"></span></span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9AA0AC;margin:13px 0 8px">Группы</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <sc-for list="{{ groupLegend }}" as="g" hint-placeholder-count="5">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;padding:3px 9px 3px 7px;border-radius:999px;color:{{ g.fg }};background:{{ g.soft }};cursor:pointer"><span style="width:7px;height:7px;border-radius:50%;background:{{ g.base }}"></span>{{ g.name }}</span>
+            </sc-for>
+          </div>
+        </div>
+
+        <!-- todos -->
+        <div style="padding:14px 16px 20px;flex:1">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+            <span style="display:inline-flex;width:15px;height:15px;color:#0D9488">{{ icCheckSq }}</span>
+            <span style="font-size:13px;font-weight:600">Дела на сегодня</span>
+            <span style="margin-left:auto;font-size:12px;font-weight:600;color:#9AA0AC">{{ todoOpenCount }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ railTodos }}" as="t" hint-placeholder-count="4">
+              <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 8px;border-radius:9px;cursor:pointer" style-hover="background:#F7F8FA">
+                <span onClick="{{ t.toggle }}" style="{{ t.cbStyle }}">{{ t.cbInner }}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;font-weight:500;color:{{ t.titleColor }};{{ t.strike }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+                    <span style="font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:999px;color:{{ t.dueFg }};background:{{ t.dueSoft }}">{{ t.due }}</span>
+                    <sc-if value="{{ t.group }}" hint-placeholder-val="">
+                      <span style="display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:999px;color:{{ t.groupFg }};background:{{ t.groupSoft }}"><span style="width:5px;height:5px;border-radius:50%;background:{{ t.groupFg }}"></span>{{ t.group }}</span>
+                    </sc-if>
+                    <sc-if value="{{ t.high }}" hint-placeholder-val="">
+                      <span style="display:inline-flex;width:11px;height:11px;color:#E11D48">{{ icFlag }}</span>
+                    </sc-if>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <button onClick="{{ openCreateTodo }}" style="width:100%;margin-top:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#F7F8FA;border:1px dashed #D7DAE0;border-radius:8px;padding:9px;font-size:12.5px;font-weight:500;color:#646A76;cursor:pointer">
+            <span style="display:inline-flex;width:14px;height:14px">{{ icPlus }}</span>Новое дело
+          </button>
+        </div>
+      </aside>
+      </sc-if>
+
+      <!-- ░ INSPECTOR SLIDE-OVER ░ -->
+      <sc-if value="{{ selected }}" hint-placeholder-val="">
+        <div onClick="{{ closeInspector }}" style="position:absolute;inset:0;background:rgba(13,19,33,.18);z-index:20;animation:wsFade .15s ease"></div>
+        <div style="position:absolute;top:0;right:0;bottom:0;width:380px;background:#fff;border-left:1px solid #E5E7EB;box-shadow:-8px 0 32px rgba(13,19,33,.12);z-index:21;display:flex;flex-direction:column;animation:wsSlide .2s cubic-bezier(.2,.8,.2,1)">
+          <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid #EEF0F3">
+            <span style="{{ selected.kindChip }}">{{ selected.kindLabel }}</span>
+            <div style="flex:1"></div>
+            <button onClick="{{ closeInspector }}" style="width:30px;height:30px;border:1px solid #EEF0F3;background:#fff;border-radius:8px;color:#646A76;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"><span style="display:inline-flex;width:15px;height:15px">{{ icX }}</span></button>
+          </div>
+          <div style="flex:1;overflow:auto;padding:18px">
+            <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px">
+              <sc-if value="{{ selected.isTodo }}" hint-placeholder-val="">
+                <span onClick="{{ selected.toggleStop }}" style="{{ selected.bigCbStyle }};margin-top:3px">{{ selected.cbInner }}</span>
+              </sc-if>
+              <h2 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.25;color:#0D1321;{{ selected.titleStrike }}">{{ selected.title }}</h2>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px">
+              <sc-if value="{{ selected.group }}" hint-placeholder-val="">
+                <span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;padding:3px 10px;border-radius:999px;color:{{ selected.groupFg }};background:{{ selected.groupSoft }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ selected.groupFg }}"></span>{{ selected.group }}</span>
+              </sc-if>
+              <sc-if value="{{ selected.statusLabel }}" hint-placeholder-val="">
+                <span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;color:{{ selected.statusFg }};background:{{ selected.statusSoft }}">{{ selected.statusLabel }}</span>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:1px;margin-bottom:18px">
+              <sc-for list="{{ selected.meta }}" as="m" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid #F4F5F7">
+                  <span style="display:inline-flex;width:15px;height:15px;color:#9AA0AC;flex-shrink:0">{{ m.icon }}</span>
+                  <span style="font-size:12.5px;color:#9AA0AC;width:84px;flex-shrink:0">{{ m.label }}</span>
+                  <span style="font-size:13px;font-weight:500;color:#2A2F3A;flex:1">{{ m.value }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ selected.showMats }}" hint-placeholder-val="">
+              <div style="margin-bottom:18px">
+                <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#9AA0AC;margin-bottom:8px">{{ selected.matsTitle }}</div>
+                <sc-for list="{{ selected.matsList }}" as="mt" hint-placeholder-count="2">
+                  <div style="display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid #EEF0F3;border-radius:8px;margin-bottom:6px;cursor:pointer">
+                    <span style="display:inline-flex;width:14px;height:14px;color:#2B4BFF">{{ icClip }}</span>
+                    <span style="font-size:12.5px;font-weight:500;color:#2A2F3A;flex:1">{{ mt }}</span>
+                    <span style="display:inline-flex;width:13px;height:13px;color:#C2C6CE">{{ icChevR }}</span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ selected.noMats }}" hint-placeholder-val="">
+                  <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px dashed #F0C97A;border-radius:9px;background:#FFFBF0">
+                    <span style="display:inline-flex;width:15px;height:15px;color:#D97706">{{ icAlert }}</span>
+                    <span style="font-size:12.5px;font-weight:500;color:#B45309;flex:1">Материалы ещё не прикреплены</span>
+                    <button style="background:#FEF3C7;color:#B45309;border:none;border-radius:7px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer">Собрать</button>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ selected.links }}" hint-placeholder-val="">
+              <div style="margin-bottom:18px">
+                <div style="font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#9AA0AC;margin-bottom:8px">Связи</div>
+                <sc-for list="{{ selected.links }}" as="lk" hint-placeholder-count="1">
+                  <button style="display:inline-flex;align-items:center;gap:7px;background:#F3F4F6;border:none;border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:500;color:#2A2F3A;cursor:pointer;margin:0 6px 6px 0"><span style="display:inline-flex;width:13px;height:13px;color:#646A76">{{ lk.icon }}</span>{{ lk.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-top:1px solid #EEF0F3">
+            <button style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#2B4BFF;color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:600;cursor:pointer">{{ selected.primaryAction }}</button>
+            <button style="width:38px;height:38px;border:1px solid #E5E7EB;background:#fff;border-radius:8px;color:#646A76;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"><span style="display:inline-flex;width:16px;height:16px">{{ icPencil }}</span></button>
+            <button style="width:38px;height:38px;border:1px solid #FBD5DC;background:#fff;border-radius:8px;color:#E11D48;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"><span style="display:inline-flex;width:16px;height:16px">{{ icTrash }}</span></button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ░ CREATE MODAL ░ -->
+      <sc-if value="{{ createOpen }}" hint-placeholder-val="">
+        <div onClick="{{ closeCreate }}" style="position:absolute;inset:0;background:rgba(13,19,33,.28);z-index:30;display:flex;align-items:center;justify-content:center;animation:wsFade .15s ease">
+          <div onClick="{{ stopProp }}" style="width:440px;background:#fff;border-radius:14px;box-shadow:0 24px 64px rgba(13,19,33,.28);overflow:hidden;animation:wsSlide .2s cubic-bezier(.2,.8,.2,1)">
+            <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid #EEF0F3">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:#E7ECFF;color:#2B4BFF"><span style="display:inline-flex;width:16px;height:16px">{{ icPlus }}</span></span>
+              <span style="font-size:16px;font-weight:600;letter-spacing:-.01em">Новое событие</span>
+              <div style="flex:1"></div>
+              <button onClick="{{ closeCreate }}" style="width:30px;height:30px;border:1px solid #EEF0F3;background:#fff;border-radius:8px;color:#646A76;cursor:pointer;display:inline-flex;align-items:center;justify-content:center"><span style="display:inline-flex;width:15px;height:15px">{{ icX }}</span></button>
+            </div>
+            <div style="padding:18px">
+              <div style="display:flex;gap:2px;background:#F3F4F6;border-radius:9px;padding:3px;margin-bottom:16px">
+                <sc-for list="{{ createTabs }}" as="ct" hint-placeholder-count="3">
+                  <button onClick="{{ ct.set }}" style="flex:1;height:34px;border:none;background:{{ ct.bg }};box-shadow:{{ ct.shadow }};border-radius:7px;font-size:13px;font-weight:600;color:{{ ct.fg }};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px"><span style="display:inline-flex;width:14px;height:14px">{{ ct.icon }}</span>{{ ct.label }}</button>
+                </sc-for>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:#646A76;margin-bottom:6px">{{ createTitleLabel }}</div>
+              <input placeholder="{{ createPlaceholder }}" style="width:100%;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;font-size:13.5px;font-family:inherit;color:#0D1321;margin-bottom:14px;outline:none" style-focus="border-color:#2B4BFF;box-shadow:0 0 0 3px #E7ECFF" />
+              <div style="display:flex;gap:12px;margin-bottom:14px">
+                <div style="flex:1">
+                  <div style="font-size:12px;font-weight:600;color:#646A76;margin-bottom:6px">Группа</div>
+                  <div style="display:flex;align-items:center;gap:7px;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;cursor:pointer"><span style="font-size:13.5px;color:#9AA0AC;flex:1">Выбрать…</span><span style="display:inline-flex;width:13px;height:13px;color:#9AA0AC">{{ icChevD }}</span></div>
+                </div>
+                <div style="flex:1">
+                  <div style="font-size:12px;font-weight:600;color:#646A76;margin-bottom:6px">{{ createDateLabel }}</div>
+                  <div style="display:flex;align-items:center;gap:7px;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;cursor:pointer"><span style="display:inline-flex;width:13px;height:13px;color:#9AA0AC">{{ icCal }}</span><span style="font-size:13.5px;color:#0D1321;flex:1">{{ createDateValue }}</span></div>
+                </div>
+              </div>
+              <sc-if value="{{ createIsLesson }}" hint-placeholder-val="{{ true }}">
+                <div style="font-size:12px;font-weight:600;color:#646A76;margin-bottom:6px">Время по расписанию</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px">
+                  <sc-for list="{{ pairChips }}" as="p" hint-placeholder-count="6">
+                    <span style="{{ p.style }}">{{ p.label }}</span>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:14px 18px;border-top:1px solid #EEF0F3;background:#FCFCFE">
+              <button onClick="{{ closeCreate }}" style="background:#fff;border:1px solid #E5E7EB;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;color:#2A2F3A;cursor:pointer">Отмена</button>
+              <button onClick="{{ closeCreate }}" style="background:#2B4BFF;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:600;color:#fff;cursor:pointer;box-shadow:0 1px 2px rgba(43,75,255,.3)">Сохранить</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1480,&quot;height&quot;:1000},&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;month&quot;,&quot;options&quot;:[&quot;month&quot;,&quot;week&quot;],&quot;tsType&quot;:&quot;'month'|'week'&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;comfortable&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;tsType&quot;:&quot;'comfortable'|'compact'&quot;},&quot;showRail&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { view: undefined, filters: { lesson: true, deadline: true, todo: true }, todoDone: {}, selected: null, createOpen: false, createType: 'lesson', createDay: 26 };
+
+  renderVals() {
+    const TONE = {
+      blue:   { base:'#2B4BFF', soft:'#E7ECFF', ink:'#1A34D1' },
+      teal:   { base:'#0D9488', soft:'#D1FAE5', ink:'#0B7A70' },
+      violet: { base:'#7C3AED', soft:'#EDE9FE', ink:'#6D28D9' },
+      amber:  { base:'#D97706', soft:'#FEF3C7', ink:'#B45309' },
+      rose:   { base:'#E11D48', soft:'#FFE4E6', ink:'#BE123C' },
+      neutral:{ base:'#646A76', soft:'#F3F4F6', ink:'#2A2F3A' },
+    };
+    const GTONE = {
+      '11 класс · Профиль':'blue', '10 класс':'teal', 'Геометрия 8':'violet',
+      'Интенсив 11':'amber', 'Индивидуальные':'rose', 'Группа А':'blue',
+    };
+    const toneOf = (g) => TONE[GTONE[g] || 'neutral'];
+
+    // ── PAIRS ──
+    const PAIRS = [
+      { key:'0', label:'Нулевая', t:'09:00', end:'10:00' },
+      { key:'1', label:'1-я пара', t:'10:15', end:'11:45' },
+      { key:'2', label:'2-я пара', t:'12:00', end:'13:45' },
+      { key:'3', label:'3-я пара', t:'14:05', end:'15:40' },
+      { key:'4', label:'4-я пара', t:'16:00', end:'17:35' },
+      { key:'5', label:'5-я пара', t:'17:45', end:'19:20' },
+    ];
+    const pairBy = {}; PAIRS.forEach((p) => { pairBy[p.key] = p; });
+
+    // ── icons ──
+    const RAW = {
+      home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>',
+      users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      cal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+      snip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v5H4zM4 13h10v7H4zM18 13h2v7h-2z"/></svg>',
+      sol:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+      file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>',
+      checkSq:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L20 5"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+      folder:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></svg>',
+      sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+      grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+      list:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>',
+      pie:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>',
+      clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      clip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>',
+      check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+      flag:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3a1 1 0 0 1 1 1v15a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1zm2 1.5h11.2a.8.8 0 0 1 .66 1.25L17 9l1.86 3.25a.8.8 0 0 1-.66 1.25H7z"/></svg>',
+      alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+      filter:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>',
+      x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+      search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+      bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',
+      plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+      chevL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+      chevR:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
+      chevD:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+      pencil:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+      trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+      book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+      user:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+      bulb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V18h6v-1.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/></svg>',
+      tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/></svg>',
+    };
+    const el = (s) => React.createElement('span', { dangerouslySetInnerHTML: { __html: s }, style: { display:'contents' } });
+    const ic = {}; Object.keys(RAW).forEach((k) => { ic[k] = el(RAW[k]); });
+
+    // ── sidebar ──
+    const nav = [
+      { label:'Сегодня', icon:ic.home },
+      { label:'Классы и группы', icon:ic.users },
+      { label:'Календарь', icon:ic.cal, active:true },
+      { label:'КТП', icon:ic.snip },
+      { label:'Журнал сдачи', icon:ic.sol, badge:'2' },
+      { label:'Заметки', icon:ic.file },
+      { label:'Дела', icon:ic.checkSq, badge:'3' },
+      { label:'Библиотека', icon:ic.folder },
+      { label:'Каникулярные', icon:ic.sun },
+    ].map((n) => ({ ...n, weight:n.active?600:500, color:n.active?'#1A34D1':'#2A2F3A', bg:n.active?'#E7ECFF':'transparent', badge:n.badge||'' }));
+    const navTools = [
+      { label:'Все задачи', icon:ic.list }, { label:'Аналитика', icon:ic.pie },
+      { label:'Рабочие листы', icon:ic.grid }, { label:'Геймификация', icon:ic.bulb },
+    ];
+
+    // ── state ──
+    const view = this.state.view ?? (this.props.startView || 'month');
+    const density = this.props.density || 'comfortable';
+    const showRail = this.props.showRail ?? true;
+    const filters = this.state.filters;
+    const isMonth = view === 'month';
+    const isWeek = view === 'week';
+    const TODAY = 26;
+
+    // ── master data (June 2026) ──
+    const LSTAT = {
+      planned:{ label:'запланирован', tone:'neutral' },
+      now:{ label:'идёт сейчас', tone:'blue' },
+      done:{ label:'проведён', tone:'teal' },
+      cancelled:{ label:'отменён', tone:'neutral' },
+    };
+    const lessons = [
+      { d:2, slot:'2', title:'Алгебра 11', group:'11 класс · Профиль', status:'done', mats:3, att:'24 / 26' },
+      { d:3, slot:'1', title:'Геометрия', group:'Геометрия 8', status:'done', mats:1, att:'9 / 10' },
+      { d:4, slot:'2', title:'10 кл — учёба', group:'10 класс', status:'cancelled', mats:0 },
+      { d:5, slot:'3', title:'Стереометрия Интенсив', group:'Интенсив 11', status:'planned', mats:2 },
+      { d:5, slot:'1', title:'Группа учёба', group:'Группа А', status:'done', mats:0 },
+      { d:6, slot:'1', title:'Интенсив 11 класс', group:'Интенсив 11', status:'cancelled', mats:0 },
+      { d:8, slot:'1', title:'Группа Учёба', group:'Группа А', status:'planned', mats:1 },
+      { d:9, slot:'2', title:'Харламова Алгебра', group:'Индивидуальные', status:'planned', mats:2 },
+      { d:9, slot:'1', title:'Группа Учёба', group:'Группа А', status:'planned', mats:0 },
+      { d:10, slot:'1', title:'Группа учёба', group:'Группа А', status:'planned', mats:1 },
+      { d:11, slot:'3', title:'Пересдача. Геометрия 8', group:'Геометрия 8', status:'planned', mats:1 },
+      { d:11, slot:'1', title:'Группа учёба', group:'Группа А', status:'planned', mats:0 },
+      { d:15, slot:'1', title:'Геометрия 8', group:'Геометрия 8', status:'planned', mats:2 },
+      { d:15, slot:'3', title:'Сафа', group:'Индивидуальные', status:'planned', mats:0 },
+      { d:16, slot:'2', title:'Харламова Алгебра', group:'Индивидуальные', status:'planned', mats:1 },
+      { d:16, slot:'1', title:'Харламова Алгебра', group:'Индивидуальные', status:'planned', mats:1 },
+      { d:17, slot:'1', title:'База + профиль', group:'10 класс', status:'planned', mats:2 },
+      { d:18, slot:'4', title:'10 класс', group:'10 класс', status:'planned', mats:1 },
+      { d:19, slot:'1', title:'Коротеев Эрик', group:'Индивидуальные', status:'planned', mats:1 },
+      { d:19, slot:'3', title:'Стереометрия. Профиль', group:'11 класс · Профиль', status:'planned', mats:2 },
+      { d:22, slot:'1', title:'Стереометрия', group:'11 класс · Профиль', status:'done', mats:2, att:'8 / 8' },
+      { d:22, slot:'3', title:'Стереометрия. UP', group:'11 класс · Профиль', status:'done', mats:1 },
+      { d:23, slot:'2', title:'Харламова Алгебра', group:'Индивидуальные', status:'planned', mats:1 },
+      { d:24, slot:'1', title:'База + профиль', group:'10 класс', status:'planned', mats:2 },
+      { d:25, slot:'4', title:'10 класс', group:'10 класс', status:'planned', mats:0 },
+      { d:26, slot:'1', title:'Коротеев Эрик', group:'Индивидуальные', status:'now', mats:1 },
+      { d:26, slot:'3', title:'Стереометрия. Профиль', group:'11 класс · Профиль', status:'planned', mats:2 },
+      { d:27, slot:'2', title:'Группа выходного', group:'Группа А', status:'planned', mats:1 },
+      { d:29, slot:'1', title:'Стереометрия', group:'11 класс · Профиль', status:'planned', mats:1 },
+    ];
+    const deadlines = [
+      { d:5, title:'Интенсив — входной тест', group:'Интенсив 11', count:14 },
+      { d:11, title:'ДЗ §18 «Подобие»', group:'Геометрия 8', count:10 },
+      { d:18, title:'Щегельская — вариант', group:'Индивидуальные', count:1 },
+      { d:25, title:'Тест: Производная', group:'11 класс · Профиль', count:8 },
+      { d:26, title:'Вариант ЕГЭ №7', group:'11 класс · Профиль', count:12 },
+    ];
+    const todosRaw = [
+      { d:12, title:'Проверить тетради 10 кл', prio:'normal', group:'10 класс', done:true },
+      { d:16, title:'Обновить КТП на июль', prio:'normal', group:'' },
+      { d:24, title:'Собрать вариант для Сафы', prio:'normal', group:'Индивидуальные' },
+      { d:25, title:'Позвонить родителям Коротеева', prio:'high', group:'Индивидуальные' },
+      { d:26, title:'Проверить пересдачу Геометрия 8', prio:'high', group:'Геометрия 8', lessonLink:'Пересдача. Геометрия 8' },
+      { d:26, title:'Выдать ДЗ группе А', prio:'normal', group:'Группа А' },
+      { d:27, title:'Материалы интенсива', prio:'normal', group:'Интенсив 11' },
+    ].map((t, i) => ({ ...t, id:'t' + i }));
+    const todoDoneState = (t) => (this.state.todoDone[t.id] !== undefined ? this.state.todoDone[t.id] : !!t.done);
+
+    // ── handlers ──
+    const select = (ev) => this.setState({ selected: ev });
+    const openCreate = (type, day) => this.setState({ createOpen:true, createType:type, createDay: day || TODAY });
+    const toggleTodo = (id) => this.setState((s) => ({ todoDone: { ...s.todoDone, [id]: !(s.todoDone[id] !== undefined ? s.todoDone[id] : todosRaw.find((x)=>x.id===id)?.done) } }));
+
+    // checkbox builder
+    const checkbox = (tone, checked, big) => {
+      const sz = big ? 17 : 13;
+      const t = TONE[tone] || TONE.teal;
+      return {
+        cbStyle:`display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;border-radius:4px;flex-shrink:0;border:1.5px solid ${checked ? t.base : '#C2C6CE'};background:${checked ? t.base : '#fff'};cursor:pointer`,
+        cbInner: checked ? React.createElement('span', { style:{ display:'inline-flex', width: big?11:9, height: big?11:9, color:'#fff' }, dangerouslySetInnerHTML:{ __html: RAW.check } }) : '',
+      };
+    };
+
+    // ── build event objects ──
+    const buildLesson = (l) => {
+      const hex = toneOf(l.group);
+      const isDone = l.status === 'done';
+      const isCx = l.status === 'cancelled';
+      const isNow = l.status === 'now';
+      const muted = isDone || isCx;
+      const bg = isCx ? '#F4F5F7' : isDone ? '#F6F7F9' : hex.soft;
+      const fg = muted ? '#9AA0AC' : hex.ink;
+      const bar = muted ? '#C2C6CE' : hex.base;
+      const p = pairBy[l.slot] || {};
+      const trail = isDone
+        ? React.createElement('span', { style:{ display:'inline-flex', width:11, height:11, color:'#0D9488', flexShrink:0 }, dangerouslySetInnerHTML:{ __html: RAW.check } })
+        : (l.mats > 0 ? React.createElement('span', { style:{ display:'inline-flex', width:10, height:10, color:hex.base, flexShrink:0, opacity:.8 }, dangerouslySetInnerHTML:{ __html: RAW.clip } }) : '');
+      const ev = {
+        kind:'lesson', isLesson:true, isDeadline:false, isTodo:false, d:l.d, slot:l.slot,
+        title:l.title, group:l.group,
+        rowStyle:`display:flex;align-items:center;gap:5px;padding:2px 6px 2px 5px;border-radius:6px;height:21px;cursor:pointer;overflow:hidden;background:${bg};${isNow?'box-shadow:0 0 0 1.5px #2B4BFF inset;':''}`,
+        markStyle:`width:3px;height:13px;border-radius:2px;flex-shrink:0;background:${bar};${isNow?'animation:wsPulse 2s ease-in-out infinite;':''}`,
+        titleStyle:`flex:1;min-width:0;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${fg};${isCx?'text-decoration:line-through;':''}`,
+        trail,
+        weekStyle:`border-radius:7px;padding:5px 7px;cursor:pointer;background:${bg};${isNow?'box-shadow:0 0 0 1.5px #2B4BFF inset;':'border:1px solid '+(muted?'#EEF0F3':hex.soft)+';'}`,
+        weekFg: fg, weekMeta: muted ? '#B5BAC4' : hex.base, strike: isCx?'text-decoration:line-through;':'',
+        timeRange:`${p.t||''}`,
+        cbStyle:'', cbInner:'',
+        // inspector
+        statusLabel: LSTAT[l.status].label, statusFg: TONE[LSTAT[l.status].tone].ink, statusSoft: TONE[LSTAT[l.status].tone].soft,
+        groupFg: hex.ink, groupSoft: hex.soft,
+        kindLabel:'Урок', kindChip:`display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;color:${hex.ink};background:${hex.soft}`,
+        meta:[
+          { icon:ic.clock, label:'Время', value:`${p.t||'—'}–${p.end||''} · ${p.label||'своё время'}` },
+          { icon:ic.cal, label:'Дата', value:`${l.d} июня 2026` },
+          { icon:ic.user, label:'Посещ.', value: l.att || '—' },
+        ],
+        showMats:true, matsTitle:`Материалы · ${l.mats}`, noMats: l.mats === 0,
+        matsList: l.mats > 0 ? Array.from({ length:l.mats }, (_, i) => `${l.title} — лист ${i + 1}`) : [],
+        links: l.status==='done' ? null : null,
+        primaryAction: isDone ? 'Открыть заметку урока' : 'Отметить посещаемость',
+      };
+      ev.open = () => select(ev);
+      ev.openStop = (e) => { e.stopPropagation(); select(ev); };
+      return ev;
+    };
+
+    const buildDeadline = (dd) => {
+      const hex = toneOf(dd.group);
+      const ev = {
+        kind:'deadline', isLesson:false, isDeadline:true, isTodo:false, d:dd.d,
+        title:dd.title, group:dd.group,
+        rowStyle:'display:flex;align-items:center;gap:5px;padding:2px 7px;border-radius:6px;height:21px;cursor:pointer;overflow:hidden;background:#FEF3C7',
+        titleStyle:'flex:1;min-width:0;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#B45309',
+        cbStyle:'', cbInner:'', trail:'', markStyle:'',
+        statusLabel:'дедлайн выдачи', statusFg:'#B45309', statusSoft:'#FEF3C7',
+        groupFg:hex.ink, groupSoft:hex.soft,
+        kindLabel:'Дедлайн', kindChip:'display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;color:#B45309;background:#FEF3C7',
+        meta:[
+          { icon:ic.cal, label:'Срок', value:`${dd.d} июня 2026, 23:59` },
+          { icon:ic.users, label:'Назначено', value:`${dd.count} ${dd.count===1?'ученику':'ученикам'}` },
+        ],
+        showMats:false, links:[{ icon:ic.book, label:dd.title }],
+        primaryAction:'Открыть работу',
+      };
+      ev.open = () => select(ev);
+      ev.openStop = (e) => { e.stopPropagation(); select(ev); };
+      return ev;
+    };
+
+    const buildTodo = (t) => {
+      const checked = todoDoneState(t);
+      const hex = t.group ? toneOf(t.group) : TONE.neutral;
+      const cb = checkbox(t.group ? GTONE[t.group] || 'teal' : 'teal', checked, false);
+      const links = [];
+      if (t.lessonLink) links.push({ icon:ic.cal, label:t.lessonLink });
+      const ev = {
+        kind:'todo', isLesson:false, isDeadline:false, isTodo:true, d:t.d, high:t.prio==='high', checked,
+        title:t.title, group:t.group,
+        rowStyle:`display:flex;align-items:center;gap:5px;padding:2px 6px;border-radius:6px;height:21px;cursor:pointer;overflow:hidden;background:#fff;border:1px solid #E8EAEE`,
+        titleStyle:`flex:1;min-width:0;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${checked?'#B5BAC4':'#2A2F3A'};${checked?'text-decoration:line-through;':''}`,
+        cbStyle: cb.cbStyle.replace('width:13px;height:13px','width:12px;height:12px'), cbInner: cb.cbInner,
+        markStyle:'', trail: t.prio==='high' && !checked ? React.createElement('span', { style:{ display:'inline-flex', width:10, height:10, color:'#E11D48', flexShrink:0 }, dangerouslySetInnerHTML:{ __html: RAW.flag } }) : '',
+        statusLabel:'', groupFg:hex.ink, groupSoft:hex.soft,
+        bigCbStyle: checkbox(t.group ? GTONE[t.group] || 'teal' : 'teal', checked, true).cbStyle,
+        titleStrike: checked ? 'text-decoration:line-through;color:#9AA0AC;' : '',
+        kindLabel:'Дело', kindChip:'display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;color:#0B7A70;background:#D1FAE5',
+        meta:[
+          { icon:ic.cal, label:'Срок', value:`${t.d} июня 2026` },
+          { icon:ic.flag, label:'Приоритет', value: t.prio==='high'?'Важное':'Обычный' },
+        ],
+        showMats:false, links: links.length?links:null,
+        primaryAction: checked ? 'Снять отметку' : 'Отметить выполненным',
+      };
+      ev.toggleStop = (e) => { e.stopPropagation(); toggleTodo(t.id); };
+      ev.open = () => select(ev);
+      ev.openStop = (e) => { e.stopPropagation(); select(ev); };
+      return ev;
+    };
+
+    // events per day
+    const byDay = {};
+    const push = (ev) => { (byDay[ev.d] = byDay[ev.d] || []).push(ev); };
+    if (filters.lesson) lessons.forEach((l) => push(buildLesson(l)));
+    if (filters.deadline) deadlines.forEach((dd) => push(buildDeadline(dd)));
+    if (filters.todo) todosRaw.forEach((t) => push(buildTodo(t)));
+    // order: deadline, lesson, todo
+    const ord = { deadline:0, lesson:1, todo:2 };
+    Object.keys(byDay).forEach((k) => byDay[k].sort((a, b) => ord[a.kind] - ord[b.kind]));
+
+    // ── MONTH grid ──
+    const weekdayHeads = ['пнд','втр','срд','чтв','птн','сбт','вск'].map((label, i) => ({ label, color: i>=5 ? '#C2C6CE' : '#9AA0AC' }));
+    const maxShow = density === 'compact' ? 2 : 3;
+    const minH = density === 'compact' ? 96 : 118;
+    const monthCells = [];
+    for (let i = 0; i < 35; i += 1) {
+      const isJune = i < 30;
+      const dayNum = isJune ? i + 1 : i - 29;
+      const col = i % 7;
+      const weekend = col >= 5;
+      const today = isJune && dayNum === TODAY;
+      const all = isJune ? (byDay[dayNum] || []) : [];
+      const shown = all.slice(0, maxShow);
+      const more = all.length - shown.length;
+      const cellBg = today ? '#F7F9FF' : (!isJune ? '#FAFAFB' : (weekend ? '#FCFCFD' : '#fff'));
+      monthCells.push({
+        dayNum, today,
+        cellStyle:`min-height:${minH}px;padding:7px 8px 8px;border-right:1px solid #F4F5F7;border-bottom:1px solid #F4F5F7;background:${cellBg};${col===6?'border-right:none;':''}`,
+        numStyle: today
+          ? 'display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:#2B4BFF;color:#fff;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums'
+          : `font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:${!isJune ? '#C8CCD3' : (weekend ? '#A2A8B2' : '#2A2F3A')};padding-right:2px`,
+        events: shown, more: more > 0 ? more : '',
+        add: (e) => { e.stopPropagation(); openCreate('lesson', isJune ? dayNum : TODAY); },
+      });
+    }
+
+    // ── WEEK grid (week of 22–28) ──
+    const weekNums = [22,23,24,25,26,27,28];
+    const dows = ['пнд','втр','срд','чтв','птн','сбт','вск'];
+    const weekColumns = weekNums.map((dn, i) => {
+      const today = dn === TODAY;
+      const weekend = i >= 5;
+      const all = byDay[dn] || [];
+      return {
+        dateNum: dn, dow: dows[i],
+        dowColor: today ? '#2B4BFF' : (weekend ? '#C2C6CE' : '#9AA0AC'),
+        headStyle:`display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-right:1px solid #F4F5F7;${today?'background:#F7F9FF;':''}`,
+        dateStyle: today
+          ? 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;background:#2B4BFF;color:#fff;font-size:14px;font-weight:600'
+          : `font-size:15px;font-weight:600;color:${weekend?'#A2A8B2':'#2A2F3A'}`,
+        cellBg: today ? '#FBFCFF' : '#FCFCFE',
+        allDay: all.filter((e) => e.isDeadline || e.isTodo),
+        byPair: all.filter((e) => e.isLesson).reduce((m, e) => { (m[e.slot] = m[e.slot] || []).push(e); return m; }, {}),
+      };
+    });
+    const weekRows = PAIRS.map((p) => ({
+      time: p.t, label: p.label,
+      cells: weekColumns.map((c, ci) => ({
+        events: c.byPair[p.key] || [],
+        bg: weekNums[ci] === TODAY ? '#FBFCFF' : '#fff',
+        add: () => openCreate('lesson', weekNums[ci]),
+      })),
+    }));
+
+    // ── view switcher ──
+    const VIEWS = [['month','Месяц'],['week','Неделя'],['day','День'],['list','Список']];
+    const views = VIEWS.map(([k, label]) => {
+      const on = view === k || (k === 'day' && false);
+      const active = view === k;
+      return { label, set: () => this.setState({ view: (k==='day'||k==='list') ? view : k, selected:null }),
+        bg: active ? '#fff' : 'transparent', shadow: active ? '0 1px 2px rgba(13,19,33,.12)' : 'none', fg: active ? '#0D1321' : '#646A76' };
+    });
+    const periodLabel = isWeek ? '22–28 июня 2026' : 'июнь 2026';
+
+    // ── right rail: stats ──
+    const inWeek = (d) => weekNums.includes(d);
+    const lessonsWeek = lessons.filter((l) => inWeek(l.d)).length;
+    const dlWeek = deadlines.filter((d) => inWeek(d.d)).length;
+    const todosWeekOpen = todosRaw.filter((t) => inWeek(t.d) && !todoDoneState(t)).length;
+    const attention = todosRaw.filter((t) => t.d < TODAY && !todoDoneState(t)).length + deadlines.filter((d) => d.d === TODAY).length;
+    const stats = [
+      { label:'Уроков', v:lessonsWeek, icon:ic.clock, tone:'blue' },
+      { label:'Дедлайнов', v:dlWeek, icon:ic.clock, tone:'amber' },
+      { label:'Дел открыто', v:todosWeekOpen, icon:ic.checkSq, tone:'teal' },
+      { label:'Требует внимания', v:attention, icon:ic.alert, tone:'rose' },
+    ].map((s) => ({ ...s, fg:TONE[s.tone].ink, soft:TONE[s.tone].soft, bg:'#fff', valColor: s.tone==='rose' ? '#E11D48' : '#0D1321', icon:s.icon }));
+
+    // ── type filters ──
+    const counts = { lesson: lessons.length, deadline: deadlines.length, todo: todosRaw.length };
+    const FT = [
+      { key:'lesson', label:'Уроки', sw:'#2B4BFF' },
+      { key:'deadline', label:'Дедлайны', sw:'#D97706' },
+      { key:'todo', label:'Дела', sw:'#0D9488' },
+    ];
+    const typeFilters = FT.map((f) => {
+      const on = filters[f.key];
+      return {
+        label:f.label, count:counts[f.key],
+        toggle: () => this.setState((s) => ({ filters: { ...s.filters, [f.key]: !s.filters[f.key] }, selected:null })),
+        rowBg: on ? '#F7F8FA' : 'transparent',
+        swatch:`width:13px;height:13px;border-radius:4px;flex-shrink:0;background:${on?f.sw:'#fff'};border:1.5px solid ${on?f.sw:'#C2C6CE'}`,
+        track:`position:relative;width:30px;height:18px;border-radius:999px;flex-shrink:0;background:${on?f.sw:'#D7DAE0'};transition:background .15s`,
+        knob:`position:absolute;top:2px;left:${on?'14px':'2px'};width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)`,
+      };
+    });
+
+    // ── group legend ──
+    const groupLegend = [
+      ['11 класс · Профиль'],['10 класс'],['Геометрия 8'],['Интенсив 11'],['Индивидуальные'],
+    ].map(([name]) => { const h = toneOf(name); return { name, base:h.base, fg:h.ink, soft:h.soft }; });
+
+    // ── rail todos (overdue + today) ──
+    const railTodos = todosRaw.filter((t) => t.d <= TODAY).sort((a, b) => a.d - b.d).map((t) => {
+      const checked = todoDoneState(t);
+      const overdue = t.d < TODAY && !checked;
+      const hex = t.group ? toneOf(t.group) : TONE.neutral;
+      const cb = checkbox(t.group ? GTONE[t.group] || 'teal' : 'teal', checked, false);
+      return {
+        title:t.title, high: t.prio==='high' && !checked, group:t.group,
+        titleColor: checked ? '#B5BAC4' : '#2A2F3A', strike: checked ? 'text-decoration:line-through' : '',
+        cbStyle: cb.cbStyle.replace('width:13px;height:13px','width:16px;height:16px'), cbInner: checkbox(t.group ? GTONE[t.group] || 'teal' : 'teal', checked, true).cbInner,
+        toggle: (e) => { e.stopPropagation(); toggleTodo(t.id); },
+        due: t.d === TODAY ? 'сегодня' : (overdue ? `−${TODAY - t.d} дн` : `${t.d} июня`),
+        dueFg: overdue ? '#BE123C' : (t.d===TODAY ? '#1A34D1' : '#646A76'),
+        dueSoft: overdue ? '#FFE4E6' : (t.d===TODAY ? '#E7ECFF' : '#F3F4F6'),
+        groupFg: hex.ink, groupSoft: hex.soft,
+      };
+    });
+    const todoOpenCount = todosRaw.filter((t) => t.d <= TODAY && !todoDoneState(t)).length;
+
+    // ── create modal ──
+    const createType = this.state.createType;
+    const CT = [ ['lesson','Урок',ic.cal], ['deadline','Дедлайн',ic.clock], ['todo','Дело',ic.checkSq] ];
+    const createTabs = CT.map(([k, label, icon]) => {
+      const active = createType === k;
+      return { label, icon, set: () => this.setState({ createType:k }),
+        bg: active ? '#fff' : 'transparent', shadow: active ? '0 1px 2px rgba(13,19,33,.12)' : 'none', fg: active ? '#0D1321' : '#646A76' };
+    });
+    const pairChips = PAIRS.map((p, i) => ({ label: `${p.label} · ${p.t}`, style:`font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:8px;cursor:pointer;color:${i===1?'#1A34D1':'#646A76'};background:${i===1?'#E7ECFF':'#F3F4F6'};border:1px solid ${i===1?'#C7D2FE':'transparent'}` }));
+
+    return {
+      nav, navTools,
+      icSearch:ic.search, icBell:ic.bell, icCal:ic.cal, icPlus:ic.plus, icUsers:ic.users, icChevD:ic.chevD,
+      icChevL:ic.chevL, icChevR:ic.chevR, icClock:ic.clock, icFilter:ic.filter, icCheckSq:ic.checkSq,
+      icFlag:ic.flag, icX:ic.x, icClip:ic.clip, icAlert:ic.alert, icPencil:ic.pencil, icTrash:ic.trash,
+      isMonth, isWeek, periodLabel, views, showRail,
+      weekdayHeads, monthCells, weekColumns, weekRows,
+      stats, summaryTitle:'Сводка недели · 22–28 июня', typeFilters, groupLegend,
+      railTodos, todoOpenCount,
+      openCreateDefault: () => openCreate('lesson', TODAY),
+      openCreateTodo: () => openCreate('todo', TODAY),
+      closeCreate: () => this.setState({ createOpen:false }),
+      stopProp: (e) => e.stopPropagation(),
+      createOpen: this.state.createOpen, createTabs,
+      createIsLesson: createType === 'lesson',
+      createTitleLabel: createType==='todo' ? 'Что нужно сделать' : 'Название',
+      createPlaceholder: createType==='lesson' ? 'Тема урока…' : createType==='deadline' ? 'Название работы…' : 'Новое дело…',
+      createDateLabel: createType==='lesson' ? 'Дата и время' : 'Срок',
+      createDateValue: `${this.state.createDay} июня 2026`,
+      pairChips,
+      selected: this.state.selected,
+      closeInspector: () => this.setState({ selected:null }),
+    };
+  }
+}
+</script>
+</body>
+</html>

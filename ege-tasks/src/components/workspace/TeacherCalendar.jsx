@@ -1,386 +1,105 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Children, cloneElement, useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, dayjsLocalizer, Views } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
+import { App, Button, Segmented, Select, Tooltip } from 'antd';
 import {
-  App, Button, DatePicker, Form, Input, Modal, Popconfirm, Segmented, Select, Space, Switch, Typography,
-} from 'antd';
-import { CalendarOutlined, FileTextOutlined, LinkOutlined, PlusOutlined, PaperClipOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
+  CalendarOutlined, PlusOutlined, LeftOutlined, RightOutlined,
+  LayoutOutlined, ColumnHeightOutlined, CompressOutlined,
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import MaterialPickerModal from './MaterialPickerModal';
-import AttendanceRoster from './AttendanceRoster';
-import { WorkspacePageHeader, Chip, groupHex } from './ui';
-import { PAIRS, guessSlot, slotRangeFromCode, endForLesson } from './lessonTime';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
 import localeData from 'dayjs/plugin/localeData';
 import weekday from 'dayjs/plugin/weekday';
 import localizedFormat from 'dayjs/plugin/localizedFormat';
+import { WorkspacePageHeader, groupHex } from './ui';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
+import LessonModal from './calendar/LessonModal';
+import EventChip from './calendar/EventChip';
+import WeekByPairs from './calendar/WeekByPairs';
+import RightRail from './calendar/RightRail';
+import EventInspector from './calendar/EventInspector';
+import CreateEventModal from './calendar/CreateEventModal';
+import { CalendarContext, useCalendarCtx } from './calendar/CalendarContext';
+import {
+  buildEvents, sortMonthEvents, weekSummary, todayTodos, periodTitle,
+} from './calendar/calendarUtils';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import './TeacherCalendar.css';
+import './calendar/calendar.css';
 
 dayjs.extend(localeData);
 dayjs.extend(weekday);
 dayjs.extend(localizedFormat);
 dayjs.locale('ru');
 
-const { Text } = Typography;
 const localizer = dayjsLocalizer(dayjs);
 const DnDCalendar = withDragAndDrop(Calendar);
 
 const RU_MESSAGES = {
-  date: 'Дата', time: 'Время', event: 'Событие',
-  allDay: 'Весь день', week: 'Неделя', work_week: 'Раб. неделя',
-  day: 'День', month: 'Месяц', previous: 'Назад', next: 'Вперёд',
-  yesterday: 'Вчера', tomorrow: 'Завтра', today: 'Сегодня', agenda: 'Список',
+  date: 'Дата', time: 'Время', event: 'Событие', allDay: 'Весь день',
+  week: 'Неделя', work_week: 'Раб. неделя', day: 'День', month: 'Месяц',
+  previous: 'Назад', next: 'Вперёд', today: 'Сегодня', agenda: 'Список',
   noEventsInRange: 'Нет событий в этом периоде',
   showMore: (n) => `+ ещё ${n}`,
 };
 
-const STATUS_LABEL = { planned: 'запланирован', done: 'проведён', cancelled: 'отменён' };
+const VIEW_OPTIONS = [
+  { value: Views.MONTH, label: 'Месяц' },
+  { value: Views.WEEK, label: 'Неделя' },
+  { value: Views.DAY, label: 'День' },
+  { value: Views.AGENDA, label: 'Список' },
+];
 
-function LessonModal({ open, initial, groups, works, onSave, onDelete, onCancel, onOpenNote, onOpenMaterial, saving, canEdit }) {
-  const [form] = Form.useForm();
-  const materialIds = Form.useWatch('materials', form) || [];
-  const watchedGroup = Form.useWatch('group', form);
-  const worksMap = useMemo(() => new Map((works || []).map((w) => [w.id, w.title])), [works]);
-  // Файлы из Библиотеки (type:'material') живут отдельно от работ (type:'work').
-  const [fileMaterials, setFileMaterials] = useState([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  // Файлы, прикреплённые к ЗАМЕТКЕ этого урока (read-only, обратная связь урок↔заметка).
-  const [noteFiles, setNoteFiles] = useState([]);
-  // Пресет «пара/часть/интенсив» — выставляет время старта по расписанию школы.
-  const [mode, setMode] = useState('single');   // 'single' | 'intensive'
-  const [pair, setPair] = useState(null);        // '0'..'5' | null (своё время / старт интенсива)
-  const [part, setPart] = useState('full');      // 'full' | '1' | '2'
-  const [endPair, setEndPair] = useState(null);  // конечная пара интенсива
-
-  useEffect(() => {
-    if (open) {
-      const all = Array.isArray(initial?.materials) ? initial.materials : [];
-      const startDate = initial?.date_plan ? dayjs(initial.date_plan)
-        : (initial?.slotDate ? dayjs(initial.slotDate) : dayjs());
-      form.setFieldsValue({
-        title: initial?.title || '',
-        group: initial?.group || undefined,
-        date_plan: startDate,
-        status: initial?.status || 'planned',
-        materials: all.filter((m) => m.type !== 'material').map((m) => m.id),
-      });
-      setFileMaterials(all.filter((m) => m.type === 'material'));
-      // Инициализация слота: приоритет time_slot, иначе угадываем по времени старта.
-      const ts = initial?.time_slot || '';
-      const inten = /^(\d)-(\d)$/.exec(ts);
-      const half = /^(\d)([ab])$/.exec(ts);
-      if (inten) { setMode('intensive'); setPair(inten[1]); setEndPair(inten[2]); setPart('full'); }
-      else if (half) { setMode('single'); setPair(half[1]); setPart(half[2] === 'a' ? '1' : '2'); setEndPair(null); }
-      else if (ts && PAIRS.some((p) => p.key === ts)) { setMode('single'); setPair(ts); setPart('full'); setEndPair(null); }
-      else { const g = guessSlot(startDate.toDate()); setMode('single'); setPair(g.pair); setPart(g.part); setEndPair(null); }
-    }
-  }, [open, initial, form]);
-
-  // Подтянуть файлы заметки урока (если заметка есть). Без создания заметки.
-  useEffect(() => {
-    let cancelled = false;
-    if (!open || !initial?.id) { setNoteFiles([]); return undefined; }
-    api.getLessonNote(initial.id)
-      .then((note) => {
-        if (cancelled) return;
-        const links = Array.isArray(note?.links) ? note.links : [];
-        setNoteFiles(links.filter((l) => l.type === 'material'));
-      })
-      .catch(() => { if (!cancelled) setNoteFiles([]); });
-    return () => { cancelled = true; };
-  }, [open, initial?.id]);
-
-  const setStartTime = (str) => {
-    const [h, m] = str.split(':').map(Number);
-    const cur = form.getFieldValue('date_plan') || dayjs();
-    form.setFieldsValue({ date_plan: dayjs(cur).hour(h).minute(m).second(0).millisecond(0) });
-  };
-
-  // Одиночная пара/полупара → старт по расписанию.
-  const applySlot = (p, prt) => {
-    setPair(p);
-    setPart(prt);
-    if (!p) return;
-    const def = PAIRS.find((x) => x.key === p);
-    if (def) setStartTime((p === '0' || prt === 'full') ? def.full[0] : (prt === '1' ? def.halves[0][0] : def.halves[1][0]));
-  };
-
-  // Интенсив → старт = начало первой пары.
-  const applyIntensive = (s, e) => {
-    setPair(s);
-    setEndPair(e);
-    if (!s) return;
-    const def = PAIRS.find((x) => x.key === s);
-    if (def) setStartTime(def.full[0]);
-  };
-
-  // Код слота для сохранения (time_slot).
-  const currentSlotCode = () => {
-    if (mode === 'intensive') {
-      if (!pair || !endPair || Number(endPair) <= Number(pair)) return '';
-      return `${pair}-${endPair}`;
-    }
-    if (!pair) return '';
-    if (pair === '0' || part === 'full') return pair;
-    return pair + (part === '1' ? 'a' : 'b');
-  };
-
-  const slotRange = slotRangeFromCode(currentSlotCode());
-  const intensiveCount = (mode === 'intensive' && pair && endPair && Number(endPair) > Number(pair))
-    ? Number(endPair) - Number(pair) + 1 : 0;
-
-  const handleFinish = (v) => {
-    onSave({
-      title: v.title,
-      group: v.group || '',
-      date_plan: v.date_plan ? v.date_plan.toISOString() : dayjs().toISOString(),
-      status: v.status || 'planned',
-      time_slot: currentSlotCode(),
-      materials: [
-        ...(v.materials || []).map((id) => ({ type: 'work', id, title: worksMap.get(id) || '' })),
-        ...fileMaterials,
-      ],
-    });
-  };
-
-  const editingExisting = initial?.id;
-
-  return (
-    <Modal
-      open={open}
-      title={editingExisting ? 'Урок' : 'Новый урок'}
-      onCancel={onCancel}
-      onOk={() => form.submit()}
-      confirmLoading={saving}
-      okText="Сохранить"
-      cancelText="Отмена"
-      okButtonProps={{ disabled: !canEdit }}
-      destroyOnHidden
-      footer={(_, { OkBtn, CancelBtn }) => (
-        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          <span>
-            {editingExisting && canEdit && (
-              <Popconfirm title="Удалить урок?" okText="Удалить" cancelText="Отмена" okButtonProps={{ danger: true }} onConfirm={onDelete}>
-                <Button danger>Удалить</Button>
-              </Popconfirm>
-            )}
-          </span>
-          <Space><CancelBtn /><OkBtn /></Space>
-        </Space>
-      )}
-    >
-      <Form form={form} layout="vertical" onFinish={handleFinish} style={{ marginTop: 8 }} disabled={!canEdit}>
-        <Form.Item name="title" label="Тема урока" rules={[{ required: true, message: 'Введите тему' }]}>
-          <Input placeholder="Тема урока" maxLength={500} autoFocus />
-        </Form.Item>
-        <Space size="large" style={{ display: 'flex' }}>
-          <Form.Item name="group" label="Группа" style={{ flex: 1 }}>
-            <Select allowClear placeholder="Группа" options={groups.map((g) => ({ value: g.id, label: g.name }))} />
-          </Form.Item>
-          <Form.Item name="status" label="Статус" style={{ flex: 1 }}>
-            <Select options={[
-              { value: 'planned', label: 'Запланирован' },
-              { value: 'done', label: 'Проведён' },
-              { value: 'cancelled', label: 'Отменён' },
-            ]} />
-          </Form.Item>
-        </Space>
-        <Form.Item label="Время по расписанию" style={{ marginBottom: 8 }}>
-          <Space direction="vertical" size={6} style={{ width: '100%' }}>
-            <Segmented value={mode}
-              onChange={(m) => {
-                setMode(m);
-                if (m === 'intensive') { if (pair) applyIntensive(pair, endPair); }
-                else if (pair) applySlot(pair, part);
-              }}
-              options={[
-                { value: 'single', label: 'Пара' },
-                { value: 'intensive', label: 'Интенсив (2–4 пары)' },
-              ]} />
-            {mode === 'single' ? (
-              <Space wrap>
-                <Select allowClear placeholder="— своё время —" style={{ width: 150 }}
-                  value={pair ?? undefined}
-                  onChange={(v) => applySlot(v ?? null, v === '0' ? 'full' : part)}
-                  options={PAIRS.map((p) => ({ value: p.key, label: p.label }))} />
-                <Segmented value={part} disabled={!pair || pair === '0'}
-                  onChange={(v) => applySlot(pair, v)}
-                  options={[
-                    { value: 'full', label: 'Вся пара' },
-                    { value: '1', label: '1-я пол.' },
-                    { value: '2', label: '2-я пол.' },
-                  ]} />
-                {slotRange && <Chip tone="blue" dot={false}>{slotRange[0]}–{slotRange[1]}</Chip>}
-              </Space>
-            ) : (
-              <Space wrap>
-                <Select placeholder="с пары" style={{ width: 130 }} value={pair ?? undefined}
-                  onChange={(v) => applyIntensive(v ?? null, endPair)}
-                  options={PAIRS.map((p) => ({ value: p.key, label: p.label }))} />
-                <span>→</span>
-                <Select placeholder="по пару" style={{ width: 130 }} value={endPair ?? undefined}
-                  onChange={(v) => applyIntensive(pair, v ?? null)}
-                  options={PAIRS.map((p) => ({ value: p.key, label: p.label }))} />
-                {slotRange && (
-                  <Chip tone="violet" dot={false}>{slotRange[0]}–{slotRange[1]} · {intensiveCount} пары</Chip>
-                )}
-                {pair && endPair && Number(endPair) <= Number(pair) && (
-                  <Typography.Text type="danger" style={{ fontSize: 12 }}>конец должен быть позже начала</Typography.Text>
-                )}
-              </Space>
-            )}
-          </Space>
-        </Form.Item>
-        <Form.Item name="date_plan" label="Дата и время" rules={[{ required: true }]}>
-          <DatePicker showTime={{ format: 'HH:mm' }} format="DD.MM.YYYY HH:mm" style={{ width: '100%' }}
-            onChange={(d) => { if (d) { const g = guessSlot(d.toDate()); setPair(g.pair); setPart(g.part); } }} />
-        </Form.Item>
-        <Form.Item name="materials" label="Материалы урока (работы)">
-          <Select
-            mode="multiple"
-            allowClear
-            placeholder="Привязать работы к уроку"
-            optionFilterProp="label"
-            options={(works || []).map((w) => ({ value: w.id, label: w.title }))}
-          />
-        </Form.Item>
-      </Form>
-
-      {/* Посещаемость: ученики из группы урока, состояние на конкретный урок */}
-      <div style={{ margin: '4px 0 12px', paddingTop: 12, borderTop: '1px solid #f0f0f0' }}>
-        {editingExisting ? (
-          <AttendanceRoster lessonId={initial.id} groupId={watchedGroup} canEdit={canEdit} />
-        ) : (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Сохраните урок, чтобы отметить посещаемость.
-          </Typography.Text>
-        )}
-      </div>
-
-      {/* Файлы из Библиотеки (pb-files) */}
-      <div style={{ marginBottom: 12 }}>
-        <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
-          <Typography.Text strong style={{ fontSize: 13 }}>
-            <PaperClipOutlined /> Файлы из Библиотеки
-          </Typography.Text>
-          {canEdit && (
-            <Button size="small" icon={<PaperClipOutlined />} onClick={() => setPickerOpen(true)}>
-              Прикрепить
-            </Button>
-          )}
-        </Space>
-        {fileMaterials.length === 0 ? (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>Нет прикреплённых файлов</Typography.Text>
-        ) : (
-          <Space direction="vertical" size={2} style={{ width: '100%' }}>
-            {fileMaterials.map((m) => (
-              <Space key={m.id} style={{ width: '100%', justifyContent: 'space-between' }}>
-                <a href={m.url} target="_blank" rel="noreferrer">
-                  <DownloadOutlined /> {m.title}
-                </a>
-                {canEdit && (
-                  <Button size="small" type="text" danger icon={<DeleteOutlined />}
-                    onClick={() => setFileMaterials((prev) => prev.filter((x) => x.id !== m.id))} />
-                )}
-              </Space>
-            ))}
-          </Space>
-        )}
-      </div>
-
-      {/* Файлы, прикреплённые к заметке урока (read-only; правка — в самой заметке) */}
-      {noteFiles.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          <Typography.Text strong style={{ fontSize: 13 }}>
-            <FileTextOutlined /> Файлы заметки урока
-          </Typography.Text>
-          <Space direction="vertical" size={2} style={{ width: '100%', marginTop: 4 }}>
-            {noteFiles.map((m) => (
-              <Space key={m.id} style={{ width: '100%', justifyContent: 'space-between' }}>
-                <a href={m.url} target="_blank" rel="noreferrer">
-                  <DownloadOutlined /> {m.title}
-                </a>
-                <Chip tone="violet" dot={false}>из заметки</Chip>
-              </Space>
-            ))}
-          </Space>
-        </div>
-      )}
-
-      <MaterialPickerModal
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        existingIds={fileMaterials.map((m) => m.id)}
-        onPick={(picked) => setFileMaterials((prev) => {
-          const seen = new Set(prev.map((x) => x.id));
-          return [...prev, ...picked.filter((p) => !seen.has(p.id))];
-        })}
-      />
-
-      {/* Быстрый переход к материалам: выдача, результаты, работа над ошибками */}
-      {materialIds.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>Открыть материал (выдача · результаты · работа над ошибками):</Typography.Text>
-          <div style={{ marginTop: 4 }}>
-            {materialIds.map((id) => (
-              <Button key={id} size="small" type="link" icon={<LinkOutlined />} style={{ paddingLeft: 0 }} onClick={() => onOpenMaterial(id)}>
-                {worksMap.get(id) || 'Работа'}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Заметка урока = общая заметка (BlockNote + формулы) */}
-      <div style={{ marginTop: 8 }}>
-        {editingExisting ? (
-          <Button icon={<FileTextOutlined />} onClick={() => onOpenNote(initial)} block>
-            Открыть заметку урока (формулы, блоки)
-          </Button>
-        ) : (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Сохраните урок, чтобы добавить заметку с формулами.
-          </Typography.Text>
-        )}
-      </div>
-    </Modal>
-  );
+// Ячейка месяца с кнопкой быстрого создания (появляется на hover).
+function MonthDateCell({ children, value }) {
+  const { onCreateInSlot, canEdit } = useCalendarCtx();
+  if (!canEdit) return children;
+  const child = Children.only(children);
+  return cloneElement(child, { className: `${child.props.className || ''} cal-monthcell` }, (
+    <span className="cal-cell-add" title="Создать"
+      onClick={(e) => { e.stopPropagation(); onCreateInSlot(value, null); }}>
+      <PlusOutlined />
+    </span>
+  ));
 }
 
 export default function TeacherCalendar() {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const { canEdit } = useAuth();
+  const { canEdit, canDelete } = useAuth();
 
   const [groups, setGroups] = useState([]);
   const [works, setWorks] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
+  const [todos, setTodos] = useState([]);
+
+  const [filters, setFilters] = useState({ lesson: true, deadline: true, todo: true });
   const [groupFilter, setGroupFilter] = useState(null);
-  const [showDeadlines, setShowDeadlines] = useState(true);
   const [view, setView] = useState(Views.MONTH);
   const [date, setDate] = useState(new Date());
-  const [modalOpen, setModalOpen] = useState(false);
+  const [density, setDensity] = useState('comfortable');
+  const [showRail, setShowRail] = useState(true);
+
+  const [selected, setSelected] = useState(null);       // событие в инспекторе
+  const [modalOpen, setModalOpen] = useState(false);    // LessonModal
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [createState, setCreateState] = useState(null); // { type, day, pair } | null
 
   const load = useCallback(async () => {
     try {
-      const [g, l, d, w] = await Promise.all([
+      const [g, l, d, w, t] = await Promise.all([
         api.getTeachingGroups(),
         api.getLessons(),
         api.getSessionsWithDeadline(),
         api.getWorks(),
+        api.getTodos(),
       ]);
-      setGroups(g);
-      setLessons(l);
-      setDeadlines(d);
-      setWorks(w);
+      setGroups(g); setLessons(l); setDeadlines(d); setWorks(w); setTodos(t);
     } catch {
       message.error('Не удалось загрузить календарь');
     }
@@ -388,113 +107,125 @@ export default function TeacherCalendar() {
 
   useEffect(() => { load(); }, [load]);
 
-  const events = useMemo(() => {
-    const lessonEvents = lessons
-      .filter((l) => !groupFilter || l.group === groupFilter)
-      .map((l) => {
-        const start = new Date(l.date_plan);
-        const hasMaterials = Array.isArray(l.materials) && l.materials.length > 0;
-        return {
-          id: l.id,
-          title: hasMaterials ? `📎 ${l.title}` : l.title,
-          start,
-          end: endForLesson(l, start),
-          resource: { type: 'lesson', raw: l, groupName: l.expand?.group?.name, status: l.status || 'planned' },
-        };
-      });
+  const events = useMemo(
+    () => buildEvents({ lessons, deadlines, todos, filters, groupFilter }),
+    [lessons, deadlines, todos, filters, groupFilter],
+  );
 
-    const deadlineEvents = showDeadlines
-      ? deadlines.map((s) => {
-          const start = new Date(s.deadline);
-          const t = s.expand?.work?.title || s.student_title || s.expand?.mc_test?.title || s.expand?.trig_mc_test?.title || 'Работа';
-          return {
-            id: `dl_${s.id}`,
-            title: `⏰ ${t}`,
-            start,
-            end: start,
-            allDay: true,
-            resource: { type: 'deadline', raw: s },
-          };
-        })
-      : [];
+  const summary = useMemo(
+    () => weekSummary({ lessons, deadlines, todos, date }),
+    [lessons, deadlines, todos, date],
+  );
+  const railTodos = useMemo(() => todayTodos(todos), [todos]);
+  const counts = useMemo(() => ({
+    lesson: lessons.filter((l) => !groupFilter || l.group === groupFilter).length,
+    deadline: deadlines.length,
+    todo: todos.filter((t) => !t.done && (!groupFilter || t.group === groupFilter)).length,
+  }), [lessons, deadlines, todos, groupFilter]);
 
-    return [...lessonEvents, ...deadlineEvents];
-  }, [lessons, deadlines, groupFilter, showDeadlines]);
-
-  const eventPropGetter = useCallback((event) => {
-    const r = event.resource;
-    if (r?.type === 'deadline') {
-      return { className: 'rbc-evt-deadline' };
+  // ── Переключение действий с делом (оптимистично) ──
+  const toggleTodo = useCallback(async (todo) => {
+    const next = !todo.done;
+    setTodos((prev) => prev.map((t) => (t.id === todo.id ? { ...t, done: next } : t)));
+    try {
+      if (next) await api.completeTodo(todo);
+      else await api.updateTodo(todo.id, { done: false });
+      load();
+    } catch {
+      message.error('Не удалось обновить дело');
+      load();
     }
-    const status = r?.status;
-    // Цвет блока = группа (единый «язык» цвета во всём разделе). Нет группы → акцент.
-    const hex = groupHex(r?.raw?.group || '');
+  }, [load, message]);
+
+  const openInspector = useCallback((event) => setSelected(event), []);
+
+  const openCreate = useCallback((day, pair) => {
+    if (!canEdit) return;
+    setCreateState({ type: 'lesson', day, pair });
+  }, [canEdit]);
+
+  // ── eventPropGetter: фон/класс обёртки по типу ──
+  const eventPropGetter = useCallback((event) => {
+    const r = event.resource || {};
+    if (r.type === 'deadline') return { className: 'rbc-evt-deadline-soft' };
+    if (r.type === 'todo') return { className: `rbc-evt-todo${r.done ? ' is-done' : ''}` };
+    const hex = groupHex(r.groupId || '');
     let cls = 'rbc-evt-lesson';
-    if (status === 'done') cls += ' rbc-evt-done';
-    else if (status === 'cancelled') cls += ' rbc-evt-cancelled';
-    return { className: cls, style: { backgroundColor: hex.base, borderColor: hex.base } };
+    if (r.status === 'done') cls += ' rbc-evt-done';
+    else if (r.status === 'cancelled') cls += ' rbc-evt-cancelled';
+    else {
+      const now = Date.now();
+      if (now >= +event.start && now <= +event.end) cls += ' is-now';
+    }
+    const style = (r.status === 'cancelled')
+      ? undefined
+      : { backgroundColor: hex.base, borderColor: hex.base };
+    return { className: cls, style };
   }, []);
 
-  const persistLessonDate = async (lessonId, start) => {
-    // оптимистично
-    setLessons((prev) => prev.map((l) => (l.id === lessonId ? { ...l, date_plan: start.toISOString() } : l)));
-    try {
-      await api.updateLesson(lessonId, { date_plan: start.toISOString() });
-    } catch {
-      message.error('Не удалось перенести урок');
-      load();
-    }
-  };
+  const dayPropGetter = useCallback((d) => {
+    const wd = dayjs(d).day();
+    if (wd === 0 || wd === 6) return { className: 'cal-weekend' };
+    return {};
+  }, []);
 
-  const persistDeadline = async (sessionId, start) => {
-    setDeadlines((prev) => prev.map((s) => (s.id === sessionId ? { ...s, deadline: start.toISOString() } : s)));
-    try {
-      await api.updateSession(sessionId, { deadline: start.toISOString() });
-    } catch {
-      message.error('Не удалось перенести дедлайн');
-      load();
-    }
-  };
-
+  // ── Drag-перенос (сохранён из прежнего календаря) ──
   const onEventDrop = useCallback(({ event, start }) => {
     if (!canEdit) return;
     const r = event.resource;
-    if (r?.type === 'lesson') persistLessonDate(r.raw.id, start);
-    else if (r?.type === 'deadline') persistDeadline(r.raw.id, start);
+    if (r?.type === 'lesson') {
+      setLessons((prev) => prev.map((l) => (l.id === r.raw.id ? { ...l, date_plan: start.toISOString() } : l)));
+      api.updateLesson(r.raw.id, { date_plan: start.toISOString() }).catch(() => { message.error('Не удалось перенести урок'); load(); });
+    } else if (r?.type === 'deadline') {
+      setDeadlines((prev) => prev.map((s) => (s.id === r.raw.id ? { ...s, deadline: start.toISOString() } : s)));
+      api.updateSession(r.raw.id, { deadline: start.toISOString() }).catch(() => { message.error('Не удалось перенести дедлайн'); load(); });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit]);
 
-  const onSelectSlot = useCallback(({ start }) => {
-    if (!canEdit) return;
-    setEditing({ slotDate: start, group: groupFilter || undefined });
-    setModalOpen(true);
-  }, [canEdit, groupFilter]);
+  const onSelectSlot = useCallback(({ start }) => { openCreate(start, null); }, [openCreate]);
 
-  const onSelectEvent = useCallback((event) => {
+  // ── Инспектор → правка ──
+  const handleEditFromInspector = (event) => {
     const r = event.resource;
-    if (r?.type === 'lesson') {
-      setEditing(r.raw);
-      setModalOpen(true);
-    } else if (r?.type === 'deadline') {
-      message.info(`Дедлайн: ${event.title.replace('⏰ ', '')} — ${dayjs(event.start).format('DD.MM.YYYY HH:mm')}`);
-    }
-  }, [message]);
+    setSelected(null);
+    if (r.type === 'lesson') { setEditing(r.raw); setModalOpen(true); }
+    else if (r.type === 'todo') { navigate('/app/todos'); }
+  };
 
+  const handleDeleteFromInspector = async (event) => {
+    const r = event.resource;
+    try {
+      if (r.type === 'lesson') await api.deleteLesson(r.raw.id);
+      else if (r.type === 'todo') await api.deleteTodo(r.raw.id);
+      setSelected(null);
+      load();
+    } catch {
+      message.error('Не удалось удалить');
+    }
+  };
+
+  // ── LessonModal save/delete/note/material ──
   const handleSave = async (data) => {
     setSaving(true);
     try {
-      if (editing?.id) {
-        await api.updateLesson(editing.id, data);
-      } else {
-        await api.createLesson(data);
-      }
-      setModalOpen(false);
-      setEditing(null);
-      load();
+      if (editing?.id) await api.updateLesson(editing.id, data);
+      else await api.createLesson(data);
+      setModalOpen(false); setEditing(null); load();
     } catch {
       message.error('Не удалось сохранить урок');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteLesson = async () => {
+    if (!editing?.id) return;
+    try {
+      await api.deleteLesson(editing.id);
+      setModalOpen(false); setEditing(null); load();
+    } catch {
+      message.error('Не удалось удалить урок');
     }
   };
 
@@ -512,77 +243,142 @@ export default function TeacherCalendar() {
     navigate(`/app/works/${workId}/edit`);
   };
 
-  const handleDelete = async () => {
-    if (!editing?.id) return;
-    try {
-      await api.deleteLesson(editing.id);
-      setModalOpen(false);
-      setEditing(null);
-      load();
-    } catch {
-      message.error('Не удалось удалить урок');
-    }
+  const handleOpenWork = (workId) => {
+    setSelected(null);
+    navigate(`/app/works/${workId}/edit`);
   };
 
+  // ── Навигация периода ──
+  const navPeriod = (dir) => {
+    const unit = view === Views.WEEK ? 'week' : view === Views.DAY ? 'day' : 'month';
+    setDate((d) => (dir === 0 ? new Date() : dayjs(d)[dir > 0 ? 'add' : 'subtract'](1, unit).toDate()));
+  };
+
+  const ctx = useMemo(() => ({
+    onToggleTodo: toggleTodo,
+    onSelectEvent: openInspector,
+    onCreateInSlot: openCreate,
+    canEdit,
+    density,
+  }), [toggleTodo, openInspector, openCreate, canEdit, density]);
+
+  const components = useMemo(() => ({
+    event: EventChip,
+    dateCellWrapper: MonthDateCell,
+  }), []);
+
+  const minHeight = density === 'compact' ? 96 : 118;
+
   return (
-    <div>
+    <CalendarContext.Provider value={ctx}>
       <WorkspacePageHeader
         icon={<CalendarOutlined />}
         accent="blue"
         title="Календарь"
-        subtitle="Уроки и дедлайны выдач на сетке · перетащите событие, чтобы перенести"
+        subtitle="Уроки · дедлайны · дела на одной сетке"
         extra={(
           <>
             <Select
-              allowClear
-              style={{ minWidth: 180 }}
-              placeholder="Все группы"
-              value={groupFilter}
-              onChange={setGroupFilter}
+              allowClear style={{ minWidth: 160 }} placeholder="Все группы"
+              value={groupFilter} onChange={setGroupFilter}
               options={groups.map((g) => ({ value: g.id, label: g.name }))}
             />
-            <Space size={4}>
-              <Switch checked={showDeadlines} onChange={setShowDeadlines} size="small" />
-              <Text type="secondary">дедлайны</Text>
-            </Space>
+            <Tooltip title={density === 'comfortable' ? 'Компактная сетка' : 'Просторная сетка'}>
+              <Button icon={density === 'comfortable' ? <CompressOutlined /> : <ColumnHeightOutlined />}
+                onClick={() => setDensity((x) => (x === 'comfortable' ? 'compact' : 'comfortable'))} />
+            </Tooltip>
+            <Tooltip title={showRail ? 'Скрыть панель' : 'Показать панель'}>
+              <Button icon={<LayoutOutlined />} type={showRail ? 'default' : 'text'}
+                onClick={() => setShowRail((x) => !x)} />
+            </Tooltip>
             {canEdit && (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditing({ slotDate: new Date(), group: groupFilter || undefined }); setModalOpen(true); }}>
-                Урок
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateState({ type: 'lesson', day: date, pair: null })}>
+                Создать
               </Button>
             )}
           </>
         )}
       />
 
-      <div className="teacher-calendar-wrap">
-        <DnDCalendar
-          localizer={localizer}
-          events={events}
-          messages={RU_MESSAGES}
-          culture="ru"
-          views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
-          view={view}
-          onView={setView}
-          date={date}
-          onNavigate={setDate}
-          popup
-          selectable={canEdit}
-          resizable={false}
-          onEventDrop={onEventDrop}
-          onSelectSlot={onSelectSlot}
-          onSelectEvent={onSelectEvent}
-          eventPropGetter={eventPropGetter}
-          draggableAccessor={() => canEdit}
-          style={{ height: 'calc(100vh - 230px)', minHeight: 520 }}
-        />
+      {/* Toolbar */}
+      <div className="cal-toolbar">
+        <div className="cal-nav">
+          <Button onClick={() => navPeriod(0)}>Сегодня</Button>
+          <Button icon={<LeftOutlined />} onClick={() => navPeriod(-1)} />
+          <Button icon={<RightOutlined />} onClick={() => navPeriod(1)} />
+        </div>
+        <div className="cal-period">{periodTitle(date, view === Views.WEEK ? 'week' : view === Views.DAY ? 'day' : 'month')}</div>
+        <Segmented options={VIEW_OPTIONS} value={view} onChange={setView} />
       </div>
 
-      <Space style={{ marginTop: 12 }} wrap size={[8, 6]}>
-        <Text type="secondary" style={{ fontSize: 12 }}>Легенда:</Text>
-        <Chip tone="neutral" dot={false}>цвет блока = группа</Chip>
-        <Text type="secondary" style={{ fontSize: 12 }}>проведённый — бледнее, отменённый — зачёркнут</Text>
-        <Chip tone="amber">дедлайн выдачи</Chip>
-      </Space>
+      <div className={`cal-layout${showRail ? '' : ' no-rail'}`}>
+        <div className="cal-main teacher-calendar-wrap" style={{ '--cal-cell-min': `${minHeight}px` }}>
+          <DnDCalendar
+            localizer={localizer}
+            events={events}
+            messages={RU_MESSAGES}
+            culture="ru"
+            views={{ month: true, week: WeekByPairs, day: true, agenda: true }}
+            view={view}
+            onView={setView}
+            date={date}
+            onNavigate={setDate}
+            toolbar={false}
+            popup
+            selectable={canEdit}
+            resizable={false}
+            onEventDrop={onEventDrop}
+            onSelectSlot={onSelectSlot}
+            onSelectEvent={openInspector}
+            eventPropGetter={eventPropGetter}
+            dayPropGetter={dayPropGetter}
+            components={components}
+            draggableAccessor={() => canEdit}
+            dayLayoutAlgorithm="no-overlap"
+            allDayAccessor="allDay"
+            style={{ height: 'calc(100vh - 250px)', minHeight: 520 }}
+          />
+        </div>
+
+        {showRail && (
+          <RightRail
+            summary={summary}
+            filters={filters}
+            setFilters={setFilters}
+            counts={counts}
+            groups={groups}
+            groupFilter={groupFilter}
+            setGroupFilter={setGroupFilter}
+            today={railTodos}
+            onToggleTodo={toggleTodo}
+            onSelectTodo={(t) => openInspector({ id: `td_${t.id}`, title: t.title, resource: { type: 'todo', raw: t, groupId: t.group || '', groupName: t.expand?.group?.name, done: !!t.done, priority: t.priority } })}
+            onCreateTodo={() => setCreateState({ type: 'todo', day: new Date(), pair: null })}
+            canEdit={canEdit}
+          />
+        )}
+      </div>
+
+      <EventInspector
+        event={selected}
+        onClose={() => setSelected(null)}
+        onEdit={handleEditFromInspector}
+        onDelete={handleDeleteFromInspector}
+        onToggleTodo={(t) => { toggleTodo(t); setSelected(null); }}
+        onOpenWork={handleOpenWork}
+        canEdit={canEdit}
+        canDelete={canDelete}
+      />
+
+      <CreateEventModal
+        open={!!createState}
+        type={createState?.type}
+        day={createState?.day}
+        pair={createState?.pair}
+        groups={groups}
+        works={works}
+        onClose={() => setCreateState(null)}
+        onCreated={load}
+      />
 
       <LessonModal
         open={modalOpen}
@@ -592,11 +388,11 @@ export default function TeacherCalendar() {
         works={works}
         canEdit={canEdit}
         onSave={handleSave}
-        onDelete={handleDelete}
+        onDelete={handleDeleteLesson}
         onOpenNote={handleOpenNote}
         onOpenMaterial={handleOpenMaterial}
         onCancel={() => { setModalOpen(false); setEditing(null); }}
       />
-    </div>
+    </CalendarContext.Provider>
   );
 }
