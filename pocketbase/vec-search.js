@@ -137,12 +137,32 @@ export function getDuplicateClusters({ type = 'exact_dup', page = 1, perPage = 2
   const slice = pending.slice(start, start + perPage);
 
   const info = d.prepare('SELECT id, code, answer, statement_md, topic FROM main.tasks WHERE id = ?');
-  // работы, использующие задачу (variants.tasks — JSON-массив id)
-  const worksStmt = d.prepare(`
-    SELECT DISTINCT w.id AS id, w.title AS title, v.number AS variant
-    FROM main.variants v JOIN main.works w ON w.id = v.work
-    WHERE v.tasks LIKE ? LIMIT 8`);
-  const worksOf = (id) => { try { return worksStmt.all(`%"${id}"%`); } catch { return []; } };
+
+  // Работы по задаче: ОДИН проход по variants и построение карты task_id → работы,
+  // только для членов текущей страницы. Раньше был `WHERE v.tasks LIKE '%"id"%'`
+  // на КАЖДОГО члена — полный скан variants ×N. Для крупных param-семейств
+  // (десятки членов на странице) это давало ~25с и таймаут фронта.
+  const pageIds = new Set();
+  for (const c of slice) for (const id of c.ids) pageIds.add(id);
+  const worksByTask = new Map();
+  if (pageIds.size) {
+    const variantRows = d.prepare(
+      `SELECT v.tasks AS tasks, w.id AS id, w.title AS title, v.number AS variant
+       FROM main.variants v JOIN main.works w ON w.id = v.work`
+    ).all();
+    for (const row of variantRows) {
+      let ids;
+      try { ids = JSON.parse(row.tasks || '[]'); } catch { ids = []; }
+      if (!Array.isArray(ids)) continue;
+      for (const tid of ids) {
+        if (!pageIds.has(tid)) continue;
+        let arr = worksByTask.get(tid);
+        if (!arr) { arr = []; worksByTask.set(tid, arr); }
+        if (arr.length < 8) arr.push({ id: row.id, title: row.title, variant: row.variant });
+      }
+    }
+  }
+  const worksOf = (id) => worksByTask.get(id) || [];
   const items = slice.map((c) => ({
     type: c.type,
     size: c.ids.length, // уже только существующие
