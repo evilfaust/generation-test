@@ -248,6 +248,11 @@ export default function TeacherCalendar() {
     navigate(`/app/works/${workId}/edit`);
   };
 
+  const handleOpenNoteById = (noteId) => {
+    setSelected(null);
+    navigate(`/app/notes?note=${noteId}`);
+  };
+
   // ── Навигация периода ──
   const navPeriod = (dir) => {
     const unit = view === Views.WEEK ? 'week' : view === Views.DAY ? 'day' : 'month';
@@ -365,6 +370,7 @@ export default function TeacherCalendar() {
         onDelete={handleDeleteFromInspector}
         onToggleTodo={(t) => { toggleTodo(t); setSelected(null); }}
         onOpenWork={handleOpenWork}
+        onOpenNote={handleOpenNoteById}
         canEdit={canEdit}
         canDelete={canDelete}
       />

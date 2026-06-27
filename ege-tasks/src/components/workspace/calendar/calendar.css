@@ -321,14 +321,26 @@
 .ci-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .ci-meta { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--cal-ink-2); }
 .ci-meta .anticon { color: var(--cal-ink-4); margin-right: 6px; }
+.ci-note-link { margin-top: 6px; }
 .ci-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--cal-ink-3); margin: 18px 0 8px; }
 .ci-warn {
   background: #FEF3C7; border: 1px solid #FCE3A0; color: #B45309;
   border-radius: 10px; padding: 10px 12px; font-size: 13px;
   display: flex; align-items: center; justify-content: space-between;
 }
-.ci-mats { display: flex; flex-direction: column; gap: 6px; }
-.ci-mat { font-size: 13px; color: var(--cal-ink-2); }
+.ci-mats { display: flex; flex-direction: column; gap: 4px; }
+.ci-mat {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--cal-ink-2);
+  padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--cal-border-thin);
+  cursor: pointer; transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ci-mat:hover { background: #F7F9FF; border-color: #2B4BFF; }
+.ci-mat .anticon { color: var(--cal-ink-4); flex: none; }
+.ci-mat-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ci-mat-action { font-size: 11px; }
+.ci-mat:hover .ci-mat-action { color: #2B4BFF; }
 .ci-actions { display: flex; gap: 8px; margin-top: 22px; }
 .ci-actions > .ant-btn-primary { flex: 1; }
 

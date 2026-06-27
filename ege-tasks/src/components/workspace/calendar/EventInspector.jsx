@@ -1,12 +1,16 @@
+import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { Button, Popconfirm } from 'antd';
 import {
   EditOutlined, DeleteOutlined, CheckOutlined, ClockCircleOutlined,
   TeamOutlined, FlagFilled, CloseOutlined, PaperClipOutlined, FileTextOutlined,
+  EyeOutlined, RightOutlined,
 } from '@ant-design/icons';
 import { Chip, GroupChip, LessonStatusChip, groupHex } from '../ui';
 import { lessonStartEnd } from '../lessonTime';
+import { api } from '../../../shared/services/pocketbase';
 import { deadlineTitle } from './calendarUtils';
+import FilePreviewModal from '../FilePreviewModal';
 
 const TYPE_CHIP = {
   lesson: { tone: 'blue', label: 'Урок' },
@@ -19,12 +23,36 @@ const TYPE_CHIP = {
  * урок · дедлайн · дело. Правка/удаление — через колбэки оркестратора.
  */
 export default function EventInspector({
-  event, onClose, onEdit, onDelete, onToggleTodo, onOpenWork, canEdit, canDelete,
+  event, onClose, onEdit, onDelete, onToggleTodo, onOpenWork, onOpenNote, canEdit, canDelete,
 }) {
   const open = !!event;
   const r = event?.resource || {};
   const type = r.type;
   const chip = TYPE_CHIP[type];
+
+  // Заметка урока (если уже существует) — для ссылки «Открыть заметку».
+  const [note, setNote] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (type !== 'lesson' || !r.raw?.id) { setNote(null); return undefined; }
+    api.getLessonNote(r.raw.id)
+      .then((n) => { if (!cancelled) setNote(n); })
+      .catch(() => { if (!cancelled) setNote(null); });
+    return () => { cancelled = true; };
+  }, [type, r.raw?.id]);
+
+  // Предпросмотр файла-материала (перед скачиванием).
+  const [preview, setPreview] = useState(null); // { record, url } | null
+  const openMaterial = (m) => {
+    if (m.type === 'material') {
+      setPreview({
+        url: m.url,
+        record: { title: m.title, original_name: m.url ? m.url.split('?')[0] : m.title },
+      });
+    } else {
+      onOpenWork(m.id);
+    }
+  };
 
   return (
     <>
@@ -53,6 +81,15 @@ export default function EventInspector({
                     <div><ClockCircleOutlined /> {dayjs(start).format('D MMMM, HH:mm')}–{dayjs(end).format('HH:mm')}</div>
                   </div>
 
+                  {note && (
+                    <div className="ci-note-link">
+                      <Button type="link" icon={<FileTextOutlined />} style={{ paddingLeft: 0 }}
+                        onClick={() => onOpenNote(note.id)}>
+                        Открыть заметку урока
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="ci-section-title">Материалы</div>
                   {mats.length === 0 ? (
                     <div className="ci-warn">
@@ -62,8 +99,11 @@ export default function EventInspector({
                   ) : (
                     <div className="ci-mats">
                       {mats.map((m) => (
-                        <div key={m.id} className="ci-mat">
-                          {m.type === 'material' ? <FileTextOutlined /> : <PaperClipOutlined />} {m.title || 'Работа'}
+                        <div key={m.id} className="ci-mat" role="button" tabIndex={0}
+                          onClick={() => openMaterial(m)}>
+                          {m.type === 'material' ? <FileTextOutlined /> : <PaperClipOutlined />}
+                          <span className="ci-mat-title">{m.title || 'Работа'}</span>
+                          {m.type === 'material' ? <EyeOutlined className="ci-mat-action" /> : <RightOutlined className="ci-mat-action" />}
                         </div>
                       ))}
                     </div>
@@ -147,6 +187,13 @@ export default function EventInspector({
           </>
         )}
       </div>
+
+      <FilePreviewModal
+        open={!!preview}
+        record={preview?.record}
+        url={preview?.url}
+        onClose={() => setPreview(null)}
+      />
     </>
   );
 }
