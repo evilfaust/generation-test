@@ -44,6 +44,7 @@ import GeometryWorksheetPrint from './GeometryWorksheetPrint';
 import LoadGeometryPrintModal from './geometry/LoadGeometryPrintModal';
 import MathRenderer from './MathRenderer';
 import { buildGeometryColumns, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from './geometry/GeometryTaskColumns';
+import GeometryTagsModal from './geometry/GeometryTagsModal';
 import './GeometryTaskPreview.css';
 
 const { Text } = Typography;
@@ -65,6 +66,10 @@ export default function GeometryTaskList() {
   const [geoSubtopics, setGeoSubtopics] = useState([]);
   const [geoSources, setGeoSources] = useState([]);
   const [geoTags, setGeoTags] = useState({ object: [], method: [], fact: [] });
+  const [bankLoadAll, setBankLoadAll] = useState(false); // явная загрузка всего банка МЦНМО
+  const [tagsModalOpen, setTagsModalOpen] = useState(false);
+
+  const reloadGeoTags = () => api.getGeometryTags().then(setGeoTags).catch(() => {});
 
   // Редактор: null = скрыт, объект = редактирование, 'new' = создание
   const [editingTask, setEditingTask] = useState(null);
@@ -136,25 +141,30 @@ export default function GeometryTaskList() {
   }, [searchInput]);
 
   const loadTasks = useCallback(async () => {
+    // Три фасетных селектора (объект/метод/факт) объединяем в один массив tags (AND в API)
+    const tags = [
+      ...(filters.tagsObject || []),
+      ...(filters.tagsMethod || []),
+      ...(filters.tagsFact || []),
+    ];
+    // Банк МЦНМО (17к+ задач): НЕ грузим всё подряд — ждём выбора фасета/поиска,
+    // либо явного «Загрузить все» (bankLoadAll). Иначе пустой список + подсказка.
+    const isBank = filters.origin === 'mccme';
+    const hasFilter = tags.length > 0 || !!filters.search || !!filters.difficulty;
+    if (isBank && !hasFilter && !bankLoadAll) {
+      setTasks([]);
+      return;
+    }
     setLoading(true);
     try {
-      // Три фасетных селектора (объект/метод/факт) объединяем в один массив tags (AND в API)
-      const effectiveFilters = {
-        ...filters,
-        tags: [
-          ...(filters.tagsObject || []),
-          ...(filters.tagsMethod || []),
-          ...(filters.tagsFact || []),
-        ],
-      };
-      const data = await api.getGeometryTasks(effectiveFilters);
+      const data = await api.getGeometryTasks({ ...filters, tags });
       setTasks(data);
     } catch {
       message.error('Ошибка загрузки задач');
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, bankLoadAll]);
 
   useEffect(() => {
     loadTasks();
@@ -485,6 +495,11 @@ export default function GeometryTaskList() {
     setImportResults(null);
   };
 
+  // Банк МЦНМО без выбранного фасета/поиска и без явной «Загрузить все» — режим подсказки
+  const bankIdle = filters.origin === 'mccme' && !bankLoadAll
+    && !(filters.tagsObject?.length || filters.tagsMethod?.length || filters.tagsFact?.length
+      || filters.search || filters.difficulty);
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       {/* ── Панель фильтров ────────────────────────────────────────────── */}
@@ -499,14 +514,14 @@ export default function GeometryTaskList() {
             onChange={(e) => setSearchInput(e.target.value)}
           />
           {/* Переключатель «Мои задачи / Банк МЦНМО» — две сущности в одной коллекции */}
+          {/* Переключатель «Мои задачи / Банк МЦНМО» — две сущности в одной коллекции */}
           <Segmented
             value={filters.origin || 'manual'}
-            onChange={(v) => setFilters((f) => ({
+            onChange={(v) => {
+              setBankLoadAll(false); // при смене режима не тянем весь банк
               // при смене режима сбрасываем фильтры, специфичные для другого режима
-              origin: v,
-              search: f.search,
-              ...(v === 'mccme' ? {} : {}),
-            }))}
+              setFilters((f) => ({ origin: v, search: f.search }));
+            }}
             options={[
               { value: 'manual', label: 'Мои задачи' },
               { value: 'mccme', label: 'Банк МЦНМО' },
@@ -566,6 +581,11 @@ export default function GeometryTaskList() {
                     { value: '5', label: '5 — Олимпиадный' },
                   ]}
                 />
+                {canEdit && (
+                  <Button icon={<EditOutlined />} onClick={() => setTagsModalOpen(true)}>
+                    Теги
+                  </Button>
+                )}
               </>
             ) : (
               <>
@@ -635,9 +655,11 @@ export default function GeometryTaskList() {
       {/* ── Заголовок + кнопка создания ───────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text type="secondary">
-          {(searchInput || Object.keys(filters).some((k) => k !== 'origin' && filters[k]))
-            ? <>Найдено: <strong>{tasks.length}</strong></>
-            : <>Всего задач: <strong>{tasks.length}</strong></>}
+          {bankIdle
+            ? <>Банк МЦНМО — выберите фасет</>
+            : (searchInput || Object.keys(filters).some((k) => k !== 'origin' && filters[k]))
+              ? <>Найдено: <strong>{tasks.length}</strong></>
+              : <>Всего задач: <strong>{tasks.length}</strong></>}
         </Text>
         <Space>
           <Segmented
@@ -674,7 +696,20 @@ export default function GeometryTaskList() {
       </div>
 
       {/* ── Таблица / Карточки ───────────────────────────────────────── */}
-      {viewMode === 'table' ? (
+      {bankIdle ? (
+        <Card style={{ textAlign: 'center', padding: '32px 16px' }}>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+            В банке МЦНМО <strong>17 634</strong> задачи.
+          </Text>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+            Выберите <strong>объект</strong>, <strong>метод</strong> или <strong>факт</strong> выше —
+            задачи подгрузятся по фасету. Либо загрузите весь банк (может быть медленно).
+          </Text>
+          <Button onClick={() => setBankLoadAll(true)} loading={loading}>
+            Загрузить все 17 634
+          </Button>
+        </Card>
+      ) : viewMode === 'table' ? (
         <Table
           dataSource={tasks}
           columns={columns}
@@ -929,6 +964,13 @@ export default function GeometryTaskList() {
         loading={savedSheetsLoading}
         onLoad={handleOpenSavedSheet}
         onDelete={handleDeleteSavedSheet}
+      />
+
+      <GeometryTagsModal
+        open={tagsModalOpen}
+        onClose={() => setTagsModalOpen(false)}
+        geoTags={geoTags}
+        onChanged={reloadGeoTags}
       />
 
       <Modal

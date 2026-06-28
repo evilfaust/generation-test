@@ -176,6 +176,24 @@ export const geometryApi = {
     }
   },
 
+  async updateGeometryTag(id, data) {
+    try {
+      return await pb.collection('geometry_tags').update(id, data);
+    } catch (error) {
+      console.error('Error updating geometry tag:', error);
+      throw error;
+    }
+  },
+
+  async deleteGeometryTag(id) {
+    try {
+      return await pb.collection('geometry_tags').delete(id);
+    } catch (error) {
+      console.error('Error deleting geometry tag:', error);
+      throw error;
+    }
+  },
+
   // Уникальные непустые источники из всех задач геометрии — для фильтра по источнику.
   async getGeometrySources() {
     try {
