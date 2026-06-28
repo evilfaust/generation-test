@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Row, Col, Spin, Empty, Pagination, Skeleton, Card, Space, Button,
   Select, Checkbox, Modal, App, Drawer, Divider, Form, Input,
@@ -150,6 +150,18 @@ const TaskList = ({
 
   const paginatedTasks = tasks;
   const selectedTasks = tasks.filter((t) => selectedTaskIds.has(t.id));
+
+  // Справочники для массовых операций (различение одноимённых подтем разных тем)
+  const topicById = useMemo(() => {
+    const m = {};
+    (topics || []).forEach((t) => { m[t.id] = t; });
+    return m;
+  }, [topics]);
+  const subtopicById = useMemo(() => {
+    const m = {};
+    (subtopics || []).forEach((s) => { m[s.id] = s; });
+    return m;
+  }, [subtopics]);
   const pageAllSelected = paginatedTasks.length > 0 && paginatedTasks.every((t) => selectedTaskIds.has(t.id));
   const pageSomeSelected = paginatedTasks.some((t) => selectedTaskIds.has(t.id));
   const selCount = selectedTaskIds.size;
@@ -226,19 +238,20 @@ const TaskList = ({
     });
   };
 
-  const applyBulkTopic = () => {
+  // Единая операция: переносит выбранные задачи в тему (+ опц. подтемы).
+  // Подтемы в UI отфильтрованы строго под выбранную тему → тема и подтема
+  // всегда согласованы, рассинхрон невозможен.
+  const applyBulkMove = () => {
     if (!bulkTopic) { message.warning('Выберите тему'); return; }
-    runBulkOp('Обновляем тему', async () => {
-      for (const task of selectedTasks) await api.updateTask(task.id, { topic: bulkTopic, subtopic: [] });
+    const topicTitle = topicById[bulkTopic]?.title || 'тему';
+    const subLabel = bulkSubtopics.length
+      ? ` → ${bulkSubtopics.map((id) => subtopicById[id]?.name || subtopicById[id]?.title || id).join(', ')}`
+      : '';
+    runBulkOp(`Переносим в «${topicTitle}»${subLabel}`, async () => {
+      for (const task of selectedTasks) {
+        await api.updateTask(task.id, { topic: bulkTopic, subtopic: bulkSubtopics });
+      }
       setBulkTopic(null);
-      setBulkSubtopics([]);
-    });
-  };
-
-  const applyBulkSubtopics = () => {
-    if (!bulkSubtopics.length) { message.warning('Выберите подтемы'); return; }
-    runBulkOp('Обновляем подтемы', async () => {
-      for (const task of selectedTasks) await api.updateTask(task.id, { subtopic: bulkSubtopics });
       setBulkSubtopics([]);
     });
   };
@@ -597,11 +610,11 @@ const TaskList = ({
 
         <Divider />
 
-        {/* Тема / Подтемы */}
-        <Title level={5}>Тема и подтемы</Title>
+        {/* Перенос в тему/подтему — одной операцией */}
+        <Title level={5}>Перенести в тему/подтему</Title>
         <Space direction="vertical" style={{ width: '100%' }} size={8}>
           <Select
-            placeholder="Выберите тему…"
+            placeholder="1. Выберите тему…"
             value={bulkTopic}
             onChange={(v) => { setBulkTopic(v); setBulkSubtopics([]); }}
             style={{ width: '100%' }}
@@ -614,34 +627,32 @@ const TaskList = ({
             optionFilterProp="label"
             allowClear
           />
-          <Button
-            block
-            onClick={applyBulkTopic}
-            loading={bulkLoading}
-            disabled={!bulkTopic}
-          >
-            Сменить тему (очистит подтемы)
-          </Button>
           <Select
             mode="multiple"
-            placeholder="Выберите подтемы…"
+            placeholder={bulkTopic ? '2. Подтемы (необязательно)…' : 'Сначала выберите тему'}
             value={bulkSubtopics}
             onChange={setBulkSubtopics}
             style={{ width: '100%' }}
             options={(subtopics || [])
-              .filter((st) => !bulkTopic || st.topic === bulkTopic)
+              .filter((st) => st.topic === bulkTopic)
               .map((st) => ({ label: st.name || st.title, value: st.id }))}
-            disabled={bulkLoading}
+            disabled={bulkLoading || !bulkTopic}
             showSearch
+            optionFilterProp="label"
           />
           <Button
             block
-            onClick={applyBulkSubtopics}
+            type="primary"
+            onClick={applyBulkMove}
             loading={bulkLoading}
-            disabled={!bulkSubtopics.length}
+            disabled={!bulkTopic}
           >
-            Применить подтемы
+            Перенести {selCount ? `${selCount} задач(и)` : 'задачи'}
           </Button>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Тема обязательна. Подтемы доступны только из выбранной темы — тема и подтема
+            всегда согласованы. Без подтем задачи переносятся в тему, подтемы очищаются.
+          </Text>
         </Space>
 
         <Divider style={{ borderColor: '#ff4d4f' }} />

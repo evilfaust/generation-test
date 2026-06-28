@@ -1,0 +1,71 @@
+/* Фича «Листки» — экраны просмотра/редактирования + печать-раздатка */
+
+/* плитки листов (поверх .ws-tile из workspace-ui) */
+.ws-tile-title { font-weight: 600; line-height: 1.35; margin-bottom: 6px; display: flex; align-items: center; }
+.ws-tile-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.ws-tile-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; opacity: 0; transition: opacity .15s; }
+.ws-tile:hover .ws-tile-actions { opacity: 1; }
+
+.listok-view { max-width: 900px; margin: 0 auto; }
+.listok-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.listok-title { font-size: 24px; font-weight: 700; margin: 4px 0 6px; }
+.listok-sub { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: #888; margin-bottom: 16px; }
+.listok-badge { background: #f0f7f5; color: #0d8a72; border-radius: 6px; padding: 1px 8px; font-size: 12px; font-weight: 600; }
+.listok-badge--muted { background: #f3f3f3; color: #888; }
+
+.listok-theory { margin-bottom: 18px; background: #fafafa; border-radius: 10px; }
+
+/* список задач */
+.listok-problems { list-style: none; margin: 0; padding: 0; }
+.listok-problem { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+.listok-pnum { flex: 0 0 auto; min-width: 38px; font-weight: 700; color: #0d8a72; }
+.listok-pbody { flex: 1; min-width: 0; }
+.listok-heading-row { margin: 18px 0 6px; display: flex; align-items: center; }
+.listok-heading-row h3 { margin: 0; font-size: 16px; color: #555; }
+.listok-flag { margin-left: 4px; font-weight: 700; }
+.listok-flag--basic { color: #52c41a; }
+.listok-flag--hard { color: #ff4d4f; }
+
+/* markdown/katex контейнер */
+.listok-md { line-height: 1.55; }
+.listok-md p { margin: 0 0 6px; }
+
+/* редактор */
+.listok-edit-actions { display: flex; gap: 8px; align-items: center; margin: 16px 0 8px; }
+.listok-count { color: #999; font-size: 13px; }
+.listok-empty { padding: 32px; text-align: center; color: #999; border: 1px dashed #e0e0e0; border-radius: 10px; }
+.listok-problems--edit .listok-problem,
+.listok-problems--edit .listok-heading-row { gap: 8px; }
+.listok-row-actions { flex: 0 0 auto; display: flex; gap: 2px; opacity: .35; transition: opacity .15s; }
+.listok-problem:hover .listok-row-actions,
+.listok-heading-row:hover .listok-row-actions { opacity: 1; }
+
+/* тёмная тема */
+[data-theme="dark"] .listok-theory, .dark .listok-theory { background: #1e1e1e; }
+[data-theme="dark"] .listok-problem, .dark .listok-problem { border-color: #2a2a2a; }
+[data-theme="dark"] .listok-badge, .dark .listok-badge { background: #103a32; color: #4fd1b0; }
+
+/* ===== Печать-раздатка ===== */
+.listok-print-overlay { position: fixed; inset: 0; background: #fff; z-index: 1000; overflow: auto; }
+.listok-print-controls { position: sticky; top: 0; display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: #fafafa; border-bottom: 1px solid #eee; z-index: 2; }
+.listok-print-root { max-width: 720px; margin: 16px auto; padding: 0 16px 48px; color: #000; }
+.lp-title { font-size: 20px; font-weight: 700; text-align: center; margin: 0 0 2px; }
+.lp-author { text-align: center; color: #555; font-size: 12px; margin-bottom: 14px; }
+.lp-theory { font-size: 13px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid #e6e6e6; border-radius: 8px; }
+.lp-problems { list-style: none; margin: 0; padding: 0; }
+.lp-problem { display: flex; gap: 8px; margin: 0 0 8px; break-inside: avoid; }
+.lp-num { font-weight: 700; flex: 0 0 auto; }
+.lp-flag { margin-left: 2px; }
+.lp-body { flex: 1; min-width: 0; }
+.lp-heading { font-weight: 700; margin: 12px 0 6px; break-after: avoid; }
+.lp-cols-2 { column-count: 2; column-gap: 20px; }
+.lp-cols-2 .lp-problem { -webkit-column-break-inside: avoid; }
+.listok-size-S .lp-body, .listok-size-S .lp-theory { font-size: 12px; }
+.listok-size-M .lp-body { font-size: 14px; }
+.listok-size-L .lp-body { font-size: 16px; }
+
+@media print {
+  body:has(.listok-print-root) { visibility: hidden; }
+  body:has(.listok-print-root) .listok-print-controls { display: none; }
+  body:has(.listok-print-root) .listok-print-root { visibility: visible; position: absolute; top: 0; left: 0; width: 100%; max-width: none; margin: 0; padding: 0; }
+}

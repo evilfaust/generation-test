@@ -30,6 +30,7 @@ export const ALL_SECTIONS = [
   'trig',          // Тригонометрия
   'arith',         // Устный счёт
   'theory',        // Теория
+  'listki',        // Листки (Гордин + свои)
   'lab',           // Лаборатория
   'import',        // Импорт задач (только editor+)
   'admin',         // Управление пользователями (только superadmin)

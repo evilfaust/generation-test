@@ -28,6 +28,7 @@ import { extJournalApi } from './pb/extjournal.js';
 import { programsApi } from './pb/programs.js';
 import { campaignsApi } from './pb/campaigns.js';
 import { attendanceApi } from './pb/attendance.js';
+import { listkiApi } from './pb/listki.js';
 
 export const api = {
   ...extrasApi,
@@ -53,6 +54,7 @@ export const api = {
   ...programsApi,
   ...campaignsApi,
   ...attendanceApi,
+  ...listkiApi,
 };
 
 export default pb;

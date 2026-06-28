@@ -50,6 +50,9 @@ const ExcalidrawSection = lazy(() => import('./components/ExcalidrawSection'));
 const TheoryArticleView = lazy(() => import('./components/TheoryArticleView'));
 const TheoryCategoryManager = lazy(() => import('./components/TheoryCategoryManager'));
 const TheoryPrintBuilder = lazy(() => import('./components/TheoryPrintBuilder'));
+const ListokLibrary = lazy(() => import('./components/listki/ListokLibrary'));
+const ListokView = lazy(() => import('./components/listki/ListokView'));
+const ListokEditor = lazy(() => import('./components/listki/ListokEditor'));
 const TaskImporter = lazy(() => import('./components/TaskImporter'));
 const WorkManager = lazy(() => import('./components/WorkManager'));
 const WorkEditorPage = lazy(() => import('./components/WorkEditorPage'));
@@ -192,6 +195,10 @@ export const R = {
   THEORY_EDIT:         '/app/theory/articles/:articleId/edit',
   THEORY_PRINT:        '/app/theory/print',
   THEORY_CATEGORIES:   '/app/theory/categories',
+  // Листки
+  LISTKI:              '/app/listki',
+  LISTOK_VIEW:         '/app/listki/:sheetId',
+  LISTOK_EDIT:         '/app/listki/:sheetId/edit',
   // Лаборатория
   EXCALIDRAW:          '/app/lab/excalidraw',
   // Администрирование
@@ -287,6 +294,10 @@ const ROUTE_META = [
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
+  // Листки
+  { re: /^\/app\/listki\/[^/]+\/edit$/,    menuKey: 'listki', menuGroup: 'listki', title: 'Листки — Редактор' },
+  { re: /^\/app\/listki\/[^/]+$/,          menuKey: 'listki', menuGroup: 'listki', title: 'Листки — Просмотр' },
+  { re: /^\/app\/listki$/,                 menuKey: 'listki', menuGroup: 'listki', title: 'Листки' },
   { re: /^\/app\/lab\/excalidraw/,         menuKey: 'excalidraw',       menuGroup: 'lab', title: 'Excalidraw', noMargin: true },
   { re: /^\/app\/admin\/users/,            menuKey: 'admin-users',      menuGroup: 'admin-group', title: 'Управление пользователями' },
   { re: /^\/app\/admin\/audit/,            menuKey: 'admin-audit',      menuGroup: 'admin-group', title: 'Журнал действий' },
@@ -355,6 +366,7 @@ const MENU_KEY_PATH = {
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
   'theory-categories':      R.THEORY_CATEGORIES,
+  'listki':                 R.LISTKI,
   excalidraw:               R.EXCALIDRAW,
   'admin-users':            R.ADMIN_USERS,
   'admin-audit':            R.ADMIN_AUDIT,
@@ -371,6 +383,7 @@ const GROUP_META = {
   trig:                 { label: 'Тригонометрия' },
   arith:                { label: 'Устный счёт' },
   theory:               { label: 'Теория',        path: R.THEORY },
+  listki:               { label: 'Листки',        path: R.LISTKI },
   lab:                  { label: 'Лаборатория' },
   'admin-group':        { label: 'Администрирование' },
 };
@@ -710,6 +723,7 @@ function AppLayout() {
         { key: 'theory-categories', icon: <FolderOutlined />,  label: 'Категории', editOnly: true },
       ],
     },
+    { key: 'listki', icon: <ReadOutlined />, label: 'Листки', section: 'listki' },
     {
       key: 'lab', icon: <EditOutlined />, label: 'Лаборатория', section: 'lab',
       children: [
@@ -943,6 +957,10 @@ function App() {
               <Route path={R.THEORY_VIEW}       element={<TheoryArticleRoute />} />
               <Route path={R.THEORY_PRINT}      element={<TheoryPrintRoute />} />
 
+              {/* Листки — библиотека и просмотр (доступно и viewer) */}
+              <Route path={R.LISTKI}      element={<ListokLibrary />} />
+              <Route path={R.LISTOK_VIEW} element={<ListokView />} />
+
               {/* Лаборатория */}
               <Route path={R.EXCALIDRAW} element={
                 <Suspense fallback={<LazyFallback />}>
@@ -956,6 +974,7 @@ function App() {
             <Route element={<ProtectedRoute requireEdit />}>
               <Route element={<AppLayout />}>
                 <Route path={R.WORK_EDITOR}      element={<WorkEditorRoute />} />
+                <Route path={R.LISTOK_EDIT}      element={<ListokEditor />} />
                 <Route path={R.IMPORT}           element={<TaskImporter />} />
                 <Route path={R.ACHIEVEMENTS}     element={<AchievementManager />} />
                 <Route path={R.GEOMETRY_TOPICS}  element={<GeometryTopicManager />} />
