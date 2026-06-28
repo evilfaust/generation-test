@@ -514,7 +514,6 @@ export default function GeometryTaskList() {
             onChange={(e) => setSearchInput(e.target.value)}
           />
           {/* Переключатель «Мои задачи / Банк МЦНМО» — две сущности в одной коллекции */}
-          {/* Переключатель «Мои задачи / Банк МЦНМО» — две сущности в одной коллекции */}
           <Segmented
             value={filters.origin || 'manual'}
             onChange={(v) => {
@@ -527,128 +526,119 @@ export default function GeometryTaskList() {
               { value: 'mccme', label: 'Банк МЦНМО' },
             ]}
           />
-          <Space wrap>
-            {filters.origin === 'mccme' ? (
-              <>
-                {/* Фасетная навигация банка: объект / метод / факт */}
-                <Select
-                  mode="multiple"
-                  placeholder="Объект (фигура)"
-                  allowClear
-                  showSearch
-                  maxTagCount="responsive"
-                  optionFilterProp="label"
-                  style={{ minWidth: 240, maxWidth: 360 }}
-                  value={filters.tagsObject || []}
-                  onChange={(v) => setFilters((f) => ({ ...f, tagsObject: v }))}
-                  options={geoTags.object.map((t) => ({ value: t.id, label: t.name }))}
-                />
-                <Select
-                  mode="multiple"
-                  placeholder="Метод (приём)"
-                  allowClear
-                  showSearch
-                  maxTagCount="responsive"
-                  optionFilterProp="label"
-                  style={{ minWidth: 240, maxWidth: 360 }}
-                  value={filters.tagsMethod || []}
-                  onChange={(v) => setFilters((f) => ({ ...f, tagsMethod: v }))}
-                  options={geoTags.method.map((t) => ({ value: t.id, label: t.name }))}
-                />
-                <Select
-                  mode="multiple"
-                  placeholder="Факт (теорема)"
-                  allowClear
-                  showSearch
-                  maxTagCount="responsive"
-                  optionFilterProp="label"
-                  style={{ minWidth: 240, maxWidth: 360 }}
-                  value={filters.tagsFact || []}
-                  onChange={(v) => setFilters((f) => ({ ...f, tagsFact: v }))}
-                  options={geoTags.fact.map((t) => ({ value: t.id, label: t.name }))}
-                />
-                <Select
-                  placeholder="Сложность"
-                  allowClear
-                  style={{ width: 150 }}
-                  value={filters.difficulty}
-                  onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
-                  options={[
-                    { value: '1', label: '1 — Базовый' },
-                    { value: '2', label: '2 — Средний' },
-                    { value: '3', label: '3 — Повышенный' },
-                    { value: '4', label: '4 — Высокий' },
-                    { value: '5', label: '5 — Олимпиадный' },
-                  ]}
-                />
-                {canEdit && (
-                  <Button icon={<EditOutlined />} onClick={() => setTagsModalOpen(true)}>
-                    Теги
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                <Select
-                  placeholder="Тема"
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                  style={{ width: 200 }}
-                  value={filters.topic}
-                  onChange={(v) => setFilters((f) => ({ ...f, topic: v, subtopic: undefined }))}
-                  options={geoTopics.map((t) => ({ value: t.id, label: t.title }))}
-                />
-                <Select
-                  placeholder="Подтема"
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                  style={{ width: 220 }}
-                  value={filters.subtopic}
-                  onChange={(v) => setFilters((f) => ({ ...f, subtopic: v }))}
-                  options={(filters.topic
-                    ? geoSubtopics.filter((s) => s.topic === filters.topic)
-                    : geoSubtopics
-                  ).map((s) => ({ value: s.id, label: s.title }))}
-                />
-                <Select
-                  placeholder="Сложность"
-                  allowClear
-                  style={{ width: 150 }}
-                  value={filters.difficulty}
-                  onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
-                  options={[
-                    { value: '1', label: '1 — Базовый' },
-                    { value: '2', label: '2 — Средний' },
-                    { value: '3', label: '3 — Повышенный' },
-                    { value: '4', label: '4 — Высокий' },
-                    { value: '5', label: '5 — Олимпиадный' },
-                  ]}
-                />
-                <Select
-                  placeholder="Источник"
-                  allowClear
-                  showSearch
-                  optionFilterProp="label"
-                  style={{ width: 220 }}
-                  value={filters.source}
-                  onChange={(v) => setFilters((f) => ({ ...f, source: v }))}
-                  options={geoSources.map((s) => ({ value: s, label: s }))}
-                  notFoundContent="Источники не заданы"
-                />
-              </>
-            )}
-            <Button
-              onClick={() => { setFilters({ origin: filters.origin || 'manual' }); setSearchInput(''); }}
-              disabled={!searchInput && !Object.keys(filters).some((k) => k !== 'origin' && filters[k])}
-            >
-              Сбросить
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={loadTasks} loading={loading}>
-              Обновить
-            </Button>
-          </Space>
+          {/* Две колонки: слева широкие фильтры-категории друг под другом
+              (длинные названия объектов/методов/фактов/тем влезают), справа —
+              сложность + теги + кнопки. */}
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            <Space direction="vertical" size={8} style={{ flex: 1, minWidth: 0 }}>
+              {filters.origin === 'mccme' ? (
+                <>
+                  {/* Фасетная навигация банка: объект / метод / факт */}
+                  <Select
+                    mode="multiple"
+                    placeholder="Объект (фигура)"
+                    allowClear showSearch
+                    maxTagCount="responsive"
+                    optionFilterProp="label"
+                    style={{ width: '100%' }}
+                    value={filters.tagsObject || []}
+                    onChange={(v) => setFilters((f) => ({ ...f, tagsObject: v }))}
+                    options={geoTags.object.map((t) => ({ value: t.id, label: t.name, title: t.name }))}
+                  />
+                  <Select
+                    mode="multiple"
+                    placeholder="Метод (приём)"
+                    allowClear showSearch
+                    maxTagCount="responsive"
+                    optionFilterProp="label"
+                    style={{ width: '100%' }}
+                    value={filters.tagsMethod || []}
+                    onChange={(v) => setFilters((f) => ({ ...f, tagsMethod: v }))}
+                    options={geoTags.method.map((t) => ({ value: t.id, label: t.name, title: t.name }))}
+                  />
+                  <Select
+                    mode="multiple"
+                    placeholder="Факт (теорема)"
+                    allowClear showSearch
+                    maxTagCount="responsive"
+                    optionFilterProp="label"
+                    style={{ width: '100%' }}
+                    value={filters.tagsFact || []}
+                    onChange={(v) => setFilters((f) => ({ ...f, tagsFact: v }))}
+                    options={geoTags.fact.map((t) => ({ value: t.id, label: t.name, title: t.name }))}
+                  />
+                </>
+              ) : (
+                <>
+                  <Select
+                    placeholder="Тема"
+                    allowClear showSearch
+                    optionFilterProp="label"
+                    style={{ width: '100%' }}
+                    value={filters.topic}
+                    onChange={(v) => setFilters((f) => ({ ...f, topic: v, subtopic: undefined }))}
+                    options={geoTopics.map((t) => ({ value: t.id, label: t.title, title: t.title }))}
+                  />
+                  <Select
+                    placeholder="Подтема"
+                    allowClear showSearch
+                    optionFilterProp="label"
+                    style={{ width: '100%' }}
+                    value={filters.subtopic}
+                    onChange={(v) => setFilters((f) => ({ ...f, subtopic: v }))}
+                    options={(filters.topic
+                      ? geoSubtopics.filter((s) => s.topic === filters.topic)
+                      : geoSubtopics
+                    ).map((s) => ({ value: s.id, label: s.title, title: s.title }))}
+                  />
+                  <Select
+                    placeholder="Источник"
+                    allowClear showSearch
+                    optionFilterProp="label"
+                    style={{ width: '100%' }}
+                    value={filters.source}
+                    onChange={(v) => setFilters((f) => ({ ...f, source: v }))}
+                    options={geoSources.map((s) => ({ value: s, label: s, title: s }))}
+                    notFoundContent="Источники не заданы"
+                  />
+                </>
+              )}
+            </Space>
+
+            <Space direction="vertical" size={8} style={{ width: 240, flexShrink: 0 }}>
+              <Select
+                placeholder="Сложность"
+                allowClear
+                style={{ width: '100%' }}
+                value={filters.difficulty}
+                onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
+                options={[
+                  { value: '1', label: '1 — Базовый' },
+                  { value: '2', label: '2 — Средний' },
+                  { value: '3', label: '3 — Повышенный' },
+                  { value: '4', label: '4 — Высокий' },
+                  { value: '5', label: '5 — Олимпиадный' },
+                ]}
+              />
+              {filters.origin === 'mccme' && canEdit && (
+                <Button block icon={<EditOutlined />} onClick={() => setTagsModalOpen(true)}>
+                  Теги
+                </Button>
+              )}
+              <Space style={{ width: '100%' }}>
+                <Button
+                  style={{ flex: 1 }}
+                  onClick={() => { setFilters({ origin: filters.origin || 'manual' }); setSearchInput(''); }}
+                  disabled={!searchInput && !Object.keys(filters).some((k) => k !== 'origin' && filters[k])}
+                >
+                  Сбросить
+                </Button>
+                <Button style={{ flex: 1 }} icon={<ReloadOutlined />} onClick={loadTasks} loading={loading}>
+                  Обновить
+                </Button>
+              </Space>
+            </Space>
+          </div>
         </Space>
       </Card>
 
