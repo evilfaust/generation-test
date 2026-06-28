@@ -59,11 +59,12 @@ export default function GeometryTaskList() {
   const { canEdit, canDelete } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState({});
+  const [filters, setFilters] = useState({ origin: 'manual' });
   const [searchInput, setSearchInput] = useState('');
   const [geoTopics, setGeoTopics] = useState([]);
   const [geoSubtopics, setGeoSubtopics] = useState([]);
   const [geoSources, setGeoSources] = useState([]);
+  const [geoTags, setGeoTags] = useState({ object: [], method: [], fact: [] });
 
   // Редактор: null = скрыт, объект = редактирование, 'new' = создание
   const [editingTask, setEditingTask] = useState(null);
@@ -112,11 +113,12 @@ export default function GeometryTaskList() {
 
   // Загружаем справочники один раз
   useEffect(() => {
-    Promise.all([api.getGeometryTopics(), api.getGeometrySubtopics(), api.getGeometrySources()])
-      .then(([topics, subtopics, sources]) => {
+    Promise.all([api.getGeometryTopics(), api.getGeometrySubtopics(), api.getGeometrySources(), api.getGeometryTags()])
+      .then(([topics, subtopics, sources, tags]) => {
         setGeoTopics(topics);
         setGeoSubtopics(subtopics);
         setGeoSources(sources);
+        setGeoTags(tags);
       })
       .catch(() => {});
   }, []);
@@ -136,7 +138,16 @@ export default function GeometryTaskList() {
   const loadTasks = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.getGeometryTasks(filters);
+      // Три фасетных селектора (объект/метод/факт) объединяем в один массив tags (AND в API)
+      const effectiveFilters = {
+        ...filters,
+        tags: [
+          ...(filters.tagsObject || []),
+          ...(filters.tagsMethod || []),
+          ...(filters.tagsFact || []),
+        ],
+      };
+      const data = await api.getGeometryTasks(effectiveFilters);
       setTasks(data);
     } catch {
       message.error('Ошибка загрузки задач');
@@ -487,58 +498,130 @@ export default function GeometryTaskList() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
+          {/* Переключатель «Мои задачи / Банк МЦНМО» — две сущности в одной коллекции */}
+          <Segmented
+            value={filters.origin || 'manual'}
+            onChange={(v) => setFilters((f) => ({
+              // при смене режима сбрасываем фильтры, специфичные для другого режима
+              origin: v,
+              search: f.search,
+              ...(v === 'mccme' ? {} : {}),
+            }))}
+            options={[
+              { value: 'manual', label: 'Мои задачи' },
+              { value: 'mccme', label: 'Банк МЦНМО' },
+            ]}
+          />
           <Space wrap>
-            <Select
-              placeholder="Тема"
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              style={{ width: 200 }}
-              value={filters.topic}
-              onChange={(v) => setFilters((f) => ({ ...f, topic: v, subtopic: undefined }))}
-              options={geoTopics.map((t) => ({ value: t.id, label: t.title }))}
-            />
-            <Select
-              placeholder="Подтема"
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              style={{ width: 220 }}
-              value={filters.subtopic}
-              onChange={(v) => setFilters((f) => ({ ...f, subtopic: v }))}
-              options={(filters.topic
-                ? geoSubtopics.filter((s) => s.topic === filters.topic)
-                : geoSubtopics
-              ).map((s) => ({ value: s.id, label: s.title }))}
-            />
-            <Select
-              placeholder="Сложность"
-              allowClear
-              style={{ width: 150 }}
-              value={filters.difficulty}
-              onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
-              options={[
-                { value: '1', label: '1 — Базовый' },
-                { value: '2', label: '2 — Средний' },
-                { value: '3', label: '3 — Повышенный' },
-                { value: '4', label: '4 — Высокий' },
-                { value: '5', label: '5 — Олимпиадный' },
-              ]}
-            />
-            <Select
-              placeholder="Источник"
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              style={{ width: 220 }}
-              value={filters.source}
-              onChange={(v) => setFilters((f) => ({ ...f, source: v }))}
-              options={geoSources.map((s) => ({ value: s, label: s }))}
-              notFoundContent="Источники не заданы"
-            />
+            {filters.origin === 'mccme' ? (
+              <>
+                {/* Фасетная навигация банка: объект / метод / факт */}
+                <Select
+                  mode="multiple"
+                  placeholder="Объект (фигура)"
+                  allowClear
+                  showSearch
+                  maxTagCount="responsive"
+                  optionFilterProp="label"
+                  style={{ minWidth: 240, maxWidth: 360 }}
+                  value={filters.tagsObject || []}
+                  onChange={(v) => setFilters((f) => ({ ...f, tagsObject: v }))}
+                  options={geoTags.object.map((t) => ({ value: t.id, label: t.name }))}
+                />
+                <Select
+                  mode="multiple"
+                  placeholder="Метод (приём)"
+                  allowClear
+                  showSearch
+                  maxTagCount="responsive"
+                  optionFilterProp="label"
+                  style={{ minWidth: 240, maxWidth: 360 }}
+                  value={filters.tagsMethod || []}
+                  onChange={(v) => setFilters((f) => ({ ...f, tagsMethod: v }))}
+                  options={geoTags.method.map((t) => ({ value: t.id, label: t.name }))}
+                />
+                <Select
+                  mode="multiple"
+                  placeholder="Факт (теорема)"
+                  allowClear
+                  showSearch
+                  maxTagCount="responsive"
+                  optionFilterProp="label"
+                  style={{ minWidth: 240, maxWidth: 360 }}
+                  value={filters.tagsFact || []}
+                  onChange={(v) => setFilters((f) => ({ ...f, tagsFact: v }))}
+                  options={geoTags.fact.map((t) => ({ value: t.id, label: t.name }))}
+                />
+                <Select
+                  placeholder="Сложность"
+                  allowClear
+                  style={{ width: 150 }}
+                  value={filters.difficulty}
+                  onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
+                  options={[
+                    { value: '1', label: '1 — Базовый' },
+                    { value: '2', label: '2 — Средний' },
+                    { value: '3', label: '3 — Повышенный' },
+                    { value: '4', label: '4 — Высокий' },
+                    { value: '5', label: '5 — Олимпиадный' },
+                  ]}
+                />
+              </>
+            ) : (
+              <>
+                <Select
+                  placeholder="Тема"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  style={{ width: 200 }}
+                  value={filters.topic}
+                  onChange={(v) => setFilters((f) => ({ ...f, topic: v, subtopic: undefined }))}
+                  options={geoTopics.map((t) => ({ value: t.id, label: t.title }))}
+                />
+                <Select
+                  placeholder="Подтема"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  style={{ width: 220 }}
+                  value={filters.subtopic}
+                  onChange={(v) => setFilters((f) => ({ ...f, subtopic: v }))}
+                  options={(filters.topic
+                    ? geoSubtopics.filter((s) => s.topic === filters.topic)
+                    : geoSubtopics
+                  ).map((s) => ({ value: s.id, label: s.title }))}
+                />
+                <Select
+                  placeholder="Сложность"
+                  allowClear
+                  style={{ width: 150 }}
+                  value={filters.difficulty}
+                  onChange={(v) => setFilters((f) => ({ ...f, difficulty: v }))}
+                  options={[
+                    { value: '1', label: '1 — Базовый' },
+                    { value: '2', label: '2 — Средний' },
+                    { value: '3', label: '3 — Повышенный' },
+                    { value: '4', label: '4 — Высокий' },
+                    { value: '5', label: '5 — Олимпиадный' },
+                  ]}
+                />
+                <Select
+                  placeholder="Источник"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  style={{ width: 220 }}
+                  value={filters.source}
+                  onChange={(v) => setFilters((f) => ({ ...f, source: v }))}
+                  options={geoSources.map((s) => ({ value: s, label: s }))}
+                  notFoundContent="Источники не заданы"
+                />
+              </>
+            )}
             <Button
-              onClick={() => { setFilters({}); setSearchInput(''); }}
-              disabled={!searchInput && !Object.keys(filters).some((k) => filters[k])}
+              onClick={() => { setFilters({ origin: filters.origin || 'manual' }); setSearchInput(''); }}
+              disabled={!searchInput && !Object.keys(filters).some((k) => k !== 'origin' && filters[k])}
             >
               Сбросить
             </Button>
@@ -552,7 +635,7 @@ export default function GeometryTaskList() {
       {/* ── Заголовок + кнопка создания ───────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text type="secondary">
-          {(searchInput || Object.keys(filters).some((k) => filters[k]))
+          {(searchInput || Object.keys(filters).some((k) => k !== 'origin' && filters[k]))
             ? <>Найдено: <strong>{tasks.length}</strong></>
             : <>Всего задач: <strong>{tasks.length}</strong></>}
         </Text>

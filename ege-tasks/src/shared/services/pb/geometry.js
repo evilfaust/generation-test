@@ -116,6 +116,18 @@ export const geometryApi = {
       if (filters.source) {
         filterArr.push(`source = "${escapeFilter(filters.source)}"`);
       }
+      // origin: 'manual' — свои задачи (пустой origin у старых = свои); 'mccme' — банк МЦНМО
+      if (filters.origin === 'mccme') {
+        filterArr.push(`origin = "mccme"`);
+      } else if (filters.origin === 'manual') {
+        filterArr.push(`(origin = "" || origin = "manual")`);
+      }
+      // tags: массив id фасетных тегов (geometry_tags) — AND по каждому выбранному
+      if (Array.isArray(filters.tags) && filters.tags.length) {
+        for (const t of filters.tags) {
+          filterArr.push(`tags ~ "${escapeFilter(t)}"`);
+        }
+      }
       if (filters.search) {
         const s = escapeFilter(filters.search);
         filterArr.push(`(code ~ "${s}" || title ~ "${s}" || statement_md ~ "${s}" || answer ~ "${s}" || source ~ "${s}")`);
@@ -127,6 +139,7 @@ export const geometryApi = {
         'id', 'code', 'title', 'topic', 'subtopic', 'difficulty',
         'statement_md',  // нужен для быстрого предпросмотра
         'answer', 'hints', 'geogebra_appname', 'drawing_view', 'drawing_svg', 'source', 'year',
+        'origin', 'mccme_id', 'tags',
         'preview_layout', 'geogebra_image_base64', 'drawing_image', 'created', 'updated',
         'expand.topic.id', 'expand.topic.title',
         'expand.subtopic.id', 'expand.subtopic.title',
@@ -143,6 +156,23 @@ export const geometryApi = {
     } catch (error) {
       console.error('Error fetching geometry tasks:', error);
       return [];
+    }
+  },
+
+  // Фасетные теги банка МЦНМО (geometry_tags). kind: object|method|fact|named|source.
+  // Возвращает сгруппированно по kind: { object: [...], method: [...], fact: [...] }.
+  async getGeometryTags() {
+    try {
+      const rows = await pb.collection('geometry_tags').getFullList({
+        sort: 'name',
+        fields: 'id,kind,name,mccme_id',
+      });
+      const byKind = { object: [], method: [], fact: [], named: [], source: [] };
+      for (const r of rows) (byKind[r.kind] ||= []).push(r);
+      return byKind;
+    } catch (error) {
+      console.error('Error fetching geometry tags:', error);
+      return { object: [], method: [], fact: [], named: [], source: [] };
     }
   },
 
