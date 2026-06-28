@@ -184,7 +184,10 @@ export function GeometryPreviewCard({
 }) {
   // Приоритет: файловое поле (drawing_image) → legacy base64 → пусто
   const imageValue = getTaskImageSrc(task);
-  const showImage = drawingMode === 'image' || drawingMode === 'task';
+  // image_role='solution' (банк МЦНМО) — чертёж относится к решению, в карточке-
+  // раздатке с УСЛОВИЕМ его показывать нельзя (иначе ученик видит чертёж решения).
+  const isSolutionImage = task?.image_role === 'solution';
+  const showImage = (drawingMode === 'image' || drawingMode === 'task') && !isSolutionImage;
   const hasImage = !isPlaceholder && showImage && !!imageValue;
   // Без чертежа белый блок image-слоя закрывал клетку пустым пятном. Рисуем слой
   // только когда есть картинка; в режиме правки — прозрачную рамку (позиционирование).

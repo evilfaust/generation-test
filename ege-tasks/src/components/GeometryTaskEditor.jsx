@@ -423,6 +423,7 @@ export default function GeometryTaskEditor({ task, onSaved, onCancel, totalTasks
         onSolutionChange={setPreviewSolution}
         solutionFiles={solutionFiles}
         onSolutionFilesChange={setSolutionFiles}
+        solutionDrawingUrl={task?.image_role === 'solution' ? api.getGeometryImageUrl(task) : ''}
       />,
     },
   ];

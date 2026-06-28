@@ -51,7 +51,8 @@ const DRAWING_SIZE_CFG = {
 function WorksheetTask({ task, index, showDrawing, drawingSize, layoutKey, textSize, sheetTasksCount, isA4 }) {
   const imageUrl = api.getGeometryImageUrl(task);
   const hasSvg   = task.drawing_view === 'svg' && !!task.drawing_svg;
-  const hasImage = !!imageUrl && !hasSvg;
+  // image_role='solution' (банк МЦНМО) — чертёж принадлежит решению, в раздатку с условием не идёт
+  const hasImage = !!imageUrl && !hasSvg && task.image_role !== 'solution';
 
   const dcfg  = DRAWING_SIZE_CFG[drawingSize] ?? DRAWING_SIZE_CFG.m;
   const maxH  = dcfg.h[layoutKey] ?? dcfg.h['2a5'];

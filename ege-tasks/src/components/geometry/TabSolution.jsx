@@ -8,9 +8,20 @@ const { Text } = Typography;
 export default function TabSolution({
   fieldMode = 'plain', previewSolution, onSolutionChange,
   solutionFiles = [], onSolutionFilesChange,
+  solutionDrawingUrl = '',
 }) {
   return (
     <Space direction="vertical" size={16} style={{ width: '100%', padding: '16px 0' }}>
+      {/* Чертёж решения (банк МЦНМО, image_role='solution') — относится к решению, не к условию */}
+      {solutionDrawingUrl && (
+        <Card
+          size="small"
+          title={<Text type="secondary" style={{ fontSize: 12 }}>Чертёж к решению</Text>}
+          styles={{ body: { padding: 12, textAlign: 'center' } }}
+        >
+          <img src={solutionDrawingUrl} alt="Чертёж решения" style={{ maxWidth: '100%', maxHeight: 360 }} />
+        </Card>
+      )}
       <Form.Item
         name="solution_md"
         label="Подробное решение (Markdown + LaTeX)"
