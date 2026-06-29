@@ -12,7 +12,7 @@ import { R, route } from '../../App';
 import ListokPrint from './ListokPrint';
 import './listki.css';
 
-const COURSE_LABEL = { planimetry: 'Планиметрия', stereometry: 'Стереометрия' };
+const COURSE_LABEL = { planimetry: 'Планиметрия', stereometry: 'Стереометрия', algebra: 'Алгебра' };
 
 // Номер задачи из code: gordin-plan-1.1 → 1.1 (иначе пусто)
 function numFromCode(code) {

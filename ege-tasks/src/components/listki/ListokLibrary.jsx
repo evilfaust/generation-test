@@ -9,8 +9,9 @@ import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { R } from '../../App';
 
-const COURSE_LABEL = { planimetry: 'Планиметрия', stereometry: 'Стереометрия' };
-const COURSE_TONE = { planimetry: 'teal', stereometry: 'violet' };
+const COURSE_LABEL = { planimetry: 'Планиметрия', stereometry: 'Стереометрия', algebra: 'Алгебра' };
+const COURSE_TONE = { planimetry: 'teal', stereometry: 'violet', algebra: 'amber' };
+const COURSE_ORDER = ['planimetry', 'stereometry', 'algebra'];
 
 export default function ListokLibrary() {
   const navigate = useNavigate();
@@ -138,6 +139,7 @@ export default function ListokLibrary() {
                 { label: 'Все', value: 'all' },
                 { label: 'Планиметрия', value: 'planimetry' },
                 { label: 'Стереометрия', value: 'stereometry' },
+                { label: 'Алгебра', value: 'algebra' },
               ]}
             />
           </div>
@@ -146,7 +148,7 @@ export default function ListokLibrary() {
         {filteredOfficial.length === 0 ? (
           <EmptyState title="Ничего не найдено" description="Измените запрос или курс." />
         ) : (
-          ['planimetry', 'stereometry'].filter((c) => byCourse[c]?.length).map((c) => (
+          COURSE_ORDER.filter((c) => byCourse[c]?.length).map((c) => (
             <div key={c} style={{ marginBottom: 18 }}>
               <div style={{ fontWeight: 600, margin: '6px 0 10px', color: 'var(--ws-muted, #555)' }}>
                 {COURSE_LABEL[c]} · {byCourse[c].length} частей
