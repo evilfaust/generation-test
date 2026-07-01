@@ -24,6 +24,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { WorkspacePageHeader, EmptyState, SectionCard, Chip, groupTone, groupHex } from './ui';
+import CourseMembersSection from './course/CourseMembersSection';
 
 const { Text } = Typography;
 
@@ -197,7 +198,12 @@ export default function GroupDetail() {
         accent={groupTone(group.id || group.name)}
         title={group.name}
         subtitle={subtitleParts.join(' · ') || undefined}
-        extra={group.archived ? <Tag>архив</Tag> : null}
+        extra={(
+          <Space>
+            {group.kind === 'course' && <Tag color="purple">курс</Tag>}
+            {group.archived ? <Tag>архив</Tag> : null}
+          </Space>
+        )}
       />
 
       <div style={{ marginBottom: 16 }}>
@@ -212,6 +218,9 @@ export default function GroupDetail() {
         </SectionCard>
       </div>
 
+      {group.kind === 'course' ? (
+        <CourseMembersSection group={group} allStudents={allStudents} />
+      ) : (
       <SectionCard
         icon={<TeamOutlined />}
         iconColor={groupHex(group.id || group.name).base}
@@ -281,6 +290,7 @@ export default function GroupDetail() {
           })
         )}
       </SectionCard>
+      )}
 
       <Modal
         open={addOpen}

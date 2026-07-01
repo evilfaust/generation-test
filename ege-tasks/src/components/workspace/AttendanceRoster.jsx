@@ -16,7 +16,7 @@ const SEG_OPTIONS = ATT_STATUSES.map((s) => ({ value: s.value, label: s.label })
 
 // Ростер посещаемости урока. Ученики берутся из группы урока, состояние хранится
 // в lesson_attendance по (урок, ученик). Создаётся лениво — только при отметке.
-export default function AttendanceRoster({ lessonId, groupId, canEdit }) {
+export default function AttendanceRoster({ lessonId, groupId, canEdit, isCourse = false }) {
   const { message } = App.useApp();
   const [students, setStudents] = useState([]);
   const [marks, setMarks] = useState({}); // studentId -> status
@@ -27,7 +27,8 @@ export default function AttendanceRoster({ lessonId, groupId, canEdit }) {
     let cancelled = false;
     if (!lessonId || !groupId) { setStudents([]); setMarks({}); return undefined; }
     setLoading(true);
-    Promise.all([api.getStudentsByGroup(groupId), api.getLessonAttendance(lessonId)])
+    const loadStudents = isCourse ? api.getCourseStudents(groupId) : api.getStudentsByGroup(groupId);
+    Promise.all([loadStudents, api.getLessonAttendance(lessonId)])
       .then(([st, att]) => {
         if (cancelled) return;
         setStudents(st);
@@ -38,7 +39,7 @@ export default function AttendanceRoster({ lessonId, groupId, canEdit }) {
       .catch(() => { if (!cancelled) message.error('Не удалось загрузить посещаемость'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [lessonId, groupId, message]);
+  }, [lessonId, groupId, message, isCourse]);
 
   const setOne = useCallback(async (studentId, status) => {
     const prev = marks[studentId];

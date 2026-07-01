@@ -1,13 +1,15 @@
 import dayjs from 'dayjs';
 import { ClockCircleOutlined, PaperClipOutlined, CheckOutlined, FlagFilled } from '@ant-design/icons';
-import { PAIRS, slotRangeFromCode, guessSlot } from '../lessonTime';
+import { PAIRS, slotRangeFromCode, guessSlot, hhmm } from '../lessonTime';
 import { groupHex } from '../ui';
 import { periodTitle } from './calendarUtils';
 import { useCalendarCtx } from './CalendarContext';
 
 const WD = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
-// Какой паре принадлежит урок: по time_slot, иначе по времени старта (guessSlot).
+// Какой паре принадлежит урок: по time_slot, иначе по времени старта (guessSlot),
+// иначе — ближайшая по времени пара (не теряем уроки с нестандартным временем,
+// напр. «своё время» вечером). Строки времени zero-padded → лексикографика ок.
 function pairKeyForLesson(l, start) {
   const r = slotRangeFromCode(l.time_slot);
   if (r) {
@@ -15,7 +17,12 @@ function pairKeyForLesson(l, start) {
     if (hit) return hit.key;
   }
   const g = guessSlot(start);
-  return g.pair;
+  if (g.pair) return g.pair;
+  // Фолбэк: последняя пара, чей старт <= времени урока (иначе — первая).
+  const t = hhmm(start);
+  let bucket = PAIRS[0];
+  for (const p of PAIRS) { if (p.full[0] <= t) bucket = p; }
+  return bucket.key;
 }
 
 /**

@@ -1,0 +1,181 @@
+/* Кабинет курса ученика — расписание, ближайшее занятие, материалы/ДЗ. */
+
+.sc-portal {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 14px 96px;
+}
+
+.sc-portal-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 4px 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1f1f1f;
+}
+
+.sc-course { margin-bottom: 28px; }
+
+.sc-course-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(114, 46, 209, 0.12), rgba(114, 46, 209, 0.04));
+  margin-bottom: 12px;
+}
+
+.sc-course-name { font-size: 17px; font-weight: 700; color: #4c1d95; }
+
+/* ── Ближайшее занятие (герой) ── */
+.sc-hero {
+  border-radius: 16px;
+  border: 1px solid rgba(114, 46, 209, 0.25);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(114, 46, 209, 0.12);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.sc-hero-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #722ed1, #9254de);
+  color: #fff;
+}
+
+.sc-hero-rel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.9;
+  font-weight: 600;
+}
+.sc-hero-title { font-size: 20px; font-weight: 700; margin: 2px 0; }
+.sc-hero-when { font-size: 13px; opacity: 0.95; text-transform: capitalize; }
+.sc-hero-join { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.16); font-weight: 600; }
+.sc-hero-body { padding: 6px 14px 12px; }
+
+/* Кнопки — умеренное закругление, без «таблеток». */
+.sc-portal .ant-btn.sc-btn { border-radius: 8px; }
+
+/* ── Карточка занятия (расписание/прошедшие) ── */
+.sc-section { margin-top: 16px; }
+.sc-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin: 0 2px 8px;
+}
+
+.sc-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  background: #fff;
+  margin-bottom: 8px;
+}
+.sc-card--dim { opacity: 0.6; }
+
+.sc-date {
+  flex: 0 0 46px;
+  height: 52px;
+  border-radius: 10px;
+  background: rgba(114, 46, 209, 0.08);
+  color: #722ed1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.sc-date-day { font-size: 20px; font-weight: 700; line-height: 1; }
+.sc-date-mon { font-size: 11px; text-transform: uppercase; }
+
+.sc-card-main { flex: 1; min-width: 0; }
+.sc-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.sc-card-title { font-weight: 600; font-size: 15px; color: #1f1f1f; }
+.sc-card-time { font-size: 12px; color: #999; white-space: nowrap; }
+.sc-card-until { font-size: 12px; font-weight: 600; color: #722ed1; margin: -2px 0 6px; }
+
+/* ── Блоки материалов / ДЗ ── */
+.sc-block { margin-top: 8px; }
+.sc-block-head {
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
+  margin-bottom: 4px;
+}
+.sc-block--hw {
+  border-top: 1px dashed #eadcff;
+  padding-top: 8px;
+}
+
+.sc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fafafa;
+  margin-bottom: 4px;
+}
+.sc-item--text {
+  display: block;
+  background: #fbf8ff;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sc-item-title { font-size: 14px; color: #333; min-width: 0; }
+.sc-item-muted { font-size: 12px; color: #bbb; }
+
+.sc-empty-note { color: #aaa; font-size: 13px; padding: 8px 2px; }
+
+/* ── Прошедшие — тоггл ── */
+.sc-past-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  padding: 4px 2px;
+}
+.sc-past-caret { transition: transform 0.15s; font-size: 11px; }
+.sc-past-caret.is-open { transform: rotate(90deg); }
+
+/* ── Тёмная тема ── */
+.student-theme-dark .sc-portal-title { color: #f0f0f0; }
+.student-theme-dark .sc-course-name { color: #d3adf7; }
+.student-theme-dark .sc-hero { background: #1f1f24; border-color: rgba(146, 84, 222, 0.4); box-shadow: none; }
+.student-theme-dark .sc-card { background: #1f1f24; border-color: #33333a; }
+.student-theme-dark .sc-card-title { color: #eee; }
+.student-theme-dark .sc-item { background: #2a2a31; }
+.student-theme-dark .sc-item-title { color: #ddd; }
+.student-theme-dark .sc-item--text { background: #26222e; }
+.student-theme-dark .sc-block-head { color: #aaa; }
+.student-theme-dark .sc-date { background: rgba(146, 84, 222, 0.2); color: #d3adf7; }
+.student-theme-dark .sc-block--hw { border-top-color: #3a3145; }
+.student-theme-dark .sc-card-until { color: #b37feb; }

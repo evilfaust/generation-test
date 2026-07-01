@@ -7,6 +7,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Spin,
   Switch,
@@ -21,6 +22,7 @@ import {
   InboxOutlined,
   PlusOutlined,
   TeamOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../shared/services/pocketbase';
@@ -39,18 +41,23 @@ function defaultYear() {
 
 function GroupModal({ open, initial, onSave, onCancel, saving }) {
   const [form] = Form.useForm();
+  const kind = Form.useWatch('kind', form) || 'class';
 
   useEffect(() => {
     if (open) {
       form.setFieldsValue(
-        initial || {
-          name: '',
-          subject: 'Математика',
-          grade: null,
-          hours_per_week: null,
-          umk: '',
-          year: defaultYear(),
-        },
+        initial
+          ? { kind: 'class', ...initial }
+          : {
+            name: '',
+            subject: 'Математика',
+            grade: null,
+            hours_per_week: null,
+            umk: '',
+            year: defaultYear(),
+            kind: 'class',
+            conference_url: '',
+          },
       );
     }
   }, [open, initial, form]);
@@ -67,13 +74,30 @@ function GroupModal({ open, initial, onSave, onCancel, saving }) {
       destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={onSave} style={{ marginTop: 8 }}>
+        <Form.Item name="kind" label="Тип">
+          <Select
+            options={[
+              { value: 'class', label: 'Класс / группа (обычная)' },
+              { value: 'course', label: 'Курс с кабинетом для учеников (онлайн-интенсив)' },
+            ]}
+          />
+        </Form.Item>
         <Form.Item
           name="name"
           label="Название"
           rules={[{ required: true, message: 'Введите название (напр. «9А»)' }]}
         >
-          <Input placeholder="9А" maxLength={100} autoFocus />
+          <Input placeholder={kind === 'course' ? 'Летний интенсив 10 кл.' : '9А'} maxLength={100} autoFocus />
         </Form.Item>
+        {kind === 'course' && (
+          <Form.Item
+            name="conference_url"
+            label="Ссылка на конференцию (комната курса)"
+            tooltip="Постоянная ссылка на телемост. На конкретном занятии её можно переопределить. Видна ученикам курса."
+          >
+            <Input prefix={<VideoCameraOutlined />} placeholder="https://telemost.yandex.ru/j/..." maxLength={1000} />
+          </Form.Item>
+        )}
         <Form.Item name="subject" label="Предмет">
           <Input placeholder="Математика" maxLength={100} />
         </Form.Item>
@@ -218,7 +242,11 @@ export default function GroupManager() {
         <div className="ws-tile__top">
           <span className="ws-tile__badge" style={{ color: hex.base, background: hex.soft }}>{initials}</span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div className="ws-tile__name">{g.name}{g.archived && <Tag style={{ marginLeft: 6 }}>архив</Tag>}</div>
+            <div className="ws-tile__name">
+              {g.name}
+              {g.kind === 'course' && <Tag color="purple" style={{ marginLeft: 6 }}>курс</Tag>}
+              {g.archived && <Tag style={{ marginLeft: 6 }}>архив</Tag>}
+            </div>
             {g.subject && <div className="ws-tile__sub">{g.subject}</div>}
           </div>
         </div>

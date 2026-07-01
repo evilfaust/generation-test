@@ -29,6 +29,7 @@ import { programsApi } from './pb/programs.js';
 import { campaignsApi } from './pb/campaigns.js';
 import { attendanceApi } from './pb/attendance.js';
 import { listkiApi } from './pb/listki.js';
+import { coursesApi } from './pb/courses.js';
 
 export const api = {
   ...extrasApi,
@@ -55,6 +56,7 @@ export const api = {
   ...campaignsApi,
   ...attendanceApi,
   ...listkiApi,
+  ...coursesApi,
 };
 
 export default pb;

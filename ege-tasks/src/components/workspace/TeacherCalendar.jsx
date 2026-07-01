@@ -21,6 +21,7 @@ import WeekByPairs from './calendar/WeekByPairs';
 import RightRail from './calendar/RightRail';
 import EventInspector from './calendar/EventInspector';
 import CreateEventModal from './calendar/CreateEventModal';
+import RepeatLessonModal from './calendar/RepeatLessonModal';
 import { CalendarContext, useCalendarCtx } from './calendar/CalendarContext';
 import {
   buildEvents, sortMonthEvents, weekSummary, todayTodos, periodTitle,
@@ -89,6 +90,8 @@ export default function TeacherCalendar() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [createState, setCreateState] = useState(null); // { type, day, pair } | null
+  const [repeatBase, setRepeatBase] = useState(null);   // урок для «Повторить серией»
+  const [repeating, setRepeating] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -206,16 +209,41 @@ export default function TeacherCalendar() {
   };
 
   // ── LessonModal save/delete/note/material ──
-  const handleSave = async (data) => {
+  const handleSave = async (data, meta = {}) => {
     setSaving(true);
     try {
-      if (editing?.id) await api.updateLesson(editing.id, data);
-      else await api.createLesson(data);
+      let id;
+      if (editing?.id) { await api.updateLesson(editing.id, data); id = editing.id; }
+      else { const rec = await api.createLesson(data); id = rec.id; }
+      // Витрина для ученика: no-op если группа урока — не курс.
+      try { await api.syncLessonPublication(id, { published: meta.published !== false }); } catch (e) { console.error('syncLessonPublication', e?.message); }
       setModalOpen(false); setEditing(null); load();
     } catch {
       message.error('Не удалось сохранить урок');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Серия занятий: создаём копии базового урока по расписанию + витрины для курса.
+  const handleRepeat = async (payloads) => {
+    setRepeating(true);
+    try {
+      for (const p of payloads) {
+        // eslint-disable-next-line no-await-in-loop
+        const rec = await api.createLesson(p);
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await api.syncLessonPublication(rec.id, { published: true });
+        } catch (e) { console.error('syncLessonPublication (series)', e?.message); }
+      }
+      message.success(`Создано занятий: ${payloads.length}`);
+      setRepeatBase(null);
+      load();
+    } catch {
+      message.error('Не удалось создать серию занятий');
+    } finally {
+      setRepeating(false);
     }
   };
 
@@ -397,7 +425,17 @@ export default function TeacherCalendar() {
         onDelete={handleDeleteLesson}
         onOpenNote={handleOpenNote}
         onOpenMaterial={handleOpenMaterial}
+        onRepeat={(lesson) => { setModalOpen(false); setEditing(null); setRepeatBase(lesson); }}
         onCancel={() => { setModalOpen(false); setEditing(null); }}
+      />
+
+      <RepeatLessonModal
+        open={!!repeatBase}
+        base={repeatBase}
+        groups={groups}
+        saving={repeating}
+        onConfirm={handleRepeat}
+        onCancel={() => setRepeatBase(null)}
       />
     </CalendarContext.Provider>
   );

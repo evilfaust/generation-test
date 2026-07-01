@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { ConfigProvider, Button, notification, theme } from 'antd';
-import { ArrowLeftOutlined, TrophyOutlined, LogoutOutlined, QrcodeOutlined, LinkOutlined, BarChartOutlined, CalendarOutlined, HomeOutlined, SunOutlined, MoonOutlined, LoginOutlined, UserAddOutlined, UserOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, TrophyOutlined, LogoutOutlined, QrcodeOutlined, LinkOutlined, BarChartOutlined, CalendarOutlined, HomeOutlined, SunOutlined, MoonOutlined, LoginOutlined, UserAddOutlined, UserOutlined, ReadOutlined } from '@ant-design/icons';
 
 // Нижнее меню кабинета ученика (показывается залогиненному на всех экранах, кроме теста).
 // go(key) — навигация: в кабинете меняет homeView, на странице сессии ведёт на /student/.
@@ -18,6 +18,7 @@ function StudentBottomNav({ active, go, onLogout }) {
   return (
     <nav className="student-bnav">
       <Item k="home" icon={<HomeOutlined />} label="Главная" onClick={() => go('home')} />
+      <Item k="courses" icon={<ReadOutlined />} label="Курсы" onClick={() => go('courses')} />
       <Item k="program" icon={<CalendarOutlined />} label="Задание" onClick={() => go('program')} />
       <Item k="progress" icon={<BarChartOutlined />} label="Прогресс" onClick={() => go('progress')} />
       <Item k="gallery" icon={<TrophyOutlined />} label="Достижения" onClick={() => go('gallery')} />
@@ -48,6 +49,7 @@ import StudentResultPage from './components/student/StudentResultPage';
 import AchievementGallery from './components/student/AchievementGallery';
 import StudentProgressPage from './components/student/StudentProgressPage';
 import StudentSummerProgram from './components/student/StudentSummerProgram';
+import StudentCoursePortal from './components/student/StudentCoursePortal';
 import { api } from './services/pocketbase';
 import { useVersionSync } from './shared/version/useVersionSync';
 import MarathonLiveBoard from './components/marathon/MarathonLiveBoard';
@@ -58,7 +60,7 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
   const [sessionCode, setSessionCode] = useState('');
   const [homeView, setHomeView] = useState(() => {
     const v = new URLSearchParams(window.location.search).get('v');
-    return ['program', 'progress', 'gallery'].includes(v) ? v : null;
+    return ['program', 'progress', 'gallery', 'courses'].includes(v) ? v : null;
   });
 
   // Минимальный псевдо-session для страниц прогресса/галереи
@@ -97,6 +99,17 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
           <div className="student-top-bar-right">{themeCorner}</div>
         </div>
         <StudentAuthPage onAuthSuccess={handleAuthSuccess} initialTab={homeView} />
+      </div>
+    );
+  }
+
+  // ---- Кабинет курса ----
+  if (homeView === 'courses') {
+    return (
+      <div className={`student-app student-has-bnav${isDark ? ' student-theme-dark' : ''}`}>
+        {themeCorner}
+        <StudentCoursePortal student={student} />
+        {navBar}
       </div>
     );
   }
@@ -217,6 +230,15 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
               <UserOutlined />
               <span>{student.name}</span>
             </div>
+            <Button
+              block
+              className="student-home-nav-btn"
+              icon={<ReadOutlined />}
+              onClick={() => setHomeView('courses')}
+              style={{ marginBottom: 8 }}
+            >
+              Мои курсы
+            </Button>
             <Button
               block
               className="student-home-nav-btn"
