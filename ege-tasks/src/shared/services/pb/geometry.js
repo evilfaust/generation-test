@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, withOwner, andOwner } from './client.js';
 import { PB_BASE_URL } from '../pocketbaseUrl';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
@@ -363,7 +363,7 @@ export const geometryApi = {
 
   async createGeometryPrintTest(data) {
     try {
-      return await pb.collection('geometry_print_tests').create(data);
+      return await pb.collection('geometry_print_tests').create(withOwner(data));
     } catch (error) {
       console.error('Error creating geometry print test:', error);
       throw error;
@@ -375,6 +375,7 @@ export const geometryApi = {
       return await pb.collection('geometry_print_tests').getFullList({
         sort: '-created',
         expand: 'tasks',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching geometry print tests:', error);

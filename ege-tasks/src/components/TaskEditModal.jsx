@@ -11,7 +11,8 @@ import LatexField from './shared/LatexField';
 import NumberLineModal from './shared/NumberLineModal';
 import { generateTaskCode } from '../utils/taskCodeGenerator';
 import { dataUrlToFile } from '../utils/cropImage';
-import { api } from '../services/pocketbase';
+import { api, aiHeaders } from '../services/pocketbase';
+import { useAuth } from '../contexts/AuthContext';
 import { useImageUpload } from '../hooks';
 import { parseMatchingTask } from '../utils/parseMatchingTask';
 import { fixLatexRoots } from '../utils/fixLatexRoots';
@@ -87,6 +88,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   // LLM-fix состояние: loading + локальный override critериев (поле не в форме,
   // а в task — после fix храним новую версию здесь, при handleSave передаём в API).
   const [latexFixLoading, setLatexFixLoading] = useState(false);
+  const { aiEnabled } = useAuth(); // ИИ-тумблер: гейт LLM-кнопок
   const [criteriaOverride, setCriteriaOverride] = useState(null);
   // Модал «Перепарсить с Решу ЕГЭ» (Уровень 2)
   const [refreshModalOpen, setRefreshModalOpen] = useState(false);
@@ -116,7 +118,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
         const role = field.replace('_md', '');
         const resp = await fetch(`${PDF_SERVICE_URL}/latex-fix`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...aiHeaders() },
           body: JSON.stringify({ text, role }),
         });
         if (!resp.ok) {
@@ -668,7 +670,7 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
           {/* Кнопка LLM-fix LaTeX — для уже сохранённых задач.
               Берёт текущее из формы, прогоняет через /latex-fix, подставляет
               результат в форму. Учитель сохраняет обычной кнопкой Save. */}
-          {!isCreateMode && (
+          {!isCreateMode && aiEnabled && (
             <Button
               size="small"
               type="default"
@@ -1034,17 +1036,19 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   → Таблица
                 </Button>
               </Tooltip>
-              <Tooltip title="Преобразование через AI — медленнее, но справляется с нестандартными форматами">
-                <Button
-                  size="small"
-                  icon={<TableOutlined />}
-                  loading={convertingTable}
-                  onClick={handleConvertAI}
-                  style={{ fontWeight: 400 }}
-                >
-                  → Таблица (AI)
-                </Button>
-              </Tooltip>
+              {aiEnabled && (
+                <Tooltip title="Преобразование через AI — медленнее, но справляется с нестандартными форматами">
+                  <Button
+                    size="small"
+                    icon={<TableOutlined />}
+                    loading={convertingTable}
+                    onClick={handleConvertAI}
+                    style={{ fontWeight: 400 }}
+                  >
+                    → Таблица (AI)
+                  </Button>
+                </Tooltip>
+              )}
               <Tooltip title="Чинит битые корни в этом поле: \sqrt: начало аргумента: 3 конец аргумента → \sqrt{3}. Мгновенно, без сети.">
                 <Button
                   size="small"

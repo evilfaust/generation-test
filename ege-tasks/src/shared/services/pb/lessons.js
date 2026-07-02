@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Учительское фло, фаза 4: API уроков (lessons) + источники событий календаря.
@@ -11,7 +11,7 @@ export const lessonsApi = {
       if (from) parts.push(`date_plan >= "${escapeFilter(from)}"`);
       if (to) parts.push(`date_plan <= "${escapeFilter(to)}"`);
       if (groupId) parts.push(`group = "${escapeFilter(groupId)}"`);
-      const filter = parts.join(' && ');
+      const filter = andOwner(parts.join(' && '));
       return await pb.collection('lessons').getFullList({
         ...(filter ? { filter } : {}),
         sort: 'date_plan',
@@ -77,7 +77,7 @@ export const lessonsApi = {
     try {
       if (!materialId) return [];
       return await pb.collection('lessons').getFullList({
-        filter: `materials ~ "${escapeFilter(materialId)}"`,
+        filter: andOwner(`materials ~ "${escapeFilter(materialId)}"`),
         sort: '-date_plan',
         expand: 'group',
       });
@@ -91,7 +91,7 @@ export const lessonsApi = {
   async getSessionsWithDeadline() {
     try {
       return await pb.collection('work_sessions').getFullList({
-        filter: 'deadline != ""',
+        filter: andOwner('deadline != ""'),
         sort: 'deadline',
         expand: 'work,mc_test,trig_mc_test',
       });

@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, withOwner } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
@@ -7,7 +7,7 @@ export const sessionsApi = {
 
   async createSession(data) {
     try {
-      return await pb.collection('work_sessions').create(data);
+      return await pb.collection('work_sessions').create(withOwner(data));
     } catch (error) {
       console.error('Error creating session:', error);
       throw error;

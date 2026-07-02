@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, aiHeaders } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
@@ -104,7 +104,7 @@ export const extrasApi = {
     const base = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
     const res = await fetch(`${base}/scan-blank`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...aiHeaders() },
       body: JSON.stringify({ image: imageBase64, tasks_count: tasksCount }),
       signal: AbortSignal.timeout(90000),
     });

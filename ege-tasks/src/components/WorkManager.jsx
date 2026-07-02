@@ -5,6 +5,7 @@ import {
   RightOutlined, InboxOutlined, SolutionOutlined, TeamOutlined,
   ClockCircleOutlined, SearchOutlined, SortAscendingOutlined, FormOutlined,
   PushpinOutlined, PushpinFilled, FolderOutlined, DownOutlined, CameraOutlined,
+  ShareAltOutlined, CopyOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
@@ -23,7 +24,7 @@ const { Option } = Select;
 const WorkManager = ({ onEditWork, onEditMCTest }) => {
   const { message, modal } = App.useApp();
   const { topics } = useReferenceData();
-  const { canEdit, canDelete } = useAuth();
+  const { canEdit, canDelete, aiEnabled, teacher, isSuperAdmin } = useAuth();
 
   const [activeTab, setActiveTab] = useState('works');
   const [mcTests, setMcTests] = useState([]);
@@ -60,6 +61,53 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   };
 
   const [scanWork, setScanWork] = useState(null); // работа, для которой сканируем бланки
+
+  // ── Общие работы (шаринг, v3.9.118) ──
+  const [sharedWorks, setSharedWorks] = useState([]);
+  const [sharedLoading, setSharedLoading] = useState(false);
+  const [cloningId, setCloningId] = useState(null);
+
+  const loadSharedWorks = useCallback(async () => {
+    setSharedLoading(true);
+    try {
+      setSharedWorks(await api.getSharedWorks());
+    } catch (err) {
+      console.error('Error loading shared works:', err);
+      message.error('Ошибка загрузки общих работ');
+    }
+    setSharedLoading(false);
+  }, [message]);
+
+  // Владелец записи (или запись без owner — легаси) может управлять шарингом.
+  const canShareWork = (work) => canEdit
+    && (isSuperAdmin || !work.owner || work.owner === teacher?.id);
+
+  const handleShareToggle = async (e, work) => {
+    e.stopPropagation();
+    const next = work.visibility === 'shared' ? 'private' : 'shared';
+    try {
+      await api.setWorkVisibility(work.id, next);
+      setWorks(prev => prev.map(w => (w.id === work.id ? { ...w, visibility: next } : w)));
+      message.success(next === 'shared'
+        ? 'Работа теперь общая — коллеги увидят её во вкладке «Общие работы»'
+        : 'Работа снова личная');
+    } catch (err) {
+      message.error('Не удалось изменить видимость');
+    }
+  };
+
+  const handleCloneWork = async (work) => {
+    setCloningId(work.id);
+    try {
+      const rec = await api.cloneWork(work.id);
+      message.success(`Скопировано в «Мои работы»: ${rec.title}`);
+      loadWorks(); // чтобы копия сразу была в списке «Контрольные работы»
+    } catch (err) {
+      console.error('Error cloning work:', err);
+      message.error('Не удалось клонировать работу');
+    }
+    setCloningId(null);
+  };
 
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -187,6 +235,11 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
       loadMcTests();
     }
   }, [activeTab, mcTests.length, mcLoading, loadMcTests]);
+
+  // Общие работы перезагружаем при каждом входе на вкладку (могли поделиться/клонировать)
+  useEffect(() => {
+    if (activeTab === 'shared') loadSharedWorks();
+  }, [activeTab, loadSharedWorks]);
 
   const handleDeleteMcTest = (e, mcId, mcTitle) => {
     e.stopPropagation();
@@ -568,6 +621,9 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                     <div className="wm-work-card-title">
                       {work.is_pinned && <PushpinFilled style={{ color: '#faad14', marginRight: 6 }} />}
                       {work.title || 'Без названия'}
+                      {work.visibility === 'shared' && (
+                        <Tag color="green" icon={<ShareAltOutlined />} style={{ marginLeft: 6 }}>Общая</Tag>
+                      )}
                       {work.archived && (
                         <span className="wm-status-badge wm-status-badge--archived">Архив</span>
                       )}
@@ -641,6 +697,16 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                         />
                       </Tooltip>
                     )}
+                    {canShareWork(work) && (
+                      <Tooltip title={work.visibility === 'shared' ? 'Общая — сделать личной' : 'Поделиться с коллегами'}>
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<ShareAltOutlined style={work.visibility === 'shared' ? { color: '#52c41a' } : undefined} />}
+                          onClick={e => handleShareToggle(e, work)}
+                        />
+                      </Tooltip>
+                    )}
                     <Tooltip title="Просмотр вариантов">
                       <Button
                         type="text"
@@ -668,7 +734,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                         🧬
                       </Button>
                     </Tooltip>
-                    {canEdit && (
+                    {canEdit && aiEnabled && (
                       <Tooltip title="Проверить бумажные бланки (фото)">
                         <Button
                           type="text"
@@ -921,6 +987,77 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
     </div>
   );
 
+  // ── Вкладка «Общие работы»: работы коллег с visibility=shared ──
+  const sharedContent = (
+    <div>
+      {sharedLoading ? (
+        <div style={{ textAlign: 'center', padding: 48 }}><Spin size="large" /></div>
+      ) : sharedWorks.length === 0 ? (
+        <Empty
+          style={{ padding: 32 }}
+          description="Общих работ пока нет. Нажмите «Поделиться» (значок ⤴) на своей работе — и коллеги увидят её здесь."
+        />
+      ) : (
+        <div className="wm-work-list">
+          {sharedWorks.map(work => {
+            const isMine = !work.owner || work.owner === teacher?.id;
+            const author = work.expand?.owner;
+            return (
+              <div key={work.id} className="wm-work-card">
+                <div className="wm-work-card-header" style={{ cursor: 'default' }}>
+                  <div className="wm-work-card-main">
+                    <div className="wm-work-card-title">
+                      {work.title || 'Без названия'}
+                      {isMine && <Tag color="blue" style={{ marginLeft: 8 }}>моя</Tag>}
+                    </div>
+                    <div className="wm-work-card-meta">
+                      <span><UserOutlined /> {author?.name || author?.username || 'учитель'}</span>
+                      <span className="wm-work-card-date">
+                        {new Date(work.created).toLocaleDateString('ru-RU', {
+                          day: 'numeric', month: 'long', year: 'numeric',
+                        })}
+                      </span>
+                      {work.expand?.topic && (
+                        <Tag color="purple" style={{ margin: 0 }}>
+                          {work.expand.topic.ege_number ? `№${work.expand.topic.ege_number} — ` : ''}{work.expand.topic.title}
+                        </Tag>
+                      )}
+                      {Number(work.time_limit) > 0 && (
+                        <Tag icon={<ClockCircleOutlined />} style={{ margin: 0 }}>{work.time_limit} мин</Tag>
+                      )}
+                    </div>
+                  </div>
+                  <div className="wm-work-card-actions">
+                    {canEdit && (
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        loading={cloningId === work.id}
+                        onClick={() => handleCloneWork(work)}
+                      >
+                        Клонировать себе
+                      </Button>
+                    )}
+                    {isMine && canShareWork(work) && (
+                      <Tooltip title="Сделать личной (убрать из общих)">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<ShareAltOutlined style={{ color: '#52c41a' }} />}
+                          onClick={async (e) => { await handleShareToggle(e, work); loadSharedWorks(); }}
+                        />
+                      </Tooltip>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="wm-dashboard">
       <PageHeader
@@ -929,8 +1066,8 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         actions={
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => activeTab === 'mc' ? loadMcTests() : loadWorks()}
-            loading={activeTab === 'mc' ? mcLoading : loading}
+            onClick={() => activeTab === 'mc' ? loadMcTests() : (activeTab === 'shared' ? loadSharedWorks() : loadWorks())}
+            loading={activeTab === 'mc' ? mcLoading : (activeTab === 'shared' ? sharedLoading : loading)}
           >
             Обновить
           </Button>
@@ -943,6 +1080,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         items={[
           { key: 'works', label: <span><SolutionOutlined /> Контрольные работы</span>, children: worksContent },
           { key: 'mc', label: <span><FormOutlined /> Тесты с выбором</span>, children: mcContent },
+          { key: 'shared', label: <span><ShareAltOutlined /> Общие работы</span>, children: sharedContent },
         ]}
       />
       <ParallelVariantsModal

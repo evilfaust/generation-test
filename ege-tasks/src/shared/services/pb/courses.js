@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Курсы (онлайн-интенсивы в малых группах) — надстройка над teaching_groups
@@ -33,7 +33,7 @@ export const coursesApi = {
       const parts = ['kind = "course"'];
       if (!includeArchived) parts.push('archived != true');
       return await pb.collection('teaching_groups').getFullList({
-        filter: parts.join(' && '),
+        filter: andOwner(parts.join(' && ')),
         sort: 'sort_order,-created',
       });
     } catch (error) {

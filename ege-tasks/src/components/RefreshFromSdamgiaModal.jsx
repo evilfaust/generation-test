@@ -13,7 +13,8 @@ import {
   Typography, Divider, Tag, App,
 } from 'antd';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import pb, { api } from '../services/pocketbase';
+import pb, { api, aiHeaders } from '../services/pocketbase';
+import { useAuth } from '../contexts/AuthContext';
 import TaskStatementRenderer from './TaskStatementRenderer';
 
 const { Text } = Typography;
@@ -64,7 +65,7 @@ async function fetchFreshTaskData(sdamgiaUrl, withLlmFix) {
       try {
         const r = await fetch(`${PDF_SERVICE_URL}/latex-fix`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...aiHeaders() },
           body: JSON.stringify({ text: fresh[k], role: k.replace('_md', '') }),
         });
         if (!r.ok) return [k, fresh[k]];
@@ -83,6 +84,7 @@ async function fetchFreshTaskData(sdamgiaUrl, withLlmFix) {
 
 export default function RefreshFromSdamgiaModal({ task, open, onClose, onApplied }) {
   const { message } = App.useApp();
+  const { aiEnabled } = useAuth(); // ИИ-тумблер: без него LLM-фикс недоступен
   const [phase, setPhase] = useState('idle'); // 'idle' | 'loading' | 'preview' | 'applying'
   const [withLlmFix, setWithLlmFix] = useState(true);
   const [reloadImages, setReloadImages] = useState(false);
@@ -104,7 +106,7 @@ export default function RefreshFromSdamgiaModal({ task, open, onClose, onApplied
   const handleStart = async () => {
     setPhase('loading');
     try {
-      const data = await fetchFreshTaskData(task.sdamgia_url, withLlmFix);
+      const data = await fetchFreshTaskData(task.sdamgia_url, withLlmFix && aiEnabled);
       setFresh(data);
       // Preselect: галочка стоит на полях, где значение реально изменилось.
       const initialSel = {};
@@ -333,17 +335,19 @@ export default function RefreshFromSdamgiaModal({ task, open, onClose, onApplied
               </ul>
             }
           />
-          <Space direction="vertical" size={12}>
-            <Checkbox
-              checked={withLlmFix}
-              onChange={(e) => setWithLlmFix(e.target.checked)}
-            >
-              <strong>🤖 Дополнительно: прогнать LaTeX через LLM</strong>
-              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                Рекомендуется. Лечит \angleABC → \angle&#123;ABC&#125;, степени в скобках, индексы и т.п.
-              </div>
-            </Checkbox>
-          </Space>
+          {aiEnabled && (
+            <Space direction="vertical" size={12}>
+              <Checkbox
+                checked={withLlmFix}
+                onChange={(e) => setWithLlmFix(e.target.checked)}
+              >
+                <strong>🤖 Дополнительно: прогнать LaTeX через LLM</strong>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                  Рекомендуется. Лечит \angleABC → \angle&#123;ABC&#125;, степени в скобках, индексы и т.п.
+                </div>
+              </Checkbox>
+            </Space>
+          )}
           <div style={{ marginTop: 24 }}>
             <Button type="primary" icon={<ReloadOutlined />} onClick={handleStart}>
               Начать

@@ -16,6 +16,7 @@ import TaskSelectModal from './TaskSelectModal';
 import { filterTaskText } from '../utils/filterTaskText';
 import { buildCryptogramForVariant, getCryptogramLetterCount, getCryptogramUniqueLetterCount, normalizeCryptogramPhrase } from '../utils/cryptogram';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { useAuth } from '../contexts/AuthContext';
 import {
   TrigGeneratorLayout,
   TrigSettingsSection,
@@ -178,6 +179,7 @@ function CryptogramPrintBlock({ tasks, phrase, title, stripPrefixes, description
 /* ── Основной компонент ─────────────────────────────────────────────────── */
 export default function CryptogramGenerator() {
   const { message } = App.useApp();
+  const { aiEnabled } = useAuth(); // ИИ-тумблер: гейт AI-определения
   const { topics, subtopics, tags } = useReferenceData();
 
   const [tasks, setTasks] = useState([]);
@@ -439,17 +441,19 @@ export default function CryptogramGenerator() {
                 autoSize={{ minRows: 2, maxRows: 5 }}
                 style={{ marginBottom: 6, fontSize: 12 }}
               />
-              <Button
-                size="small"
-                icon={<BulbOutlined />}
-                loading={defLoading}
-                disabled={!phrase.trim()}
-                onClick={handleGetDefinition}
-                style={{ width: '100%' }}
-              >
-                {defLoading ? 'Генерирую (~30 сек)…' : 'Сгенерировать определение (AI)'}
-              </Button>
-              {!phrase.trim() && (
+              {aiEnabled && (
+                <Button
+                  size="small"
+                  icon={<BulbOutlined />}
+                  loading={defLoading}
+                  disabled={!phrase.trim()}
+                  onClick={handleGetDefinition}
+                  style={{ width: '100%' }}
+                >
+                  {defLoading ? 'Генерирую (~30 сек)…' : 'Сгенерировать определение (AI)'}
+                </Button>
+              )}
+              {aiEnabled && !phrase.trim() && (
                 <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
                   Сначала введите фразу-термин выше
                 </div>

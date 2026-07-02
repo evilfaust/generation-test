@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 const TODO_EXPAND = 'group,source_note,folder,student,lesson,work';
@@ -16,7 +16,7 @@ function shiftDate(iso, repeat) {
 export const todoFoldersApi = {
   async getTodoFolders() {
     try {
-      return await pb.collection('todo_folders').getFullList({ sort: 'sort_order,created' });
+      return await pb.collection('todo_folders').getFullList({ sort: 'sort_order,created', filter: andOwner() });
     } catch (error) {
       console.error('Error fetching todo folders:', error);
       return [];
@@ -53,6 +53,7 @@ export const todosApi = {
       return await pb.collection('teacher_todos').getFullList({
         sort: 'done,sort_order,-created',
         expand: TODO_EXPAND,
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching todos:', error);

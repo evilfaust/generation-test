@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, withOwner, andOwnerOrFree, andRelOwnerOrFree } from './client.js';
 import { PB_BASE_URL } from '../pocketbaseUrl';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
@@ -221,6 +221,8 @@ export const studentsApi = {
       return await pb.collection('students').getFullList({
         sort: '-created',
         fields: 'id,username,name,student_class,external,created,updated',
+        // мои ученики + «ничьи» (саморегистрация) — до модели привязки учеников
+        filter: andOwnerOrFree(),
       });
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -239,14 +241,14 @@ export const studentsApi = {
     let lastErr;
     for (let i = 0; i < 3; i += 1) {
       try {
-        const rec = await pb.collection('students').create({
+        const rec = await pb.collection('students').create(withOwner({
           name: nm,
           username: `ext_${Math.random().toString(36).slice(2, 10)}`,
           password,
           passwordConfirm: password,
           external: true,
           ...(groupId ? { teaching_group: groupId } : {}),
-        });
+        }));
         _logAudit('create', 'students', rec.id, `внешний: ${nm}`);
         return rec;
       } catch (e) {
@@ -302,7 +304,8 @@ export const studentsApi = {
   async getAttemptsForRegisteredStudents() {
     try {
       return await pb.collection('attempts').getFullList({
-        filter: 'student != ""',
+        // скоуп аналитики: попытки моих учеников (+ «ничьих» до привязки)
+        filter: andRelOwnerOrFree('student', 'student != ""'),
         sort: '-created',
         expand: 'session,session.work,session.mc_test,variant',
       });

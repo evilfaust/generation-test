@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, withOwner, andOwner } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
@@ -8,7 +8,7 @@ export const catalogApi = {
   // Создать карточку
   async createCard(data) {
     try {
-      return await pb.collection('cards').create(data);
+      return await pb.collection('cards').create(withOwner(data));
     } catch (error) {
       console.error('Error creating card:', error);
       throw error;
@@ -21,6 +21,7 @@ export const catalogApi = {
       const records = await pb.collection('cards').getFullList({
         sort: '-created',
         expand: 'tasks,tasks.topic',
+        filter: andOwner(),
       });
       return records;
     } catch (error) {

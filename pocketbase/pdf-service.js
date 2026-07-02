@@ -37,6 +37,53 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// ─── ИИ-гейт (мультиучительство, v3.9.117) ─────────────────────────────────
+// LLM-ручки (/latex-fix, /scan-blank) тратят деньги → проверяем токен учителя
+// через PocketBase (auth-refresh) и флаг teachers.ai_enabled. Включается
+// переменной REQUIRE_TEACHER_AI_AUTH=1 в systemd override; без неё поведение
+// прежнее (совместимость с фронтом до v3.9.117, который не шлёт токен).
+const REQUIRE_TEACHER_AI_AUTH = process.env.REQUIRE_TEACHER_AI_AUTH === '1';
+const PB_URL = process.env.PB_URL || 'http://127.0.0.1:8095';
+const aiAuthCache = new Map(); // token → { exp, value }
+
+async function checkTeacherAi(req) {
+  const auth = req.get('Authorization') || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : auth;
+  if (!token) return { ok: false, status: 401, error: 'Нужен вход учителя (токен не передан)' };
+  const now = Date.now();
+  const cached = aiAuthCache.get(token);
+  if (cached && cached.exp > now) return cached.value;
+  let value;
+  try {
+    const r = await fetch(`${PB_URL}/api/collections/teachers/auth-refresh`, {
+      method: 'POST',
+      headers: { Authorization: token },
+    });
+    if (!r.ok) {
+      value = { ok: false, status: 401, error: 'Токен учителя не прошёл проверку' };
+    } else {
+      const data = await r.json();
+      value = data?.record?.ai_enabled === false
+        ? { ok: false, status: 403, error: 'ИИ-функции выключены для этого учителя (см. суперадмина)' }
+        : { ok: true };
+    }
+  } catch (e) {
+    // PB недоступен — fail-open: не роняем фичу из-за сетевой ошибки проверки
+    console.warn('[ai-gate] проверка токена недоступна:', e.message);
+    value = { ok: true, degraded: true };
+  }
+  aiAuthCache.set(token, { exp: now + 5 * 60 * 1000, value });
+  if (aiAuthCache.size > 500) aiAuthCache.clear();
+  return value;
+}
+
+async function aiGate(req, res, next) {
+  if (!REQUIRE_TEACHER_AI_AUTH) return next();
+  const v = await checkTeacherAi(req);
+  if (!v.ok) return res.status(v.status || 401).json({ error: v.error });
+  return next();
+}
+
 // ============================================================
 // SDAMGIA PARSER — порт логики из par.py
 // ============================================================
@@ -1013,7 +1060,7 @@ function normalizeLatexDelimiters(text) {
   return out;
 }
 
-app.post('/latex-fix', async (req, res) => {
+app.post('/latex-fix', aiGate, async (req, res) => {
   const { text, role } = req.body || {};
 
   if (!text || typeof text !== 'string') {
@@ -1126,7 +1173,7 @@ ${tasksCount ? `- В этом варианте ${tasksCount} заданий: з�
 
 Правила: только непустые поля; в fields — то, что написано в основной зоне (замены НЕ применяй, их верни отдельно в replacements); десятичный разделитель — запятая; минус — обычный дефис; символы без пробелов.`;
 
-app.post('/scan-blank', async (req, res) => {
+app.post('/scan-blank', aiGate, async (req, res) => {
   const { image, tasks_count } = req.body || {};
 
   if (!image || typeof image !== 'string') {

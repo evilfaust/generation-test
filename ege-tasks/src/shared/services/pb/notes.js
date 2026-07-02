@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Учительское фло, фаза 5: API заметок (teacher_notes). body = JSON-документ BlockNote.
@@ -6,7 +6,7 @@ import { escapeFilter } from '../../utils/escapeFilter';
 export const notesApi = {
   async getNotes() {
     try {
-      return await pb.collection('teacher_notes').getFullList({ sort: '-updated', expand: 'group' });
+      return await pb.collection('teacher_notes').getFullList({ sort: '-updated', expand: 'group', filter: andOwner() });
     } catch (error) {
       console.error('Error fetching notes:', error);
       return [];
@@ -100,7 +100,7 @@ export const notesApi = {
     try {
       if (!noteId) return [];
       const all = await pb.collection('teacher_notes').getFullList({
-        filter: `links ~ "${escapeFilter(noteId)}"`,
+        filter: andOwner(`links ~ "${escapeFilter(noteId)}"`),
         sort: '-updated',
         expand: 'group',
       });
@@ -119,7 +119,7 @@ export const notesApi = {
     try {
       if (!studentId) return [];
       const all = await pb.collection('teacher_notes').getFullList({
-        filter: `links ~ "${escapeFilter(studentId)}"`,
+        filter: andOwner(`links ~ "${escapeFilter(studentId)}"`),
         sort: '-updated',
         expand: 'group,lesson',
       });

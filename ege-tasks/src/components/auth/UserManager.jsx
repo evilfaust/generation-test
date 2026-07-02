@@ -12,7 +12,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Table, Button, Space, Tag, Modal, Form, Input, Select, Checkbox,
-  Popconfirm, message, Typography, Card, Empty, Avatar, Upload,
+  Popconfirm, message, Typography, Card, Empty, Avatar, Upload, Switch,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined,
@@ -231,6 +231,28 @@ export default function UserManager() {
           </Space>
         );
       },
+    },
+    {
+      title: 'ИИ',
+      dataIndex: 'ai_enabled',
+      key: 'ai_enabled',
+      width: 70,
+      render: (_, record) => (
+        <Switch
+          size="small"
+          checked={record.ai_enabled !== false}
+          title="ИИ-функции (LLM): починка LaTeX, сканирование бланков, определения"
+          onChange={async (checked) => {
+            try {
+              await api.updateTeacher(record.id, { ai_enabled: checked });
+              setTeachers((prev) => prev.map((t) => (t.id === record.id ? { ...t, ai_enabled: checked } : t)));
+              message.success(checked ? 'ИИ включён' : 'ИИ выключен');
+            } catch (e) {
+              message.error(`Не удалось изменить: ${e?.message || 'ошибка'}`);
+            }
+          }}
+        />
+      ),
     },
     {
       title: 'Последний вход',

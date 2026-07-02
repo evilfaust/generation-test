@@ -59,4 +59,7 @@ export const api = {
   ...coursesApi,
 };
 
+// Заголовок авторизации для ИИ-ручек pdf-service (см. pb/client.js).
+export { aiHeaders } from './pb/client.js';
+
 export default pb;

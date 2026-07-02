@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Учительское фло, фаза 3: API КТП (courses + ktp_entries).
@@ -7,7 +7,7 @@ export const ktpApi = {
   // ── Courses (КТП-документы) ────────────────────────────────────────────────
   async getCourses({ includeArchived = false } = {}) {
     try {
-      const filter = includeArchived ? '' : 'archived != true';
+      const filter = andOwner(includeArchived ? '' : 'archived != true');
       return await pb.collection('courses').getFullList({
         ...(filter ? { filter } : {}),
         sort: '-created',

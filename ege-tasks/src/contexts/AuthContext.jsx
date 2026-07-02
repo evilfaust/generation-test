@@ -124,6 +124,9 @@ export function AuthProvider({ children }) {
   const isSuperAdmin = role === 'superadmin';
   const canEdit = role === 'superadmin' || role === 'editor';
   const canDelete = canEdit;
+  // ИИ-тумблер (v3.9.117): суперадмин управляет в UserManager.
+  // Отсутствие поля (старые записи/токен до миграции) = включено.
+  const aiEnabled = !!teacher && teacher.ai_enabled !== false;
 
   const hasSection = useCallback(
     (key) => {
@@ -145,11 +148,12 @@ export function AuthProvider({ children }) {
       isSuperAdmin,
       canEdit,
       canDelete,
+      aiEnabled,
       hasSection,
       login,
       logout,
     }),
-    [teacher, role, isSuperAdmin, canEdit, canDelete, hasSection, login, logout],
+    [teacher, role, isSuperAdmin, canEdit, canDelete, aiEnabled, hasSection, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, withOwner, andOwner } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
@@ -8,6 +8,7 @@ export const worksheetsApi = {
       return await pb.collection('qr_worksheets').getFullList({
         sort: '-created',
         expand: 'tasks',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching qr_worksheets:', error);
@@ -17,7 +18,7 @@ export const worksheetsApi = {
 
   async createQrWorksheet(data) {
     try {
-      return await pb.collection('qr_worksheets').create(data);
+      return await pb.collection('qr_worksheets').create(withOwner(data));
     } catch (error) {
       console.error('Error creating qr_worksheet:', error);
       throw error;
@@ -50,6 +51,7 @@ export const worksheetsApi = {
       return await pb.collection('pixel_art_worksheets').getFullList({
         sort: '-created',
         fields: 'id,title,grid_cols,grid_rows,threshold,two_sheets,show_teacher_key,two_columns,custom_answers,created,tasks',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching pixel_art_worksheets:', error);
@@ -71,7 +73,7 @@ export const worksheetsApi = {
 
   async createPixelArtWorksheet(data) {
     try {
-      return await pb.collection('pixel_art_worksheets').create(data);
+      return await pb.collection('pixel_art_worksheets').create(withOwner(data));
     } catch (error) {
       console.error('Error creating pixel_art_worksheet:', error);
       throw error;
@@ -140,7 +142,7 @@ export const worksheetsApi = {
 
   async getPixelArtTeamSets() {
     try {
-      return await pb.collection('pixel_art_team_sets').getFullList({ sort: '-created' });
+      return await pb.collection('pixel_art_team_sets').getFullList({ sort: '-created', filter: andOwner() });
     } catch (error) {
       console.error('Error fetching pixel_art_team_sets:', error);
       return [];
@@ -169,7 +171,7 @@ export const worksheetsApi = {
 
   async createPixelArtTeamSet(data) {
     try {
-      return await pb.collection('pixel_art_team_sets').create(data);
+      return await pb.collection('pixel_art_team_sets').create(withOwner(data));
     } catch (error) {
       console.error('Error creating pixel_art_team_set:', error);
       throw error;
@@ -228,6 +230,7 @@ export const worksheetsApi = {
       return await pb.collection('route_sheets').getFullList({
         sort: '-created',
         expand: 'tasks',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching route_sheets:', error);
@@ -237,7 +240,7 @@ export const worksheetsApi = {
 
   async createRouteSheet(data) {
     try {
-      return await pb.collection('route_sheets').create(data);
+      return await pb.collection('route_sheets').create(withOwner(data));
     } catch (error) {
       console.error('Error creating route_sheet:', error);
       throw error;
@@ -268,6 +271,7 @@ export const worksheetsApi = {
     try {
       return await pb.collection('unit_circle_worksheets').getFullList({
         sort: '-created',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching unit_circle_worksheets:', error);
@@ -277,7 +281,7 @@ export const worksheetsApi = {
 
   async createUnitCircleWorksheet(data) {
     try {
-      return await pb.collection('unit_circle_worksheets').create(data);
+      return await pb.collection('unit_circle_worksheets').create(withOwner(data));
     } catch (error) {
       console.error('Error creating unit_circle_worksheet:', error);
       throw error;
@@ -308,6 +312,7 @@ export const worksheetsApi = {
     try {
       return await pb.collection('trig_values_worksheets').getFullList({
         sort: '-created',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching trig_values_worksheets:', error);
@@ -317,7 +322,7 @@ export const worksheetsApi = {
 
   async createTrigValuesWorksheet(data) {
     try {
-      return await pb.collection('trig_values_worksheets').create(data);
+      return await pb.collection('trig_values_worksheets').create(withOwner(data));
     } catch (error) {
       console.error('Error creating trig_values_worksheet:', error);
       throw error;
@@ -349,6 +354,7 @@ export const worksheetsApi = {
       return await pb.collection('marathons').getFullList({
         sort: '-created',
         expand: 'tasks',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching marathons:', error);
@@ -367,7 +373,7 @@ export const worksheetsApi = {
 
   async createMarathon(data) {
     try {
-      return await pb.collection('marathons').create(data);
+      return await pb.collection('marathons').create(withOwner(data));
     } catch (error) {
       console.error('Error creating marathon:', error);
       throw error;
@@ -407,6 +413,7 @@ export const worksheetsApi = {
       return await pb.collection('cryptograms').getFullList({
         sort: '-created',
         expand: 'tasks',
+        filter: andOwner(),
       });
     } catch (error) {
       console.error('Error fetching cryptograms:', error);
@@ -425,7 +432,7 @@ export const worksheetsApi = {
 
   async createCryptogram(data) {
     try {
-      return await pb.collection('cryptograms').create(data);
+      return await pb.collection('cryptograms').create(withOwner(data));
     } catch (error) {
       console.error('Error creating cryptogram:', error);
       throw error;
@@ -454,7 +461,7 @@ export const worksheetsApi = {
 
   async getMCTests() {
     try {
-      return await pb.collection('mc_tests').getFullList({ sort: '-created' });
+      return await pb.collection('mc_tests').getFullList({ sort: '-created', filter: andOwner() });
     } catch (error) {
       console.error('Error fetching mc_tests:', error);
       return [];
@@ -472,7 +479,7 @@ export const worksheetsApi = {
 
   async createMCTest(data) {
     try {
-      const rec = await pb.collection('mc_tests').create(data);
+      const rec = await pb.collection('mc_tests').create(withOwner(data));
       _logAudit('create', 'mc_tests', rec.id, rec.title);
       return rec;
     } catch (error) {
@@ -522,12 +529,12 @@ export const worksheetsApi = {
   // Сессия для mc_test (без поля work)
   async createMCTestSession(mcTestId, extra = {}) {
     try {
-      return await pb.collection('work_sessions').create({
+      return await pb.collection('work_sessions').create(withOwner({
         mc_test: mcTestId,
         is_open: true,
         achievements_enabled: true,
         ...extra,
-      });
+      }));
     } catch (error) {
       console.error('Error creating mc_test session:', error);
       throw error;
@@ -551,7 +558,7 @@ export const worksheetsApi = {
   async getMCTestsByGeneratorType(generatorType) {
     try {
       return await pb.collection('mc_tests').getFullList({
-        filter: `source_type = "generator" && generator_type = "${generatorType}"`,
+        filter: andOwner(`source_type = "generator" && generator_type = "${generatorType}"`),
         sort: '-created',
       });
     } catch (error) {
@@ -603,7 +610,7 @@ export const worksheetsApi = {
 
   async getFormulaSheets() {
     try {
-      return await pb.collection('formula_sheets').getFullList({ sort: '-id' });
+      return await pb.collection('formula_sheets').getFullList({ sort: '-id', filter: andOwner() });
     } catch (error) {
       console.error('Error fetching formula_sheets:', error);
       return [];
@@ -621,7 +628,7 @@ export const worksheetsApi = {
 
   async createFormulaSheet(data) {
     try {
-      return await pb.collection('formula_sheets').create(data);
+      return await pb.collection('formula_sheets').create(withOwner(data));
     } catch (error) {
       console.error('Error creating formula_sheet:', error);
       throw error;

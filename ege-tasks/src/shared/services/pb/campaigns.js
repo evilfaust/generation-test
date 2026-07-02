@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Кампании каникулярных заданий (vacation_campaigns).
@@ -10,7 +10,7 @@ export const campaignsApi = {
       if (year)   parts.push(`year = ${Number(year)}`);
       if (status) parts.push(`status = "${escapeFilter(status)}"`);
       return await pb.collection('vacation_campaigns').getFullList({
-        filter: parts.join(' && ') || '',
+        filter: andOwner(parts.join(' && ')) || '',
         sort: '-year,-created',
         expand: 'group',
       });

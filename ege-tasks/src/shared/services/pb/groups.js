@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner, andOwnerOrFree, currentTeacher } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Учительское фло, фаза 1: API классов/групп (коллекция `teaching_groups`).
@@ -7,7 +7,7 @@ export const groupsApi = {
   // ── Классы/группы (teaching_groups) ───────────────────────────────────────
   async getTeachingGroups({ includeArchived = false } = {}) {
     try {
-      const filter = includeArchived ? '' : 'archived != true';
+      const filter = andOwner(includeArchived ? '' : 'archived != true');
       return await pb.collection('teaching_groups').getFullList({
         ...(filter ? { filter } : {}),
         // Ручной порядок (sort_order), затем — новые сверху для одинакового sort_order.
@@ -117,6 +117,8 @@ export const groupsApi = {
       return await pb.collection('students').getFullList({
         sort: 'name',
         fields: 'id,name,username,student_class,teaching_group',
+        // мои ученики + «ничьи» (саморегистрация) — до модели привязки учеников
+        filter: andOwnerOrFree(),
       });
     } catch (error) {
       console.error('Error fetching students for picker:', error);
@@ -126,10 +128,24 @@ export const groupsApi = {
 
   async setStudentGroup(studentId, groupId) {
     try {
-      // groupId === null → отвязать.
-      return await pb.collection('students').update(studentId, {
-        teaching_group: groupId || '',
-      });
+      // groupId === null → отвязать (владелец при этом сохраняется).
+      const data = { teaching_group: groupId || '' };
+      // Привязка к группе «забирает» ничейного ученика (саморегистрация)
+      // текущему учителю — это и есть модель привязки учеников.
+      const t = currentTeacher();
+      if (groupId && t) {
+        try {
+          const found = await pb.collection('students').getFullList({
+            filter: `id = "${escapeFilter(studentId)}"`,
+            fields: 'id,owner',
+          });
+          if (found[0] && !found[0].owner) {
+            data.owner = t.id;
+            _logAudit('update', 'students', studentId, 'привязан к учителю (claim при добавлении в группу)');
+          }
+        } catch (_) { /* не смогли прочитать — просто не claim'им */ }
+      }
+      return await pb.collection('students').update(studentId, data);
     } catch (error) {
       console.error('Error setting student group:', error);
       throw error;

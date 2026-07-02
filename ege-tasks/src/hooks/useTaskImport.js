@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import pb, { api } from '../services/pocketbase';
+import pb, { api, aiHeaders } from '../services/pocketbase';
 import { parseMarkdownFile, parseSdamgiaResult, getRandomTagColor } from '../utils/markdownTaskParser';
 import { rewriteImageUrls } from '../components/TaskStatementRenderer';
 
@@ -302,7 +302,7 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
         try {
           const resp = await fetch(`${PDF_SERVICE_URL}/latex-fix`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...aiHeaders() },
             body: JSON.stringify({ text: task[field], role: field.replace('_md', '') }),
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

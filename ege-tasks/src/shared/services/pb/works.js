@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, withOwner, andOwner } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
@@ -8,7 +8,7 @@ export const worksApi = {
   // Создать работу
   async createWork(data) {
     try {
-      const rec = await pb.collection('works').create(data);
+      const rec = await pb.collection('works').create(withOwner(data));
       _logAudit('create', 'works', rec.id, rec.title);
       return rec;
     } catch (error) {
@@ -46,7 +46,7 @@ export const worksApi = {
         filterArr.push(`title ~ "${escapeFilter(search)}"`);
       }
 
-      const filterString = filterArr.length > 0 ? filterArr.join(' && ') : '';
+      const filterString = andOwner(filterArr.length > 0 ? filterArr.join(' && ') : '');
 
       const records = await pb.collection('works').getFullList({
         sort: '-created',
@@ -58,6 +58,57 @@ export const worksApi = {
       console.error('Error fetching works:', error);
       return [];
     }
+  },
+
+  // ── Шаринг работ (v3.9.118) ──────────────────────────────────────────────
+
+  // Общие работы всех учителей (вкладка «Общие работы»).
+  // expand: owner → автор (teachers.viewRule открыт для учителей), topic → тема.
+  async getSharedWorks() {
+    try {
+      return await pb.collection('works').getFullList({
+        filter: 'visibility = "shared" && (archived = false || archived = null)',
+        sort: '-created',
+        expand: 'topic,owner',
+      });
+    } catch (error) {
+      console.error('Error fetching shared works:', error);
+      return [];
+    }
+  },
+
+  // Поделиться / сделать личной. Правка только владельцем (правила PB).
+  async setWorkVisibility(id, visibility) {
+    const rec = await pb.collection('works').update(id, { visibility });
+    _logAudit('update', 'works', id, `visibility → ${visibility}: ${rec.title || id}`);
+    return rec;
+  },
+
+  // Клонировать работу себе (свою или общую чужую): копия работы + всех
+  // вариантов (задачи и порядок). Выдачи/попытки/папки/пин не копируются.
+  async cloneWork(workId) {
+    const src = await pb.collection('works').getOne(workId);
+    const variants = await pb.collection('variants').getFullList({
+      filter: `work = "${escapeFilter(workId)}"`,
+      sort: 'number',
+    });
+    const data = {
+      title: `${src.title || 'Работа'} (копия)`,
+      class: src.class,
+      time_limit: src.time_limit,
+    };
+    if (src.topic) data.topic = src.topic;
+    const rec = await pb.collection('works').create(withOwner(data));
+    for (const v of variants) {
+      await pb.collection('variants').create({
+        work: rec.id,
+        number: v.number,
+        tasks: v.tasks,
+        ...(v.order != null ? { order: v.order } : {}),
+      });
+    }
+    _logAudit('create', 'works', rec.id, `клон работы ${src.title || workId} (${variants.length} вар.)`);
+    return rec;
   },
 
   // Получить работу по ID

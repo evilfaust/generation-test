@@ -8,7 +8,8 @@ import {
 import MathRenderer from './MathRenderer';
 import ImportStep from './task-importer/ImportStep';
 import { useTaskImport } from '../hooks/useTaskImport';
-import { api } from '../services/pocketbase';
+import { api, aiHeaders } from '../services/pocketbase';
+import { useAuth } from '../contexts/AuthContext';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { SDAMGIA_SOURCE_LABELS } from '../utils/markdownTaskParser';
 
@@ -76,6 +77,7 @@ const EXAM_TYPE_OPTIONS = [
 
 export default function TaskImporter() {
   const { message } = App.useApp();
+  const { aiEnabled } = useAuth(); // ИИ-тумблер: гейт LLM-контролов импорта
   const { topics: ctxTopics, tags, subtopics: ctxSubtopics, reloadData } = useReferenceData();
   const [currentStep, setCurrentStep] = useState(0);
   const [inputMode, setInputMode] = useState('file'); // 'file' | 'text' | 'sdamgia'
@@ -167,7 +169,7 @@ export default function TaskImporter() {
         if (!task[field]) continue;
         const resp = await fetch(`${PDF_SERVICE_URL}/latex-fix`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...aiHeaders() },
           body: JSON.stringify({ text: task[field], role: field.replace('_md', '') }),
         });
         if (!resp.ok) {
@@ -834,18 +836,22 @@ export default function TaskImporter() {
             <Space wrap>
               <Button size="small" onClick={selectAll}>Выбрать все</Button>
               <Button size="small" onClick={deselectAll}>Снять выбор</Button>
-              <Button
-                size="small"
-                onClick={selectAllLlmNeedsReview}
-                title="Отметить 🤖 для всех выбранных задач с пометкой «Проверить LaTeX»"
-              >
-                🤖 для проблемных
-              </Button>
-              <Button size="small" onClick={selectAllLlm} title="Отметить 🤖 для всех выбранных">
-                🤖 для всех
-              </Button>
-              {llmTasks.size > 0 && (
-                <Button size="small" onClick={deselectAllLlm}>Снять 🤖</Button>
+              {aiEnabled && (
+                <>
+                  <Button
+                    size="small"
+                    onClick={selectAllLlmNeedsReview}
+                    title="Отметить 🤖 для всех выбранных задач с пометкой «Проверить LaTeX»"
+                  >
+                    🤖 для проблемных
+                  </Button>
+                  <Button size="small" onClick={selectAllLlm} title="Отметить 🤖 для всех выбранных">
+                    🤖 для всех
+                  </Button>
+                  {llmTasks.size > 0 && (
+                    <Button size="small" onClick={deselectAllLlm}>Снять 🤖</Button>
+                  )}
+                </>
               )}
             </Space>
           }
@@ -870,17 +876,19 @@ export default function TaskImporter() {
                       onChange={() => toggleTask(index)}
                       style={{ marginTop: 3 }}
                     />
-                    <Checkbox
-                      checked={llmTasks.has(index)}
-                      disabled={!selectedTasks.has(index)}
-                      onChange={() => toggleLlmTask(index)}
-                      style={{ marginTop: 3 }}
-                      title="Прогнать через LLM (/latex-fix) при импорте"
-                    >
-                      <span style={{ fontSize: 12, color: llmTasks.has(index) ? '#722ed1' : '#999' }}>
-                        🤖
-                      </span>
-                    </Checkbox>
+                    {aiEnabled && (
+                      <Checkbox
+                        checked={llmTasks.has(index)}
+                        disabled={!selectedTasks.has(index)}
+                        onChange={() => toggleLlmTask(index)}
+                        style={{ marginTop: 3 }}
+                        title="Прогнать через LLM (/latex-fix) при импорте"
+                      >
+                        <span style={{ fontSize: 12, color: llmTasks.has(index) ? '#722ed1' : '#999' }}>
+                          🤖
+                        </span>
+                      </Checkbox>
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ marginBottom: 4 }}>
                         <Text strong>#{task.number}</Text>
@@ -914,15 +922,17 @@ export default function TaskImporter() {
                         {task.latex_needs_review && (
                           <>
                             <Tag color="warning">⚠ Проверить LaTeX</Tag>
-                            <Button
-                              size="small"
-                              type="link"
-                              loading={!!llmFixLoading[index]}
-                              onClick={() => handleLlmFix(index)}
-                              style={{ padding: 0, marginLeft: 4 }}
-                            >
-                              🤖 LLM-fix
-                            </Button>
+                            {aiEnabled && (
+                              <Button
+                                size="small"
+                                type="link"
+                                loading={!!llmFixLoading[index]}
+                                onClick={() => handleLlmFix(index)}
+                                style={{ padding: 0, marginLeft: 4 }}
+                              >
+                                🤖 LLM-fix
+                              </Button>
+                            )}
                           </>
                         )}
                       </div>

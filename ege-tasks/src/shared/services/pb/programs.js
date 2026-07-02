@@ -1,4 +1,4 @@
-import { pb, _logAudit } from './client.js';
+import { pb, _logAudit, andOwner } from './client.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Индивидуальные летние программы (study_programs + study_program_items).
@@ -13,7 +13,7 @@ export const programsApi = {
       if (year) parts.push(`year = ${Number(year)}`);
       if (season) parts.push(`season = "${escapeFilter(season)}"`);
       return await pb.collection('study_programs').getFullList({
-        filter: parts.join(' && '),
+        filter: andOwner(parts.join(' && ')),
         sort: '-created',
         expand: 'student,group',
       });
