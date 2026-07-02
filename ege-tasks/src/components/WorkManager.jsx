@@ -4,13 +4,14 @@ import {
   DeleteOutlined, SendOutlined, ReloadOutlined, EyeOutlined, EditOutlined,
   RightOutlined, InboxOutlined, SolutionOutlined, TeamOutlined,
   ClockCircleOutlined, SearchOutlined, SortAscendingOutlined, FormOutlined,
-  PushpinOutlined, PushpinFilled, FolderOutlined, DownOutlined,
+  PushpinOutlined, PushpinFilled, FolderOutlined, DownOutlined, CameraOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import SessionPanel from './worksheet/SessionPanel';
 import ParallelVariantsModal from './worksheet/ParallelVariantsModal';
+import ScanBlankModal from './worksheet/ScanBlankModal';
 import TeacherResultsDashboard from './worksheet/TeacherResultsDashboard';
 import MathRenderer from './MathRenderer';
 import { PageHeader, StatRow, Stat, FilterRow } from '../ui';
@@ -57,6 +58,8 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
       message.error('Не удалось загрузить работу');
     }
   };
+
+  const [scanWork, setScanWork] = useState(null); // работа, для которой сканируем бланки
 
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -666,6 +669,16 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                       </Button>
                     </Tooltip>
                     {canEdit && (
+                      <Tooltip title="Проверить бумажные бланки (фото)">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<CameraOutlined />}
+                          onClick={e => { e.stopPropagation(); setScanWork(work); }}
+                        />
+                      </Tooltip>
+                    )}
+                    {canEdit && (
                       <Tooltip title={work.archived ? 'Вернуть из архива' : 'В архив'}>
                         <Button
                           type="text"
@@ -939,6 +952,12 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         baseWorkId={parallelWork.id}
         baseTitle={parallelWork.title}
         onOpenWork={onEditWork}
+      />
+      <ScanBlankModal
+        open={!!scanWork}
+        work={scanWork}
+        onClose={() => setScanWork(null)}
+        onRecorded={loadWorks}
       />
     </div>
   );

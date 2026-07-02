@@ -96,5 +96,23 @@ export const extrasApi = {
     return family;
   },
 
-  // Получить все темы (опционально фильтр по exam_type)
+  // ── Сканирование бумажных бланков ответов №1 (v3.9.116) ────────────────
+  // Фото заполненного бланка → pdf-service /scan-blank (vision-LLM) →
+  // { fields: {"1": "17", ...}, replacements, uncertain }. Замены уже применены.
+  // Результат обязательно проходит верификацию учителем перед записью.
+  async scanBlank({ imageBase64, tasksCount }) {
+    const base = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
+    const res = await fetch(`${base}/scan-blank`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageBase64, tasks_count: tasksCount }),
+      signal: AbortSignal.timeout(90000),
+    });
+    if (!res.ok) {
+      let msg = `Сервис распознавания ответил ${res.status}`;
+      try { msg = (await res.json()).error || msg; } catch { /* не-JSON */ }
+      throw new Error(msg);
+    }
+    return res.json();
+  },
 };

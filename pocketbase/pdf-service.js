@@ -1094,6 +1094,129 @@ app.post('/latex-fix', async (req, res) => {
 });
 
 /**
+ * POST /scan-blank
+ * Распознавание фото заполненного бланка ответов №1 ЕГЭ через vision-LLM.
+ * Модель выбрана сравнительным тестом 02.07.2026: gemini-2.5-flash —
+ * единственная стабильно правильно обрабатывает зону «Замена ошибочных
+ * ответов» (gpt-5.4-mini путал её с полем 21). Результат ВСЕГДА проходит
+ * ручную верификацию учителем на клиенте — ручка не пишет в БД.
+ *
+ * Принимает:
+ *   { image: string (base64 JPEG/PNG, можно с data:-префиксом),
+ *     tasks_count?: number (полей в варианте; поля с бОльшими номерами отбрасываются) }
+ *
+ * Возвращает:
+ *   { fields: {"1": "17", ...},      — итоговые ответы (замены уже применены)
+ *     replacements: [{task, value}], — что было в зоне замены
+ *     uncertain: [номера],           — поля, в прочтении которых модель не уверена
+ *     model, usage }
+ */
+const SCAN_BLANK_MODEL = process.env.SCAN_BLANK_MODEL || 'gemini/gemini-2.5-flash';
+
+const SCAN_BLANK_PROMPT = (tasksCount) => `На фото — бланк ответов №1 ЕГЭ, заполненный от руки.
+
+СТРУКТУРА БЛАНКА:
+- Основная зона «Результаты выполнения заданий с КРАТКИМ ответом»: поля 1–40 в две колонки. СЛЕВА поля 1–20, СПРАВА поля 21–40. Номер поля напечатан слева от клеток. В каждом поле ответ записан по одному символу в клетке (цифры, минус, запятая).
+- Внизу отдельная зона «Замена ошибочных ответов»: строки вида [2 клетки с номером задания] - [клетки с новым ответом]. Печатный дефис между номером задания и ответом — разделитель, напечатанный на бланке, он НЕ минус ответа. Минус ответа, если есть, написан от руки в первой клетке самого ответа.
+- Если в зоне замены есть запись для задания N — новый ответ ЗАМЕНЯЕТ содержимое поля N.
+${tasksCount ? `- В этом варианте ${tasksCount} заданий: заполненными могут быть только поля 1–${tasksCount}. Записи, похожие на ответы вне этих полей, не выдумывай.` : ''}
+
+Верни СТРОГО JSON без пояснений и без markdown-ограждений:
+{"fields":{"<номер>":"<ответ>"},"replacements":[{"task":<номер>,"value":"<ответ>"}],"uncertain":[<номера полей, в прочтении которых сомневаешься>]}
+
+Правила: только непустые поля; в fields — то, что написано в основной зоне (замены НЕ применяй, их верни отдельно в replacements); десятичный разделитель — запятая; минус — обычный дефис; символы без пробелов.`;
+
+app.post('/scan-blank', async (req, res) => {
+  const { image, tasks_count } = req.body || {};
+
+  if (!image || typeof image !== 'string') {
+    return res.status(400).json({ error: 'Поле image обязательно (base64-строка)' });
+  }
+  // ~14 МБ base64 ≈ 10 МБ файла — фото с телефона, ужатое клиентом, много меньше
+  if (image.length > 14_000_000) {
+    return res.status(400).json({ error: 'Изображение слишком большое (клиент должен ужимать до ~1600px)' });
+  }
+
+  const aiUrl = process.env.TIMEWEB_AI_URL;
+  const aiKey = process.env.TIMEWEB_AI_KEY;
+  if (!aiUrl || !aiKey) {
+    return res.status(503).json({
+      error: 'LLM endpoint не настроен на сервере (TIMEWEB_AI_URL / TIMEWEB_AI_KEY)',
+    });
+  }
+
+  const tasksCount = Number.isInteger(tasks_count) && tasks_count > 0 && tasks_count <= 40
+    ? tasks_count : null;
+  const dataUrl = image.startsWith('data:') ? image : `data:image/jpeg;base64,${image}`;
+
+  try {
+    const resp = await fetch(aiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${aiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: SCAN_BLANK_MODEL,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: SCAN_BLANK_PROMPT(tasksCount) },
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
+        }],
+      }),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      console.error('[scan-blank] upstream:', resp.status, body.slice(0, 200));
+      return res.status(502).json({
+        error: `AI gateway HTTP ${resp.status}`,
+        details: body.slice(0, 300),
+      });
+    }
+
+    const data = await resp.json();
+    const raw = data?.choices?.[0]?.message?.content?.trim();
+    if (!raw) {
+      return res.status(502).json({ error: 'AI gateway вернул пустой ответ' });
+    }
+
+    // Модель может обернуть JSON в ```json ... ``` вопреки промпту
+    const jsonText = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      console.error('[scan-blank] не-JSON ответ модели:', raw.slice(0, 300));
+      return res.status(502).json({ error: 'Модель вернула не-JSON', raw: raw.slice(0, 500) });
+    }
+
+    // Нормализация + пост-фильтр по числу заданий варианта
+    const inRange = (n) => Number.isInteger(n) && n >= 1 && n <= (tasksCount || 40);
+    const fields = {};
+    for (const [k, v] of Object.entries(parsed.fields || {})) {
+      const n = parseInt(k, 10);
+      if (inRange(n) && typeof v === 'string' && v.trim()) fields[n] = v.trim();
+    }
+    const replacements = (Array.isArray(parsed.replacements) ? parsed.replacements : [])
+      .map(r => ({ task: parseInt(r?.task, 10), value: String(r?.value ?? '').trim() }))
+      .filter(r => inRange(r.task) && r.value);
+    // Замена перекрывает основное поле
+    for (const r of replacements) fields[r.task] = r.value;
+    const uncertain = (Array.isArray(parsed.uncertain) ? parsed.uncertain : [])
+      .map(n => parseInt(n, 10)).filter(inRange);
+
+    console.log(`[scan-blank] fields=${Object.keys(fields).length} repl=${replacements.length} uncertain=${uncertain.length} tokens=${data?.usage?.total_tokens ?? '?'}`);
+    res.json({ fields, replacements, uncertain, model: SCAN_BLANK_MODEL, usage: data?.usage || null });
+  } catch (error) {
+    console.error('[scan-blank] error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /health
  * Health check
  */
@@ -1101,7 +1224,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'lemma-backend-helper',
-    features: ['sdamgia-parser', 'latex-fix', 'vec-search'],
+    features: ['sdamgia-parser', 'latex-fix', 'vec-search', 'scan-blank'],
     timestamp: new Date().toISOString(),
   });
 });

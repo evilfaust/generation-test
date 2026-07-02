@@ -1,8 +1,8 @@
 # Lemma — платформа для учителя математики
 
-[![Version](https://img.shields.io/badge/version-3.9.29-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.9.116-blue.svg)](./CHANGELOG.md)
 [![Stack](https://img.shields.io/badge/stack-React%2018%20%2B%20PocketBase-green.svg)]()
-[![Tests](https://img.shields.io/badge/tests-304%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-418%20passing-brightgreen.svg)]()
 
 **Lemma** — веб-платформа для учителей математики: база задач, генераторы вариантов работ, тригонометрические и арифметические тренажёры, онлайн-тесты для учеников, аналитика результатов, модуль геометрии с GeoGebra и теоретический модуль ТДФ.
 
@@ -59,8 +59,8 @@
 - React Router v7
 - PocketBase SDK 0.21
 - GeoGebra applet API + JSXGraph (SVG export)
-- html2pdf.js (fallback) + Puppeteer (primary через сервис)
-- Vitest (304 теста)
+- Печать/PDF на клиенте: `window.print()` + `@media print`, html2pdf.js (серверный Puppeteer выпилен в июне 2026)
+- Vitest (418 тестов)
 
 **Backend** (`pocketbase/`):
 - PocketBase 0.36.4 (SQLite, REST API, Auth, File storage)
@@ -138,7 +138,7 @@ lemma/
 │   │   ├── App.jsx                 # Teacher routes
 │   │   └── StudentApp.jsx          # Student routes
 │   ├── public/                     # Static assets (ачивки, логотипы)
-│   └── __tests__/                  # 304 теста (Vitest)
+│   └── __tests__/                  # 418 тестов (Vitest)
 │
 ├── pocketbase/                     # Backend (deployed to VPS)
 │   ├── pb_migrations/              # SQL миграции (~40 шт.)
@@ -185,7 +185,7 @@ lemma/
 
 ## История изменений
 
-См. [CHANGELOG.md](./CHANGELOG.md). Последняя версия — **3.9.29** (2026-05-21).
+См. [CHANGELOG.md](./CHANGELOG.md). Последняя версия — **3.9.116** (2026-07-02).
 
 ---
 
