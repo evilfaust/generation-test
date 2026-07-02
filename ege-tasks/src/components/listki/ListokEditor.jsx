@@ -6,6 +6,7 @@ import {
   ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, EyeOutlined,
 } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
+import LatexField from '../shared/LatexField';
 import TaskSelectModal from '../TaskSelectModal';
 import { api } from '../../shared/services/pocketbase';
 import { R } from '../../App';
@@ -112,8 +113,8 @@ export default function ListokEditor() {
           label: <span>Вводный текст / теория (Markdown + LaTeX)</span>,
           children: (
             <div>
-              <Input.TextArea value={intro} onChange={(e) => setIntro(e.target.value)}
-                autoSize={{ minRows: 3, maxRows: 14 }} placeholder="Определения, теоремы, формулировки… Поддерживается $LaTeX$." />
+              <LatexField mode="code" value={intro} onChange={(val) => setIntro(val)}
+                rows={6} placeholder="Определения, теоремы, формулировки… Поддерживается Markdown и $LaTeX$." />
               {intro.trim() && (
                 <Collapse ghost items={[{ key: 'p', label: <span><EyeOutlined /> Предпросмотр</span>,
                   children: <div className="listok-md"><MathRenderer content={intro} /></div> }]} />

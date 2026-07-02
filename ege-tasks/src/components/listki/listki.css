@@ -46,6 +46,8 @@
 .listok-pcheck { flex: 0 0 auto; margin-top: 2px; }
 .listok-row-edit { flex: 0 0 auto; opacity: .4; transition: opacity .15s; }
 .listok-problem--edit:hover .listok-row-edit { opacity: 1; }
+.listok-heading-row .listok-row-edit { margin-left: 8px; }
+.listok-heading-row:hover .listok-row-edit { opacity: 1; }
 [data-theme="dark"] .listok-problem--edit:hover,
 .dark .listok-problem--edit:hover { background: #15233a; }
 

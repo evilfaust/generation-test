@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { App, Button, Card, Checkbox, Collapse, Space, Spin, Tag, Tooltip } from 'antd';
+import { App, Button, Card, Checkbox, Collapse, Input, Modal, Space, Spin, Tag, Tooltip } from 'antd';
 import {
   ArrowLeftOutlined, PrinterOutlined, EditOutlined, CopyOutlined,
   SendOutlined, ReadOutlined, FormOutlined, SettingOutlined, CloseOutlined,
+  EyeOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
+import LatexField from '../shared/LatexField';
 import TaskEditModal from '../TaskEditModal';
 import ListokTaskBulkDrawer from './ListokTaskBulkDrawer';
 import { api } from '../../shared/services/pocketbase';
@@ -41,6 +43,14 @@ export default function ListokView() {
   const [editingTask, setEditingTask] = useState(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // ── Правка теории (intro_md) и заголовков-разделов ────────────────────
+  const [introEditOpen, setIntroEditOpen] = useState(false);
+  const [introDraft, setIntroDraft] = useState('');
+  const [introSaving, setIntroSaving] = useState(false);
+  const [editingHeading, setEditingHeading] = useState(null); // listok_items type=heading
+  const [headingDraft, setHeadingDraft] = useState('');
+  const [headingSaving, setHeadingSaving] = useState(false);
 
   const reloadItems = async () => {
     try { setItems(await api.getListokItems(sheetId)); } catch (e) { console.error(e); }
@@ -99,6 +109,31 @@ export default function ListokView() {
       const full = await api.getTask(taskId);
       setEditingTask(full);
     } catch (e) { console.error(e); message.error('Не удалось загрузить задачу'); }
+  };
+
+  const openIntroEditor = () => { setIntroDraft(sheet.intro_md || ''); setIntroEditOpen(true); };
+  const saveIntro = async () => {
+    setIntroSaving(true);
+    try {
+      const updated = await api.updateListok(sheet.id, { intro_md: introDraft });
+      setSheet(updated);
+      setIntroEditOpen(false);
+      message.success('Теория сохранена');
+    } catch (e) { console.error(e); message.error('Ошибка сохранения теории'); }
+    finally { setIntroSaving(false); }
+  };
+
+  const openHeadingEditor = (item) => { setHeadingDraft(item.heading_text || ''); setEditingHeading(item); };
+  const saveHeading = async () => {
+    if (!editingHeading) return;
+    setHeadingSaving(true);
+    try {
+      await api.updateListokItem(editingHeading.id, { heading_text: headingDraft.trim() });
+      setEditingHeading(null);
+      await reloadItems();
+      message.success('Заголовок сохранён');
+    } catch (e) { console.error(e); message.error('Ошибка сохранения заголовка'); }
+    finally { setHeadingSaving(false); }
   };
 
   const saveTask = async (taskId, data) => {
@@ -178,13 +213,13 @@ export default function ListokView() {
           <Button icon={<SendOutlined />} loading={busy} onClick={assign}>Выдать ученику</Button>
         </Tooltip>
         {canEdit && (
-          <Tooltip title="Править задачи: редактор по ✏️ и массовое изменение тем/тегов/сложности">
+          <Tooltip title="Правка листка: задачи (✏️ и массовое изменение атрибутов), теория и заголовки разделов">
             <Button
               icon={<FormOutlined />}
               type={editMode ? 'primary' : 'default'}
               onClick={() => (editMode ? exitEditMode() : setEditMode(true))}
             >
-              {editMode ? 'Готово' : 'Править задачи'}
+              {editMode ? 'Готово' : 'Править листок'}
             </Button>
           </Tooltip>
         )}
@@ -207,17 +242,31 @@ export default function ListokView() {
         {sheet.pdf_url && <a href={sheet.pdf_url} target="_blank" rel="noreferrer">↗ PDF части</a>}
       </div>
 
-      {sheet.intro_md?.trim() && (
+      {sheet.intro_md?.trim() ? (
         <Collapse
           defaultActiveKey={isOfficial ? ['theory'] : []}
           className="listok-theory"
           items={[{
             key: 'theory',
             label: <span><ReadOutlined /> Теория и определения</span>,
+            extra: canEdit ? (
+              <Tooltip title="Править теорию (Markdown + LaTeX)">
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={(e) => { e.stopPropagation(); openIntroEditor(); }}
+                />
+              </Tooltip>
+            ) : undefined,
             children: <div className="listok-md"><MathRenderer content={sheet.intro_md} /></div>,
           }]}
         />
-      )}
+      ) : (editMode && (
+        <Button type="dashed" block icon={<PlusOutlined />} style={{ marginBottom: 12 }} onClick={openIntroEditor}>
+          Добавить теорию / вводный текст
+        </Button>
+      ))}
 
       {editMode && (
         <Card
@@ -258,7 +307,20 @@ export default function ListokView() {
 
       <ol className="listok-problems">
         {problems.map((p) => p.type === 'heading' ? (
-          <li key={p.id} className="listok-heading-row"><h3>{p.heading_text}</h3></li>
+          <li key={p.id} className="listok-heading-row">
+            <h3>{p.heading_text}</h3>
+            {editMode && (
+              <Tooltip title="Править заголовок раздела">
+                <Button
+                  className="listok-row-edit"
+                  size="small"
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={() => openHeadingEditor(p)}
+                />
+              </Tooltip>
+            )}
+          </li>
         ) : (
           <li key={p.id} className={`listok-problem${editMode ? ' listok-problem--edit' : ''}`}>
             {editMode && (
@@ -305,6 +367,54 @@ export default function ListokView() {
         allSubtopics={subtopics}
         allTopics={topics}
       />
+
+      <Modal
+        title="Теория и вводный текст"
+        open={introEditOpen}
+        onCancel={() => setIntroEditOpen(false)}
+        onOk={saveIntro}
+        okText="Сохранить"
+        cancelText="Отмена"
+        confirmLoading={introSaving}
+        width={920}
+        style={{ top: 32 }}
+      >
+        <LatexField
+          mode="code"
+          value={introDraft}
+          onChange={(val) => setIntroDraft(val)}
+          rows={12}
+          placeholder="Определения, теоремы, формулировки… Поддерживается Markdown и $LaTeX$."
+        />
+        {introDraft.trim() && (
+          <Collapse
+            ghost
+            defaultActiveKey={['p']}
+            items={[{
+              key: 'p',
+              label: <span><EyeOutlined /> Предпросмотр</span>,
+              children: <div className="listok-md"><MathRenderer content={introDraft} /></div>,
+            }]}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        title="Заголовок-раздел"
+        open={!!editingHeading}
+        onCancel={() => setEditingHeading(null)}
+        onOk={saveHeading}
+        okText="Сохранить"
+        cancelText="Отмена"
+        confirmLoading={headingSaving}
+      >
+        <Input
+          value={headingDraft}
+          onChange={(e) => setHeadingDraft(e.target.value)}
+          onPressEnter={saveHeading}
+          placeholder="Например: Дополнительные задачи"
+        />
+      </Modal>
 
       <ListokTaskBulkDrawer
         open={bulkOpen}
