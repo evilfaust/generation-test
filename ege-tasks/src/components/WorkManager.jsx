@@ -5,7 +5,7 @@ import {
   RightOutlined, InboxOutlined, SolutionOutlined, TeamOutlined,
   ClockCircleOutlined, SearchOutlined, SortAscendingOutlined, FormOutlined,
   PushpinOutlined, PushpinFilled, FolderOutlined, DownOutlined, CameraOutlined,
-  ShareAltOutlined, CopyOutlined, UserOutlined,
+  ShareAltOutlined, CopyOutlined, UserOutlined, SwapOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
@@ -93,6 +93,43 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         : 'Работа снова личная');
     } catch (err) {
       message.error('Не удалось изменить видимость');
+    }
+  };
+
+  // ── Передача работы другому учителю (v3.9.121) ──
+  const [transferWork, setTransferWork] = useState(null); // работа в модалке передачи
+  const [transferTo, setTransferTo] = useState(null);
+  const [teachersList, setTeachersList] = useState(null);
+  const [transferBusy, setTransferBusy] = useState(false);
+
+  const openTransfer = async (e, work) => {
+    e.stopPropagation();
+    setTransferTo(null);
+    setTransferWork(work);
+    if (teachersList === null) {
+      try {
+        setTeachersList(await api.getTeachers());
+      } catch {
+        setTeachersList([]);
+        message.error('Не удалось загрузить список учителей');
+      }
+    }
+  };
+
+  const handleTransferWork = async () => {
+    if (!transferWork || !transferTo) return;
+    setTransferBusy(true);
+    try {
+      await api.transferWork(transferWork.id, transferTo);
+      message.success('Работа и её выдачи переданы');
+      setTransferWork(null);
+      setTransferTo(null);
+      loadWorks();
+    } catch (err) {
+      console.error('Error transferring work:', err);
+      message.error('Не удалось передать работу');
+    } finally {
+      setTransferBusy(false);
     }
   };
 
@@ -707,6 +744,16 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
                         />
                       </Tooltip>
                     )}
+                    {canShareWork(work) && (
+                      <Tooltip title="Передать работу другому учителю (с выдачами и результатами)">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<SwapOutlined />}
+                          onClick={e => openTransfer(e, work)}
+                        />
+                      </Tooltip>
+                    )}
                     <Tooltip title="Просмотр вариантов">
                       <Button
                         type="text"
@@ -1097,6 +1144,34 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         onClose={() => setScanWork(null)}
         onRecorded={loadWorks}
       />
+      <Modal
+        open={!!transferWork}
+        title={`Передать работу «${transferWork?.title || ''}»`}
+        onCancel={() => { setTransferWork(null); setTransferTo(null); }}
+        onOk={handleTransferWork}
+        confirmLoading={transferBusy}
+        okText="Передать"
+        cancelText="Отмена"
+        okButtonProps={{ disabled: !transferTo }}
+        destroyOnHidden
+      >
+        <Text type="secondary">
+          Работа уйдёт выбранному учителю вместе со всеми выдачами и результатами.
+          {!isSuperAdmin && ' После передачи вы перестанете её видеть.'}
+        </Text>
+        <Select
+          style={{ width: '100%', marginTop: 12 }}
+          placeholder="Выберите учителя"
+          loading={teachersList === null}
+          value={transferTo}
+          onChange={setTransferTo}
+          options={(teachersList || [])
+            .filter(t => t.id !== teacher?.id && t.id !== transferWork?.owner && t.username !== 'journal-sync')
+            .map(t => ({ value: t.id, label: `${t.name || t.username} — @${t.username}` }))}
+          showSearch
+          optionFilterProp="label"
+        />
+      </Modal>
     </div>
   );
 };

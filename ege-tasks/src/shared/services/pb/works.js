@@ -84,6 +84,22 @@ export const worksApi = {
     return rec;
   },
 
+  // Передать работу другому учителю (владелец/superadmin — правила PB):
+  // вместе с работой уходят все её выдачи, иначе новый владелец не увидит
+  // результаты. Варианты/попытки привязаны к работе/выдаче — едут сами.
+  async transferWork(workId, teacherId) {
+    const rec = await pb.collection('works').update(workId, { owner: teacherId });
+    const sessions = await pb.collection('work_sessions').getFullList({
+      filter: `work = "${escapeFilter(workId)}"`,
+      fields: 'id',
+    });
+    for (const s of sessions) {
+      await pb.collection('work_sessions').update(s.id, { owner: teacherId });
+    }
+    _logAudit('update', 'works', workId, `передана учителю ${teacherId} (+${sessions.length} выдач): ${rec.title || workId}`);
+    return rec;
+  },
+
   // Клонировать работу себе (свою или общую чужую): копия работы + всех
   // вариантов (задачи и порядок). Выдачи/попытки/папки/пин не копируются.
   async cloneWork(workId) {
