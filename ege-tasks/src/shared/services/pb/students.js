@@ -220,8 +220,8 @@ export const studentsApi = {
     try {
       return await pb.collection('students').getFullList({
         sort: '-created',
-        fields: 'id,username,name,student_class,external,created,updated',
-        // мои ученики + «ничьи» (саморегистрация) — до модели привязки учеников
+        fields: 'id,username,name,student_class,external,owner,created,updated',
+        // мои ученики + «ничьи» (саморегистрация до привязки)
         filter: andOwnerOrFree(),
       });
     } catch (error) {
@@ -259,6 +259,44 @@ export const studentsApi = {
     }
     console.error('Error creating manual student:', lastErr);
     throw lastErr;
+  },
+
+  // Полноценный аккаунт ученика, созданный учителем (v3.9.120): логин и пароль
+  // генерируются и возвращаются наружу — показать учителю ОДИН раз (в БД
+  // хранится только хэш). owner = создавший учитель.
+  async createStudentAccount({ name, groupId = null, studentClass = '' } = {}) {
+    const nm = (name || '').trim();
+    if (!nm) throw new Error('Имя обязательно');
+    let lastErr;
+    for (let i = 0; i < 3; i += 1) {
+      const username = `st_${Math.random().toString(36).slice(2, 8)}`;
+      const password = Math.random().toString(36).slice(2, 6) + Math.random().toString(36).slice(2, 6);
+      try {
+        const rec = await pb.collection('students').create(withOwner({
+          name: nm,
+          username,
+          password,
+          passwordConfirm: password,
+          ...(studentClass ? { student_class: studentClass } : {}),
+          ...(groupId ? { teaching_group: groupId } : {}),
+        }));
+        _logAudit('create', 'students', rec.id, `аккаунт учителем: ${nm} (@${username})`);
+        return { record: rec, username, password };
+      } catch (e) {
+        lastErr = e;
+        // повтор только при коллизии username
+        if (!String(e?.message || '').toLowerCase().includes('username')) break;
+      }
+    }
+    console.error('Error creating student account:', lastErr);
+    throw lastErr;
+  },
+
+  // Передать ученика другому учителю (владелец или superadmin — правила PB).
+  async transferStudent(studentId, teacherId) {
+    const rec = await pb.collection('students').update(studentId, { owner: teacherId });
+    _logAudit('update', 'students', studentId, `передан учителю ${teacherId}`);
+    return rec;
   },
 
   // Полная запись одного ученика (включая telegram_id — нужен для матча профиля слабостей).

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Button, Table, Tag, Progress, Space, Spin, Typography, Popover, Segmented, Modal, Input, Checkbox, message } from 'antd';
+import { Button, Table, Tag, Progress, Space, Spin, Typography, Popover, Segmented, Modal, Input, Checkbox, Select, message } from 'antd';
 import { CheckCircleOutlined, CopyOutlined, FileAddOutlined } from '@ant-design/icons';
 import {
   ArrowLeftOutlined, LineChartOutlined, BookOutlined,
   WarningOutlined, HistoryOutlined, TrophyOutlined, LoadingOutlined,
-  CalendarOutlined, FileTextOutlined,
+  CalendarOutlined, FileTextOutlined, SwapOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
+import { useAuth } from '../contexts/AuthContext';
 import { ATT_STATUSES } from './workspace/AttendanceRoster';
 import MathRenderer from './MathRenderer';
 import { AttemptDetails, ScoreChart } from './StudentDetailCharts';
@@ -57,8 +58,14 @@ const ATT_BY_VALUE = Object.fromEntries(ATT_STATUSES.map(s => [s.value, s]));
 // MAIN COMPONENT
 // ============================================
 function StudentDetailPage({ studentId, onBack, onOpenWork, onOpenNote }) {
+  const { canEdit, isSuperAdmin, teacher } = useAuth();
   const [loading, setLoading] = useState(true);
   const [student, setStudent] = useState(null);
+  // Передача ученика другому учителю (v3.9.120)
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [teachersList, setTeachersList] = useState(null);
+  const [transferTo, setTransferTo] = useState(null);
+  const [transferBusy, setTransferBusy] = useState(false);
   const [attempts, setAttempts] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [lessonNotes, setLessonNotes] = useState([]);
@@ -518,15 +525,81 @@ function StudentDetailPage({ studentId, onBack, onOpenWork, onOpenNote }) {
             {student.external && <Tag color="orange">без аккаунта</Tag>}
             {student.student_class && <Tag color="geekblue">{student.student_class} класс</Tag>}
             {!student.external && <Tag>@{student.username}</Tag>}
+            {!student.owner && <Tag color="volcano">не привязан к учителю</Tag>}
             <Text type="secondary">
               Регистрация: {new Date(student.created).toLocaleDateString('ru-RU')}
             </Text>
             <Text type="secondary">
               Попыток: {attempts.length}
             </Text>
+            {canEdit && (isSuperAdmin || !student.owner || student.owner === teacher?.id) && (
+              <Button
+                size="small"
+                icon={<SwapOutlined />}
+                onClick={async () => {
+                  setTransferOpen(true);
+                  if (teachersList === null) {
+                    try { setTeachersList(await api.getTeachers()); }
+                    catch { setTeachersList([]); message.error('Не удалось загрузить список учителей'); }
+                  }
+                }}
+              >
+                {student.owner ? 'Передать учителю' : 'Привязать к учителю'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
+
+      <Modal
+        open={transferOpen}
+        title={student.owner ? 'Передать ученика другому учителю' : 'Привязать ученика к учителю'}
+        onCancel={() => { setTransferOpen(false); setTransferTo(null); }}
+        confirmLoading={transferBusy}
+        okText={student.owner ? 'Передать' : 'Привязать'}
+        cancelText="Отмена"
+        okButtonProps={{ disabled: !transferTo }}
+        onOk={async () => {
+          setTransferBusy(true);
+          try {
+            await api.transferStudent(studentId, transferTo);
+            const toMe = transferTo === teacher?.id;
+            message.success(toMe ? 'Ученик привязан к вам' : 'Ученик передан');
+            setTransferOpen(false);
+            setTransferTo(null);
+            if (toMe || isSuperAdmin) {
+              setStudent(prev => (prev ? { ...prev, owner: transferTo } : prev));
+            } else {
+              onBack(); // ученик больше не наш — карточка недоступна
+            }
+          } catch {
+            message.error('Не удалось передать ученика');
+          } finally {
+            setTransferBusy(false);
+          }
+        }}
+        destroyOnHidden
+      >
+        <Text type="secondary">
+          Ученик со всеми результатами уйдёт в списки выбранного учителя.
+          {!isSuperAdmin && ' После передачи другому учителю вы перестанете его видеть.'}
+        </Text>
+        <Select
+          style={{ width: '100%', marginTop: 12 }}
+          placeholder="Выберите учителя"
+          loading={teachersList === null}
+          value={transferTo}
+          onChange={setTransferTo}
+          options={(teachersList || [])
+            .filter(t => t.id !== student.owner && t.username !== 'journal-sync')
+            .map(t => ({
+              value: t.id,
+              label: `${t.name || t.username}${t.id === teacher?.id ? ' (я)' : ''} — @${t.username}`,
+            }))}
+          showSearch
+          optionFilterProp="label"
+        />
+      </Modal>
 
       {/* Period Filter */}
       <div className="sdp-period-bar">
