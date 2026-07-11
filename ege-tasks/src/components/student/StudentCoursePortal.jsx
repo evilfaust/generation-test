@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button, Empty, Spin } from 'antd';
 import {
   DownloadOutlined, LinkOutlined, PlayCircleOutlined, VideoCameraOutlined,
-  ClockCircleOutlined, ReadOutlined, RightOutlined,
+  ClockCircleOutlined, ReadOutlined, RightOutlined, FundProjectionScreenOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ru';
@@ -116,7 +116,7 @@ function LessonCard({ pub, dimmed }) {
 }
 
 // Крупная карточка ближайшего занятия.
-function NextLessonHero({ pub }) {
+function NextLessonHero({ pub, boardUrl }) {
   const d = pub.date_plan ? dayjs(pub.date_plan).locale('ru') : null;
   return (
     <div className="sc-hero">
@@ -128,10 +128,19 @@ function NextLessonHero({ pub }) {
             {d ? d.format('dddd, D MMMM') : ''} · <b>{timeRange(pub, d)}</b>
           </div>
         </div>
-        {pub.conference_url && (
-          <Button type="primary" icon={<VideoCameraOutlined />} href={pub.conference_url} target="_blank" className="sc-hero-join sc-btn">
-            Подключиться
-          </Button>
+        {(pub.conference_url || boardUrl) && (
+          <div className="sc-hero-actions">
+            {pub.conference_url && (
+              <Button type="primary" icon={<VideoCameraOutlined />} href={pub.conference_url} target="_blank" className="sc-hero-join sc-btn">
+                Подключиться
+              </Button>
+            )}
+            {boardUrl && (
+              <Button icon={<FundProjectionScreenOutlined />} href={boardUrl} target="_blank" className="sc-hero-join sc-btn">
+                Доска
+              </Button>
+            )}
+          </div>
         )}
       </div>
       <div className="sc-hero-body"><LessonBody pub={pub} /></div>
@@ -203,16 +212,23 @@ export default function StudentCoursePortal({ student }) {
           <section key={course.id} className="sc-course">
             <header className="sc-course-head">
               <div className="sc-course-name">🎓 {course.name}</div>
-              {course.conference_url && (
-                <Button size="small" className="sc-btn" icon={<LinkOutlined />} href={course.conference_url} target="_blank">
-                  Комната курса
-                </Button>
-              )}
+              <div className="sc-course-links">
+                {course.conference_url && (
+                  <Button size="small" className="sc-btn" icon={<LinkOutlined />} href={course.conference_url} target="_blank">
+                    Комната курса
+                  </Button>
+                )}
+                {course.board_url && (
+                  <Button size="small" className="sc-btn" icon={<FundProjectionScreenOutlined />} href={course.board_url} target="_blank">
+                    Доска
+                  </Button>
+                )}
+              </div>
             </header>
 
             {!list.length && <div className="sc-empty-note">Занятия ещё не опубликованы</div>}
 
-            {next && <NextLessonHero pub={next} />}
+            {next && <NextLessonHero pub={next} boardUrl={course.board_url} />}
 
             {rest.length > 0 && (
               <div className="sc-section">

@@ -19,6 +19,7 @@ import {
   ArrowUpOutlined,
   DeleteOutlined,
   EditOutlined,
+  FundProjectionScreenOutlined,
   InboxOutlined,
   PlusOutlined,
   TeamOutlined,
@@ -57,6 +58,7 @@ function GroupModal({ open, initial, onSave, onCancel, saving }) {
             year: defaultYear(),
             kind: 'class',
             conference_url: '',
+            board_url: '',
           },
       );
     }
@@ -90,13 +92,22 @@ function GroupModal({ open, initial, onSave, onCancel, saving }) {
           <Input placeholder={kind === 'course' ? 'Летний интенсив 10 кл.' : '9А'} maxLength={100} autoFocus />
         </Form.Item>
         {kind === 'course' && (
-          <Form.Item
-            name="conference_url"
-            label="Ссылка на конференцию (комната курса)"
-            tooltip="Постоянная ссылка на телемост. На конкретном занятии её можно переопределить. Видна ученикам курса."
-          >
-            <Input prefix={<VideoCameraOutlined />} placeholder="https://telemost.yandex.ru/j/..." maxLength={1000} />
-          </Form.Item>
+          <>
+            <Form.Item
+              name="conference_url"
+              label="Ссылка на конференцию (комната курса)"
+              tooltip="Постоянная ссылка на телемост. На конкретном занятии её можно переопределить. Видна ученикам курса."
+            >
+              <Input prefix={<VideoCameraOutlined />} placeholder="https://telemost.yandex.ru/j/..." maxLength={1000} />
+            </Form.Item>
+            <Form.Item
+              name="board_url"
+              label="Ссылка на онлайн-доску (для всего курса)"
+              tooltip="Постоянная доска курса (Miro, Excalidraw и т.п.). Видна ученикам курса рядом с комнатой."
+            >
+              <Input prefix={<FundProjectionScreenOutlined />} placeholder="https://miro.com/app/board/..." maxLength={1000} />
+            </Form.Item>
+          </>
         )}
         <Form.Item name="subject" label="Предмет">
           <Input placeholder="Математика" maxLength={100} />

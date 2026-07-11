@@ -119,6 +119,12 @@ export default function CourseMembersSection({ group, allStudents = [] }) {
                 ? <a href={group.conference_url} target="_blank" rel="noreferrer">ссылка на конференцию</a>
                 : <b>не задана</b>}
             </span>
+            <span>
+              Доска:{' '}
+              {group.board_url
+                ? <a href={group.board_url} target="_blank" rel="noreferrer">ссылка на онлайн-доску</a>
+                : <b>не задана</b>}
+            </span>
             <span>Опубликовано занятий: <b>{publishedCount}</b> из {pubs.length}</span>
           </div>
           <Text type="secondary" style={{ fontSize: 12, padding: '0 8px' }}>
