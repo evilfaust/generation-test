@@ -700,11 +700,81 @@ export function findSimilarGeometry({ taskId, limit = 8, minCos = 0, origin = nu
   return { error: null, items: out };
 }
 
+/**
+ * Дедуп «мои ↔ банк МЦНМО»: для каждой проиндексированной СВОЕЙ задачи — ближайшие
+ * соседи из банка с cos ≥ minCos. Офлайн-кластеризация не нужна, НО ~190 KNN по
+ * 17.8k векторов = ~20с синхронного better-sqlite3 → кэш результата (TTL) +
+ * уступка event loop между пачками запросов, чтобы не вешать /latex-fix и /similar.
+ * ⚠️ У банка в тексте эмбеддинга есть фасетные теги, у своих задач их нет → даже
+ * точный текстовый дубль даёт cos заметно ниже 1.0. Порог по умолчанию мягче
+ * дедупа банка tasks (там 0.93).
+ */
+const _geoDupCache = new Map(); // `${minCos}|${perTask}` → { at, data }
+const GEO_DUP_TTL_MS = 10 * 60 * 1000;
+
+export async function findGeometryBankDuplicates({ minCos = 0.87, perTask = 3 } = {}) {
+  const cacheKey = `${minCos}|${perTask}`;
+  const hit = _geoDupCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < GEO_DUP_TTL_MS) return hit.data;
+
+  const d = getDb();
+  if (!geoIndexReady(d)) return { error: 'no_index', pairs: [] };
+
+  const MANUAL_WHERE = `(g.origin IS NULL OR g.origin = '' OR g.origin = 'manual')`;
+  const manual = d.prepare(`
+    SELECT v.task_id AS id, v.embedding AS embedding,
+           g.code AS code, g.title AS title, g.answer AS answer, g.statement_md AS statement_md
+    FROM vdb.vec_geometry v
+    JOIN main.geometry_tasks g ON g.id = v.task_id
+    WHERE ${MANUAL_WHERE}
+  `).all();
+  const knn = d.prepare(`
+    SELECT v.task_id AS task_id, v.distance AS distance,
+           g.code AS code, g.origin AS origin, g.answer AS answer, g.statement_md AS statement_md
+    FROM vdb.vec_geometry v JOIN main.geometry_tasks g ON g.id = v.task_id
+    WHERE v.embedding MATCH ? AND v.k = ? ORDER BY v.distance
+  `);
+
+  const normAns = (a) => String(a || '').replace(/\s+/g, '').replace(/,/g, '.').toLowerCase();
+  const snip = (s) => (s || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+
+  const pairs = [];
+  for (let i = 0; i < manual.length; i++) {
+    // Каждый KNN ~100мс синхронно; раз в несколько запросов отпускаем event loop.
+    if (i % 5 === 4) await new Promise((resolve) => setImmediate(resolve));
+    const m = manual[i];
+    let picked = 0;
+    for (const r of knn.all(m.embedding, perTask * 5 + 15)) {
+      if (r.task_id === m.id) continue;
+      const cos = 1 - r.distance;
+      if (cos < minCos) break; // KNN отсортирован по cos ↓ — дальше только хуже
+      if (r.origin !== 'mccme') continue; // пары свои↔свои здесь не интересны
+      pairs.push({
+        cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)),
+        answers_match: !!normAns(m.answer) && normAns(m.answer) === normAns(r.answer),
+        mine: { id: m.id, code: m.code, title: m.title || '', answer: m.answer || '', statement: snip(m.statement_md) },
+        bank: { id: r.task_id, code: r.code, answer: r.answer || '', statement: snip(r.statement_md) },
+      });
+      if (++picked >= perTask) break;
+    }
+  }
+  pairs.sort((a, b) => b.cos - a.cos);
+
+  const manualTotal = d.prepare(
+    `SELECT count(*) c FROM main.geometry_tasks g WHERE ${MANUAL_WHERE}`
+  ).get().c;
+  const data = { error: null, pairs, manual_indexed: manual.length, manual_total: manualTotal };
+  _geoDupCache.set(cacheKey, { at: Date.now(), data });
+  return data;
+}
+
 export function indexGeometryVectors(rows) {
+  _geoDupCache.clear(); // индекс меняется — кэш дедуп-пар устарел
   return indexVectorsInto('vec_geometry', 'vec_geometry_meta', rows);
 }
 
 export function pruneGeometryVectors(validIds) {
+  _geoDupCache.clear();
   return pruneVectorsFrom('vec_geometry', 'vec_geometry_meta', validIds);
 }
 

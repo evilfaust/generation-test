@@ -16,9 +16,9 @@ import { fixLatex } from './latex-fixer.js';
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
 let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null, pruneVectors = null, setClusters = null;
 let selectBySeed = null, selectDiverse = null, selectNovelty = null, scoreNovelty = null;
-let findSimilarGeometry = null, indexGeometryVectors = null, pruneGeometryVectors = null;
+let findSimilarGeometry = null, indexGeometryVectors = null, pruneGeometryVectors = null, findGeometryBankDuplicates = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty, findSimilarGeometry, indexGeometryVectors, pruneGeometryVectors } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty, findSimilarGeometry, indexGeometryVectors, pruneGeometryVectors, findGeometryBankDuplicates } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1325,6 +1325,25 @@ app.post('/geo/similar', (req, res) => {
     res.json(r);
   } catch (e) {
     console.error('[geo/similar]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /geo/duplicates — дедуп «мои ↔ банк МЦНМО»: пары похожих задач
+ * (своя задача × ближайшие соседи из банка). Считается на лету.
+ * body: { min_cos?, per_task? }
+ */
+app.post('/geo/duplicates', async (req, res) => {
+  if (!findGeometryBankDuplicates) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { min_cos, per_task } = req.body || {};
+  try {
+    res.json(await findGeometryBankDuplicates({
+      minCos: Math.min(Math.max(Number(min_cos) || 0.87, 0.5), 0.999),
+      perTask: Math.min(Math.max(Number(per_task) || 3, 1), 10),
+    }));
+  } catch (e) {
+    console.error('[geo/duplicates]', e.message);
     res.status(500).json({ error: e.message });
   }
 });

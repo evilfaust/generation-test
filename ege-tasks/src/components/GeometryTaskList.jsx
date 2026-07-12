@@ -47,6 +47,7 @@ import MathRenderer from './MathRenderer';
 import { buildGeometryColumns, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from './geometry/GeometryTaskColumns';
 import GeometryTagsModal from './geometry/GeometryTagsModal';
 import SimilarGeometryPanel from './geometry/SimilarGeometryPanel';
+import GeometryBankDuplicatesModal from './geometry/GeometryBankDuplicatesModal';
 import './GeometryTaskPreview.css';
 
 const { Text } = Typography;
@@ -70,6 +71,7 @@ export default function GeometryTaskList() {
   const [geoTags, setGeoTags] = useState({ object: [], method: [], fact: [] });
   const [bankLoadAll, setBankLoadAll] = useState(false); // явная загрузка всего банка МЦНМО
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
+  const [bankDupOpen, setBankDupOpen] = useState(false); // дубли «мои ↔ банк МЦНМО»
 
   const reloadGeoTags = () => api.getGeometryTags().then(setGeoTags).catch(() => {});
 
@@ -638,6 +640,9 @@ export default function GeometryTaskList() {
                   Теги
                 </Button>
               )}
+              <Button block icon={<SearchOutlined />} onClick={() => setBankDupOpen(true)}>
+                Дубли с банком
+              </Button>
               <Space style={{ width: '100%' }}>
                 <Button
                   style={{ flex: 1 }}
@@ -967,6 +972,12 @@ export default function GeometryTaskList() {
         loading={savedSheetsLoading}
         onLoad={handleOpenSavedSheet}
         onDelete={handleDeleteSavedSheet}
+      />
+
+      <GeometryBankDuplicatesModal
+        open={bankDupOpen}
+        onClose={() => setBankDupOpen(false)}
+        onOpenTask={openSimilarInPreview}
       />
 
       <GeometryTagsModal
