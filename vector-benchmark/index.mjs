@@ -21,7 +21,7 @@ import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
 import { PB_URL, OLLAMA_URL, MODEL, PDF_URL, INDEX_TOKEN } from './lib/config.mjs';
-import { buildText } from './2-embed.mjs';
+import { buildText, buildGeoText } from './2-embed.mjs';
 
 const DIM = 1024;
 const VEC_DB = new URL('./data/vec.db', import.meta.url).pathname;
@@ -31,7 +31,16 @@ const START = Date.now();
 const FULL = process.argv.includes('--full');
 const PUSH = process.argv.includes('--push');
 const FORCE_DEDUP = process.argv.includes('--dedup');
+const GEO = process.argv.includes('--geometry');
 const HELP = process.argv.includes('--help') || process.argv.includes('-h');
+
+// Профиль коллекции: обычный банк задач (vec_tasks) или геометрия (vec_geometry).
+// Обе таблицы живут в одном локальном data/vec.db и в одном vec.db на VPS.
+const P = GEO
+  ? { label: 'геометрия (geometry_tasks)', table: 'vec_geometry', meta: 'vec_geometry_meta',
+      indexPath: '/geo/index-vectors', prunePath: '/geo/prune-vectors' }
+  : { label: 'банк задач (tasks)', table: 'vec_tasks', meta: 'vec_meta',
+      indexPath: '/index-vectors', prunePath: '/prune-vectors' };
 
 // ── вывод ────────────────────────────────────────────────────────────────────
 const log = (s = '') => process.stdout.write(s + '\n');
@@ -51,10 +60,15 @@ function printHelp() {
                  изменённых задач и сохранить в data/vec.db. На VPS НЕ отправляет.
   --push         Инкремент + отправить новые вектора на VPS. ← обычный режим
                  (то же самое, что \`npm run index\`)
+  --geometry     Индексировать ГЕОМЕТРИЧЕСКИЕ задачи (geometry_tasks →
+                 vec_geometry) вместо обычного банка. Текст = тема + фасетные
+                 теги + заголовок + условие; задачи «чертёж без текста»
+                 пропускаются. То же — \`npm run index:geo\`. Дедуп не считается.
   --full         Пересчитать эмбеддинги ВСЕХ задач заново (медленно, ~20 мин).
-                 Сочетается с --push.
+                 Сочетается с --push и --geometry.
   --dedup        Дополнительно пересчитать кластеры дублей для вкладки
                  «Похожие (вектор)». Тяжело (~5-6 мин). То же — \`npm run dedup\`.
+                 Только для обычного банка (с --geometry игнорируется).
   --help, -h     Показать эту справку.
 
 Источники (можно переопределить переменными окружения):
@@ -102,7 +116,7 @@ async function preflight() {
 
 // ── сеть: VPS ────────────────────────────────────────────────────────────────
 async function pushVectors(rows) {
-  const res = await fetch(`${PDF_URL}/index-vectors`, {
+  const res = await fetch(`${PDF_URL}${P.indexPath}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
     body: JSON.stringify({ vectors: rows }),
@@ -113,7 +127,7 @@ async function pushVectors(rows) {
 }
 
 async function pruneRemote(validIds) {
-  const res = await fetch(`${PDF_URL}/prune-vectors`, {
+  const res = await fetch(`${PDF_URL}${P.prunePath}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
     body: JSON.stringify({ valid_task_ids: validIds }),
@@ -215,13 +229,44 @@ async function* allTasks() {
   } while (page <= totalPages);
 }
 
+// Геометрические задачи: банк МЦНМО + свои. Тянем фасетные теги и тему —
+// они входят в текст эмбеддинга (buildGeoText).
+async function* allGeometryTasks() {
+  const perPage = 500;
+  let page = 1, totalPages = 1;
+  do {
+    const url = `${PB_URL}/api/collections/geometry_tasks/records?perPage=${perPage}&page=${page}`
+      + `&expand=topic,tags&fields=id,title,statement_md,answer,origin,topic,`
+      + `expand.topic.title,expand.tags.name,expand.tags.kind`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`PocketBase ${r.status} на странице ${page} (geometry_tasks)`);
+    const data = await r.json();
+    totalPages = data.totalPages;
+    for (const it of data.items) {
+      const rawTags = it.expand?.tags;
+      yield {
+        id: it.id,
+        statement_md: it.statement_md || '',
+        title: it.title || '',
+        topic_title: it.expand?.topic?.title || '',
+        topic: it.topic || '',
+        answer: it.answer || '',
+        origin: it.origin === 'mccme' ? 'mccme' : 'manual',
+        tags: (Array.isArray(rawTags) ? rawTags : rawTags ? [rawTags] : [])
+          .map((t) => ({ kind: t.kind, name: t.name })),
+      };
+    }
+    page++;
+  } while (page <= totalPages);
+}
+
 function openVecDb() {
   fs.mkdirSync(path.dirname(VEC_DB), { recursive: true });
   const db = new Database(VEC_DB);
   sqliteVec.load(db);
   // distance_metric=cosine — порог дедупа калиброван по КОСИНУСУ (cos = 1 - distance).
-  db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_tasks USING vec0(task_id TEXT, embedding FLOAT[${DIM}] distance_metric=cosine);`);
-  db.exec(`CREATE TABLE IF NOT EXISTS vec_meta (task_id TEXT PRIMARY KEY, model TEXT, dim INTEGER, text_hash TEXT, indexed_at TEXT);`);
+  db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS ${P.table} USING vec0(task_id TEXT, embedding FLOAT[${DIM}] distance_metric=cosine);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS ${P.meta} (task_id TEXT PRIMARY KEY, model TEXT, dim INTEGER, text_hash TEXT, indexed_at TEXT);`);
   return db;
 }
 
@@ -231,9 +276,10 @@ async function main() {
 
   hr();
   log('📊 Индексация векторного поиска Lemma');
+  log(`   Коллекция: ${P.label}`);
   log(`   Режим: ${FULL ? 'ПОЛНЫЙ пересчёт всех задач' : 'инкремент (только новые/изменённые)'}` +
       `${PUSH ? ' · с отправкой на VPS' : ' · ТОЛЬКО локально (без VPS)'}` +
-      `${FORCE_DEDUP ? ' · + пересчёт дублей' : ''}`);
+      `${FORCE_DEDUP && !GEO ? ' · + пересчёт дублей' : ''}`);
   hr();
 
   if (!(await preflight())) {
@@ -243,21 +289,26 @@ async function main() {
   }
 
   if (FULL && fs.existsSync(VEC_DB)) {
-    fs.rmSync(VEC_DB);
-    log('\n--full: старая локальная vec.db удалена, считаю заново.');
+    // Дропаем только таблицы ТЕКУЩЕГО профиля — vec.db общий на банк и геометрию,
+    // удаление файла целиком снесло бы чужой индекс.
+    const tmp = new Database(VEC_DB);
+    sqliteVec.load(tmp);
+    tmp.exec(`DROP TABLE IF EXISTS ${P.table}; DROP TABLE IF EXISTS ${P.meta};`);
+    tmp.close();
+    log(`\n--full: локальные ${P.table}/${P.meta} сброшены, считаю заново.`);
   }
 
   const db = openVecDb();
-  const getMeta = db.prepare('SELECT text_hash FROM vec_meta WHERE task_id = ?');
-  const delVec = db.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
-  const insVec = db.prepare('INSERT INTO vec_tasks(task_id, embedding) VALUES (?, ?)');
-  const upMeta = db.prepare(`INSERT INTO vec_meta(task_id, model, dim, text_hash, indexed_at)
+  const getMeta = db.prepare(`SELECT text_hash FROM ${P.meta} WHERE task_id = ?`);
+  const delVec = db.prepare(`DELETE FROM ${P.table} WHERE task_id = ?`);
+  const insVec = db.prepare(`INSERT INTO ${P.table}(task_id, embedding) VALUES (?, ?)`);
+  const upMeta = db.prepare(`INSERT INTO ${P.meta}(task_id, model, dim, text_hash, indexed_at)
     VALUES (@task_id, @model, @dim, @text_hash, @indexed_at)
     ON CONFLICT(task_id) DO UPDATE SET model=@model, dim=@dim, text_hash=@text_hash, indexed_at=@indexed_at`);
 
   // Шаг 1 — выгрузка задач (потоково; считаем по ходу)
   log('\n[1/4] Загружаю задачи из PocketBase и сравниваю с локальным индексом...');
-  let seen = 0, embedded = 0, skipped = 0, failed = 0, pushed = 0, reconciled = 0;
+  let seen = 0, embedded = 0, skipped = 0, skippedShort = 0, failed = 0, pushed = 0, reconciled = 0;
   let pushBuf = [];
   const allIds = [];
   const taskMeta = new Map(); // id → {topic, answer} для дедупа
@@ -284,12 +335,22 @@ async function main() {
   };
 
   log('\n[2/4] Считаю эмбеддинги через Ollama (модель ' + MODEL + ')...');
-  for await (const task of allTasks()) {
+  for await (const task of (GEO ? allGeometryTasks() : allTasks())) {
     seen++;
+
+    const text = GEO ? buildGeoText(task) : buildText(task);
+
+    // Геометрия: задачи «чертёж без текста» (нет ни условия, ни тегов, ни
+    // заголовка) дают мусорный вектор → не индексируем вовсе. Такие id не
+    // попадают в allIds → прунинг уберёт их и с VPS, если были.
+    if (GEO) {
+      const signal = text.split('\n').filter((l) => !l.startsWith('Тема:')).join(' ').trim();
+      if (signal.length < 30) { skippedShort++; continue; }
+    }
+
     allIds.push(task.id);
     taskMeta.set(task.id, { topic: task.topic, answer: task.answer });
 
-    const text = buildText(task);
     const hash = textHash(text);
     if (!FULL) {
       const meta = getMeta.get(task.id);
@@ -324,14 +385,16 @@ async function main() {
   }
   await flushPush();
   log('');
-  log(`   Просмотрено ${seen}, посчитано ${embedded}, пропущено без изменений ${skipped}${failed ? `, с ошибками ${failed}` : ''}.`);
+  log(`   Просмотрено ${seen}, посчитано ${embedded}, пропущено без изменений ${skipped}`
+    + `${skippedShort ? `, без текста (не индексируются) ${skippedShort}` : ''}`
+    + `${failed ? `, с ошибками ${failed}` : ''}.`);
 
   // Прунинг локально — убрать вектора удалённых задач
   const validSet = new Set(allIds);
-  const localOrphans = db.prepare('SELECT task_id FROM vec_tasks').all()
+  const localOrphans = db.prepare(`SELECT task_id FROM ${P.table}`).all()
     .map((r) => r.task_id).filter((id) => !validSet.has(id));
   if (localOrphans.length) {
-    const delMeta = db.prepare('DELETE FROM vec_meta WHERE task_id = ?');
+    const delMeta = db.prepare(`DELETE FROM ${P.meta} WHERE task_id = ?`);
     db.transaction(() => { for (const id of localOrphans) { delVec.run(id); delMeta.run(id); } })();
     log(`   Удалено из локальной базы (задачи удалены из Lemma): ${localOrphans.length}`);
   }
@@ -351,8 +414,8 @@ async function main() {
       if (missing.length) {
         log(`   ⚠ На VPS не хватает ${missing.length} векторов (рассинхрон) — досылаю...`);
         const getRow = db.prepare(
-          'SELECT v.embedding e, m.text_hash h, m.model mdl FROM vec_tasks v '
-          + 'LEFT JOIN vec_meta m ON m.task_id = v.task_id WHERE v.task_id = ?');
+          `SELECT v.embedding e, m.text_hash h, m.model mdl FROM ${P.table} v `
+          + `LEFT JOIN ${P.meta} m ON m.task_id = v.task_id WHERE v.task_id = ?`);
         let batch = [];
         const flushReconcile = async () => {
           if (!batch.length) return;
@@ -382,8 +445,10 @@ async function main() {
     log('       останутся только в локальной data/vec.db.');
   }
 
-  // Шаг 4 — дедуп (только по флагу)
-  if (PUSH && FORCE_DEDUP) {
+  // Шаг 4 — дедуп (только по флагу; для геометрии не считается)
+  if (GEO && FORCE_DEDUP) {
+    log('\n[4/4] Дедуп для геометрии не поддерживается (--dedup игнорируется).');
+  } else if (PUSH && FORCE_DEDUP) {
     log('\n[4/4] Пересчитываю кластеры дублей (это долго, ~5-6 мин)...');
     try {
       const clusters = computeClusters(db, taskMeta);
@@ -392,12 +457,12 @@ async function main() {
     } catch (e) {
       log(`   ⚠ пересчёт дублей не удался: ${e.message}`);
     }
-  } else if (PUSH) {
+  } else if (PUSH && !GEO) {
     log('\n[4/4] Дубли НЕ пересчитывались (для этого нужен флаг --dedup или `npm run dedup`).');
   }
 
   // Итог
-  const total = db.prepare('SELECT count(*) c FROM vec_tasks').get().c;
+  const total = db.prepare(`SELECT count(*) c FROM ${P.table}`).get().c;
   const sizeMb = (fs.statSync(VEC_DB).size / 1024 / 1024).toFixed(1);
   db.close();
 

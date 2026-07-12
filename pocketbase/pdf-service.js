@@ -16,8 +16,9 @@ import { fixLatex } from './latex-fixer.js';
 // недоступны — сервис всё равно стартует, /similar вернёт 503.
 let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null, pruneVectors = null, setClusters = null;
 let selectBySeed = null, selectDiverse = null, selectNovelty = null, scoreNovelty = null;
+let findSimilarGeometry = null, indexGeometryVectors = null, pruneGeometryVectors = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty, findSimilarGeometry, indexGeometryVectors, pruneGeometryVectors } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1304,6 +1305,64 @@ app.post('/similar', (req, res) => {
 app.get('/similar/health', (req, res) => {
   if (!vecHealth) return res.status(503).json({ ok: false, error: 'vec-search не инициализирован' });
   res.json(vecHealth());
+});
+
+/**
+ * POST /geo/similar — похожие ГЕОМЕТРИЧЕСКИЕ задачи (vec_geometry ⋈ geometry_tasks).
+ * body: { task_id, limit?, min_cos?, origin? ('manual'|'mccme') }
+ */
+app.post('/geo/similar', (req, res) => {
+  if (!findSimilarGeometry) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_id, limit, min_cos, origin } = req.body || {};
+  if (!task_id) return res.status(400).json({ error: 'task_id обязателен' });
+  try {
+    const r = findSimilarGeometry({
+      taskId: task_id,
+      limit: Number(limit) || 8,
+      minCos: Number(min_cos) || 0,
+      origin: origin === 'manual' || origin === 'mccme' ? origin : null,
+    });
+    res.json(r);
+  } catch (e) {
+    console.error('[geo/similar]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /geo/index-vectors — заливка векторов геометрии (счёт на Mac → VPS).
+ * Защита X-Index-Token. body: { vectors: [{task_id, vec, text_hash}] }
+ */
+app.post('/geo/index-vectors', (req, res) => {
+  if (!indexGeometryVectors) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  if (INDEX_TOKEN && req.get('X-Index-Token') !== INDEX_TOKEN) {
+    return res.status(401).json({ error: 'неверный токен' });
+  }
+  const { vectors } = req.body || {};
+  if (!Array.isArray(vectors) || vectors.length === 0) return res.json({ indexed: 0 });
+  try {
+    res.json(indexGeometryVectors(vectors));
+  } catch (e) {
+    console.error('[geo/index-vectors]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /geo/prune-vectors — прунинг осиротевших векторов геометрии.
+ * Защита X-Index-Token. body: { valid_task_ids: [...] }
+ */
+app.post('/geo/prune-vectors', (req, res) => {
+  if (!pruneGeometryVectors) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  if (INDEX_TOKEN && req.get('X-Index-Token') !== INDEX_TOKEN) return res.status(401).json({ error: 'неверный токен' });
+  const { valid_task_ids } = req.body || {};
+  if (!Array.isArray(valid_task_ids) || valid_task_ids.length === 0) return res.status(400).json({ error: 'valid_task_ids обязателен' });
+  try {
+    res.json(pruneGeometryVectors(valid_task_ids));
+  } catch (e) {
+    console.error('[geo/prune-vectors]', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 /**

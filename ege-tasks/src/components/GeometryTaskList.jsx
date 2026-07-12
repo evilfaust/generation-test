@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Collapse,
   Input,
   Modal,
   Pagination,
@@ -45,6 +46,7 @@ import LoadGeometryPrintModal from './geometry/LoadGeometryPrintModal';
 import MathRenderer from './MathRenderer';
 import { buildGeometryColumns, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from './geometry/GeometryTaskColumns';
 import GeometryTagsModal from './geometry/GeometryTagsModal';
+import SimilarGeometryPanel from './geometry/SimilarGeometryPanel';
 import './GeometryTaskPreview.css';
 
 const { Text } = Typography;
@@ -287,6 +289,17 @@ export default function GeometryTaskList() {
     setQuickPreviewOpen(false);
     setQuickPreviewTask(null);
     setAutosaveStatus(null);
+  };
+
+  // Клик по похожей задаче в панели «Похожие» — подгружаем полную запись
+  // (в панели только id) и переключаем быстрый просмотр на неё.
+  const openSimilarInPreview = async (taskId) => {
+    try {
+      const full = await api.getGeometryTask(taskId);
+      openQuickPreview(full);
+    } catch {
+      message.error('Не удалось загрузить похожую задачу');
+    }
   };
 
   // Автосохраняет макет в БД через 800ms после последнего изменения.
@@ -1029,6 +1042,23 @@ export default function GeometryTaskList() {
               )}
             </div>
           </div>
+
+          {quickPreviewTask && (
+            <Collapse
+              size="small"
+              destroyInactivePanel
+              items={[{
+                key: 'similar',
+                label: '🔎 Похожие задачи (вектор)',
+                children: (
+                  <SimilarGeometryPanel
+                    taskId={quickPreviewTask.id}
+                    onOpenTask={openSimilarInPreview}
+                  />
+                ),
+              }]}
+            />
+          )}
         </Space>
       </Modal>
 

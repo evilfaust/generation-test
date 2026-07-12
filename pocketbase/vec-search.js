@@ -220,18 +220,19 @@ export function findPairs(taskIds, minCos = 0.7) {
  * Инкрементальная запись векторов в vec.db (A: /index-vectors).
  * rows: [{ task_id, vec:[float×1024], text_hash, model? }]. Upsert по task_id.
  * Открывает отдельное WRITABLE-соединение; поисковое инвалидируется.
+ * table/metaTable параметризованы: vec_tasks (банк задач) | vec_geometry (геометрия).
  */
-export function indexVectors(rows) {
+function indexVectorsInto(table, metaTable, rows) {
   invalidateDb(); // освобождаем readonly-attach на vec.db перед записью
   const w = new Database(VEC_DB);
   try {
     sqliteVec.load(w);
     w.pragma('busy_timeout = 5000');
-    w.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS vec_tasks USING vec0(task_id TEXT, embedding FLOAT[${DIM}] distance_metric=cosine);`);
-    w.exec(`CREATE TABLE IF NOT EXISTS vec_meta (task_id TEXT PRIMARY KEY, model TEXT, dim INTEGER, text_hash TEXT, indexed_at TEXT);`);
-    const del = w.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
-    const ins = w.prepare('INSERT INTO vec_tasks(task_id, embedding) VALUES (?, ?)');
-    const meta = w.prepare(`INSERT INTO vec_meta(task_id, model, dim, text_hash, indexed_at)
+    w.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS ${table} USING vec0(task_id TEXT, embedding FLOAT[${DIM}] distance_metric=cosine);`);
+    w.exec(`CREATE TABLE IF NOT EXISTS ${metaTable} (task_id TEXT PRIMARY KEY, model TEXT, dim INTEGER, text_hash TEXT, indexed_at TEXT);`);
+    const del = w.prepare(`DELETE FROM ${table} WHERE task_id = ?`);
+    const ins = w.prepare(`INSERT INTO ${table}(task_id, embedding) VALUES (?, ?)`);
+    const meta = w.prepare(`INSERT INTO ${metaTable}(task_id, model, dim, text_hash, indexed_at)
       VALUES (@task_id, @model, @dim, @text_hash, @indexed_at)
       ON CONFLICT(task_id) DO UPDATE SET model=@model, dim=@dim, text_hash=@text_hash, indexed_at=@indexed_at`);
     const tx = w.transaction((items) => {
@@ -243,11 +244,15 @@ export function indexVectors(rows) {
       }
     });
     tx(rows);
-    const total = w.prepare('SELECT count(*) c FROM vec_tasks').get().c;
+    const total = w.prepare(`SELECT count(*) c FROM ${table}`).get().c;
     return { indexed: rows.length, total };
   } finally {
     w.close();
   }
+}
+
+export function indexVectors(rows) {
+  return indexVectorsInto('vec_tasks', 'vec_meta', rows);
 }
 
 /**
@@ -613,26 +618,94 @@ export function scoreNovelty({ taskIds = [], refTaskIds = [], dupCos = 0.95, fre
  *   на VPS. Mac досылает их вектора (самосверка: лечит дрейф из-за непрошедшего
  *   когда-то пуша — инкремент сам бы их пропустил по text_hash и не дослал).
  */
-export function pruneVectors(validIds) {
+function pruneVectorsFrom(table, metaTable, validIds) {
   const valid = new Set(validIds);
   invalidateDb();
   const w = new Database(VEC_DB);
   try {
     sqliteVec.load(w);
     w.pragma('busy_timeout = 5000');
-    const all = w.prepare('SELECT task_id FROM vec_tasks').all().map((r) => r.task_id);
+    let all;
+    try {
+      all = w.prepare(`SELECT task_id FROM ${table}`).all().map((r) => r.task_id);
+    } catch {
+      // Таблицы ещё нет (первая индексация не приезжала) — нечего прунить,
+      // все локальные вектора числятся отсутствующими → Mac их дошлёт.
+      return { pruned: 0, total: 0, missing_on_vps: validIds };
+    }
     const onVps = new Set(all);
     const orphans = all.filter((id) => !valid.has(id));
-    const delVec = w.prepare('DELETE FROM vec_tasks WHERE task_id = ?');
-    const delMeta = w.prepare('DELETE FROM vec_meta WHERE task_id = ?');
+    const delVec = w.prepare(`DELETE FROM ${table} WHERE task_id = ?`);
+    const delMeta = w.prepare(`DELETE FROM ${metaTable} WHERE task_id = ?`);
     const tx = w.transaction((ids) => { for (const id of ids) { delVec.run(id); delMeta.run(id); } });
     tx(orphans);
-    const total = w.prepare('SELECT count(*) c FROM vec_tasks').get().c;
+    const total = w.prepare(`SELECT count(*) c FROM ${table}`).get().c;
     const missing_on_vps = validIds.filter((id) => !onVps.has(id));
     return { pruned: orphans.length, total, missing_on_vps };
   } finally {
     w.close();
   }
+}
+
+export function pruneVectors(validIds) {
+  return pruneVectorsFrom('vec_tasks', 'vec_meta', validIds);
+}
+
+// === Геометрия: vec_geometry ⋈ geometry_tasks ===============================
+// Отдельная таблица в том же vec.db (та же модель/размерность). Смыслы не
+// смешиваем с банком tasks: другая сущность — другая выдача.
+
+function geoIndexReady(d) {
+  try { d.prepare('SELECT 1 FROM vdb.vec_geometry LIMIT 1').get(); return true; }
+  catch { return false; }
+}
+
+/**
+ * Похожие геометрические задачи.
+ * У банка МЦНМО дерево тем не используется (фасетные теги) → фильтра «та же
+ * тема» нет; вместо него опциональный фильтр по происхождению (manual|mccme).
+ * @param {object} o { taskId, limit=8, minCos=0, origin=null }
+ */
+export function findSimilarGeometry({ taskId, limit = 8, minCos = 0, origin = null }) {
+  const d = getDb();
+  if (!geoIndexReady(d)) return { error: 'no_index', items: [] };
+  const row = d.prepare('SELECT embedding FROM vdb.vec_geometry WHERE task_id = ?').get(taskId);
+  if (!row) return { error: 'not_indexed', items: [] };
+
+  const k = Math.max(limit * 8, 60);
+  const rows = d.prepare(`
+    SELECT v.task_id AS task_id, v.distance AS distance,
+           g.code AS code, g.title AS title, g.origin AS origin,
+           g.source AS source, g.statement_md AS statement_md
+    FROM vdb.vec_geometry v
+    JOIN main.geometry_tasks g ON g.id = v.task_id
+    WHERE v.embedding MATCH ? AND v.k = ?
+    ORDER BY v.distance
+  `).all(row.embedding, k);
+
+  const out = [];
+  for (const r of rows) {
+    if (r.task_id === taskId) continue;
+    const rOrigin = r.origin === 'mccme' ? 'mccme' : 'manual';
+    if (origin && rOrigin !== origin) continue;
+    const cos = 1 - r.distance;
+    if (cos < minCos) continue;
+    const stmt = (r.statement_md || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    out.push({
+      task_id: r.task_id, cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)),
+      code: r.code, title: r.title || '', origin: rOrigin, source: r.source || '', statement: stmt,
+    });
+    if (out.length >= limit) break;
+  }
+  return { error: null, items: out };
+}
+
+export function indexGeometryVectors(rows) {
+  return indexVectorsInto('vec_geometry', 'vec_geometry_meta', rows);
+}
+
+export function pruneGeometryVectors(validIds) {
+  return pruneVectorsFrom('vec_geometry', 'vec_geometry_meta', validIds);
 }
 
 // Принять готовые дедуп-кластеры (посчитаны на Mac) — записать файл + кэш.
@@ -649,7 +722,9 @@ export function vecHealth() {
   try {
     const d = getDb();
     const n = d.prepare('SELECT count(*) c FROM vdb.vec_tasks').get().c;
-    return { ok: true, vectors: n, data_db: DATA_DB, vec_db: VEC_DB };
+    let geo = 0;
+    try { geo = d.prepare('SELECT count(*) c FROM vdb.vec_geometry').get().c; } catch { /* индекса ещё нет */ }
+    return { ok: true, vectors: n, geometry_vectors: geo, data_db: DATA_DB, vec_db: VEC_DB };
   } catch (e) {
     return { ok: false, error: e.message };
   }

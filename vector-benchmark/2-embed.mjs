@@ -13,6 +13,27 @@ export function buildText(task) {
   return `${topic}\n${body}`.trim();
 }
 
+// Текст для эмбеддинга ГЕОМЕТРИЧЕСКОЙ задачи (geometry_tasks):
+// тема + фасетные теги МЦНМО (объект/метод/факт — сильный семантический сигнал,
+// вытягивает короткие условия) + заголовок + условие.
+const GEO_TAG_KIND = { object: 'объекты', method: 'методы', fact: 'факты', named: 'теоремы', source: 'источник' };
+export function buildGeoText(task) {
+  const parts = [];
+  if (task.topic_title) parts.push(`Тема: ${task.topic_title}.`);
+  if (Array.isArray(task.tags) && task.tags.length) {
+    const byKind = {};
+    for (const t of task.tags) { if (t?.name) (byKind[t.kind] ||= []).push(t.name); }
+    const s = Object.entries(byKind)
+      .map(([k, names]) => `${GEO_TAG_KIND[k] || k}: ${names.join(', ')}`)
+      .join('; ');
+    if (s) parts.push(`Теги — ${s}.`);
+  }
+  if (task.title) parts.push(task.title);
+  const body = cleanLatex(task.statement_md);
+  if (body) parts.push(body);
+  return parts.join('\n').trim();
+}
+
 async function embed(text) {
   const r = await fetch(`${OLLAMA_URL}/api/embeddings`, {
     method: 'POST',
