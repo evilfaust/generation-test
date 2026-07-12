@@ -64,13 +64,12 @@
 
 **Backend** (`pocketbase/`):
 - PocketBase 0.36.4 (SQLite, REST API, Auth, File storage)
-- PDF Service на Node.js + Puppeteer + Chromium (порт 3001)
-- Telegram-бот мониторинга VPS
+- Backend Helper на Node.js (порт 3001): sdamgia-парсер, LLM-ручки, векторный поиск
 
 **Infrastructure:**
-- VPS: PocketBase + PDF service + nginx + cron-бэкапы
+- VPS: PocketBase + backend helper + nginx + cron-бэкапы (локально + S3)
 - Raspberry Pi (или CDN): статический фронтенд через nginx в Docker
-- GitHub Actions: автодеплой лендинга
+- GitHub Actions: деплой лендинга (вручную, workflow_dispatch)
 
 ---
 
