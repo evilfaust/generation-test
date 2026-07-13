@@ -11,6 +11,7 @@
  */
 
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
 
@@ -652,8 +653,15 @@ export function pruneVectors(validIds) {
 }
 
 // === Геометрия: vec_geometry ⋈ geometry_tasks ===============================
-// Отдельная таблица в том же vec.db (та же модель/размерность). Смыслы не
-// смешиваем с банком tasks: другая сущность — другая выдача.
+// Отдельная таблица в том же vec.db (та же размерность 1024, но модель ДРУГАЯ —
+// text-embedding-3-large, см. блок NL-поиска ниже). Смыслы не смешиваем с
+// банком tasks: другая сущность — другая выдача.
+
+// Калибровка % для геометрии — под te3-large: у неё косинусы сжаты
+// (замер 13.07.2026: почти-дубль ≈ 0.90, несвязанные ≈ 0.45-0.55).
+const GEO_CAL_FLOOR = 0.50;
+const GEO_CAL_CEIL = 0.90;
+const toPctGeo = (cos) => Math.max(0, Math.min(100, ((cos - GEO_CAL_FLOOR) / (GEO_CAL_CEIL - GEO_CAL_FLOOR)) * 100));
 
 function geoIndexReady(d) {
   try { d.prepare('SELECT 1 FROM vdb.vec_geometry LIMIT 1').get(); return true; }
@@ -692,7 +700,7 @@ export function findSimilarGeometry({ taskId, limit = 8, minCos = 0, origin = nu
     if (cos < minCos) continue;
     const stmt = (r.statement_md || '').replace(/\s+/g, ' ').trim().slice(0, 200);
     out.push({
-      task_id: r.task_id, cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)),
+      task_id: r.task_id, cos: Number(cos.toFixed(4)), pct: Math.round(toPctGeo(cos)),
       code: r.code, title: r.title || '', origin: rOrigin, source: r.source || '', statement: stmt,
     });
     if (out.length >= limit) break;
@@ -712,7 +720,7 @@ export function findSimilarGeometry({ taskId, limit = 8, minCos = 0, origin = nu
 const _geoDupCache = new Map(); // `${minCos}|${perTask}` → { at, data }
 const GEO_DUP_TTL_MS = 10 * 60 * 1000;
 
-export async function findGeometryBankDuplicates({ minCos = 0.87, perTask = 3 } = {}) {
+export async function findGeometryBankDuplicates({ minCos = 0.82, perTask = 3 } = {}) {
   const cacheKey = `${minCos}|${perTask}`;
   const hit = _geoDupCache.get(cacheKey);
   if (hit && Date.now() - hit.at < GEO_DUP_TTL_MS) return hit.data;
@@ -750,7 +758,7 @@ export async function findGeometryBankDuplicates({ minCos = 0.87, perTask = 3 } 
       if (cos < minCos) break; // KNN отсортирован по cos ↓ — дальше только хуже
       if (r.origin !== 'mccme') continue; // пары свои↔свои здесь не интересны
       pairs.push({
-        cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)),
+        cos: Number(cos.toFixed(4)), pct: Math.round(toPctGeo(cos)),
         answers_match: !!normAns(m.answer) && normAns(m.answer) === normAns(r.answer),
         mine: { id: m.id, code: m.code, title: m.title || '', answer: m.answer || '', statement: snip(m.statement_md) },
         bank: { id: r.task_id, code: r.code, answer: r.answer || '', statement: snip(r.statement_md) },
@@ -776,6 +784,276 @@ export function indexGeometryVectors(rows) {
 export function pruneGeometryVectors(validIds) {
   _geoDupCache.clear();
   return pruneVectorsFrom('vec_geometry', 'vec_geometry_meta', validIds);
+}
+
+// === NL-поиск + серверная переиндексация геометрии (v3.9.125) ===============
+// Эмбеддинги геометрии считаются через Timeweb AI Gateway
+// (openai/text-embedding-3-large @ dimensions=1024 — та же размерность, что у
+// bge-m3, схема vec_geometry не меняется). Сервер сам и индексирует, и
+// эмбеддит поисковый запрос — Mac/Ollama для геометрии больше не нужны.
+// ⚠️ Банк tasks (vec_tasks) остаётся на bge-m3/Mac — не смешивать.
+
+const AI_BASE = (process.env.TIMEWEB_AI_URL || '').replace(/\/chat\/completions\/?$/, '');
+const AI_KEY = process.env.TIMEWEB_AI_KEY || '';
+const GEO_EMBED_MODEL = process.env.GEO_EMBED_MODEL || 'openai/text-embedding-3-large';
+
+// ⚠️ ТОЛЬКО по одному тексту за запрос. Батч-ответы шлюза Timeweb приходят с
+// БИТЫМ полем index (проверено 12.07.2026: input из 3 → индексы [0,1,1]) —
+// раскладка по index теряет/путает вектора. Одиночный запрос перепутать нечем.
+async function embedRemoteOne(text) {
+  if (!AI_BASE || !AI_KEY) throw new Error('AI gateway не настроен (TIMEWEB_AI_URL/TIMEWEB_AI_KEY)');
+  const res = await fetch(`${AI_BASE}/embeddings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${AI_KEY}` },
+    body: JSON.stringify({ model: GEO_EMBED_MODEL, input: text, dimensions: DIM }),
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) throw new Error(`embeddings ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const data = await res.json();
+  const vec = data?.data?.[0]?.embedding;
+  if (!Array.isArray(vec) || vec.length !== DIM) {
+    throw new Error(`embeddings: неожиданный ответ (dim=${vec?.length ?? 'нет'})`);
+  }
+  return vec;
+}
+
+// LRU-кэш эмбеддингов поисковых запросов (запрос короткий, но зачем платить дважды).
+const _queryVecCache = new Map(); // normalized text → Buffer(Float32)
+async function embedQueryCached(text) {
+  const key = text.trim().toLowerCase();
+  const hit = _queryVecCache.get(key);
+  if (hit) { _queryVecCache.delete(key); _queryVecCache.set(key, hit); return hit; }
+  const vec = await embedRemoteOne(text);
+  const buf = Buffer.from(Float32Array.from(vec).buffer);
+  _queryVecCache.set(key, buf);
+  if (_queryVecCache.size > 300) _queryVecCache.delete(_queryVecCache.keys().next().value);
+  return buf;
+}
+
+function geoIndexModel(d) {
+  try { return d.prepare('SELECT model FROM vdb.vec_geometry_meta LIMIT 1').get()?.model || null; }
+  catch { return null; }
+}
+
+/**
+ * Поиск геометрических задач по запросу на естественном языке
+ * («задача про биссектрису и вписанную окружность»).
+ * Запрос эмбеддится ТОЙ ЖЕ моделью, что индекс — иначе отказ (model_mismatch).
+ */
+export async function searchGeometryByText({ query, limit = 12, origin = null, minCos = 0.2 }) {
+  const q = String(query || '').trim();
+  if (!q) return { error: 'empty_query', items: [] };
+  const d = getDb();
+  if (!geoIndexReady(d)) return { error: 'no_index', items: [] };
+  const idxModel = geoIndexModel(d);
+  if (idxModel && idxModel !== GEO_EMBED_MODEL) {
+    return { error: 'index_model_mismatch', index_model: idxModel, expected: GEO_EMBED_MODEL, items: [] };
+  }
+
+  const qvec = await embedQueryCached(q);
+  const k = Math.max(limit * 6, 60);
+  const rows = d.prepare(`
+    SELECT v.task_id AS task_id, v.distance AS distance,
+           g.code AS code, g.title AS title, g.origin AS origin,
+           g.source AS source, g.statement_md AS statement_md
+    FROM vdb.vec_geometry v
+    JOIN main.geometry_tasks g ON g.id = v.task_id
+    WHERE v.embedding MATCH ? AND v.k = ?
+    ORDER BY v.distance
+  `).all(qvec, k);
+
+  const out = [];
+  for (const r of rows) {
+    const rOrigin = r.origin === 'mccme' ? 'mccme' : 'manual';
+    if (origin && rOrigin !== origin) continue;
+    const cos = 1 - r.distance;
+    if (cos < minCos) continue;
+    out.push({
+      task_id: r.task_id, cos: Number(cos.toFixed(4)),
+      code: r.code, title: r.title || '', origin: rOrigin, source: r.source || '',
+      statement: (r.statement_md || '').replace(/\s+/g, ' ').trim().slice(0, 240),
+    });
+    if (out.length >= limit) break;
+  }
+  return { error: null, model: GEO_EMBED_MODEL, items: out };
+}
+
+// --- Серверная переиндексация геометрии (фоновая job) -----------------------
+// Текст эмбеддинга = тема + фасетные теги + заголовок + условие — семантика
+// как у buildGeoText в vector-benchmark/2-embed.mjs (Mac-путь для геометрии
+// выведен из эксплуатации, сервер — единственный владелец vec_geometry).
+
+const GEO_TAG_KIND = { object: 'объекты', method: 'методы', fact: 'факты', named: 'теоремы', source: 'источник' };
+
+// Упрощённый cleanLatex (порт vector-benchmark/lib/cleanLatex.mjs).
+function cleanLatexForEmbed(input) {
+  if (!input) return '';
+  let s = String(input);
+  s = s.replace(/\$\$?/g, ' ');
+  s = s.replace(/\\[()[\]]/g, ' ');
+  for (let i = 0; i < 3; i++) s = s.replace(/\\d?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)');
+  s = s.replace(/\\sqrt\s*\[([^\]]*)\]\s*\{([^{}]*)\}/g, 'корень $1-й степени из ($2)');
+  s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)');
+  s = s.replace(/\^\s*\{([^{}]*)\}/g, '^$1');
+  s = s.replace(/_\s*\{([^{}]*)\}/g, '_$1');
+  const cmd = {
+    '\\cdot': '*', '\\times': '*', '\\div': '/', '\\pm': '±', '\\mp': '∓',
+    '\\leq': '<=', '\\le': '<=', '\\geq': '>=', '\\ge': '>=', '\\neq': '≠', '\\ne': '≠',
+    '\\approx': '≈', '\\infty': '∞', '\\pi': 'пи', '\\alpha': 'альфа', '\\beta': 'бета',
+    '\\gamma': 'гамма', '\\theta': 'тета', '\\angle': 'угол', '\\triangle': 'треугольник',
+    '\\sin': 'sin', '\\cos': 'cos', '\\tan': 'tg', '\\tg': 'tg', '\\cot': 'ctg', '\\ctg': 'ctg',
+    '\\log': 'log', '\\ln': 'ln', '\\lg': 'lg', '\\sum': 'сумма', '\\int': 'интеграл',
+    '\\to': '→', '\\rightarrow': '→', '\\Rightarrow': '⇒', '\\in': 'принадлежит',
+    '\\cup': 'объединение', '\\cap': 'пересечение', '\\varnothing': 'пустое множество',
+    '\\left': '', '\\right': '', '\\,': ' ', '\\;': ' ', '\\!': '', '\\quad': ' ', '\\qquad': ' ',
+  };
+  for (const [k, v] of Object.entries(cmd)) s = s.split(k).join(` ${v} `);
+  s = s.replace(/\\([a-zA-Z]+)/g, '$1');
+  s = s.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+  s = s.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  s = s.replace(/[{}]/g, ' ');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+function buildGeoTextRow(row, tagsById) {
+  const parts = [];
+  if (row.topic_title) parts.push(`Тема: ${row.topic_title}.`);
+  let tagIds = [];
+  try { tagIds = JSON.parse(row.tags_json || '[]'); } catch { tagIds = []; }
+  if (!Array.isArray(tagIds)) tagIds = tagIds ? [tagIds] : [];
+  if (tagIds.length) {
+    const byKind = {};
+    for (const id of tagIds) {
+      const t = tagsById.get(id);
+      if (t?.name) (byKind[t.kind] ||= []).push(t.name);
+    }
+    const s = Object.entries(byKind)
+      .map(([k, names]) => `${GEO_TAG_KIND[k] || k}: ${names.join(', ')}`)
+      .join('; ');
+    if (s) parts.push(`Теги — ${s}.`);
+  }
+  if (row.title) parts.push(row.title);
+  const body = cleanLatexForEmbed(row.statement_md);
+  if (body) parts.push(body);
+  return parts.join('\n').trim();
+}
+
+const _geoReindex = {
+  running: false, phase: null, done: 0, total: 0, skipped: 0, skipped_short: 0,
+  failed: 0, pruned: 0, total_vectors: 0, started_at: null, finished_at: null, error: null,
+};
+export function geoReindexStatus() { return { ..._geoReindex, model: GEO_EMBED_MODEL }; }
+
+/**
+ * Запустить фоновую переиндексацию геометрии (эмбеддинги через AI gateway).
+ * Инкрементальная: пропускает задачи с совпавшим text_hash И моделью.
+ * full=true — пересчитать всё. Возвращает сразу; прогресс — geoReindexStatus().
+ */
+export function reindexGeometry({ full = false } = {}) {
+  if (_geoReindex.running) return { started: false, reason: 'already_running', status: geoReindexStatus() };
+  if (!AI_BASE || !AI_KEY) return { started: false, reason: 'ai_not_configured' };
+  Object.assign(_geoReindex, {
+    running: true, phase: 'read', done: 0, total: 0, skipped: 0, skipped_short: 0,
+    failed: 0, pruned: 0, total_vectors: 0, started_at: new Date().toISOString(), finished_at: null, error: null,
+  });
+
+  (async () => {
+    try {
+      const d = getDb();
+      const tagsById = new Map(
+        d.prepare('SELECT id, kind, name FROM main.geometry_tags').all().map((t) => [t.id, t])
+      );
+      const rows = d.prepare(`
+        SELECT g.id, g.title, g.statement_md, g.tags AS tags_json, t.title AS topic_title
+        FROM main.geometry_tasks g
+        LEFT JOIN main.geometry_topics t ON t.id = g.topic
+      `).all();
+
+      // Мета для инкремента — отдельным ro-соединением (attach инвалидируется записями).
+      let meta = new Map();
+      try {
+        const mr = new Database(VEC_DB, { readonly: true, fileMustExist: true });
+        try {
+          meta = new Map(mr.prepare('SELECT task_id, text_hash, model FROM vec_geometry_meta').all()
+            .map((r) => [r.task_id, r]));
+        } finally { mr.close(); }
+      } catch { /* таблицы ещё нет */ }
+
+      const items = [];
+      const validIds = [];
+      for (const r of rows) {
+        const text = buildGeoTextRow(r, tagsById);
+        const signal = text.split('\n').filter((l) => !l.startsWith('Тема:')).join(' ').trim();
+        if (signal.length < 30) { _geoReindex.skipped_short++; continue; }
+        validIds.push(r.id);
+        const hash = crypto.createHash('sha256').update(text).digest('hex');
+        const m = meta.get(r.id);
+        if (!full && m && m.text_hash === hash && m.model === GEO_EMBED_MODEL) { _geoReindex.skipped++; continue; }
+        items.push({ id: r.id, text, hash });
+      }
+      _geoReindex.total = items.length;
+      _geoReindex.phase = 'embed';
+
+      // Эмбеддим ПО ОДНОЙ задаче (батчи шлюза с битым index — см. embedRemoteOne),
+      // но CONC параллельных запросов; пишем в vec.db пачками по мере готовности.
+      // Единичный отказ не валит прогон — задача идёт в failed и доедет
+      // следующим инкрементом (text_hash в мета не записывается).
+      const CONC = 8;
+      const FLUSH_AT = 64;
+      let cursor = 0;
+      let pending = [];
+      const flush = () => {
+        if (!pending.length) return;
+        const chunk = pending;
+        pending = [];
+        indexVectorsInto('vec_geometry', 'vec_geometry_meta', chunk);
+      };
+      const worker = async () => {
+        for (;;) {
+          const i = cursor++;
+          if (i >= items.length) return;
+          const it = items[i];
+          let vec = null;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try { vec = await embedRemoteOne(it.text); break; }
+            catch (e) {
+              if (attempt >= 3) console.warn(`[geo-reindex] пропуск ${it.id}: ${e.message}`);
+              else await new Promise((r) => setTimeout(r, 1500 * attempt));
+            }
+          }
+          if (vec) {
+            pending.push({ task_id: it.id, vec, text_hash: it.hash, model: GEO_EMBED_MODEL });
+            if (pending.length >= FLUSH_AT) flush();
+          } else {
+            _geoReindex.failed++;
+          }
+          _geoReindex.done++;
+        }
+      };
+      await Promise.all(Array.from({ length: CONC }, worker));
+      flush();
+
+      _geoReindex.phase = 'prune';
+      const pr = pruneVectorsFrom('vec_geometry', 'vec_geometry_meta', validIds);
+      _geoReindex.pruned = pr.pruned;
+      _geoReindex.total_vectors = pr.total;
+      _geoReindex.phase = 'done';
+      console.log(`[geo-reindex] готово: ${_geoReindex.done - _geoReindex.failed} посчитано, `
+        + `${_geoReindex.failed} с ошибками, ${_geoReindex.skipped} пропущено, всего ${pr.total}`);
+    } catch (e) {
+      _geoReindex.error = e.message;
+      _geoReindex.phase = 'error';
+      console.error('[geo-reindex]', e.message);
+    } finally {
+      _geoReindex.running = false;
+      _geoReindex.finished_at = new Date().toISOString();
+      _geoDupCache.clear();
+      _queryVecCache.clear();
+    }
+  })();
+
+  return { started: true };
 }
 
 // Принять готовые дедуп-кластеры (посчитаны на Mac) — записать файл + кэш.

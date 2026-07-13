@@ -48,6 +48,7 @@ import { buildGeometryColumns, DIFFICULTY_COLORS, DIFFICULTY_LABELS } from './ge
 import GeometryTagsModal from './geometry/GeometryTagsModal';
 import SimilarGeometryPanel from './geometry/SimilarGeometryPanel';
 import GeometryBankDuplicatesModal from './geometry/GeometryBankDuplicatesModal';
+import GeometrySemanticSearchModal from './geometry/GeometrySemanticSearchModal';
 import './GeometryTaskPreview.css';
 
 const { Text } = Typography;
@@ -72,6 +73,7 @@ export default function GeometryTaskList() {
   const [bankLoadAll, setBankLoadAll] = useState(false); // явная загрузка всего банка МЦНМО
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [bankDupOpen, setBankDupOpen] = useState(false); // дубли «мои ↔ банк МЦНМО»
+  const [semanticOpen, setSemanticOpen] = useState(false); // поиск по смыслу (NL)
 
   const reloadGeoTags = () => api.getGeometryTags().then(setGeoTags).catch(() => {});
 
@@ -640,6 +642,9 @@ export default function GeometryTaskList() {
                   Теги
                 </Button>
               )}
+              <Button block icon={<SearchOutlined />} onClick={() => setSemanticOpen(true)}>
+                🧠 Поиск по смыслу
+              </Button>
               <Button block icon={<SearchOutlined />} onClick={() => setBankDupOpen(true)}>
                 Дубли с банком
               </Button>
@@ -977,6 +982,12 @@ export default function GeometryTaskList() {
       <GeometryBankDuplicatesModal
         open={bankDupOpen}
         onClose={() => setBankDupOpen(false)}
+        onOpenTask={openSimilarInPreview}
+      />
+
+      <GeometrySemanticSearchModal
+        open={semanticOpen}
+        onClose={() => setSemanticOpen(false)}
         onOpenTask={openSimilarInPreview}
       />
 

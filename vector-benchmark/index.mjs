@@ -34,13 +34,21 @@ const FORCE_DEDUP = process.argv.includes('--dedup');
 const GEO = process.argv.includes('--geometry');
 const HELP = process.argv.includes('--help') || process.argv.includes('-h');
 
-// Профиль коллекции: обычный банк задач (vec_tasks) или геометрия (vec_geometry).
-// Обе таблицы живут в одном локальном data/vec.db и в одном vec.db на VPS.
-const P = GEO
-  ? { label: 'геометрия (geometry_tasks)', table: 'vec_geometry', meta: 'vec_geometry_meta',
-      indexPath: '/geo/index-vectors', prunePath: '/geo/prune-vectors' }
-  : { label: 'банк задач (tasks)', table: 'vec_tasks', meta: 'vec_meta',
-      indexPath: '/index-vectors', prunePath: '/prune-vectors' };
+// ⛔ Геометрия с Mac БОЛЬШЕ НЕ индексируется (v3.9.125): vec_geometry считается
+// СЕРВЕРОМ через Timeweb AI Gateway (text-embedding-3-large @1024d) — это даёт
+// NL-поиск «/geo/search» с сайта. Пуш bge-m3-векторов отсюда ОТРАВИЛ БЫ индекс
+// (смешение моделей). Переиндексация: `npm run index:geo` (= node geo-reindex.mjs,
+// дёргает POST /geo/reindex на VPS и ждёт).
+if (GEO) {
+  console.log('⛔ --geometry больше не поддерживается с Mac: индекс геометрии считает VPS');
+  console.log('   (text-embedding-3-large через Timeweb AI Gateway, см. vec-search.js).');
+  console.log('   Запуск: npm run index:geo   (триггерит серверную переиндексацию и ждёт)');
+  process.exit(1);
+}
+
+// Профиль коллекции (после блока выше — всегда обычный банк задач).
+const P = { label: 'банк задач (tasks)', table: 'vec_tasks', meta: 'vec_meta',
+  indexPath: '/index-vectors', prunePath: '/prune-vectors' };
 
 // ── вывод ────────────────────────────────────────────────────────────────────
 const log = (s = '') => process.stdout.write(s + '\n');

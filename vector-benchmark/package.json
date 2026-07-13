@@ -10,8 +10,8 @@
     "index": "node index.mjs --push",
     "dedup": "node index.mjs --push --dedup",
     "index:full": "node index.mjs --full --push",
-    "index:geo": "node index.mjs --geometry --push",
-    "index:geo:full": "node index.mjs --geometry --full --push",
+    "index:geo": "node geo-reindex.mjs",
+    "index:geo:full": "node geo-reindex.mjs --full",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

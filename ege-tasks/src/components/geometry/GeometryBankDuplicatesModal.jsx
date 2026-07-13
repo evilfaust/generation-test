@@ -7,12 +7,13 @@ const { Text } = Typography;
 
 const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhost:3001';
 
-// Пороги мягче дедупа банка tasks (0.93): у банковских задач в тексте эмбеддинга
-// есть фасетные теги, у своих — нет, поэтому даже точный дубль даёт cos < 1.
+// Пороги калиброваны под text-embedding-3-large (замер 13.07.2026): у неё
+// косинусы сжаты (почти-дубль ≈ 0.90), плюс у банковских задач в тексте
+// эмбеддинга есть фасетные теги, у своих — нет → точный дубль даёт cos < 1.
 const THRESHOLDS = [
-  { label: 'Строго', value: 0.92 },
-  { label: 'Средне', value: 0.87 },
-  { label: 'Широко', value: 0.82 },
+  { label: 'Строго', value: 0.86 },
+  { label: 'Средне', value: 0.82 },
+  { label: 'Широко', value: 0.78 },
 ];
 
 // Просмотренные пары — в localStorage (разовое ревью небольшого каталога,
@@ -67,7 +68,7 @@ export default function GeometryBankDuplicatesModal({ open, onClose, onOpenTask 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
-  const [minCos, setMinCos] = useState(0.87);
+  const [minCos, setMinCos] = useState(0.82);
   const [hidden, setHidden] = useState(loadHidden);
   const [showHidden, setShowHidden] = useState(false);
 

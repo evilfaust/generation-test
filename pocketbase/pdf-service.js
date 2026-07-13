@@ -17,8 +17,9 @@ import { fixLatex } from './latex-fixer.js';
 let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs = null, indexVectors = null, buildParallelVariants = null, buildRemediation = null, pruneVectors = null, setClusters = null;
 let selectBySeed = null, selectDiverse = null, selectNovelty = null, scoreNovelty = null;
 let findSimilarGeometry = null, indexGeometryVectors = null, pruneGeometryVectors = null, findGeometryBankDuplicates = null;
+let searchGeometryByText = null, reindexGeometry = null, geoReindexStatus = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty, findSimilarGeometry, indexGeometryVectors, pruneGeometryVectors, findGeometryBankDuplicates } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty, findSimilarGeometry, indexGeometryVectors, pruneGeometryVectors, findGeometryBankDuplicates, searchGeometryByText, reindexGeometry, geoReindexStatus } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1330,6 +1331,51 @@ app.post('/geo/similar', (req, res) => {
 });
 
 /**
+ * POST /geo/search — поиск геометрических задач по запросу на естественном
+ * языке (эмбеддинг запроса через AI gateway → KNN по vec_geometry).
+ * Гейтится токеном учителя (aiGate) — каждый запрос дёргает платный API.
+ * body: { query, limit?, origin? ('manual'|'mccme'), min_cos? }
+ */
+app.post('/geo/search', aiGate, async (req, res) => {
+  if (!searchGeometryByText) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { query, limit, origin, min_cos } = req.body || {};
+  if (!query || !String(query).trim()) return res.status(400).json({ error: 'query обязателен' });
+  try {
+    res.json(await searchGeometryByText({
+      query: String(query).slice(0, 500),
+      limit: Math.min(Math.max(Number(limit) || 12, 1), 50),
+      origin: origin === 'manual' || origin === 'mccme' ? origin : null,
+      minCos: Number(min_cos) || 0.2,
+    }));
+  } catch (e) {
+    console.error('[geo/search]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /geo/reindex — запустить серверную переиндексацию геометрии
+ * (эмбеддинги через AI gateway, фоновая job). Защита X-Index-Token.
+ * body: { full? }  ·  прогресс: GET /geo/reindex/status
+ */
+app.post('/geo/reindex', (req, res) => {
+  if (!reindexGeometry) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  if (INDEX_TOKEN && req.get('X-Index-Token') !== INDEX_TOKEN) return res.status(401).json({ error: 'неверный токен' });
+  try {
+    res.json(reindexGeometry({ full: !!(req.body || {}).full }));
+  } catch (e) {
+    console.error('[geo/reindex]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/geo/reindex/status', (req, res) => {
+  if (!geoReindexStatus) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  if (INDEX_TOKEN && req.get('X-Index-Token') !== INDEX_TOKEN) return res.status(401).json({ error: 'неверный токен' });
+  res.json(geoReindexStatus());
+});
+
+/**
  * POST /geo/duplicates — дедуп «мои ↔ банк МЦНМО»: пары похожих задач
  * (своя задача × ближайшие соседи из банка). Считается на лету.
  * body: { min_cos?, per_task? }
@@ -1339,7 +1385,7 @@ app.post('/geo/duplicates', async (req, res) => {
   const { min_cos, per_task } = req.body || {};
   try {
     res.json(await findGeometryBankDuplicates({
-      minCos: Math.min(Math.max(Number(min_cos) || 0.87, 0.5), 0.999),
+      minCos: Math.min(Math.max(Number(min_cos) || 0.82, 0.5), 0.999),
       perTask: Math.min(Math.max(Number(per_task) || 3, 1), 10),
     }));
   } catch (e) {
