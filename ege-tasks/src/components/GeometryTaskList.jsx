@@ -37,6 +37,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
+import { sanitizeSvg } from '../utils/sanitizeSvg';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { useAuth } from '../contexts/AuthContext';
 import GeometryTaskEditor from './GeometryTaskEditor';
@@ -892,7 +893,7 @@ export default function GeometryTaskList() {
                       >
                         <div
                           // eslint-disable-next-line react/no-danger
-                          dangerouslySetInnerHTML={{ __html: record.drawing_svg }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeSvg(record.drawing_svg) }}
                           style={{ width: '100%', maxHeight: 124, overflow: 'hidden' }}
                         />
                       </div>

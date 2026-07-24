@@ -5,6 +5,7 @@ import {
 } from 'react-router-dom';
 import { Layout, Menu, ConfigProvider, Spin, Drawer, Button, Grid, Breadcrumb } from 'antd';
 import { hybridTheme } from './theme/hybrid';
+import ErrorBoundary from './components/ErrorBoundary';
 import {
   FileTextOutlined, FileSearchOutlined, BookOutlined, FileAddOutlined,
   UploadOutlined, PieChartOutlined, SolutionOutlined, EditOutlined,
@@ -849,9 +850,11 @@ function AppLayout() {
             background: '#fff',
             borderRadius: noMargin ? 0 : 8,
           }}>
-            <Suspense fallback={<LazyFallback />}>
-              <Outlet />
-            </Suspense>
+            <ErrorBoundary source="route" resetKeys={[location.pathname]}>
+              <Suspense fallback={<LazyFallback />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </Content>
       </Layout>

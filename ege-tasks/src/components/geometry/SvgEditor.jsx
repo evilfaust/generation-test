@@ -22,6 +22,7 @@ import {
   ggbXmlToSvg,
   parseGgbPoints,
 } from '../../utils/ggbToSvg';
+import { sanitizeSvg } from '../../utils/sanitizeSvg';
 
 const { Text } = Typography;
 
@@ -247,7 +248,7 @@ export default function SvgEditor({ xmlString, svgString, onSave, onCancel }) {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <div ref={containerRef} dangerouslySetInnerHTML={{ __html: currentSvg }} />
+        <div ref={containerRef} dangerouslySetInnerHTML={{ __html: sanitizeSvg(currentSvg) }} />
 
         {viewBox && (
           <svg

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button, Card, Input, Segmented, Space, Switch, Typography } from 'antd';
 import { ArrowLeftOutlined, PrinterOutlined } from '@ant-design/icons';
 import { api } from '../shared/services/pocketbase';
+import { sanitizeSvg } from '../utils/sanitizeSvg';
 import MathRenderer from './MathRenderer';
 import './GeometryWorksheetPrint.css';
 
@@ -89,7 +90,7 @@ function WorksheetTask({ task, index, showDrawing, drawingSize, layoutKey, textS
 
         {showDrawing && hasSvg && (
           <div className="geo-worksheet-task-drawing" style={drawingStyle}>
-            <div dangerouslySetInnerHTML={{ __html: task.drawing_svg }} style={{ lineHeight: 0 }} />
+            <div dangerouslySetInnerHTML={{ __html: sanitizeSvg(task.drawing_svg) }} style={{ lineHeight: 0 }} />
           </div>
         )}
         {showDrawing && hasImage && (

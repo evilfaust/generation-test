@@ -14,6 +14,7 @@ import {
 import GeoGebraApplet from '../GeoGebraApplet';
 import CropModal from '../shared/CropModal';
 import SvgEditor from './SvgEditor';
+import { sanitizeSvg } from '../../utils/sanitizeSvg';
 
 // ── Удаление фона: flood-fill от 4 углов с зоной защиты ─────────────────────
 async function toDataUrl(src) {
@@ -353,7 +354,7 @@ export default function TabDrawing({
             >
               <div
                 // eslint-disable-next-line react/no-danger
-                dangerouslySetInnerHTML={{ __html: drawingSvg }}
+                dangerouslySetInnerHTML={{ __html: sanitizeSvg(drawingSvg) }}
                 style={{ lineHeight: 0, maxHeight: 200, overflow: 'hidden' }}
               />
             </Card>

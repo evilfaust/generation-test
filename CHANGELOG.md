@@ -1,5 +1,30 @@
 # Changelog — История изменений
 
+## [3.9.126] - 2026-07-24
+
+### 🛡 Устойчивость и безопасность (Горизонт 1 из аудита приложения)
+
+- **Границы ошибок (ErrorBoundary).** Одна битая формула/задача/чертёж больше не
+  роняет весь интерфейс белым экраном. `components/ErrorBoundary.jsx` подключён на
+  двух уровнях: корень обоих приложений (`teacher/main.jsx`, `student/main.jsx`) и
+  вокруг `<Outlet/>` в `AppLayout` (`resetKeys={[location.pathname]}` → при переходе
+  на другой роут фолбэк сам гаснет). Фолбэк — дружелюбный экран с кнопками
+  «Попробовать снова» / «Обновить страницу».
+- **Глобальный учёт ошибок.** `shared/reportError.js` + `installGlobalErrorHandlers()`
+  ловит `window.onerror` и `unhandledrejection`. Единая точка для будущего
+  мониторинга (Sentry/бэкенд) — подключать туда.
+- **Санитайзинг SVG (закрыт вектор stored-XSS).** `utils/sanitizeSvg.js` на DOMPurify
+  (профиль svg) вырезает `<script>`, обработчики событий и `<foreignObject>`,
+  сохраняя геометрию. Применён ко всем недоверенным SVG-инжектам (банк МЦНМО,
+  SVG-редактор, GeoGebra→SVG): `GeometryTaskList`, `GeometryWorksheetPrint`,
+  `geometry/SvgEditor`, `geometry/TabDrawing`. Покрыт тестом `__tests__/sanitizeSvg.test.js`.
+- **Зависимости.** `npm audit fix` (без `--force`): 22 → 15 уязвимостей, все
+  критичные устранены (jspdf, vitest, ws) + прямые high (react-router-dom, js-yaml);
+  изменён только `package-lock.json`. Остаток — за major-апгрейдами, которые не
+  делаем (BlockNote 0.52 требует React 19, vite 8, excalidraw).
+- **Убран сторонний скрипт из прода.** Из `index.html` удалён случайный лефтовер
+  `mcp.figma.com/.../capture.js` (грузился на боевой учительской странице).
+
 ## [3.9.125] - 2026-07-13
 
 ### 🧠 Поиск геометрических задач по смыслу (NL) + миграция индекса на te3
