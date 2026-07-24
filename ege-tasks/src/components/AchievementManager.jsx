@@ -12,9 +12,12 @@ import AchievementBadge from './student/AchievementBadge';
 
 // ==================== CONSTANTS ====================
 
-const ALL_ICONS = Array.from({ length: 78 }, (_, i) =>
-  `icon${String(i + 1).padStart(3, '0')}.png`
-);
+// icon001–078 — png (071 отсутствует), icon079–089 — jpg
+const ALL_ICONS = [
+  ...Array.from({ length: 78 }, (_, i) => `icon${String(i + 1).padStart(3, '0')}.png`)
+    .filter((name) => name !== 'icon071.png'),
+  ...Array.from({ length: 11 }, (_, i) => `icon${String(i + 79).padStart(3, '0')}.jpg`),
+];
 
 const RARITY_COLORS = {
   common: 'green',
