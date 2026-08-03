@@ -2,6 +2,33 @@ import { pb, _logAudit, withOwner, andOwner } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
+// Название работы хранится копией в двух местах: в плане каникулярной программы
+// (study_program_items.title) и в заголовке выдачи (work_sessions.student_title).
+// После переименования работы подтягиваем те копии, которые совпадали со старым
+// названием — то есть были снимком, а не своей меткой, заданной учителем.
+async function syncWorkTitleSnapshots(workId, prevTitle, nextTitle) {
+  try {
+    const [items, sessions] = await Promise.all([
+      pb.collection('study_program_items').getFullList({
+        filter: `title = "${escapeFilter(prevTitle)}"`,
+      }).catch(() => []),
+      pb.collection('work_sessions').getFullList({
+        filter: `work = "${escapeFilter(workId)}" && student_title = "${escapeFilter(prevTitle)}"`,
+      }).catch(() => []),
+    ]);
+
+    await Promise.all([
+      ...items
+        .filter((it) => it.params?.workId === workId)
+        .map((it) => pb.collection('study_program_items').update(it.id, { title: nextTitle })),
+      ...sessions.map((s) => pb.collection('work_sessions').update(s.id, { student_title: nextTitle })),
+    ]);
+  } catch (error) {
+    // Не роняем переименование работы из-за синхронизации копий.
+    console.error('Error syncing work title snapshots:', error);
+  }
+}
+
 export const worksApi = {
   // ============ РАБОТЫ (WORKS) ============
 
@@ -156,10 +183,21 @@ export const worksApi = {
     }
   },
 
-  // Обновить работу
+  // Обновить работу. Название работы копируется в план каникулярной программы
+  // (study_program_items.title) и в заголовок выдачи (work_sessions.student_title) —
+  // при переименовании подтягиваем эти снимки, см. syncWorkTitleSnapshots.
   async updateWork(id, data) {
     try {
-      return await pb.collection('works').update(id, data);
+      let prevTitle = null;
+      if ('title' in data) {
+        const before = await pb.collection('works').getOne(id, { fields: 'id,title' }).catch(() => null);
+        prevTitle = before?.title || null;
+      }
+      const rec = await pb.collection('works').update(id, data);
+      if (prevTitle && rec.title && rec.title !== prevTitle) {
+        await syncWorkTitleSnapshots(id, prevTitle, rec.title);
+      }
+      return rec;
     } catch (error) {
       console.error('Error updating work:', error);
       throw error;
