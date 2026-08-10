@@ -12,6 +12,9 @@ import dayjs from 'dayjs';
 import { api } from '../../../shared/services/pocketbase';
 import { WorkspacePageHeader, Chip, GroupChip } from '../ui';
 import MaterialPickerModal from '../MaterialPickerModal';
+import {
+  computeCampaignProgress, lastActivityLabel, PACE, PACE_LABEL, PACE_TONE,
+} from './campaignProgress';
 
 const { Text, Paragraph } = Typography;
 
@@ -291,6 +294,79 @@ function BlockCard({ block, onEdit, onDelete }) {
   );
 }
 
+// ─── Сводка прогресса класса ──────────────────────────────────────────────────
+
+// Порядок чипов: сначала то, что требует реакции учителя.
+const PACE_ORDER = [PACE.NOT_STARTED, PACE.BEHIND, PACE.ON_TRACK, PACE.DONE];
+
+function ProgressSummary({ progress, reviewedCount, loading, onOpenStudent }) {
+  const { totals } = progress;
+  const pct = totals.works ? Math.round((totals.done / totals.works) * 100) : 0;
+  const dash = loading ? '…' : null;
+
+  const cells = [
+    { label: 'Учеников', value: totals.students },
+    { label: 'Есть программа', value: totals.withProgram },
+    { label: 'Приступили', value: dash ?? `${totals.startedStudents} из ${totals.withProgram}`, color: '#1677ff' },
+    { label: 'Сдано работ', value: dash ?? `${totals.done} из ${totals.works}`, color: '#52c41a' },
+    {
+      label: 'Решаемость',
+      value: dash ?? (totals.quality == null ? '—' : `${Math.round(totals.quality * 100)}%`),
+    },
+    { label: 'Проверено', value: reviewedCount },
+  ];
+
+  return (
+    <Card size="small" style={{ marginBottom: 16 }}>
+      <Space size={32} wrap style={{ width: '100%' }}>
+        {cells.map(({ label, value, color }) => (
+          <span key={label}>
+            <Text type="secondary" style={{ fontSize: 12 }}>{label}</Text><br />
+            <Text strong style={{ fontSize: 20, color }}>{value}</Text>
+          </span>
+        ))}
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <Progress
+            percent={pct}
+            size="small"
+            status={loading ? 'active' : 'normal'}
+            format={() => `${totals.done}/${totals.works} работ сдано`}
+          />
+        </div>
+      </Space>
+
+      {!loading && (totals.works > 0 || totals.notStarted.length > 0) && (
+        <Space size={8} wrap style={{ marginTop: 12 }}>
+          {PACE_ORDER.filter((p) => totals.pace[p] > 0).map((p) => (
+            <Chip key={p} tone={PACE_TONE[p]}>{PACE_LABEL[p]}: {totals.pace[p]}</Chip>
+          ))}
+          {totals.notStarted.length > 0 && (
+            <>
+              <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>Не приступили:</Text>
+              {totals.notStarted.slice(0, 8).map((s) => (
+                <Button key={s.id} size="small" type="link" style={{ padding: '0 4px', height: 22 }}
+                  onClick={() => onOpenStudent(s.id)}>
+                  {s.name}
+                </Button>
+              ))}
+              {totals.notStarted.length > 8 && (
+                <Text type="secondary" style={{ fontSize: 12 }}>ещё {totals.notStarted.length - 8}</Text>
+              )}
+            </>
+          )}
+        </Space>
+      )}
+
+      {!loading && totals.works === 0 && (
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+          Прогресс считается по выданным работам. В планах учеников их пока нет —
+          файлы, ссылки и устный счёт факта выполнения не оставляют.
+        </Text>
+      )}
+    </Card>
+  );
+}
+
 // ─── Главный компонент ────────────────────────────────────────────────────────
 
 export default function VacationCampaignDetail() {
@@ -306,6 +382,8 @@ export default function VacationCampaignDetail() {
   const [editOpen, setEditOpen]   = useState(false);
   const [creating, setCreating]   = useState(false);
   const [blockModal, setBlockModal] = useState({ open: false, block: null });
+  const [factData, setFactData] = useState(null);        // { items, attempts } — факт по выдачам
+  const [factLoading, setFactLoading] = useState(false);
   const saveTimer = useRef(null);
 
   // Блоки общего задания (из template_config)
@@ -334,6 +412,35 @@ export default function VacationCampaignDetail() {
   }, [campaignId, message]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Факт выполнения грузим вторым этапом — страница не ждёт его, чтобы отрисоваться.
+  const programIds = useMemo(
+    () => Object.values(programs).map((p) => p.id).sort().join(','),
+    [programs],
+  );
+
+  useEffect(() => {
+    if (!programIds) { setFactData(null); return undefined; }
+    let cancelled = false;
+    (async () => {
+      setFactLoading(true);
+      try {
+        const items = await api.getCampaignProgramItems(programIds.split(','));
+        const sessionIds = [...new Set(items.map((i) => i.session).filter(Boolean))];
+        const attempts = sessionIds.length
+          ? await api.getAttemptsBySessions(sessionIds, {
+            fields: 'id,session,status,score,total,submitted_at,created',
+          })
+          : [];
+        if (!cancelled) setFactData({ items, attempts });
+      } catch {
+        if (!cancelled) setFactData({ items: [], attempts: [] });
+      } finally {
+        if (!cancelled) setFactLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [programIds]);
 
   // Автосохранение блоков с debounce 800ms
   const saveBlocks = useCallback((nextBlocks) => {
@@ -416,14 +523,20 @@ export default function VacationCampaignDetail() {
     }
   };
 
-  const stats = useMemo(() => {
-    const total    = students.length;
-    const hasProgram = students.filter((s) => !!programs[s.id]).length;
-    const issued   = students.filter((s) => programs[s.id]?.status === 'issued').length;
-    const done     = students.filter((s) => programs[s.id]?.status === 'done').length;
-    const reviewed = students.filter((s) => !!programs[s.id]?.reviewed_at).length;
-    return { total, hasProgram, issued, done, reviewed };
-  }, [students, programs]);
+  // Прогресс = факт по выдачам (attempts), а не статус программы: его никто не двигает.
+  const progress = useMemo(() => computeCampaignProgress({
+    students,
+    programs,
+    items: factData?.items || [],
+    attempts: factData?.attempts || [],
+    campaign,
+    now: new Date(),
+  }), [students, programs, factData, campaign]);
+
+  const reviewedCount = useMemo(
+    () => students.filter((s) => !!programs[s.id]?.reviewed_at).length,
+    [students, programs],
+  );
 
   const group = useMemo(() => groups.find((g) => g.id === campaign?.group), [groups, campaign]);
 
@@ -431,15 +544,105 @@ export default function VacationCampaignDetail() {
     {
       title: 'Ученик',
       dataIndex: 'name',
+      fixed: 'left',
+      width: 200,
       render: (name) => <Text strong>{name}</Text>,
     },
     {
       title: 'Программа',
       key: 'status',
+      width: 110,
       render: (_, s) => {
         const prog = programs[s.id];
         if (!prog) return <Text type="secondary">Нет</Text>;
         return PROG_STATUS_TAG[prog.status] || <Tag>{prog.status}</Tag>;
+      },
+    },
+    {
+      title: 'Выполнено',
+      key: 'progress',
+      width: 170,
+      sorter: (a, b) => {
+        const ratio = (id) => {
+          const p = progress.byStudent[id];
+          return p?.works ? p.done / p.works : -1;
+        };
+        return ratio(a.id) - ratio(b.id);
+      },
+      render: (_, s) => {
+        if (factLoading) return <Text type="secondary">…</Text>;
+        const p = progress.byStudent[s.id];
+        if (!p || !p.works) return <Text type="secondary">—</Text>;
+        return (
+          <Tooltip title={p.inProgress ? `${p.inProgress} начато, но не сдано` : null}>
+            <Progress
+              percent={Math.round((p.done / p.works) * 100)}
+              size="small"
+              status={p.pace === PACE.BEHIND ? 'exception' : (p.done >= p.works ? 'success' : 'normal')}
+              format={() => `${p.done}/${p.works}${p.inProgress ? ` +${p.inProgress}` : ''}`}
+            />
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Темп',
+      key: 'pace',
+      width: 130,
+      sorter: (a, b) => {
+        const rank = { [PACE.NOT_STARTED]: 0, [PACE.BEHIND]: 1, [PACE.ON_TRACK]: 2, [PACE.DONE]: 3, [PACE.NO_PLAN]: 4 };
+        return (rank[progress.byStudent[a.id]?.pace] ?? 9) - (rank[progress.byStudent[b.id]?.pace] ?? 9);
+      },
+      render: (_, s) => {
+        if (factLoading) return <Text type="secondary">…</Text>;
+        const p = progress.byStudent[s.id];
+        if (!p || p.pace === PACE.NO_PLAN) return <Text type="secondary">—</Text>;
+        const hint = p.expected == null
+          ? 'Даты плана не заданы — темп относительно плана не считается'
+          : `Ожидалось к сегодня: ${p.expected} из ${p.works}`;
+        return (
+          <Tooltip title={hint}>
+            <span>
+              <Chip tone={PACE_TONE[p.pace]}>
+                {PACE_LABEL[p.pace]}{p.behindBy > 0 ? ` на ${p.behindBy}` : ''}
+              </Chip>
+            </span>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Решаемость',
+      key: 'quality',
+      width: 110,
+      sorter: (a, b) => (progress.byStudent[a.id]?.quality ?? -1) - (progress.byStudent[b.id]?.quality ?? -1),
+      render: (_, s) => {
+        if (factLoading) return <Text type="secondary">…</Text>;
+        const p = progress.byStudent[s.id];
+        if (!p || p.quality == null) return <Text type="secondary">—</Text>;
+        return (
+          <Tooltip title={`Верно ${p.correct} из ${p.answered} задач (лучшая попытка каждой работы)`}>
+            <Text strong>{Math.round(p.quality * 100)}%</Text>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Активность',
+      key: 'activity',
+      width: 120,
+      sorter: (a, b) => (progress.byStudent[a.id]?.lastActivity?.getTime() || 0)
+        - (progress.byStudent[b.id]?.lastActivity?.getTime() || 0),
+      render: (_, s) => {
+        if (factLoading) return <Text type="secondary">…</Text>;
+        const p = progress.byStudent[s.id];
+        const label = lastActivityLabel(p?.lastActivity);
+        if (!label) return <Text type="secondary">—</Text>;
+        return (
+          <Tooltip title={dayjs(p.lastActivity).format('D MMMM YYYY, HH:mm')}>
+            <Text type="secondary">{label}</Text>
+          </Tooltip>
+        );
       },
     },
     {
@@ -561,31 +764,14 @@ export default function VacationCampaignDetail() {
         )}
       </Card>
 
-      {/* ── Прогресс ── */}
+      {/* ── Прогресс класса ── */}
       {students.length > 0 && (
-        <Card size="small" style={{ marginBottom: 16 }}>
-          <Space size={32} wrap>
-            {[
-              { label: 'Учеников', value: stats.total },
-              { label: 'Есть программа', value: stats.hasProgram },
-              { label: 'Выдано', value: stats.issued, color: '#1677ff' },
-              { label: 'Сдано', value: stats.done, color: '#52c41a' },
-              { label: 'Проверено', value: stats.reviewed },
-            ].map(({ label, value, color }) => (
-              <span key={label}>
-                <Text type="secondary" style={{ fontSize: 12 }}>{label}</Text><br />
-                <Text strong style={{ fontSize: 20, color }}>{value}</Text>
-              </span>
-            ))}
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <Progress
-                percent={stats.total ? Math.round((stats.done / stats.total) * 100) : 0}
-                size="small"
-                format={() => `${stats.done}/${stats.total} сдано`}
-              />
-            </div>
-          </Space>
-        </Card>
+        <ProgressSummary
+          progress={progress}
+          reviewedCount={reviewedCount}
+          loading={factLoading}
+          onOpenStudent={(sid) => navigate(`/app/summer/${sid}?campaign=${campaignId}`)}
+        />
       )}
 
       {/* ── Индивидуальные задания (ростер) ── */}
@@ -624,6 +810,7 @@ export default function VacationCampaignDetail() {
             rowKey="id"
             pagination={false}
             size="small"
+            scroll={{ x: 1080 }}
           />
         )}
       </Card>

@@ -64,6 +64,31 @@ export const campaignsApi = {
     }
   },
 
+  // Элементы планов кампании (по списку программ) — для расчёта прогресса.
+  // Фильтруем по program, а не по program.campaign: список программ уже на руках,
+  // лишней зависимости от точечной нотации PB не заводим.
+  async getCampaignProgramItems(programIds = []) {
+    try {
+      if (!programIds.length) return [];
+      const CHUNK_SIZE = 40;
+      const chunks = [];
+      for (let i = 0; i < programIds.length; i += CHUNK_SIZE) {
+        chunks.push(programIds.slice(i, i + CHUNK_SIZE));
+      }
+      const results = await Promise.all(
+        chunks.map((chunk) => pb.collection('study_program_items').getFullList({
+          filter: chunk.map((id) => `program = "${escapeFilter(id)}"`).join(' || '),
+          fields: 'id,program,session,title,block_type,status,params',
+          sort: 'order',
+        })),
+      );
+      return results.flat();
+    } catch (err) {
+      console.error('getCampaignProgramItems:', err);
+      return [];
+    }
+  },
+
   // Пометить программу «проверена».
   async markReviewed(programId, reviewed) {
     return pb.collection('study_programs').update(programId, {

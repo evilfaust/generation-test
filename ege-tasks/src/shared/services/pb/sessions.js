@@ -144,7 +144,9 @@ export const sessionsApi = {
     }
   },
 
-  async getAttemptsBySessions(sessionIds = []) {
+  // fields по умолчанию — минимум для агрегатов; вызывающий может запросить больше
+  // (например статус и время сдачи для прогресса кампании).
+  async getAttemptsBySessions(sessionIds = [], { fields = 'id,session,score,total' } = {}) {
     try {
       if (!sessionIds.length) return [];
       const CHUNK_SIZE = 50;
@@ -155,7 +157,7 @@ export const sessionsApi = {
       const results = await Promise.all(
         chunks.map(chunk => {
           const filter = chunk.map(id => `session = "${escapeFilter(id)}"`).join(' || ');
-          return pb.collection('attempts').getFullList({ filter, fields: 'id,session,score,total' });
+          return pb.collection('attempts').getFullList({ filter, fields });
         })
       );
       return results.flat();
