@@ -75,6 +75,38 @@ function attemptTime(a) {
 }
 
 /**
+ * Факт по каждой выдаче: sessionId → { tries, done, inProgress, score, total, quality, at }.
+ * Нужен там, где разбирают план ОДНОГО ученика — какая работа сдана, какая начата,
+ * а к какой ученик не притрагивался. Логика лучшей попытки — та же, что в сводке.
+ */
+export function sessionFacts(attempts = []) {
+  const bySession = new Map();
+  for (const a of attempts) {
+    if (!a.session) continue;
+    if (!bySession.has(a.session)) bySession.set(a.session, []);
+    bySession.get(a.session).push(a);
+  }
+
+  const out = new Map();
+  for (const [sid, list] of bySession) {
+    const best = bestAttempt(list);
+    const last = list.reduce((m, a) => Math.max(m, attemptTime(a)), 0);
+    const score = best ? Number(best.score) || 0 : null;
+    const total = best ? Number(best.total) || 0 : null;
+    out.set(sid, {
+      tries: list.length,
+      done: !!best,
+      inProgress: !best,
+      score,
+      total,
+      quality: total ? score / total : null,
+      at: last ? new Date(last) : null,
+    });
+  }
+  return out;
+}
+
+/**
  * Сводка по кампании.
  *
  * @param {object[]} students  ученики группы (без external)

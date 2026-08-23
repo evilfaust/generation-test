@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeCampaignProgress, currentWeekIndex, lastActivityLabel, PACE,
+  computeCampaignProgress, currentWeekIndex, lastActivityLabel, sessionFacts, PACE,
 } from '../components/workspace/summer/campaignProgress';
 
 const CONFIG = { startDate: '2026-07-01', endDate: '2026-08-31' };
@@ -31,6 +31,32 @@ describe('currentWeekIndex', () => {
   it('без дат — null (темп не считаем)', () => {
     expect(currentWeekIndex(null, NOW)).toBeNull();
     expect(currentWeekIndex({ startDate: '2026-07-01' }, NOW)).toBeNull();
+  });
+});
+
+describe('sessionFacts', () => {
+  it('по каждой сессии отдаёт лучшую сданную попытку', () => {
+    const facts = sessionFacts([
+      attempt('se1', 'submitted', 4, 10, '2026-07-05T10:00:00Z'),
+      attempt('se1', 'submitted', 8, 10, '2026-07-06T10:00:00Z'),
+    ]);
+    const f = facts.get('se1');
+    expect(f.done).toBe(true);
+    expect(f.tries).toBe(2);
+    expect(f.score).toBe(8);
+    expect(f.total).toBe(10);
+    expect(f.quality).toBeCloseTo(0.8);
+  });
+
+  it('начатая, но не сданная попытка — inProgress, не done', () => {
+    const f = sessionFacts([attempt('se2', 'started', 0, 0, null)]).get('se2');
+    expect(f.done).toBe(false);
+    expect(f.inProgress).toBe(true);
+    expect(f.score).toBeNull();
+  });
+
+  it('сессия без попыток в карту не попадает', () => {
+    expect(sessionFacts([]).get('se3')).toBeUndefined();
   });
 });
 

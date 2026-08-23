@@ -14,12 +14,15 @@ import { useReferenceData } from '../../../contexts/ReferenceDataContext';
 import { useStudentWeaknessProfile } from '../../../hooks/useStudentWeaknessProfile';
 import { WEAK_STATUS } from '../../../shared/utils/weaknessProfile';
 import { summerWeeks, defaultSummerRange } from '../../../shared/utils/summerWeeks';
-import { WorkspacePageHeader, EmptyState, Chip } from '../ui';
+import { WorkspacePageHeader, EmptyState, Chip, SubmitChip } from '../ui';
 import MaterialPickerModal from '../MaterialPickerModal';
 import MathRenderer from '../../MathRenderer';
 import LatexField from '../../shared/LatexField';
 import SummerProgramPrintView from './SummerProgramPrintView';
 import { assembleSummerProgram, addExistingWorkItem, generateWorkItem } from './buildProgram';
+import {
+  computeCampaignProgress, sessionFacts, lastActivityLabel, PACE, PACE_LABEL, PACE_TONE,
+} from './campaignProgress';
 
 const { Text } = Typography;
 
@@ -85,7 +88,8 @@ export default function StudentProgramEditor() {
   const [preview, setPreview] = useState(false);       // drawer предпросмотра ученического вида
   const [memoOpen, setMemoOpen] = useState(false);     // модал «памятка ученику»
   const [printOpen, setPrintOpen] = useState(false);   // полноэкранная печать «красивого PDF»
-  const [doneSessions, setDoneSessions] = useState(() => new Set()); // сессии со сданной попыткой
+  const [attempts, setAttempts] = useState([]);        // попытки по выдачам этого плана
+  const [factLoading, setFactLoading] = useState(false);
   const [campaign, setCampaign] = useState(null);
 
   const { profile, loading: loadingProfile } = useStudentWeaknessProfile(student);
@@ -163,21 +167,86 @@ export default function StudentProgramEditor() {
     return () => { cancelled = true; };
   }, [studentId, year, loadItems, message]);
 
-  // Какие сессии ученик уже сдал (для «графика выполнения» в памятке).
+  // Факт выполнения: попытки по выдачам плана. Берём именно ПО СЕССИЯМ, а не по
+  // attempt.student — иначе теряются решения без входа в аккаунт (аноним по ссылке).
+  const sessionKey = useMemo(
+    () => [...new Set(items.map((i) => i.session).filter(Boolean))].sort().join(','),
+    [items],
+  );
+
   useEffect(() => {
-    if (!student?.id) { setDoneSessions(new Set()); return; }
+    if (!sessionKey) { setAttempts([]); return undefined; }
     let cancelled = false;
-    api.getAttemptsByStudentAll(student.id).then((atts) => {
-      if (cancelled) return;
-      const done = new Set(
-        (atts || [])
-          .filter((a) => a.status === 'submitted' || a.status === 'corrected')
-          .map((a) => a.session)
-      );
-      setDoneSessions(done);
-    }).catch(() => {});
+    setFactLoading(true);
+    api.getAttemptsBySessions(sessionKey.split(','), {
+      fields: 'id,session,status,score,total,submitted_at,created',
+    })
+      .then((atts) => { if (!cancelled) setAttempts(atts || []); })
+      .catch(() => { if (!cancelled) setAttempts([]); })
+      .finally(() => { if (!cancelled) setFactLoading(false); });
     return () => { cancelled = true; };
-  }, [student?.id, items]);
+  }, [sessionKey]);
+
+  // sessionId → факт (сдано / начато, баллы, когда).
+  const factBySession = useMemo(() => sessionFacts(attempts), [attempts]);
+
+  // Совместимость с памяткой и печатью — им нужен только Set сданных сессий.
+  const doneSessions = useMemo(
+    () => new Set([...factBySession].filter(([, f]) => f.done).map(([sid]) => sid)),
+    [factBySession],
+  );
+
+  // Блоки общего задания кампании (одинаковые у всех учеников класса).
+  const campaignBlocks = useMemo(() => campaign?.template_config?.blocks || [], [campaign]);
+
+  // Факт по общим блокам: сессия одна на весь класс, поэтому попытку этого ученика
+  // ищем по attempt.student (аноним по такой ссылке не атрибутируется — так и помечаем).
+  const [blockFacts, setBlockFacts] = useState(new Map());
+  const blockSessionKey = useMemo(
+    () => [...new Set(campaignBlocks.map((b) => b.session_id).filter(Boolean))].sort().join(','),
+    [campaignBlocks],
+  );
+
+  useEffect(() => {
+    if (!blockSessionKey || !student?.id) { setBlockFacts(new Map()); return undefined; }
+    let cancelled = false;
+    api.getAttemptsBySessions(blockSessionKey.split(','), {
+      fields: 'id,session,status,score,total,submitted_at,created,student',
+    })
+      .then((atts) => {
+        if (cancelled) return;
+        setBlockFacts(sessionFacts((atts || []).filter((a) => a.student === student.id)));
+      })
+      .catch(() => { if (!cancelled) setBlockFacts(new Map()); });
+    return () => { cancelled = true; };
+  }, [blockSessionKey, student?.id]);
+
+  // Сводка по ученику — тем же расчётом, что и в кампании (темп/решаемость/активность).
+  // config берём из state: даты каникул учитель может править прямо тут.
+  const fact = useMemo(() => {
+    if (!student || !program) return null;
+    const res = computeCampaignProgress({
+      students: [student],
+      programs: { [student.id]: { ...program, config } },
+      items,
+      attempts,
+      campaign,
+    });
+    return res.byStudent[student.id] || null;
+  }, [student, program, config, items, attempts, campaign]);
+
+  // Сдано/решается в пределах списка элементов (неделя, «вне недель»).
+  const weekFact = useCallback((list = []) => {
+    let total = 0; let done = 0; let inProgress = 0;
+    for (const it of list) {
+      if (!it.session) continue;
+      total += 1;
+      const f = factBySession.get(it.session);
+      if (f?.done) done += 1;
+      else if (f) inProgress += 1;
+    }
+    return { total, done, inProgress };
+  }, [factBySession]);
 
   const setBlock = (key, patch) =>
     setConfig((c) => ({ ...c, blocks: { ...c.blocks, [key]: { ...c.blocks[key], ...patch } } }));
@@ -414,6 +483,36 @@ export default function StudentProgramEditor() {
       ),
     },
     {
+      title: 'Статус', key: 'fact', width: 200,
+      render: (_, r) => {
+        if (!r.session) return <Text type="secondary" style={{ fontSize: 12 }}>без выдачи</Text>;
+        if (factLoading) return <Text type="secondary">…</Text>;
+        const f = factBySession.get(r.session);
+        if (!f) return <SubmitChip kind="none" title="Ученик не открывал работу">не приступал</SubmitChip>;
+        const when = f.at ? dayjs(f.at).format('D MMMM, HH:mm') : null;
+        if (!f.done) {
+          return (
+            <SubmitChip kind="in_progress" title={`Попытка начата, но не сдана${when ? ` · ${when}` : ''}`}>
+              решает
+            </SubmitChip>
+          );
+        }
+        return (
+          <Space size={6}>
+            <SubmitChip kind="passed" title={`Сдано${when ? ` ${when}` : ''}${f.tries > 1 ? ` · попыток: ${f.tries}` : ''}`}>
+              сдано
+            </SubmitChip>
+            {f.total ? (
+              <Text style={{ fontSize: 12 }}>
+                <Text strong>{f.score}/{f.total}</Text>{' '}
+                <Text type="secondary">{Math.round(f.quality * 100)}%</Text>
+              </Text>
+            ) : null}
+          </Space>
+        );
+      },
+    },
+    {
       title: 'Ссылка', key: 'link', width: 140,
       render: (_, r) => r.session ? (
         <Space size={6}>
@@ -479,8 +578,6 @@ export default function StudentProgramEditor() {
   if (loadingMeta) return <div style={{ textAlign: 'center', padding: 48 }}><Spin /></div>;
   if (!student) return <EmptyState title="Ученик не найден" />;
 
-  const campaignBlocks = campaign?.template_config?.blocks || [];
-
   if (printOpen) {
     return (
       <SummerProgramPrintView
@@ -535,6 +632,8 @@ export default function StudentProgramEditor() {
           <Text type="warning">У ученика не указан telegram_id — внешние результаты решу матчатся по имени (менее надёжно).</Text>
         </Card>
       )}
+
+      <StudentFactSummary fact={fact} loading={factLoading} />
 
       <Row gutter={16}>
         {/* Профиль слабостей */}
@@ -605,6 +704,51 @@ export default function StudentProgramEditor() {
         </Col>
       </Row>
 
+      {/* Общее задание класса — статус именно этого ученика */}
+      {campaignBlocks.length > 0 && (
+        <>
+          <Divider orientation="left" style={{ marginTop: 20 }}>Общее задание класса</Divider>
+          <Card size="small" styles={{ body: { padding: 12 } }}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {campaignBlocks.map((b) => {
+                const f = b.session_id ? blockFacts.get(b.session_id) : null;
+                return (
+                  <Space key={b.id} size={8} wrap>
+                    <Text strong>{b.title || 'Общее задание'}</Text>
+                    {!b.session_id ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>без выдачи</Text>
+                    ) : f?.done ? (
+                      <Space size={6}>
+                        <SubmitChip kind="passed" title={f.at ? `Сдано ${dayjs(f.at).format('D MMMM, HH:mm')}` : undefined}>
+                          сдано
+                        </SubmitChip>
+                        {f.total ? (
+                          <Text style={{ fontSize: 12 }}>
+                            <Text strong>{f.score}/{f.total}</Text>{' '}
+                            <Text type="secondary">{Math.round(f.quality * 100)}%</Text>
+                          </Text>
+                        ) : null}
+                      </Space>
+                    ) : f ? (
+                      <SubmitChip kind="in_progress">решает</SubmitChip>
+                    ) : (
+                      <SubmitChip kind="none" title="Нет попытки от этого ученика (решение без входа в аккаунт сюда не попадает)">
+                        не приступал
+                      </SubmitChip>
+                    )}
+                    {b.session_id && (
+                      <a href={buildStudentUrl(b.session_id)} target="_blank" rel="noreferrer">
+                        открыть <ExportOutlined />
+                      </a>
+                    )}
+                  </Space>
+                );
+              })}
+            </Space>
+          </Card>
+        </>
+      )}
+
       {/* Доска по неделям */}
       <Divider orientation="left" style={{ marginTop: 20 }}>План по неделям</Divider>
 
@@ -614,11 +758,22 @@ export default function StudentProgramEditor() {
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           {weeksInfo.map((w) => {
             const list = byWeek.get(w.week) || [];
+            const wk = weekFact(list);
             return (
               <Card
                 key={w.week}
                 size="small"
-                title={<Space><Chip tone="blue" dot={false}>Неделя {w.week}</Chip><Text type="secondary">{w.label}</Text></Space>}
+                title={
+                  <Space>
+                    <Chip tone="blue" dot={false}>Неделя {w.week}</Chip>
+                    <Text type="secondary">{w.label}</Text>
+                    {wk.total > 0 && !factLoading && (
+                      <Chip tone={wk.done === wk.total ? 'teal' : (wk.done || wk.inProgress ? 'amber' : 'neutral')}>
+                        сдано {wk.done} из {wk.total}
+                      </Chip>
+                    )}
+                  </Space>
+                }
                 extra={
                   <Space size={4}>
                     <Button size="small" icon={<PaperClipOutlined />} onClick={() => setWeekPicker(w.week)}>Файл недели</Button>
@@ -643,7 +798,18 @@ export default function StudentProgramEditor() {
           })}
 
           {leftover.length > 0 && (
-            <Card size="small" title={<Text type="secondary">Вне недель</Text>} styles={{ body: { padding: 0 } }}>
+            <Card
+              size="small"
+              title={
+                <Space>
+                  <Text type="secondary">Вне недель</Text>
+                  {!factLoading && weekFact(leftover).total > 0 && (
+                    <Chip tone="neutral">сдано {weekFact(leftover).done} из {weekFact(leftover).total}</Chip>
+                  )}
+                </Space>
+              }
+              styles={{ body: { padding: 0 } }}
+            >
               <Table size="small" rowKey="id" columns={itemColumns} dataSource={leftover} pagination={false} showHeader={false} />
             </Card>
           )}
@@ -717,6 +883,68 @@ export default function StudentProgramEditor() {
         }}
       />
     </div>
+  );
+}
+
+// ─── Сводка выполнения по ученику (тот же язык, что в списке кампании) ───────
+function StudentFactSummary({ fact, loading }) {
+  if (!fact) return null;
+  const dash = loading ? '…' : null;
+  const activity = lastActivityLabel(fact.lastActivity);
+  const pct = fact.works ? Math.round((fact.done / fact.works) * 100) : 0;
+
+  if (!fact.works && !loading) {
+    return (
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Выполнение считается по выданным работам. В плане их пока нет — файлы, ссылки
+          и устный счёт факта выполнения не оставляют.
+        </Text>
+      </Card>
+    );
+  }
+
+  const cells = [
+    { label: 'Сдано работ', value: dash ?? `${fact.done} из ${fact.works}`, color: '#52c41a' },
+    ...(fact.inProgress > 0 ? [{ label: 'Решает сейчас', value: fact.inProgress, color: '#1677ff' }] : []),
+    { label: 'Решаемость', value: dash ?? (fact.quality == null ? '—' : `${Math.round(fact.quality * 100)}%`) },
+    { label: 'Активность', value: dash ?? (activity || '—') },
+  ];
+
+  return (
+    <Card size="small" style={{ marginBottom: 16 }}>
+      <Space size={32} wrap style={{ width: '100%' }}>
+        {cells.map(({ label, value, color }) => (
+          <span key={label}>
+            <Text type="secondary" style={{ fontSize: 12 }}>{label}</Text><br />
+            <Text strong style={{ fontSize: 20, color }}>{value}</Text>
+          </span>
+        ))}
+        <span>
+          <Text type="secondary" style={{ fontSize: 12 }}>Темп</Text><br />
+          {loading ? <Text strong style={{ fontSize: 20 }}>…</Text> : (
+            <Tooltip title={fact.expected == null
+              ? 'Даты каникул не заданы — темп относительно плана не считается'
+              : `Ожидалось к сегодня: ${fact.expected} из ${fact.works}`}
+            >
+              <span style={{ display: 'inline-block', marginTop: 4 }}>
+                <Chip tone={PACE_TONE[fact.pace]}>
+                  {PACE_LABEL[fact.pace]}{fact.behindBy > 0 ? ` на ${fact.behindBy}` : ''}
+                </Chip>
+              </span>
+            </Tooltip>
+          )}
+        </span>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <Progress
+            percent={pct}
+            size="small"
+            status={loading ? 'active' : (fact.pace === PACE.BEHIND ? 'exception' : (fact.done >= fact.works ? 'success' : 'normal'))}
+            format={() => `${fact.done}/${fact.works} работ сдано`}
+          />
+        </div>
+      </Space>
+    </Card>
   );
 }
 
