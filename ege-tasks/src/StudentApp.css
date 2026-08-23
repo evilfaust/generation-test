@@ -131,6 +131,10 @@
   color: #666 !important;
 }
 
+.student-theme-dark .student-home-legal {
+  color: #5c5c5c;
+}
+
 /* ---- Auth page ---- */
 .student-theme-dark .student-auth-title {
   color: #f0f0f0 !important;
@@ -630,6 +634,19 @@
   text-align: center;
   color: #8b90a3;
   font-size: 13px;
+}
+
+.student-home-legal {
+  margin-top: 16px;
+  text-align: center;
+  color: #a0a4b8;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.student-home-legal a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 /* ---- Логотип ---- */

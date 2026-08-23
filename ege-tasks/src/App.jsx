@@ -781,6 +781,15 @@ function AppLayout() {
           v{APP_VERSION}
         </span>
       )}
+      <a
+        href="https://github.com/evilfaust/lemma"
+        target="_blank"
+        rel="noreferrer"
+        title="Lemma © 2026 Oleg Pavlyuchenko. Лицензия AGPL-3.0 — исходный код открыт"
+        style={{ fontSize: 9, lineHeight: 1, color: '#d9d9d9', letterSpacing: 0.2, textDecoration: 'none' }}
+      >
+        © Oleg Pavlyuchenko · AGPL-3.0
+      </a>
     </div>
   );
 

@@ -22,10 +22,11 @@ const FooterV2 = () => (
     {/* Footer */}
     <footer className="v2-footer">
       <div className="v2-container v2-footer-inner">
-        <span>Lemma &copy; {new Date().getFullYear()} • v{APP_VERSION}</span>
-        <div style={{ display: 'flex', gap: '1.5rem' }}>
+        <span>Lemma &copy; {new Date().getFullYear()} Oleg Pavlyuchenko • v{APP_VERSION}</span>
+        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
           <a href="https://oipav.ru" className="v2-footer-link">oipav.ru</a>
           <a href="https://github.com/evilfaust/lemma" className="v2-footer-link">github.com/evilfaust/lemma</a>
+          <a href="https://github.com/evilfaust/lemma/blob/main/LICENSE" className="v2-footer-link">AGPL-3.0</a>
         </div>
       </div>
     </footer>

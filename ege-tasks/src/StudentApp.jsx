@@ -250,6 +250,12 @@ function StudentHomeLanding({ isDark, onToggleTheme, student, authChecked, onAut
           </div>
         )}
       </div>
+      <div className="student-home-legal">
+        Lemma &copy; 2026 Oleg Pavlyuchenko ·{' '}
+        <a href="https://github.com/evilfaust/lemma" target="_blank" rel="noreferrer">
+          AGPL-3.0, исходный код
+        </a>
+      </div>
       {student && navBar}
     </div>
   );
