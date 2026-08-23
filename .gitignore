@@ -27,7 +27,6 @@ QUICK_START.md
 RASPBERRY_SERVICE.md
 SCHEMA_GEOMETRY.md
 SDAMGIA_TABLE_PARSING.md
-START_GUIDE.md
 TEST_AND_COMMIT.md
 plan.md
 lemma_vector_search_idea.md
@@ -114,3 +113,11 @@ oge-*-result.json
 import-*-created-ids.txt
 *-import-result.json
 *-repair-result.json
+
+# ── Дизайн-хэндофы (локальные рабочие материалы) ─────────────────────────────
+# Макеты .dc.html + support.js, по которым делались редизайны разделов.
+# В публичном репозитории им не место — нужны только на машине автора.
+design_handoff_*/
+
+# ── Исторические планы реализованных фич ─────────────────────────────────────
+SDAMGIA_PART2_PLAN.md
