@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import {
   BrowserRouter, Routes, Route, Navigate,
   useNavigate, useLocation, useParams, useSearchParams, Outlet,
@@ -14,6 +14,7 @@ import {
   FormOutlined, QrcodeOutlined, PictureOutlined, HeatMapOutlined,
   BranchesOutlined, CreditCardOutlined, RadarChartOutlined, KeyOutlined,
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
+  MenuFoldOutlined, MenuUnfoldOutlined, TableOutlined, FileMarkdownOutlined,
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
   PercentageOutlined, HomeOutlined, CalendarOutlined,
 } from '@ant-design/icons';
@@ -48,6 +49,8 @@ const TaskCatalogManager = lazy(() => import('./components/TaskCatalogManager'))
 const TheoryBrowser = lazy(() => import('./components/TheoryBrowser'));
 const TheoryEditor = lazy(() => import('./components/TheoryEditor'));
 const ExcalidrawSection = lazy(() => import('./components/ExcalidrawSection'));
+const GristSection = lazy(() => import('./components/lab/GristSection'));
+const HedgeDocSection = lazy(() => import('./components/lab/HedgeDocSection'));
 const TheoryArticleView = lazy(() => import('./components/TheoryArticleView'));
 const TheoryCategoryManager = lazy(() => import('./components/TheoryCategoryManager'));
 const TheoryPrintBuilder = lazy(() => import('./components/TheoryPrintBuilder'));
@@ -113,6 +116,7 @@ const { Header, Content, Sider } = Layout;
 // Версия приложения (впекается при сборке из package.json через vite define)
 /* global __APP_VERSION__ */
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
+const SIDER_COLLAPSED_KEY = 'lemma-sider-collapsed';
 
 // ── Route path constants ────────────────────────────────────────────────────
 export const R = {
@@ -202,6 +206,8 @@ export const R = {
   LISTOK_EDIT:         '/app/listki/:sheetId/edit',
   // Лаборатория
   EXCALIDRAW:          '/app/lab/excalidraw',
+  LAB_GRIST:           '/app/lab/grist',
+  LAB_PAD:             '/app/lab/pad',
   // Администрирование
   ADMIN_USERS:         '/app/admin/users',
   ADMIN_AUDIT:         '/app/admin/audit',
@@ -300,6 +306,8 @@ const ROUTE_META = [
   { re: /^\/app\/listki\/[^/]+$/,          menuKey: 'listki', menuGroup: 'listki', title: 'Листки — Просмотр' },
   { re: /^\/app\/listki$/,                 menuKey: 'listki', menuGroup: 'listki', title: 'Листки' },
   { re: /^\/app\/lab\/excalidraw/,         menuKey: 'excalidraw',       menuGroup: 'lab', title: 'Excalidraw', noMargin: true },
+  { re: /^\/app\/lab\/grist/,              menuKey: 'lab-grist',        menuGroup: 'lab', title: 'Grist — таблицы', noMargin: true },
+  { re: /^\/app\/lab\/pad/,                menuKey: 'lab-pad',          menuGroup: 'lab', title: 'HedgeDoc — заметки', noMargin: true },
   { re: /^\/app\/admin\/users/,            menuKey: 'admin-users',      menuGroup: 'admin-group', title: 'Управление пользователями' },
   { re: /^\/app\/admin\/audit/,            menuKey: 'admin-audit',      menuGroup: 'admin-group', title: 'Журнал действий' },
 ];
@@ -369,6 +377,8 @@ const MENU_KEY_PATH = {
   'theory-categories':      R.THEORY_CATEGORIES,
   'listki':                 R.LISTKI,
   excalidraw:               R.EXCALIDRAW,
+  'lab-grist':              R.LAB_GRIST,
+  'lab-pad':                R.LAB_PAD,
   'admin-users':            R.ADMIN_USERS,
   'admin-audit':            R.ADMIN_AUDIT,
 };
@@ -581,6 +591,18 @@ function AppLayout() {
   const isDesktop = !!screens.lg;
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [openKeys, setOpenKeys] = useState([]);
+  // Свёрнутое боковое меню (десктоп): состояние переживает перезагрузку
+  const [siderCollapsed, setSiderCollapsed] = useState(() => {
+    try { return localStorage.getItem(SIDER_COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+
+  const toggleSider = useCallback(() => {
+    setSiderCollapsed((v) => {
+      const next = !v;
+      try { localStorage.setItem(SIDER_COLLAPSED_KEY, next ? '1' : '0'); } catch { /* private mode */ }
+      return next;
+    });
+  }, []);
 
   useVersionSync();
 
@@ -729,6 +751,8 @@ function AppLayout() {
       key: 'lab', icon: <EditOutlined />, label: 'Лаборатория', section: 'lab',
       children: [
         { key: 'excalidraw', icon: <EditOutlined />, label: 'Excalidraw' },
+        { key: 'lab-grist', icon: <TableOutlined />, label: 'Grist — таблицы' },
+        { key: 'lab-pad', icon: <FileMarkdownOutlined />, label: 'HedgeDoc — заметки' },
       ],
     },
     {
@@ -757,11 +781,13 @@ function AppLayout() {
   };
   const menuItems = allMenuItems.map(filterMenuItem).filter(Boolean);
 
+  const menuCollapsed = isDesktop && siderCollapsed;
+
   const menuEl = (
     <Menu
       mode="inline"
       selectedKeys={menuKey ? [menuKey] : []}
-      openKeys={openKeys}
+      openKeys={menuCollapsed ? [] : openKeys}
       onOpenChange={setOpenKeys}
       items={menuItems}
       onClick={handleMenuClick}
@@ -769,34 +795,54 @@ function AppLayout() {
     />
   );
 
+  // В свёрнутом виде подписи прячем, но ссылка на исходники остаётся на самом
+  // логотипе (title + href) — это выполнение §13 AGPL, убирать её нельзя.
   const logo = (
     <div style={{
       minHeight: 64, display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: '8px 16px 6px', flexShrink: 0, gap: 2,
+      justifyContent: 'center', padding: menuCollapsed ? '8px 4px 6px' : '8px 16px 6px',
+      flexShrink: 0, gap: 2,
     }}>
-      <img src="/lemma-logo-new.png" alt="Lemma"
-        style={{ height: 38, width: 'auto', borderRadius: 6 }} />
-      {APP_VERSION && (
-        <span style={{ fontSize: 10, lineHeight: 1, color: '#bfbfbf', letterSpacing: 0.2 }}>
-          v{APP_VERSION}
-        </span>
-      )}
       <a
         href="https://github.com/evilfaust/lemma"
         target="_blank"
         rel="noreferrer"
-        title="Lemma © 2026 Oleg Pavlyuchenko. Лицензия AGPL-3.0 — исходный код открыт"
-        style={{ fontSize: 9, lineHeight: 1, color: '#d9d9d9', letterSpacing: 0.2, textDecoration: 'none' }}
+        title={`Lemma${APP_VERSION ? ` v${APP_VERSION}` : ''} © 2026 Oleg Pavlyuchenko. Лицензия AGPL-3.0 — исходный код открыт`}
+        style={{ display: 'flex', lineHeight: 0 }}
       >
-        © Oleg Pavlyuchenko · AGPL-3.0
+        <img src="/lemma-logo-new.png" alt="Lemma"
+          style={{ height: menuCollapsed ? 28 : 38, width: 'auto', borderRadius: 6 }} />
       </a>
+      {!menuCollapsed && APP_VERSION && (
+        <span style={{ fontSize: 10, lineHeight: 1, color: '#bfbfbf', letterSpacing: 0.2 }}>
+          v{APP_VERSION}
+        </span>
+      )}
+      {!menuCollapsed && (
+        <a
+          href="https://github.com/evilfaust/lemma"
+          target="_blank"
+          rel="noreferrer"
+          title="Lemma © 2026 Oleg Pavlyuchenko. Лицензия AGPL-3.0 — исходный код открыт"
+          style={{ fontSize: 9, lineHeight: 1, color: '#d9d9d9', letterSpacing: 0.2, textDecoration: 'none' }}
+        >
+          © Oleg Pavlyuchenko · AGPL-3.0
+        </a>
+      )}
     </div>
   );
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {isDesktop && (
-        <Sider width={220} style={{ background: '#fff', boxShadow: '2px 0 8px rgba(0,0,0,0.05)' }}>
+        <Sider
+          width={220}
+          collapsible
+          collapsed={siderCollapsed}
+          collapsedWidth={64}
+          trigger={null}
+          style={{ background: '#fff', boxShadow: '2px 0 8px rgba(0,0,0,0.05)' }}
+        >
           {logo}
           {menuEl}
         </Sider>
@@ -828,6 +874,18 @@ function AppLayout() {
               type="text"
               icon={<MenuOutlined style={{ fontSize: 20 }} />}
               onClick={() => setMobileDrawerOpen(true)}
+              style={{ flexShrink: 0, width: 40, height: 40 }}
+            />
+          )}
+          {isDesktop && (
+            <Button
+              type="text"
+              aria-label={siderCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
+              title={siderCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
+              icon={siderCollapsed
+                ? <MenuUnfoldOutlined style={{ fontSize: 18 }} />
+                : <MenuFoldOutlined style={{ fontSize: 18 }} />}
+              onClick={toggleSider}
               style={{ flexShrink: 0, width: 40, height: 40 }}
             />
           )}
@@ -977,6 +1035,16 @@ function App() {
               <Route path={R.EXCALIDRAW} element={
                 <Suspense fallback={<LazyFallback />}>
                   <ExcalidrawSection />
+                </Suspense>
+              } />
+              <Route path={R.LAB_GRIST} element={
+                <Suspense fallback={<LazyFallback />}>
+                  <GristSection />
+                </Suspense>
+              } />
+              <Route path={R.LAB_PAD} element={
+                <Suspense fallback={<LazyFallback />}>
+                  <HedgeDocSection />
                 </Suspense>
               } />
             </Route>

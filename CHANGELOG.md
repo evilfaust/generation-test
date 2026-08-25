@@ -1,5 +1,52 @@
 # Changelog — История изменений
 
+## [3.9.132] - 2026-08-25
+
+### 🧪 Лаборатория: Grist (таблицы) и HedgeDoc (совместные заметки) на малине
+
+Два self-hosted сервиса рядом с учительским фронтом, встроены в раздел
+«Лаборатория» через iframe-обёртку.
+
+- **Малина** (Pi 4, 2 ГБ): отдельный стек `/opt/docker/lab/docker-compose.yml`
+  (`lab-grist`, `lab-hedgedoc`, `lab-pg`) — намеренно НЕ в основном
+  `docker-compose.yml`, чтобы `up -d` не задевал боевой nginx. Сеть —
+  внешняя `docker_default`, наружу порты не публикуются. `mem_limit`
+  800/500/256 МБ. Расход в покое: Grist 195 МБ, HedgeDoc 117 МБ, PG 57 МБ.
+- **zram-swap 1,1 ГБ** (`zram-tools`, PERCENT=60) — раньше swap не было вовсе,
+  и OOM-killer при нехватке памяти мог прибить nginx вместе с l.oipav.ru.
+- **Grist**: аутентификации у OSS-версии нет, поэтому личность приходит из
+  заголовка — `GRIST_FORWARD_AUTH_HEADER=x-forwarded-user` + обязательный
+  `GRIST_IGNORE_SESSION=true` (без него Grist держит анонимную сессию и не
+  пускает даже после `/auth/login`). Заголовок проставляет nginx из логина
+  basic-auth и всегда перезаписывает — иначе личность подделывается запросом.
+  Песочница — `pyodide`: gvisor на arm64 недоступен.
+- **HedgeDoc** 1.12 на Postgres 16, свои учётки (`bin/manage_users`),
+  саморегистрация закрыта. `CMD_CSP_ALLOW_FRAMING=true` для встраивания,
+  домен фрейминга ограничен в nginx (`frame-ancestors 'self' https://l.oipav.ru`).
+- **nginx**: `proxy_set_header Authorization ""` в grist-локации — обязательно.
+  Иначе Grist принимает заголовок basic-auth за свой API-ключ и отвечает
+  401 «unsupported Authorization scheme, expected 'Bearer'», хотя nginx
+  аутентификацию уже прошёл. Сертификаты Let's Encrypt выпущены на оба
+  домена (`enable-tls.sh`), фрейминг ограничен `frame-ancestors 'self'
+  https://l.oipav.ru`.
+- **Бэкап** (`/opt/docker/lab/lab-backup.sh`, cron 02:40): Grist-базы через
+  `sqlite3 .backup` (открыты сервисом), `pg_dump` HedgeDoc, uploads через
+  `docker cp` (0700 под контейнерным uid), `.env`+htpasswd. Локально 7,
+  S3 `tws3:math-lemma/lab` 14. До этого данные малины offsite не уезжали.
+- **Фронт**: `components/lab/LabEmbed.jsx` — обёртка с «во весь экран»,
+  «в новой вкладке» и перезагрузкой; `GristSection` / `HedgeDocSection` как
+  lazy-роуты `/app/lab/grist` и `/app/lab/pad`. Адреса — через
+  `VITE_LAB_GRIST_URL` / `VITE_LAB_PAD_URL`.
+
+### 🎛 Сворачиваемое левое меню
+
+- `Sider` стал `collapsible` (220 ⇄ 64 px), триггер — кнопка в шапке рядом с
+  хлебными крошками; встроенный нижний триггер не годится, меню слишком
+  длинное и он перекрывал бы пункты. Состояние живёт в localStorage.
+- В свёрнутом виде `openKeys` передаётся пустым (иначе antd ругается на
+  inline-collapsed) и прячутся подписи. Ссылка на исходники по §13 AGPL
+  остаётся доступной — переезжает на сам логотип (href + title).
+
 ## [3.9.131] - 2026-08-23
 
 ### 🐛 Главная ученического: футер уехал вбок
