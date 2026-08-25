@@ -132,7 +132,7 @@
 }
 
 .student-theme-dark .student-home-legal {
-  color: #5c5c5c;
+  color: #787d91;
 }
 
 /* ---- Auth page ---- */
@@ -547,6 +547,7 @@
   min-height: 100vh;
   padding: 20px 16px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background:
@@ -558,6 +559,7 @@
 .student-home-card {
   width: 100%;
   max-width: 420px;
+  flex-shrink: 0;
   border-radius: 24px;
   padding: 28px 20px 22px;
   background: rgba(255, 255, 255, 0.9);
@@ -637,9 +639,12 @@
 }
 
 .student-home-legal {
+  width: 100%;
+  max-width: 420px;
+  flex-shrink: 0;
   margin-top: 16px;
   text-align: center;
-  color: #a0a4b8;
+  color: #666b7e;
   font-size: 11px;
   line-height: 1.5;
 }
