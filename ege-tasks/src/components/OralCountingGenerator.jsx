@@ -30,6 +30,7 @@ const CATEGORY_ORDER = [
   'mulPow10',
   'decimalDiv',
   'decimalSimple',
+  'negSigns',
 ];
 
 

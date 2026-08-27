@@ -301,6 +301,162 @@ function genDecimalSimple() {
   return { exprLatex, resultLatex };
 }
 
+// Категория 11: минусы и скобки
+// Цепочки знаков: вычитание отрицательного, произведение/частное двух
+// отрицательных дробей, внешний унарный минус перед всей скобкой.
+// В каждом задании минимум два минуса, обычно три-четыре:
+//   -7/8 : (-14/8),   -3/4 - (-2,25),   -(-7/8 : (-14/8))
+
+// Рациональные числа — пара [числитель, знаменатель > 0]
+function ratNeg([n, d])         { return [-n, d]; }
+function ratAdd([a, b], [c, d]) { return reduceFrac(a * d + c * b, b * d); }
+function ratSub(x, y)           { return ratAdd(x, ratNeg(y)); }
+function ratMul([a, b], [c, d]) { return reduceFrac(a * c, b * d); }
+function ratDiv([a, b], [c, d]) { return c === 0 ? null : reduceFrac(a * d, b * c); }
+
+// Конечная десятичная запись? (знаменатель раскладывается только на 2 и 5)
+function isTerminating(d) {
+  let x = Math.abs(d);
+  while (x % 2 === 0) x /= 2;
+  while (x % 5 === 0) x /= 5;
+  return x === 1;
+}
+
+// Десятичные с «круглым» знаменателем — чтобы и ответ был десятичным
+const NEG_DECIMALS = [
+  { tex: '0{,}5',  n: 1, d: 2 },
+  { tex: '1{,}5',  n: 3, d: 2 },
+  { tex: '2{,}5',  n: 5, d: 2 },
+  { tex: '3{,}5',  n: 7, d: 2 },
+  { tex: '0{,}25', n: 1, d: 4 },
+  { tex: '0{,}75', n: 3, d: 4 },
+  { tex: '1{,}25', n: 5, d: 4 },
+  { tex: '2{,}25', n: 9, d: 4 },
+  { tex: '0{,}2',  n: 1, d: 5 },
+  { tex: '0{,}4',  n: 2, d: 5 },
+  { tex: '1{,}2',  n: 6, d: 5 },
+  { tex: '1{,}8',  n: 9, d: 5 },
+];
+
+const NEG_FRAC_DENS = [2, 3, 4, 5, 6, 8];
+const DEC_FRAC_DENS = [2, 4, 5, 10];    // дроби с конечной десятичной записью
+const SUB_FRAC_DENS = [2, 3, 4, 6];     // НОК любых двух ≤ 12 → ответ «красивый»
+
+// Отрицательный терм в скобках: (-6) / \left(-\dfrac{3}{4}\right)
+function negParen(tex, isFrac) {
+  return isFrac ? `\\left(-${tex}\\right)` : `(-${tex})`;
+}
+
+// -a/b : (-ak/b) → 1/k  (общий знаменатель, вторая дробь несокращённая)
+function negDivFracs() {
+  const b = rand(NEG_FRAC_DENS);
+  const a = rand(coprimeNumerators(b));
+  const k = rand([2, 3, 4]);
+  if ((a * k) % b === 0) return null;   // иначе вторая дробь — целое (2/2, 6/3)
+  const flip = Math.random() < 0.5;
+  const f1 = flip ? [a * k, b] : [a, b];
+  const f2 = flip ? [a, b] : [a * k, b];
+  const tex = `-\\dfrac{${f1[0]}}{${f1[1]}} : ${negParen(`\\dfrac{${f2[0]}}{${f2[1]}}`, true)}`;
+  return { tex, val: ratDiv(ratNeg(f1), ratNeg(f2)), decimal: false };
+}
+
+// -a/b · (-b/c) → a/c
+function negMulFracs() {
+  const b = rand(NEG_FRAC_DENS);
+  const c = rand(NEG_FRAC_DENS.filter(x => x !== b));
+  const a = randInt(1, 9);
+  // отбрасываем дроби, равные целому: -6/2 · (-2/5)
+  if (a % b === 0 || b % c === 0) return null;
+  const tex = `-\\dfrac{${a}}{${b}} \\cdot ${negParen(`\\dfrac{${b}}{${c}}`, true)}`;
+  return { tex, val: ratMul(ratNeg([a, b]), ratNeg([b, c])), decimal: false };
+}
+
+// Десятичные: -3/4 - (-2,25) / -1,5 + (-0,25) / -7 - (-2,5)
+function negSubDecimal() {
+  const y = rand(NEG_DECIMALS);
+  const yVal = [y.n, y.d];
+  const yTex = negParen(y.tex, false);
+  const op = Math.random() < 0.65 ? '-' : '+';
+  const apply = (x) => (op === '-' ? ratSub(x, ratNeg(yVal)) : ratAdd(x, ratNeg(yVal)));
+  const kind = rand(['frac', 'dec', 'int']);
+
+  if (kind === 'frac') {
+    const b = rand(DEC_FRAC_DENS);
+    const a = rand(coprimeNumerators(b));
+    const tex = `-\\dfrac{${a}}{${b}} ${op} ${yTex}`;
+    return { tex, val: apply(ratNeg([a, b])), decimal: true };
+  }
+  if (kind === 'dec') {
+    const x = rand(NEG_DECIMALS);
+    const tex = `-${x.tex} ${op} ${yTex}`;
+    return { tex, val: apply(ratNeg([x.n, x.d])), decimal: true };
+  }
+  const n = randInt(2, 12);
+  const tex = `-${n} ${op} ${yTex}`;
+  return { tex, val: apply([-n, 1]), decimal: true };
+}
+
+// -a/b - (-c/d) → обыкновенная дробь
+function negSubFracs() {
+  const b = rand(SUB_FRAC_DENS);
+  const d = Math.random() < 0.5 ? b : rand(SUB_FRAC_DENS);
+  const a = rand(coprimeNumerators(b));
+  const c = rand(coprimeNumerators(d));
+  const op = Math.random() < 0.6 ? '-' : '+';
+  const x = ratNeg([a, b]);
+  const y = ratNeg([c, d]);
+  const val = op === '-' ? ratSub(x, y) : ratAdd(x, y);
+  const tex = `-\\dfrac{${a}}{${b}} ${op} ${negParen(`\\dfrac{${c}}{${d}}`, true)}`;
+  return { tex, val, decimal: false };
+}
+
+// Цепочки минусов на целых и десятичных
+function negIntChain() {
+  const kind = rand(['triple', 'mul', 'sub', 'decMix']);
+  if (kind === 'triple') {
+    const a = randInt(2, 15);
+    return { tex: `-\\left(-(-${a})\\right)`, val: [-a, 1], decimal: true };
+  }
+  if (kind === 'mul') {
+    const a = randInt(2, 9);
+    const b = randInt(2, 9);
+    return { tex: `-(-${a}) \\cdot (-${b})`, val: [-a * b, 1], decimal: true };
+  }
+  if (kind === 'sub') {
+    const a = randInt(2, 15);
+    const b = randInt(2, 15);
+    return { tex: `-(-${a}) - (-${b})`, val: [a + b, 1], decimal: true };
+  }
+  const x = rand(NEG_DECIMALS);
+  const n = randInt(2, 9);
+  return { tex: `-(-${x.tex}) - ${n}`, val: ratSub([x.n, x.d], [n, 1]), decimal: true };
+}
+
+const NEG_BUILDERS = [
+  negDivFracs, negMulFracs, negSubDecimal, negSubDecimal, negSubFracs, negIntChain,
+];
+
+function genNegSigns() {
+  const inner = rand(NEG_BUILDERS)();
+  if (!inner || !inner.val) return null;
+
+  let { tex, val } = inner;
+  // Внешний унарный минус перед всей скобкой: -( ... )
+  if (Math.random() < 0.4) {
+    tex = tex.includes('\\dfrac')
+      ? `-\\left(${tex}\\right)`
+      : `-(${tex})`;
+    val = ratNeg(val);
+  }
+
+  const [rn, rd] = reduceFrac(val[0], val[1]);
+  if (!isNice(rn, rd)) return null;
+  const resultLatex = inner.decimal && isTerminating(rd)
+    ? fmtDecimal(rn / rd)
+    : fmtAnswer(rn, rd);
+  return { exprLatex: tex, resultLatex };
+}
+
 // ─── Маппинг категорий ────────────────────────────────────────────────────────
 const GENERATORS = {
   fracTimesInt:     genFracTimesInt,
@@ -313,6 +469,7 @@ const GENERATORS = {
   mulPow10:         genMulPow10,
   decimalDiv:       genDecimalDiv,
   decimalSimple:    genDecimalSimple,
+  negSigns:         genNegSigns,
 };
 
 export const CATEGORY_LABELS = {
@@ -326,6 +483,7 @@ export const CATEGORY_LABELS = {
   mulPow10:        '× / ÷ степень 10',
   decimalDiv:      'Деление десятичных',
   decimalSimple:   'Десятичные ± целое',
+  negSigns:        'Минусы и скобки',
 };
 
 // ─── Настройки по умолчанию ───────────────────────────────────────────────────
@@ -350,6 +508,7 @@ export const DEFAULT_SETTINGS = {
     mulPow10:        true,
     decimalDiv:      true,
     decimalSimple:   true,
+    negSigns:        true,
   },
 };
 
