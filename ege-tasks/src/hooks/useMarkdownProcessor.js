@@ -8,6 +8,7 @@ import rehypeKatex from 'rehype-katex'
 import rehypeStringify from 'rehype-stringify'
 import DOMPurify from 'dompurify'
 import { numberLineSvgFromSpec } from '../utils/numberLine'
+import { coordPlotSvgFromSpec } from '../utils/coordPlot'
 import { autofixTableDelimiters } from '../utils/markdownTables'
 
 // Декодирование HTML-сущностей внутри <code> (rehype экранирует < & " > ).
@@ -254,6 +255,25 @@ function postprocess(html, columns, geogebraBlocks = [], callouts = []) {
     },
   )
 
+  // Координатная плоскость: fenced-блок ```plot (алиас ```vectors) → график
+  // функции / векторы (общая сборка coordPlotSvgFromSpec).
+  result = result.replace(
+    /<pre><code class="language-(?:plot|vectors)">([\s\S]*?)<\/code><\/pre>/g,
+    (_, body) => {
+      const spec = decodeEntities(body)
+      return `<div class="coordplot-block" style="text-align:center;margin:10px 0">${coordPlotSvgFromSpec(spec)}</div>`
+    },
+  )
+
+  // Inline-форма для ячеек таблиц: <code>plot: …</code> → компактный <svg>.
+  result = result.replace(
+    /<code>(?:plot|vectors):\s*([\s\S]*?)<\/code>/gi,
+    (_, body) => {
+      const spec = decodeEntities(body)
+      return `<span class="coordplot-inline" style="display:inline-block;vertical-align:middle">${coordPlotSvgFromSpec(spec, { width: 200, maxHeight: 200 })}</span>`
+    },
+  )
+
   // Размер картинки: ![alt](url){S|M|L|XL} → class на <img>, токен убираем.
   result = result.replace(
     /<img\b([^>]*?)\s*\/?>\s*\{(s|m|l|xl)\}/gi,
@@ -319,7 +339,9 @@ export function useMarkdownProcessor(markdown, columns = 1) {
         ADD_ATTR: ['class', 'style', 'encoding', 'xmlns', 'aria-hidden',
           'viewBox', 'role', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'cx', 'cy', 'r',
           'd', 'fill', 'stroke', 'stroke-width', 'width', 'height', 'transform',
-          'font-size', 'font-style', 'text-anchor'],
+          'font-size', 'font-style', 'text-anchor',
+          'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray',
+          'font-weight', 'font-family', 'opacity', 'fill-opacity'],
         ALLOW_DATA_ATTR: true,
       })
       setHtml(cleanHtml)

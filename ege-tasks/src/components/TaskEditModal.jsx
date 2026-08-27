@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse, Row, Col } from 'antd';
-import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined, ClearOutlined, DashOutlined } from '@ant-design/icons';
+import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined, ClearOutlined, DashOutlined, LineChartOutlined, RiseOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import TaskStatementRenderer from './TaskStatementRenderer';
 import RefreshFromSdamgiaModal from './RefreshFromSdamgiaModal';
@@ -9,6 +9,7 @@ import GeoGebraDrawingPanel from './GeoGebraDrawingPanel';
 import CropModal from './shared/CropModal';
 import LatexField from './shared/LatexField';
 import NumberLineModal from './shared/NumberLineModal';
+import PlotModal from './shared/PlotModal';
 import { generateTaskCode } from '../utils/taskCodeGenerator';
 import { dataUrlToFile } from '../utils/cropImage';
 import { api, aiHeaders } from '../services/pocketbase';
@@ -80,6 +81,8 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
   const solutionTextAreaRef = useRef(null);
   // Конструктор числовой прямой: открыт + целевое поле ('statement_md'|'solution_md')
   const [numlineTarget, setNumlineTarget] = useState(null);
+  // Конструктор координатной плоскости: { field, kind: 'function'|'vectors' }
+  const [plotTarget, setPlotTarget] = useState(null);
 
   // Картинки задачи из коллекции task_images, сгруппированы по ролям.
   // Используются для подмены ![image](внешний_url) на локальный в превью.
@@ -460,11 +463,11 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
     setPreviewStatement(newValue);
   }, [form]);
 
-  // Вставка готового сниппета числовой прямой (блок ```numline или inline-код
-  // `numline: …` для ячеек таблиц) в поле по курсору. Если поле не сфокусировано
-  // (или редактор в code-режиме без нативного textarea) — дописываем в конец.
-  const insertNumline = useCallback((snippet) => {
-    const fieldName = numlineTarget;
+  // Вставка готового сниппета чертежа (блок ```numline / ```plot или inline-код
+  // `numline: …` / `plot: …` для ячеек таблиц) в поле по курсору. Если поле не
+  // сфокусировано (или редактор в code-режиме без нативного textarea) —
+  // дописываем в конец.
+  const insertSnippet = useCallback((fieldName, snippet) => {
     if (!fieldName) return;
     const refObj = fieldName === 'solution_md' ? solutionTextAreaRef : statementTextAreaRef;
     const setter = fieldName === 'solution_md' ? setPreviewSolution : setPreviewStatement;
@@ -480,8 +483,17 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
     }
     form.setFieldValue(fieldName, next);
     setter(next);
+  }, [form]);
+
+  const insertNumline = useCallback((snippet) => {
+    insertSnippet(numlineTarget, snippet);
     setNumlineTarget(null);
-  }, [numlineTarget, form]);
+  }, [insertSnippet, numlineTarget]);
+
+  const insertPlot = useCallback((snippet) => {
+    insertSnippet(plotTarget?.field, snippet);
+    setPlotTarget(null);
+  }, [insertSnippet, plotTarget]);
 
   // Кнопка 1: эвристика
   const handleConvertHeuristic = useCallback(() => {
@@ -1079,6 +1091,26 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   Числовая прямая
                 </Button>
               </Tooltip>
+              <Tooltip title="Вставить график функции на клетчатой плоскости (конструктор)">
+                <Button
+                  size="small"
+                  icon={<LineChartOutlined />}
+                  onClick={() => setPlotTarget({ field: 'statement_md', kind: 'function' })}
+                  style={{ fontWeight: 400 }}
+                >
+                  График
+                </Button>
+              </Tooltip>
+              <Tooltip title="Вставить векторы на клетчатой плоскости (конструктор)">
+                <Button
+                  size="small"
+                  icon={<RiseOutlined />}
+                  onClick={() => setPlotTarget({ field: 'statement_md', kind: 'vectors' })}
+                  style={{ fontWeight: 400 }}
+                >
+                  Векторы
+                </Button>
+              </Tooltip>
             </span>
           }
           rules={[{ required: isCreateMode, message: 'Введите текст задания' }]}
@@ -1152,6 +1184,26 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   style={{ fontWeight: 400 }}
                 >
                   Числовая прямая
+                </Button>
+              </Tooltip>
+              <Tooltip title="Вставить график функции на клетчатой плоскости (конструктор)">
+                <Button
+                  size="small"
+                  icon={<LineChartOutlined />}
+                  onClick={() => setPlotTarget({ field: 'solution_md', kind: 'function' })}
+                  style={{ fontWeight: 400 }}
+                >
+                  График
+                </Button>
+              </Tooltip>
+              <Tooltip title="Вставить векторы на клетчатой плоскости (конструктор)">
+                <Button
+                  size="small"
+                  icon={<RiseOutlined />}
+                  onClick={() => setPlotTarget({ field: 'solution_md', kind: 'vectors' })}
+                  style={{ fontWeight: 400 }}
+                >
+                  Векторы
                 </Button>
               </Tooltip>
             </span>
@@ -1252,6 +1304,15 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
       onCancel={() => setNumlineTarget(null)}
       onInsert={insertNumline}
       defaultFormat="inline"
+    />
+
+    {/* Конструктор координатной плоскости — тоже вне основного Modal. */}
+    <PlotModal
+      open={!!plotTarget}
+      kind={plotTarget?.kind || 'function'}
+      onCancel={() => setPlotTarget(null)}
+      onInsert={insertPlot}
+      defaultFormat="block"
     />
     </>
   );

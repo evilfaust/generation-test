@@ -6,12 +6,13 @@ import {
   CodeOutlined, PictureOutlined, LinkOutlined,
   MinusOutlined, FunctionOutlined, ContainerOutlined, DownOutlined,
   InboxOutlined, ScissorOutlined, ReloadOutlined, BorderHorizontalOutlined,
-  DashOutlined
+  DashOutlined, LineChartOutlined, RiseOutlined
 } from '@ant-design/icons';
 import TableInsertPopover from './TableInsertPopover';
 import FormulaPalette from './FormulaPalette';
 import CropModal from '../shared/CropModal';
 import NumberLineModal from '../shared/NumberLineModal';
+import PlotModal from '../shared/PlotModal';
 import { materialsApi } from '../../shared/services/pb/filesClient';
 import { dataUrlToFile } from '../../utils/cropImage';
 import './EditorToolbar.css';
@@ -52,6 +53,8 @@ export default function EditorToolbar({ editorRef }) {
   const [linkUrl, setLinkUrl] = useState('');
   const [linkText, setLinkText] = useState('');
   const [numlineOpen, setNumlineOpen] = useState(false);
+  // Конструктор координатной плоскости: null | 'function' | 'vectors'
+  const [plotKind, setPlotKind] = useState(null);
 
   const insert = useCallback((opts) => {
     insertIntoEditor(editorRef.current, opts);
@@ -253,6 +256,14 @@ export default function EditorToolbar({ editorRef }) {
           <Button size="small" type="text" className="tf-btn" icon={<DashOutlined />}
             onClick={() => setNumlineOpen(true)} />
         </Tooltip>
+        <Tooltip title="График функции на клетчатой плоскости">
+          <Button size="small" type="text" className="tf-btn" icon={<LineChartOutlined />}
+            onClick={() => setPlotKind('function')} />
+        </Tooltip>
+        <Tooltip title="Векторы на клетчатой плоскости">
+          <Button size="small" type="text" className="tf-btn" icon={<RiseOutlined />}
+            onClick={() => setPlotKind('vectors')} />
+        </Tooltip>
         <Tooltip title="Ссылка">
           <Button size="small" type="text" className="tf-btn" icon={<LinkOutlined />}
             onClick={() => setLinkModalOpen(true)} />
@@ -376,6 +387,17 @@ export default function EditorToolbar({ editorRef }) {
         onInsert={(snippet) => {
           insertIntoEditor(editorRef.current, { text: snippet });
           setNumlineOpen(false);
+        }}
+      />
+
+      {/* Modal: конструктор координатной плоскости (график / векторы) */}
+      <PlotModal
+        open={!!plotKind}
+        kind={plotKind || 'function'}
+        onCancel={() => setPlotKind(null)}
+        onInsert={(snippet) => {
+          insertIntoEditor(editorRef.current, { text: snippet });
+          setPlotKind(null);
         }}
       />
 
