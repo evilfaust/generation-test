@@ -12,6 +12,24 @@ export function normalizeLabel(value) {
 }
 
 /**
+ * Нормализация названия темы/подтемы для сопоставления с базой.
+ * Дополнительно к normalizeLabel убирает «№» и пунктуацию: в YAML-файлах
+ * тему пишут как «ЕГЭ-База №14 Вычисления», а в базе она «ЕГЭ-База. №14
+ * Вычисления» — точное сравнение такую пару не ловит.
+ */
+export function normalizeTopicTitle(value) {
+  if (!value) return '';
+  return value
+    .toString()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/№/g, ' ')
+    .replace(/[.,:;!?'"`«»()\[\]{}<>—–-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Строгая нормализация условия задачи (точное совпадение текста).
  */
 export function normalizeStatementStrict(value) {

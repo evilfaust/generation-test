@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeLabel, normalizeStatementStrict, normalizeStatementLoose } from '../utils/normalize';
+import { normalizeLabel, normalizeTopicTitle, normalizeStatementStrict, normalizeStatementLoose } from '../utils/normalize';
 
 describe('normalizeLabel', () => {
   it('приводит к нижнему регистру', () => {
@@ -65,5 +65,26 @@ describe('normalizeStatementLoose', () => {
   it('возвращает пустую строку для falsy', () => {
     expect(normalizeStatementLoose('')).toBe('');
     expect(normalizeStatementLoose(null)).toBe('');
+  });
+});
+
+describe('normalizeTopicTitle', () => {
+  it('игнорирует точку и «№» — тема из файла совпадает с темой в базе', () => {
+    expect(normalizeTopicTitle('ЕГЭ-База №14 Вычисления'))
+      .toBe(normalizeTopicTitle('ЕГЭ-База. №14 Вычисления'));
+  });
+
+  it('игнорирует регистр и ё', () => {
+    expect(normalizeTopicTitle('Чётность')).toBe(normalizeTopicTitle('четность'));
+  });
+
+  it('схлопывает пробелы после снятой пунктуации', () => {
+    expect(normalizeTopicTitle('Входной тест из 10 в 11 класс. Профиль'))
+      .toBe('входной тест из 10 в 11 класс профиль');
+  });
+
+  it('возвращает пустую строку для falsy', () => {
+    expect(normalizeTopicTitle('')).toBe('');
+    expect(normalizeTopicTitle(null)).toBe('');
   });
 });

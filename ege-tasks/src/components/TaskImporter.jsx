@@ -84,17 +84,26 @@ export default function TaskImporter() {
   const [textInput, setTextInput] = useState('');
   const [fileName, setFileName] = useState('');
 
-  // Локальные мутабельные списки (обновляются при создании новых тем/подтем)
-  const [localTopics, setLocalTopics] = useState(ctxTopics);
-  const [localSubtopics, setLocalSubtopics] = useState(ctxSubtopics);
+  // Темы/подтемы, созданные прямо здесь: контекст узнает о них только после
+  // reloadData(), поэтому держим их отдельно и подмешиваем к спискам контекста.
+  // 🚨 Копию контекста в useState класть НЕЛЬЗЯ: синхронизация «по разной длине»
+  // затирала только что созданную тему (список снова становился контекстным),
+  // после чего импорт падал с «У темы не указан номер ЕГЭ» — темы просто не
+  // было в списке, по которому ищут ege_number.
+  const [extraTopics, setExtraTopics] = useState([]);
+  const [extraSubtopics, setExtraSubtopics] = useState([]);
 
-  // Синхронизация с контекстом при внешних обновлениях
-  if (ctxTopics !== localTopics && ctxTopics.length !== localTopics.length) {
-    setLocalTopics(ctxTopics);
-  }
-  if (ctxSubtopics !== localSubtopics && ctxSubtopics.length !== localSubtopics.length) {
-    setLocalSubtopics(ctxSubtopics);
-  }
+  const localTopics = useMemo(() => {
+    if (extraTopics.length === 0) return ctxTopics;
+    const known = new Set(ctxTopics.map(t => t.id));
+    return [...ctxTopics, ...extraTopics.filter(t => !known.has(t.id))];
+  }, [ctxTopics, extraTopics]);
+
+  const localSubtopics = useMemo(() => {
+    if (extraSubtopics.length === 0) return ctxSubtopics;
+    const known = new Set(ctxSubtopics.map(st => st.id));
+    return [...ctxSubtopics, ...extraSubtopics.filter(st => !known.has(st.id))];
+  }, [ctxSubtopics, extraSubtopics]);
 
   // Состояние создания темы
   const [showNewTopic, setShowNewTopic] = useState(false);
@@ -203,6 +212,41 @@ export default function TaskImporter() {
   // Нормализация названия для проверки дубликатов
   const normalize = (s) => (s || '').trim().toLowerCase();
 
+  // Угадываем тип экзамена для новой темы по метаданным файла: в YAML пишут
+  // «Профиль», «База», «ОГЭ» — поля exam_type там нет.
+  const guessExamTypeFromMeta = (meta) => {
+    const hay = [meta?.topic, meta?.subtopic, meta?.source, ...(meta?.tags || [])]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (/огэ/.test(hay)) return 'oge';
+    if (/впр/.test(hay)) return 'vpr';
+    if (/профил/.test(hay)) return 'ege_profile';
+    if (/базов|егэ-база|\bбаза\b/.test(hay)) return 'ege_base';
+    if (/тригонометр/.test(hay)) return 'trig';
+    return 'other';
+  };
+
+  // Открыть модалку создания темы. Из шага 2 подставляем название, тип экзамена
+  // и номер (если он есть в заголовке) из YAML — иначе тему, которую Лемма уже
+  // прочитала из файла, приходится перепечатывать руками.
+  const openNewTopicModal = (context) => {
+    if (context === 'preview' && parsedData?.metadata) {
+      const meta = parsedData.metadata;
+      const numMatch = (meta.topic || '').match(/№\s*(\d+)/);
+      setNewTopicTitle(meta.topic || '');
+      // Есть «№N» в заголовке — это тема каталога ЕГЭ/ОГЭ; нет — тема вне
+      // нумерации (входной тест, зачёт): номер 0 + тип «Прочее», иначе она
+      // лишней строкой полезет в генератор вариантов.
+      setNewTopicNumber(numMatch ? Number(numMatch[1]) : 0);
+      setNewTopicExamType(numMatch ? guessExamTypeFromMeta(meta) : 'other');
+      setNewTopicExamPart(1);
+    } else {
+      // Preselect типа экзамена из контекста sdamgia-формы.
+      setNewTopicExamType(SDAMGIA_TO_EXAM_TYPE[sdamgiaSourceType] || 'ege_base');
+      setNewTopicExamPart(sdamgiaExamPart || 1);
+    }
+    setShowNewTopic(true);
+  };
+
   // Создание новой темы
   const handleCreateTopic = async () => {
     const trimmedTitle = (newTopicTitle || '').trim();
@@ -218,7 +262,9 @@ export default function TaskImporter() {
     // Дубль ищем по паре (exam_type, ege_number) — у разных экзаменов
     // независимая нумерация. Темы без exam_type считаем легаси-базовыми.
     const examTypeForCheck = newTopicExamType || 'ege_base';
-    const existingByNumber = localTopics.find(t =>
+    // Номер 0 = тема вне нумерации ЕГЭ (входной тест, марафон, летнее ДЗ) —
+    // таких тем может быть сколько угодно, дубль по номеру для них не проверяем.
+    const existingByNumber = Number(newTopicNumber) === 0 ? null : localTopics.find(t =>
       String(t.ege_number) === String(newTopicNumber) &&
       (t.exam_type || 'ege_base') === examTypeForCheck
     );
@@ -247,7 +293,7 @@ export default function TaskImporter() {
         topicData.exam_part = Number(newTopicExamPart);
       }
       const newTopic = await api.createTopic(topicData);
-      setLocalTopics(prev => [...prev, newTopic]);
+      setExtraTopics(prev => [...prev, newTopic]);
       message.success(`Тема "${trimmedTitle}" создана`);
       setNewTopicTitle('');
       setNewTopicNumber(null);
@@ -292,7 +338,7 @@ export default function TaskImporter() {
         name: trimmedName,
         topic: forTopicId,
       });
-      setLocalSubtopics(prev => [...prev, newSub]);
+      setExtraSubtopics(prev => [...prev, newSub]);
       message.success(`Подтема "${trimmedName}" создана`);
       setNewSubtopicName('');
       setShowNewSubtopic(false);
@@ -601,13 +647,7 @@ export default function TaskImporter() {
                         />
                         <Button
                           icon={<PlusOutlined />}
-                          onClick={() => {
-                            // Preselect типа экзамена из контекста sdamgia-формы или превью.
-                            const ctxType = SDAMGIA_TO_EXAM_TYPE[sdamgiaSourceType] || 'ege_base';
-                            setNewTopicExamType(ctxType);
-                            setNewTopicExamPart(sdamgiaExamPart || 1);
-                            setShowNewTopic(true);
-                          }}
+                          onClick={() => openNewTopicModal('sdamgia')}
                           title="Создать тему"
                         />
                       </Space.Compact>
@@ -754,6 +794,27 @@ export default function TaskImporter() {
 
         {/* Маппинг на БД */}
         <Card size="small" title="Привязка к базе данных" style={{ marginBottom: 16 }}>
+          {/* Тему из YAML в базе не нашли — предлагаем создать её одним кликом,
+              с уже подставленными названием и типом экзамена. */}
+          {parsedData.metadata.topic && !topicId && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`Тема «${parsedData.metadata.topic}» не найдена в базе`}
+              description="Выберите похожую тему из списка или создайте новую — название и тип экзамена подставятся из файла."
+              action={
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => openNewTopicModal('preview')}
+                >
+                  Создать тему
+                </Button>
+              }
+            />
+          )}
           <Row gutter={16}>
             <Col span={12}>
               <div style={{ marginBottom: 4, fontWeight: 500 }}>
@@ -775,13 +836,7 @@ export default function TaskImporter() {
                 />
                 <Button
                   icon={<PlusOutlined />}
-                  onClick={() => {
-                            // Preselect типа экзамена из контекста sdamgia-формы или превью.
-                            const ctxType = SDAMGIA_TO_EXAM_TYPE[sdamgiaSourceType] || 'ege_base';
-                            setNewTopicExamType(ctxType);
-                            setNewTopicExamPart(sdamgiaExamPart || 1);
-                            setShowNewTopic(true);
-                          }}
+                  onClick={() => openNewTopicModal('preview')}
                   title="Создать тему"
                 />
               </Space.Compact>
@@ -811,6 +866,7 @@ export default function TaskImporter() {
                   disabled={!topicId}
                   onClick={() => {
                     setNewSubtopicContext('preview');
+                    setNewSubtopicName(parsedData.metadata.subtopic || '');
                     setShowNewSubtopic(true);
                   }}
                   title="Создать подтему"
@@ -1050,12 +1106,16 @@ export default function TaskImporter() {
           <div style={{ marginBottom: 4, fontWeight: 500 }}>Номер задания ЕГЭ</div>
           <InputNumber
             style={{ width: '100%' }}
-            min={1}
+            min={0}
             max={27}
             value={newTopicNumber}
             onChange={setNewTopicNumber}
             placeholder="Например: 14"
           />
+          <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+            Поставьте 0, если тема вне нумерации ЕГЭ (входной тест, зачёт,
+            повторение) — номер нужен только для кодов задач вида «14-001».
+          </div>
         </div>
       </Modal>
 

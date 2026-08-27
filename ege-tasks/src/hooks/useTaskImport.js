@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import pb, { api, aiHeaders } from '../services/pocketbase';
 import { parseMarkdownFile, parseSdamgiaResult, getRandomTagColor } from '../utils/markdownTaskParser';
 import { rewriteImageUrls } from '../components/TaskStatementRenderer';
+import { normalizeTopicTitle } from '../utils/normalize';
 
 const getPdfServiceUrl = () => {
   const envUrl = import.meta.env.VITE_PDF_SERVICE_URL;
@@ -14,6 +15,11 @@ const getPdfServiceUrl = () => {
 };
 
 const PDF_SERVICE_URL = getPdfServiceUrl();
+
+// Минимальная длина названия темы для частичного совпадения. Короткие
+// («Марафон», «Планиметрия») слишком часто встречаются внутри длинных
+// заголовков из файла и дают ложный автовыбор темы.
+const MIN_PARTIAL_MATCH_LEN = 8;
 
 /**
  * Хук для импорта задач из markdown файлов.
@@ -52,15 +58,20 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
   const matchTopic = useCallback((topicName) => {
     if (!topicName || topics.length === 0) return null;
 
-    // Точное совпадение
-    const exact = topics.find(t => t.title === topicName);
+    const norm = normalizeTopicTitle(topicName);
+    if (!norm) return null;
+
+    // Точное совпадение (с точностью до регистра, ё/е, «№» и пунктуации)
+    const exact = topics.find(t => normalizeTopicTitle(t.title) === norm);
     if (exact) return exact.id;
 
-    // Частичное совпадение (содержит подстроку)
-    const partial = topics.filter(t =>
-      t.title.toLowerCase().includes(topicName.toLowerCase()) ||
-      topicName.toLowerCase().includes(t.title.toLowerCase())
-    );
+    // Частичное совпадение (содержит подстроку). Совсем короткие названия
+    // пропускаем — «Планиметрия» внутри длинной фразы даёт ложные попадания.
+    const partial = topics.filter(t => {
+      const title = normalizeTopicTitle(t.title);
+      if (title.length < MIN_PARTIAL_MATCH_LEN) return false;
+      return title.includes(norm) || norm.includes(title);
+    });
     if (partial.length === 1) return partial[0].id;
 
     // Если несколько — вернём null, пользователь выберет сам
@@ -73,12 +84,15 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
   const matchSubtopic = useCallback((subtopicName, forTopicId) => {
     if (!subtopicName || !forTopicId) return null;
 
+    const norm = normalizeTopicTitle(subtopicName);
+    if (!norm) return null;
+
     const topicSubtopics = existingSubtopics.filter(st => st.topic === forTopicId);
-    const exact = topicSubtopics.find(st => st.name === subtopicName);
+    const exact = topicSubtopics.find(st => normalizeTopicTitle(st.name) === norm);
     if (exact) return exact.id;
 
     const partial = topicSubtopics.filter(st =>
-      st.name.toLowerCase().includes(subtopicName.toLowerCase())
+      normalizeTopicTitle(st.name).includes(norm)
     );
     if (partial.length === 1) return partial[0].id;
 
@@ -325,8 +339,10 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
         existingRecords.map(r => (r.statement_md || '').trim())
       );
 
-      // 2. Определяем следующий код задачи
-      const topic = topics.find(t => t.id === topicId);
+      // 2. Определяем следующий код задачи.
+      // Тему, только что созданную в этой же сессии, список из контекста ещё
+      // может не содержать — тогда дочитываем запись из БД, а не падаем.
+      const topic = topics.find(t => t.id === topicId) || await api.getTopic(topicId);
       const egeNumber = topic?.ege_number;
       if (!egeNumber && egeNumber !== 0) {
         results.errors = total;
