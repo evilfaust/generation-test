@@ -1,0 +1,108 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Оформление markdown-таблиц: классы ставит remark-плагин
+   `utils/remarkTableModifiers.js` (директива «{без линий}» перед таблицей
+   либо автоподбор). Базовый вид таблиц НЕ трогаем — здесь только модификаторы.
+
+   Про !important: условия задач рендерятся внутри полутора десятков печатных
+   вёрсток (.task-content, .et-task-text, КИМ, теория), и почти каждая задаёт
+   свои border/background для th/td — часть уже с !important в @media print.
+   Поэтому модификаторы объявлены с !important и селектором `table.md-table--*`
+   (специфичность выше легаси-правил вида `.task-content td`).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Пустая ячейка = место под рукописный ответ ─────────────────────────────
+   Без высоты строка «| А | Б | В | Г |» + пустая строка схлопывалась в ноль,
+   и вписать в неё было нечего. Работает в любой таблице, без директив. */
+table td.md-cell--blank {
+  height: 9mm;
+  min-width: 12mm;
+}
+
+/* answerBoxes: явная рамка-поле внутри ячейки (экран ученика, превью задачи) */
+table td.md-cell--box {
+  box-shadow: inset 0 0 0 1.5px #555;
+}
+
+/* ── {без линий} — таблица-раскладка без рамок ──────────────────────────────
+   Задания на соответствие: два независимых столбца, как в оригинальном КИМ. */
+table.md-table--plain,
+table.md-table--plain thead,
+table.md-table--plain tbody,
+table.md-table--plain tr,
+table.md-table--plain th,
+table.md-table--plain td {
+  border: 0 !important;
+  background: transparent !important;
+}
+table.md-table--plain {
+  width: auto !important;
+  margin: 6px 0 !important;
+}
+table.md-table--plain th {
+  text-align: center !important;
+  font-weight: 600;
+  padding: 0 14px 4px 0 !important;
+}
+table.md-table--plain td {
+  vertical-align: top;
+  padding: 1px 14px 1px 0 !important;
+}
+table.md-table--plain th:not(:first-child),
+table.md-table--plain td:not(:first-child) {
+  padding-left: 10px !important;
+}
+/* в плоской таблице пустая ячейка — это просто «нет данных», не поле ответа */
+table.md-table--plain td.md-cell--blank {
+  height: auto;
+  min-width: 0;
+}
+
+/* ── {бланк} — таблица А Б В Г под вписывание ответа ────────────────────────
+   Узкая, по центру, без серой заливки шапки (при печати серый фон мешает). */
+table.md-table--answers {
+  width: auto !important;
+  margin: 8px auto !important;
+  border-collapse: collapse !important;
+}
+table.md-table--answers thead,
+table.md-table--answers tbody tr {
+  background: transparent !important;
+}
+table.md-table--answers th,
+table.md-table--answers td {
+  border: 1px solid #333 !important;
+  background: transparent !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  min-width: 16mm;
+  padding: 2px 8px !important;
+  font-weight: 600;
+}
+table.md-table--answers td.md-cell--blank {
+  height: 10mm;
+  font-weight: 400;
+}
+
+/* ── {без шапки} ────────────────────────────────────────────────────────────*/
+table.md-table--noheader thead {
+  display: none !important;
+}
+
+/* ── {компактная} ───────────────────────────────────────────────────────────*/
+table.md-table--compact th,
+table.md-table--compact td {
+  padding: 1px 6px !important;
+  font-size: 0.95em;
+}
+
+@media print {
+  table.md-table--answers th,
+  table.md-table--answers td {
+    border-color: #000 !important;
+  }
+  table.md-table--plain,
+  table.md-table--answers {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

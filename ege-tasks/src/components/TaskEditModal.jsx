@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse, Row, Col } from 'antd';
+import { Modal, Form, Select, Input, InputNumber, Button, Space, Popconfirm, Spin, Divider, Alert, Segmented, Upload, App, Tooltip, Tag, Collapse, Row, Col, Dropdown } from 'antd';
 import { EditOutlined, SaveOutlined, DeleteOutlined, ExclamationCircleOutlined, PlusOutlined, LinkOutlined, HighlightOutlined, UploadOutlined, ScissorOutlined, CloseCircleOutlined, ExportOutlined, TableOutlined, ReloadOutlined, ClearOutlined, DashOutlined, LineChartOutlined, RiseOutlined } from '@ant-design/icons';
 import MathRenderer from './MathRenderer';
 import TaskStatementRenderer from './TaskStatementRenderer';
@@ -17,6 +17,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useImageUpload } from '../hooks';
 import { parseMatchingTask } from '../utils/parseMatchingTask';
 import { fixLatexRoots } from '../utils/fixLatexRoots';
+import { TABLE_SNIPPETS } from '../utils/markdownTables';
 
 const DEFINE_API_BASE = import.meta.env.VITE_DEFINE_API_URL?.replace('/define', '') || 'https://l.oipav.ru';
 
@@ -494,6 +495,24 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
     insertSnippet(plotTarget?.field, snippet);
     setPlotTarget(null);
   }, [insertSnippet, plotTarget]);
+
+  // Меню «Таблица»: готовые заготовки (соответствие без линий, бланк ответа и
+  // т.п.) вставляются по курсору. Вид таблицы задаёт директива в самой разметке.
+  const tableMenu = useCallback((fieldName) => ({
+    items: TABLE_SNIPPETS.map((s) => ({
+      key: s.key,
+      label: (
+        <div style={{ lineHeight: 1.3 }}>
+          <div>{s.label}</div>
+          <div style={{ fontSize: 11, color: '#888' }}>{s.hint}</div>
+        </div>
+      ),
+    })),
+    onClick: ({ key }) => {
+      const snippet = TABLE_SNIPPETS.find((s) => s.key === key);
+      if (snippet) insertSnippet(fieldName, snippet.md);
+    },
+  }), [insertSnippet]);
 
   // Кнопка 1: эвристика
   const handleConvertHeuristic = useCallback(() => {
@@ -1081,6 +1100,11 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   🧹 Ответ+решение
                 </Button>
               </Tooltip>
+              <Dropdown menu={tableMenu('statement_md')} trigger={['click']}>
+                <Button size="small" icon={<TableOutlined />} style={{ fontWeight: 400 }}>
+                  Таблица ▾
+                </Button>
+              </Dropdown>
               <Tooltip title="Вставить числовую прямую со штриховкой (конструктор)">
                 <Button
                   size="small"
@@ -1176,6 +1200,11 @@ const TaskEditModal = ({ task, visible, onClose, onSave, onDelete, allTags = [],
                   🧹 Корни
                 </Button>
               </Tooltip>
+              <Dropdown menu={tableMenu('solution_md')} trigger={['click']}>
+                <Button size="small" icon={<TableOutlined />} style={{ fontWeight: 400 }}>
+                  Таблица ▾
+                </Button>
+              </Dropdown>
               <Tooltip title="Вставить числовую прямую со штриховкой (конструктор)">
                 <Button
                   size="small"

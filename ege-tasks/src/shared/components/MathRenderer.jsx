@@ -4,7 +4,9 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import NumberLineSVG from '../../components/shared/NumberLineSVG';
 import CoordPlotSVG from '../../components/shared/CoordPlotSVG';
-import { autofixTableDelimiters } from '../../utils/markdownTables';
+import { prepareMarkdownTables } from '../../utils/markdownTables';
+import remarkTableModifiers from '../../utils/remarkTableModifiers';
+import './markdownTables.css';
 
 // Из <pre>-узла react-markdown достаёт fenced-блок чертежа (```numline /
 // ```plot / ```vectors) и его содержимое. Возвращает { kind, spec } либо null,
@@ -59,12 +61,14 @@ const rehypeKatexOptions = {
  * - Inline формулы $...$
  * - Блочные формулы $$...$$
  * - answerBoxes=true: пустые ячейки таблицы рендерятся как поля для записи ответа
+ * - модификаторы таблиц: «{без линий}» / «{бланк}» перед таблицей
+ *   (см. utils/remarkTableModifiers.js)
  */
 const MathRenderer = ({ text, content, inline = true, answerBoxes = false }) => {
   const sourceText = text ?? content;
   if (!sourceText) return null;
 
-  const processedText = preprocessLatex(autofixTableDelimiters(sourceText));
+  const processedText = preprocessLatex(prepareMarkdownTables(sourceText));
 
   // Кастомные компоненты для react-markdown
   const components = {
@@ -109,8 +113,8 @@ const MathRenderer = ({ text, content, inline = true, answerBoxes = false }) => 
         {children}
       </a>
     ),
-    table: ({ children, ...props }) => (
-      <table {...props} style={{
+    table: ({ children, className, ...props }) => (
+      <table {...props} className={className} style={{
         borderCollapse: 'collapse',
         width: '100%',
         marginBottom: '1em',
@@ -124,34 +128,15 @@ const MathRenderer = ({ text, content, inline = true, answerBoxes = false }) => 
         {children}
       </thead>
     ),
-    td: ({ children, ...props }) => {
-      const isEmpty = answerBoxes && (
-        !children ||
-        (Array.isArray(children) && children.every(
-          c => c == null || (typeof c === 'string' && !c.trim())
-        ))
-      );
-      if (isEmpty) {
-        return (
-          <td {...props} style={{
-            border: '1px solid #bbb',
-            padding: '2px 4px',
-            minWidth: '2.8em',
-            height: '2.2em',
-            verticalAlign: 'middle',
-          }}>
-            <span style={{
-              display: 'block',
-              minWidth: '2.8em',
-              height: '1.6em',
-              border: '1.5px solid #555',
-              borderRadius: 2,
-            }} />
-          </td>
-        );
-      }
+    // Пустые ячейки помечены классом `md-cell--blank` (remarkTableModifiers) —
+    // высоту под рукописный ответ им задаёт markdownTables.css. answerBoxes
+    // добавляет ещё и явную рамку-поле.
+    td: ({ children, className, ...props }) => {
+      const blank = /\bmd-cell--blank\b/.test(className || '');
+      const cls = [className, blank && answerBoxes ? 'md-cell--box' : null]
+        .filter(Boolean).join(' ') || undefined;
       return (
-        <td {...props} style={{ border: '1px solid #ddd', padding: '4px 8px' }}>
+        <td {...props} className={cls} style={{ border: '1px solid #ddd', padding: '4px 8px' }}>
           {children}
         </td>
       );
@@ -170,7 +155,7 @@ const MathRenderer = ({ text, content, inline = true, answerBoxes = false }) => 
 
   return (
     <ReactMarkdown
-      remarkPlugins={[remarkGfm, remarkMath]}
+      remarkPlugins={[remarkGfm, remarkMath, remarkTableModifiers]}
       rehypePlugins={[[rehypeKatex, rehypeKatexOptions]]}
       components={components}
     >

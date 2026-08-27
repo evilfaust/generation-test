@@ -9,7 +9,8 @@ import rehypeStringify from 'rehype-stringify'
 import DOMPurify from 'dompurify'
 import { numberLineSvgFromSpec } from '../utils/numberLine'
 import { coordPlotSvgFromSpec } from '../utils/coordPlot'
-import { autofixTableDelimiters } from '../utils/markdownTables'
+import { prepareMarkdownTables } from '../utils/markdownTables'
+import remarkTableModifiers from '../utils/remarkTableModifiers'
 
 // Декодирование HTML-сущностей внутри <code> (rehype экранирует < & " > ).
 function decodeEntities(s) {
@@ -120,7 +121,7 @@ function parseGeoGebraConfig(rawConfig = '') {
 const INLINE_GEO_RE = /^:::geogebra\s+(\S+)\s*:::$/
 
 function preprocess(md) {
-  const normalized = autofixTableDelimiters(md.replace(/\r\n/g, '\n'))
+  const normalized = prepareMarkdownTables(md.replace(/\r\n/g, '\n'))
   const lines = normalized.split('\n')
   const outLines = []
   const geogebraBlocks = []
@@ -319,6 +320,7 @@ export function useMarkdownProcessor(markdown, columns = 1) {
       .use(remarkParse)
       .use(remarkGfm)
       .use(remarkMath)
+      .use(remarkTableModifiers)
       .use(remarkRehype)
       .use(rehypeKatex)
       .use(rehypeStringify)
