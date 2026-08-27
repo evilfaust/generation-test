@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { App } from 'antd';
@@ -177,6 +179,38 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
   it('без вариантов ничего не рендерит', () => {
     const { container } = render(<EntranceTestPrint variants={[]} meta={meta} />, { wrapper });
     expect(container.querySelector('.et-root')).toBeNull();
+  });
+});
+
+describe('EntranceTestPrint — формулы', () => {
+  const sqrtTask = {
+    id: 'sq',
+    code: 'EGE-16',
+    statement_md: String.raw`Найдите значение выражения $-4\sqrt{3}\sin(-780^\circ)$`,
+    answer: '6',
+  };
+
+  it('радикал \\sqrt рендерится на печатном листе', () => {
+    const { container } = render(
+      <EntranceTestPrint variants={[{ number: 1, tasks: [sqrtTask] }]} meta={meta} />,
+      { wrapper }
+    );
+    const page = container.querySelector('.et-page');
+    expect(page.querySelector('.katex .sqrt')).toBeTruthy();
+    // KaTeX рисует знак корня инлайновым <svg> внутри .hide-tail
+    expect(page.querySelectorAll('.katex .hide-tail svg').length).toBeGreaterThan(0);
+  });
+
+  it('в CSS нет глобального правила по svg внутри условия', () => {
+    // Регрессия 28.08.2026: `.et-task-text svg { max-width: 100% }` (добавлено
+    // ради встроенных numline/plot) схлопывало 400em-радикал KaTeX в ноль —
+    // на печати вместо «−4√3 sin(−780°)» выходило «−4  3 sin(−780°)».
+    // jsdom импортированный CSS не применяет, а `?raw` на .css отдаёт пустую
+    // строку (vitest глушит CSS) — поэтому читаем файл с диска.
+    const cssPath = resolve(process.cwd(), 'src/components/entrance-test/EntranceTestPrint.css');
+    const css = readFileSync(cssPath, 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css.length).toBeGreaterThan(1000);
+    expect(css).not.toMatch(/\.et-task-text\s+svg\s*[,{]/);
   });
 });
 
