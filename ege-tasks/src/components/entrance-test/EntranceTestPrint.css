@@ -1,0 +1,494 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Входная контрольная работа — печатный лист A4.
+
+   Стиль: строго монохромный. Цвета нет намеренно — лист печатается на ч/б
+   принтере, любой акцент превращается в серую кашу. Иерархия держится
+   кеглем, насыщенностью и толщиной линеек:
+     0.5mm  — рамка шапки (единственная «жирная» линия на листе)
+     0.35mm — линии для заполнения (ФИО, ответ)
+     0.25mm — рамка блока инструкции, ячейки листа ответов
+     0.2pt  — волосяные: разделители задач, клетка/линовка
+
+   Геометрия страницы продублирована в EntranceTestPrint.jsx
+   (PAGE_*, PAD_*, HEAD_MM, FOOT_MM, TASK_GAP_MM, NUM_COL_MM) — там по ней
+   считается пагинация. Меняешь одно — меняй оба.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.et-root {
+  --et-ink:    #101010;   /* основной текст */
+  --et-ink-2:  #303030;   /* инструкция, вторичный текст */
+  --et-ink-3:  #5A5A5A;   /* подписи, метаданные */
+  --et-ink-4:  #8A8A8A;   /* колонтитулы */
+  --et-rule:   #111111;   /* структурные линии */
+  --et-rule-2: #9A9A9A;   /* рамки блоков */
+  --et-hair:   #CFCFCF;   /* волосяные разделители */
+  --et-grid:   #D8D8D8;   /* клетка и линовка */
+  --et-scale:  1;
+
+  color: var(--et-ink);
+  font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 12px;
+  background: #E9EAEE;
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;   /* лист шире экрана — прокручиваем, а не сжимаем */
+}
+
+/* Антиква для условий — под стать формулам KaTeX */
+.et-root--serif .et-task-text,
+.et-root--serif .et-note-text,
+.et-root--serif .et-key-answer {
+  font-family: 'Latin Modern Roman', 'CMU Serif', Georgia, 'Times New Roman', serif;
+}
+
+/* ── Зона измерения (вне экрана) ─────────────────────────────────────────── */
+.et-measure {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 182mm;              /* = BODY_W_MM */
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ── Лист ─────────────────────────────────────────────────────────────────── */
+.et-page {
+  width: 210mm;
+  height: 297mm;
+  padding: 12mm 14mm 8mm;
+  box-sizing: border-box;
+  background: #fff;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 6px 28px rgba(17, 24, 39, 0.10);
+}
+
+.et-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Колонтитулы ──────────────────────────────────────────────────────────── */
+.et-runhead {
+  flex: 0 0 9mm;
+  height: 9mm;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6mm;
+  padding-bottom: 1.6mm;
+  margin-bottom: 4mm;
+  border-bottom: 0.25mm solid var(--et-rule-2);
+  font-size: 2.8mm;
+  color: var(--et-ink-3);
+}
+.et-runhead > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.et-foot {
+  flex: 0 0 8mm;
+  height: 8mm;
+  box-sizing: border-box;
+  margin-top: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6mm;
+  padding-top: 2mm;
+  border-top: 0.2pt solid var(--et-hair);
+  font-size: 2.5mm;
+  color: var(--et-ink-4);
+}
+.et-foot > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Шапка первой страницы ────────────────────────────────────────────────── */
+.et-head {
+  flex: 0 0 auto;
+  padding-bottom: 3.5mm;
+  margin-bottom: 5mm;
+  border-bottom: 0.5mm solid var(--et-rule);
+}
+
+.et-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6mm;
+}
+
+.et-eyebrow {
+  font-size: 2.6mm;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--et-ink-3);
+}
+
+.et-variant {
+  flex: 0 0 auto;
+  padding: 0.9mm 2.6mm;
+  border: 0.35mm solid var(--et-rule);
+  font-size: 2.9mm;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--et-ink);
+}
+
+.et-title {
+  font-size: 6.2mm;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+  margin: 1.6mm 0 0;
+  color: var(--et-ink);
+}
+
+.et-subtitle {
+  font-size: 3.2mm;
+  color: var(--et-ink-3);
+  margin-top: 1mm;
+  line-height: 1.3;
+}
+
+/* Метаданные одной строкой: класс · время · заданий · дата */
+.et-meta {
+  font-size: 3mm;
+  color: var(--et-ink-2);
+  margin-top: 2mm;
+}
+.et-meta-sep {
+  color: var(--et-ink-4);
+  padding: 0 1.2mm;
+}
+
+/* Поля для заполнения учеником */
+.et-fields {
+  display: flex;
+  gap: 6mm;
+  margin-top: 4mm;
+}
+.et-field {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 1.8mm;
+  min-width: 0;
+}
+.et-field--wide { flex: 2.4; }
+.et-field-label {
+  font-size: 2.8mm;
+  color: var(--et-ink-3);
+  white-space: nowrap;
+}
+.et-field-rule {
+  flex: 1;
+  height: 4.6mm;
+  border-bottom: 0.35mm solid var(--et-ink-3);
+}
+
+/* Инструкция + произвольный блок — один хайрлайн-бокс, метки врезкой */
+.et-note {
+  margin-top: 4mm;
+  padding: 2.4mm 3mm;
+  border: 0.25mm solid var(--et-rule-2);
+}
+.et-note-label {
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--et-ink);
+}
+.et-note-text {
+  font-size: 2.95mm;
+  line-height: 1.42;
+  color: var(--et-ink-2);
+  margin: 0 0 1mm;
+}
+.et-note-text:last-child { margin-bottom: 0; }
+.et-note-sep {
+  height: 0;
+  border-top: 0.2pt solid var(--et-hair);
+  margin: 2mm 0;
+}
+
+/* ── Задача ───────────────────────────────────────────────────────────────── */
+.et-task {
+  display: flex;
+  gap: 3.5mm;              /* NUM_COL_MM = 6.5mm квадрат + 3.5mm зазор */
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+/* Волосяной разделитель между задачами. Сумма margin + padding = TASK_GAP_MM.
+   Селектор `+` не срабатывает в measure-зоне (там задачи в обёртках), поэтому
+   измеренная высота задачи зазор не включает — он добавляется пагинацией. */
+.et-task + .et-task {
+  margin-top: 3.5mm;
+  padding-top: 3.5mm;
+  border-top: 0.2pt solid var(--et-hair);
+}
+
+.et-task-num {
+  flex: 0 0 6.5mm;
+  height: 6.5mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.3mm solid var(--et-rule);
+  font-size: 3.3mm;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--et-ink);
+}
+
+.et-task-main { flex: 1 1 auto; min-width: 0; }
+
+.et-task-text {
+  font-size: calc(3.9mm * var(--et-scale));   /* ≈ 11pt при M */
+  line-height: 1.45;
+  color: var(--et-ink);
+}
+.et-task-text p { margin: 0 0 1.4mm; }
+.et-task-text p:last-child { margin-bottom: 0; }
+.et-task-text ol,
+.et-task-text ul { margin: 1mm 0 1mm 5mm; padding: 0; }
+.et-task-text li { margin-bottom: 0.6mm; }
+
+.et-task-text table {
+  border-collapse: collapse;
+  margin: 2mm 0;
+  font-size: 0.95em;
+}
+.et-task-text th,
+.et-task-text td {
+  border: 0.25mm solid var(--et-rule-2);
+  padding: 1mm 2mm;
+  text-align: left;
+}
+.et-task-text th { font-weight: 600; }
+
+/* Чертежи: блочные, по центру, без рамок и заливок */
+.et-task-text svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.et-task-image {
+  margin: 2.5mm auto 0;
+  text-align: center;
+}
+.et-task-image img {
+  max-width: 100%;
+  display: inline-block;
+}
+
+.et-task-code {
+  margin-top: 1.2mm;
+  font-size: 2.4mm;
+  color: var(--et-ink-4);
+  font-family: 'Geist Mono', ui-monospace, monospace;
+}
+
+/* Строка ответа */
+.et-answer {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  margin-top: 2.6mm;
+}
+.et-answer-label {
+  font-size: 2.9mm;
+  color: var(--et-ink-2);
+}
+.et-answer-rule {
+  flex: 0 1 66mm;
+  height: 5mm;
+  border-bottom: 0.35mm solid var(--et-ink-3);
+}
+
+/* Зона решения (рабочая тетрадь) */
+.et-solution {
+  position: relative;
+  margin-top: 2.6mm;
+  border: 0.25mm solid var(--et-rule-2);
+  overflow: hidden;
+  background: #fff;
+}
+.et-solution-label {
+  position: absolute;
+  top: 1mm;
+  left: 2mm;
+  z-index: 1;
+  font-size: 2.3mm;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--et-ink-4);
+}
+
+.et-fill { position: absolute; inset: 0; }
+.et-fill-h {
+  position: absolute;
+  left: 0; right: 0;
+  height: 0;
+  border-top: 0.2pt solid var(--et-grid);
+  pointer-events: none;
+}
+.et-fill-v {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 0;
+  border-left: 0.2pt solid var(--et-grid);
+  pointer-events: none;
+}
+
+/* ── Лист ответов ─────────────────────────────────────────────────────────── */
+/* Ответов может быть больше одного листа (много вариантов) — даём странице
+   расти и разбиваться браузером, иначе overflow:hidden просто съест хвост. */
+.et-page--key {
+  height: auto;
+  min-height: 297mm;
+  overflow: visible;
+}
+
+.et-key-title {
+  font-size: 5mm;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0 0 4mm;
+  padding-bottom: 2mm;
+  border-bottom: 0.5mm solid var(--et-rule);
+}
+.et-key-block + .et-key-block { margin-top: 5mm; }
+.et-key-variant {
+  font-size: 2.8mm;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--et-ink-2);
+  margin-bottom: 2mm;
+}
+.et-key-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 0.25mm solid var(--et-rule-2);
+  border-left: 0.25mm solid var(--et-rule-2);
+}
+.et-key-cell {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  padding: 1.4mm 2.2mm;
+  border-right: 0.25mm solid var(--et-rule-2);
+  border-bottom: 0.25mm solid var(--et-rule-2);
+  font-size: 3.1mm;
+  min-height: 8mm;
+  overflow: hidden;
+}
+.et-key-num {
+  flex: 0 0 auto;
+  min-width: 5mm;
+  font-weight: 650;
+  color: var(--et-ink-3);
+}
+.et-key-answer { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.et-key-dash { color: var(--et-ink-4); }
+
+/* KaTeX внутри листа не должен раздувать строку */
+.et-root .katex { font-size: 1.04em; }
+.et-root .katex-display { margin: 1.6mm 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Печать
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  body:has(.et-root) {
+    visibility: hidden;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body:has(.et-root) .et-root,
+  body:has(.et-root) .et-root * {
+    visibility: visible;
+  }
+
+  body:has(.et-root) .et-root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    display: block;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+    background: #fff;
+    overflow: visible;
+  }
+
+  /* Панель настроек не должна создавать пустые страницы */
+  body:has(.et-root) .no-print { display: none !important; }
+
+  /* Обнуляем контекст позиционирования и обрезку у оболочки приложения:
+     .et-root позиционируется absolute от НАЧАЛА печатной области, а не от
+     Content (у него inline overflow:hidden и возможный position:relative).
+     Иначе листы уезжают вниз/вправо и хвост обрезается — грабля КИМ. */
+  body:has(.et-root) #root,
+  body:has(.et-root) .ant-app,
+  body:has(.et-root) .ant-layout,
+  body:has(.et-root) .ant-layout-content,
+  body:has(.et-root) .ant-layout-content > div {
+    position: static !important;
+    overflow: visible !important;
+  }
+
+  .et-measure { display: none !important; }
+
+  .et-page {
+    width: 210mm;
+    max-width: 100%;
+    /* 296mm, а не 297: доля миллиметра от округлений печати выдавливает
+       пустую страницу после каждого листа. Пагинация уже держит SAFETY_MM. */
+    height: 296mm;
+    margin: 0 auto;
+    border: 0;
+    box-shadow: none;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .et-page--key {
+    height: auto;
+    min-height: 296mm;
+    overflow: visible;
+  }
+
+  .et-page:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

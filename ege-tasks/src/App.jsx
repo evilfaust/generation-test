@@ -16,7 +16,7 @@ import {
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, TableOutlined, FileMarkdownOutlined,
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
-  PercentageOutlined, HomeOutlined, CalendarOutlined,
+  PercentageOutlined, HomeOutlined, CalendarOutlined, ProfileOutlined,
 } from '@ant-design/icons';
 // ── Ленивая загрузка страниц-компонентов ────────────────────────────────────
 // Все компоненты ниже используются ТОЛЬКО как элементы маршрутов (через page-
@@ -41,6 +41,7 @@ const SummerProgramList = lazy(() => import('./components/workspace/summer/Summe
 const StudentProgramEditor = lazy(() => import('./components/workspace/summer/StudentProgramEditor'));
 const TaskSheetGenerator = lazy(() => import('./components/OralWorksheetGenerator'));
 const TestWorkGenerator = lazy(() => import('./components/TestWorkGenerator'));
+const EntranceTestGenerator = lazy(() => import('./components/EntranceTestGenerator'));
 const EgeVariantGenerator = lazy(() => import('./components/EgeVariantGenerator'));
 const EgeProfileVariantGenerator = lazy(() => import('./components/EgeProfileVariantGenerator'));
 const OgeVariantGenerator = lazy(() => import('./components/OgeVariantGenerator'));
@@ -145,6 +146,7 @@ export const R = {
   OGE_VARIANT:         '/app/worksheets/oge-variant',
   EGE_SCORE_CALC:      '/app/worksheets/ege-score-calc',
   TEST:                '/app/worksheets/test',
+  ENTRANCE_TEST:       '/app/worksheets/entrance-test',
   MC_TEST:             '/app/worksheets/mc-test',
   MC_TEST_EDIT:        '/app/worksheets/mc-test/:testId',
   // Геймификация
@@ -264,6 +266,7 @@ const ROUTE_META = [
   { re: /^\/app\/worksheets\/ege-profile-variant/, menuKey: 'ege-profile-variant', menuGroup: 'worksheets-group', title: 'Варианты ЕГЭ (профильный уровень)' },
   { re: /^\/app\/worksheets\/oge-variant/, menuKey: 'oge-variant',       menuGroup: 'worksheets-group', title: 'Варианты ОГЭ (9 класс)' },
   { re: /^\/app\/worksheets\/ege-score/,   menuKey: 'ege-score-calc',    menuGroup: 'worksheets-group', title: 'Калькулятор баллов ЕГЭ' },
+  { re: /^\/app\/worksheets\/entrance-test/, menuKey: 'entrance-test',   menuGroup: 'worksheets-group', title: 'Входная контрольная работа' },
   { re: /^\/app\/worksheets\/test/,        menuKey: 'test-generator',    menuGroup: 'worksheets-group', title: 'Контрольные работы' },
   { re: /^\/app\/worksheets\/mc-test$/,    menuKey: 'mc-test',           menuGroup: 'worksheets-group', title: 'Тесты с выбором' },
   { re: /^\/app\/gamification\/qr/,        menuKey: 'qr-worksheet',      menuGroup: 'gamification-group', title: 'QR-листы' },
@@ -335,6 +338,7 @@ const MENU_KEY_PATH = {
   'oge-variant':            R.OGE_VARIANT,
   'ege-score-calc':         R.EGE_SCORE_CALC,
   'test-generator':         R.TEST,
+  'entrance-test':          R.ENTRANCE_TEST,
   'mc-test':                R.MC_TEST,
   'qr-worksheet':           R.QR,
   'pixel-art':              R.PIXEL_ART,
@@ -669,6 +673,7 @@ function AppLayout() {
         { key: 'oge-variant',     icon: <FileAddOutlined />,    label: 'Варианты ОГЭ (9 класс)' },
         { key: 'ege-score-calc',  icon: <BarChartOutlined />,   label: 'Калькулятор баллов' },
         { key: 'test-generator',  icon: <SnippetsOutlined />,   label: 'Контрольные работы' },
+        { key: 'entrance-test',   icon: <ProfileOutlined />,    label: 'Входная контрольная' },
         { key: 'mc-test',         icon: <FormOutlined />,       label: 'Тесты с выбором' },
       ],
     },
@@ -972,6 +977,7 @@ function App() {
               <Route path={R.OGE_VARIANT}    element={<OgeVariantGenerator />} />
               <Route path={R.EGE_SCORE_CALC} element={<EgeScoreCalculator />} />
               <Route path={R.TEST}           element={<TestWorkGenerator />} />
+              <Route path={R.ENTRANCE_TEST}  element={<EntranceTestGenerator />} />
               <Route path={R.MC_TEST}        element={<MCTestPage />} />
               <Route path={R.MC_TEST_EDIT}   element={<MCTestPage />} />
 
