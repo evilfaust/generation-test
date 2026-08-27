@@ -149,6 +149,20 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
     expect(second.container.querySelector('.et-page--key')).toBeNull();
   });
 
+  it('нижний колонтитул печатается по умолчанию и выключается тумблером', () => {
+    const on = render(<EntranceTestPrint variants={variants} meta={meta} />, { wrapper });
+    expect(on.container.querySelectorAll('.et-page .et-foot').length).toBeGreaterThan(0);
+    on.unmount();
+
+    const off = render(
+      <EntranceTestPrint variants={variants} meta={meta} options={{ showFooter: false }} />,
+      { wrapper }
+    );
+    expect(off.container.querySelector('.et-foot')).toBeNull();
+    // шапка и задачи на месте — выключается только подвал
+    expect(off.container.querySelectorAll('.et-page .et-task').length).toBe(2);
+  });
+
   it('номер варианта показывается, когда вариантов больше одного', () => {
     const { container } = render(
       <EntranceTestPrint

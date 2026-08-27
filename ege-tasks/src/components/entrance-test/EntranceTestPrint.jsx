@@ -19,8 +19,13 @@ const SAFETY_MM  = 3;    // запас на округления печати
 const TASK_GAP_MM = 7;   // зазор между задачами (3.5 margin + 3.5 padding)
 
 export const BODY_W_MM = PAGE_W_MM - 2 * PAD_X_MM;          // 182
-const BODY_H_REST_MM  = PAGE_H_MM - PAD_TOP_MM - PAD_BOT_MM - HEAD_MM - FOOT_MM - SAFETY_MM;
-const BODY_H_FIRST_MM = PAGE_H_MM - PAD_TOP_MM - PAD_BOT_MM - FOOT_MM - SAFETY_MM;
+
+// Ёмкость страницы зависит от того, печатается ли подвал: без него задачам
+// достаётся ещё 8 мм, и пагинация обязана это учесть.
+const bodyRestMm  = (withFoot) =>
+  PAGE_H_MM - PAD_TOP_MM - PAD_BOT_MM - HEAD_MM - (withFoot ? FOOT_MM : 0) - SAFETY_MM;
+const bodyFirstMm = (withFoot) =>
+  PAGE_H_MM - PAD_TOP_MM - PAD_BOT_MM - (withFoot ? FOOT_MM : 0) - SAFETY_MM;
 
 const MM = 96 / 25.4;    // px на мм при 96dpi
 const TASK_GAP_PX = TASK_GAP_MM * MM;
@@ -245,6 +250,7 @@ function VariantPages({
   const measureKey = useMemo(() => [
     layout, options.answerLine, options.solutionSpace, options.solutionFill,
     options.hideTaskPrefixes, options.showTaskCode, options.fontScale, options.fontFamily,
+    options.showFooter,
     meta.instruction, meta.notes, meta.notesTitle, meta.title, meta.subtitle,
     meta.eyebrow, meta.classLabel, meta.dateLabel, meta.duration, meta.showStudentFields,
     tasks.map(t => `${t.__key}|${t.statement_md || ''}|${t.has_image ? 1 : 0}|${t.kimImageSize || 'm'}`).join('§'),
@@ -266,8 +272,9 @@ function VariantPages({
       if (el) heights.set(t.__key, el.offsetHeight);
     });
     const headPx = headRef.current?.offsetHeight || 0;
-    const firstCap = Math.max(BODY_H_FIRST_MM * MM - headPx, 40 * MM);
-    setPages(paginateByHeight(tasks, heights, firstCap, BODY_H_REST_MM * MM));
+    const withFoot = options.showFooter !== false;
+    const firstCap = Math.max(bodyFirstMm(withFoot) * MM - headPx, 40 * MM);
+    setPages(paginateByHeight(tasks, heights, firstCap, bodyRestMm(withFoot) * MM));
   }, [measureKey, tick]);
 
   const list = pages || [];
@@ -317,10 +324,12 @@ function VariantPages({
             ))}
           </div>
 
-          <div className="et-foot">
-            <span>{meta.footerNote || brand}</span>
-            <span>{pageOffset + i + 1}</span>
-          </div>
+          {options.showFooter !== false && (
+            <div className="et-foot">
+              <span>{meta.footerNote || brand}</span>
+              <span>{pageOffset + i + 1}</span>
+            </div>
+          )}
         </section>
       ))}
     </>
@@ -328,7 +337,7 @@ function VariantPages({
 }
 
 /* ── Лист ответов (для учителя) ─────────────────────────────────────────────*/
-function AnswerKeyPage({ variants, variantLabel, meta, brand, pageNumber }) {
+function AnswerKeyPage({ variants, variantLabel, meta, brand, pageNumber, showFooter }) {
   return (
     <section className="et-page et-page--key">
       <div className="et-runhead">
@@ -355,10 +364,12 @@ function AnswerKeyPage({ variants, variantLabel, meta, brand, pageNumber }) {
         ))}
       </div>
 
-      <div className="et-foot">
-        <span>{meta.footerNote || brand}</span>
-        <span>{pageNumber}</span>
-      </div>
+      {showFooter && (
+        <div className="et-foot">
+          <span>{meta.footerNote || brand}</span>
+          <span>{pageNumber}</span>
+        </div>
+      )}
     </section>
   );
 }
@@ -388,6 +399,7 @@ export default function EntranceTestPrint({
     showTaskCode: false,
     fontScale: 1,
     fontFamily: 'sans',
+    showFooter: true,
     ...options,
   };
 
@@ -433,6 +445,7 @@ export default function EntranceTestPrint({
           meta={meta}
           brand={brand}
           pageNumber={offset + 1}
+          showFooter={opts.showFooter}
         />
       )}
     </div>

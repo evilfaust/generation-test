@@ -117,6 +117,7 @@ const EntranceTestGenerator = () => {
   const [showTaskCode, setShowTaskCode] = useState(false);
   const [hideTaskPrefixes, setHideTaskPrefixes] = useState(false);
   const [showAnswersPage, setShowAnswersPage] = useState(true);
+  const [showFooter, setShowFooter] = useState(true);
 
   // ── Сохранение / загрузка ─────────────────────────────────────────────────
   const [saveModalVisible, setSaveModalVisible] = useState(false);
@@ -287,7 +288,8 @@ const EntranceTestGenerator = () => {
     showTaskCode,
     fontScale,
     fontFamily,
-  }), [answerLine, solutionSpace, solutionFill, hideTaskPrefixes, showTaskCode, fontScale, fontFamily]);
+    showFooter,
+  }), [answerLine, solutionSpace, solutionFill, hideTaskPrefixes, showTaskCode, fontScale, fontFamily, showFooter]);
 
   const hasVariants = variants.length > 0;
 
@@ -427,10 +429,14 @@ const EntranceTestGenerator = () => {
                       </Col>
                       <Col xs={24} md={12}>
                         <div style={{ marginBottom: 12 }}>
-                          <Text type="secondary" style={{ fontSize: 12 }}>Подпись в подвале листа</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Подпись в подвале листа
+                            {!showFooter && ' — подвал выключен в «Оформлении»'}
+                          </Text>
                           <Input
                             value={meta.footerNote}
                             onChange={setMetaField('footerNote')}
+                            disabled={!showFooter}
                             placeholder="МБОУ «Школа №…» · кабинет математики"
                           />
                         </div>
@@ -652,6 +658,12 @@ const EntranceTestGenerator = () => {
                       <Space size={8}>
                         <Switch size="small" checked={answerLine} onChange={setAnswerLine} />
                         <Text style={{ fontSize: 13 }}>Строка «Ответ»</Text>
+                      </Space>
+                      <Space size={8}>
+                        <Switch size="small" checked={showFooter} onChange={setShowFooter} />
+                        <Tooltip title="Подпись слева и номер страницы справа. Без подвала задачам достаётся ещё 8 мм на листе.">
+                          <Text style={{ fontSize: 13 }}>Нижний колонтитул</Text>
+                        </Tooltip>
                       </Space>
                       <Space size={8}>
                         <Switch size="small" checked={showAnswersPage} onChange={setShowAnswersPage} />
