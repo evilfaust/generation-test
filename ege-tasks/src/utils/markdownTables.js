@@ -72,13 +72,27 @@ export function autofixTableDelimiters(md) {
 export function normalizeTableDirectives(md) {
   if (!md || typeof md !== 'string' || md.indexOf('{') === -1) return md;
   const lines = md.split('\n');
+  const isDirective = new Array(lines.length).fill(false);
+
+  // Идём снизу вверх: строка работает как директива, если ведёт к таблице —
+  // напрямую или через другую директиву. Второе нужно, чтобы модификаторы
+  // можно было писать отдельными строками («{галерея}» и «{без линий}»),
+  // а не только перечислением через запятую.
+  let below = -1; // ближайшая непустая строка ниже текущей
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const t = lines[i].trim();
+    if (t === '') continue;
+    if (DIRECTIVE_LINE_RE.test(t) && below >= 0 && (isTableish(lines[below]) || isDirective[below])) {
+      isDirective[i] = true;
+    }
+    below = i;
+  }
+
   const out = [];
   for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
-    const isDirective = DIRECTIVE_LINE_RE.test(line.trim()) && isTableish(lines[i + 1]);
-    if (isDirective && out.length && out[out.length - 1].trim() !== '') out.push('');
-    out.push(line);
-    if (isDirective) out.push('');
+    if (isDirective[i] && out.length && out[out.length - 1].trim() !== '') out.push('');
+    out.push(lines[i]);
+    if (isDirective[i]) out.push('');
   }
   return out.join('\n');
 }

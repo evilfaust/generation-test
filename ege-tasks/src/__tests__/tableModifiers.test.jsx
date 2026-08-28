@@ -116,6 +116,24 @@ describe('MathRenderer — модификаторы таблиц', () => {
     expect(container.querySelector('thead').textContent).toContain('1. один');
   });
 
+  it('директивы можно писать отдельными строками подряд', () => {
+    const md = '{галерея}\n{без линий}\n| А | Б |\n| --- | --- |\n| 1 | 2 |';
+    const { container } = render(<MathRenderer text={md} />);
+    const cls = container.querySelector('table').className;
+    expect(cls).toContain('md-table--gallery');
+    expect(cls).toContain('md-table--plain');
+    expect(container.textContent).not.toContain('{');
+  });
+
+  it('три директивы подряд и запись через запятую дают один результат', () => {
+    const rows = '| А | Б |\n| --- | --- |\n| 1 | 2 |';
+    const a = render(<MathRenderer text={`{галерея}\n{без линий}\n{компактная}\n${rows}`} />);
+    const b = render(<MathRenderer text={`{галерея, без линий, компактная}\n${rows}`} />);
+    const clsA = a.container.querySelector('table').className.split(' ').sort().join(' ');
+    const clsB = b.container.querySelector('table').className.split(' ').sort().join(' ');
+    expect(clsA).toBe(clsB);
+  });
+
   it('{галерея} работает и с таблицей в одну строку', () => {
     const md = 'ГРАФИКИ\n{галерея}\n| А) один | Б) два | В) три | Г) четыре |\nЗапишите в ответ цифры:';
     const { container } = render(<MathRenderer text={md} />);
