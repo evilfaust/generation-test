@@ -102,6 +102,20 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
     expect(screen.getAllByText('Фамилия, имя').length).toBeGreaterThan(0);
   });
 
+  it('поле «Класс» убирается отдельным тумблером, остальные остаются', () => {
+    const withClass = render(<EntranceTestPrint variants={variants} meta={meta} />, { wrapper });
+    const labels = (r) =>
+      [...r.container.querySelectorAll('.et-page .et-field-label')].map(el => el.textContent);
+    expect(labels(withClass)).toEqual(['Фамилия, имя', 'Класс', 'Дата']);
+    withClass.unmount();
+
+    const noClass = render(
+      <EntranceTestPrint variants={variants} meta={{ ...meta, showClassField: false }} />,
+      { wrapper }
+    );
+    expect(labels(noClass)).toEqual(['Фамилия, имя', 'Дата']);
+  });
+
   it('метаданные идут одной строкой с правильным склонением', () => {
     const { container } = render(<EntranceTestPrint variants={variants} meta={meta} />, { wrapper });
     const line = container.querySelector('.et-page .et-meta').textContent;

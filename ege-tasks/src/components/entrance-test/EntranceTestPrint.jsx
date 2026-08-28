@@ -209,10 +209,12 @@ function SheetHeader({ meta, variantLabel, variantNumber, tasksCount, showVarian
             <span className="et-field-label">Фамилия, имя</span>
             <span className="et-field-rule" />
           </div>
-          <div className="et-field">
-            <span className="et-field-label">Класс</span>
-            <span className="et-field-rule" />
-          </div>
+          {meta.showClassField !== false && (
+            <div className="et-field">
+              <span className="et-field-label">Класс</span>
+              <span className="et-field-rule" />
+            </div>
+          )}
           <div className="et-field">
             <span className="et-field-label">Дата</span>
             <span className="et-field-rule" />
@@ -252,7 +254,8 @@ function VariantPages({
     options.hideTaskPrefixes, options.showTaskCode, options.fontScale, options.fontFamily,
     options.showFooter,
     meta.instruction, meta.notes, meta.notesTitle, meta.title, meta.subtitle,
-    meta.eyebrow, meta.classLabel, meta.dateLabel, meta.duration, meta.showStudentFields,
+    meta.eyebrow, meta.classLabel, meta.dateLabel, meta.duration,
+    meta.showStudentFields, meta.showClassField,
     tasks.map(t => `${t.__key}|${t.statement_md || ''}|${t.has_image ? 1 : 0}|${t.kimImageSize || 'm'}`).join('§'),
   ].join('¦'), [tasks, layout, options, meta]);
 

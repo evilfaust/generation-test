@@ -98,6 +98,7 @@ const EntranceTestGenerator = () => {
     dateLabel: todayLabel(),
     footerNote: '',
     showStudentFields: true,
+    showClassField: true,
     alwaysShowVariant: true,
   }));
 
@@ -480,7 +481,25 @@ const EntranceTestGenerator = () => {
                           checked={meta.showStudentFields}
                           onChange={v => setMeta(prev => ({ ...prev, showStudentFields: v }))}
                         />
-                        <Text style={{ fontSize: 13 }}>Поля «Фамилия, имя · Класс · Дата»</Text>
+                        <Text style={{ fontSize: 13 }}>Поля «Фамилия, имя» и «Дата»</Text>
+                      </Space>
+                      <Space size={8}>
+                        <Switch
+                          size="small"
+                          checked={meta.showClassField}
+                          disabled={!meta.showStudentFields}
+                          onChange={v => setMeta(prev => ({ ...prev, showClassField: v }))}
+                        />
+                        <Tooltip title="В школах, где класс один, поле только мешает — но коллегам с параллелями оно нужно.">
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: meta.showStudentFields ? undefined : 'var(--ink-4)',
+                            }}
+                          >
+                            Поле «Класс»
+                          </Text>
+                        </Tooltip>
                       </Space>
                       <Space size={8}>
                         <Switch
