@@ -7,6 +7,16 @@
 // первой в блоке (предыдущая строка — не таблица) и СЛЕДУЮЩАЯ строка — тоже
 // таблица, но НЕ разделитель. Тогда после заголовка вставляем разделитель по
 // числу столбцов заголовка. Существующие корректные таблицы не трогаем.
+//
+// Отдельный случай — таблица В ОДНУ СТРОКУ (ряд чертежей «А) … | Б) … | В) …»):
+// тела у неё нет, поэтому GFM не видит таблицы вообще и печатает строку с
+// палками как текст. Одинокую строку признаём таблицей ТОЛЬКО если перед ней
+// стоит строка-директива («{галерея}» и т.п.) — там намерение объявлено явно.
+// Без директивы любая строка с палками стала бы таблицей.
+
+// Строка-директива оформления таблицы: «{без линий}», «{галерея}», «{бланк}»…
+// (разбирает utils/remarkTableModifiers.js).
+const DIRECTIVE_LINE_RE = /^\{\s*[^{}]+\s*\}$/;
 
 function isTableish(line) {
   const t = (line || '').trim();
@@ -24,6 +34,16 @@ function headerColCount(line) {
   return line.trim().slice(1, -1).split('|').length;
 }
 
+// Ближайшая непустая строка выше — директива оформления?
+function afterDirective(lines, i) {
+  for (let j = i - 1; j >= 0; j -= 1) {
+    const t = (lines[j] || '').trim();
+    if (t === '') continue;
+    return DIRECTIVE_LINE_RE.test(t);
+  }
+  return false;
+}
+
 export function autofixTableDelimiters(md) {
   if (!md || typeof md !== 'string' || md.indexOf('|') === -1) return md;
   const lines = md.split('\n');
@@ -31,21 +51,24 @@ export function autofixTableDelimiters(md) {
   for (let i = 0; i < lines.length; i += 1) {
     out.push(lines[i]);
     const isStartOfBlock = isTableish(lines[i]) && (i === 0 || !isTableish(lines[i - 1]));
+    if (!isStartOfBlock) continue;
     const next = lines[i + 1];
-    if (isStartOfBlock && next !== undefined && isTableish(next) && !isDelimiterRow(next)) {
+    const nextIsRow = next !== undefined && isTableish(next) && !isDelimiterRow(next);
+    const soloRow = !isTableish(next) && afterDirective(lines, i);
+    if (nextIsRow || soloRow) {
       const cols = headerColCount(lines[i]);
       if (cols >= 1) out.push(`|${' --- |'.repeat(cols)}`);
+      // Однострочную таблицу нужно закрыть пустой строкой: иначе GFM утащит
+      // следующий абзац («Запишите в ответ цифры…») в тело таблицы.
+      if (soloRow && next !== undefined && next.trim() !== '') out.push('');
     }
   }
   return out.join('\n');
 }
 
-// Строка-директива оформления таблицы («{без линий}», «{бланк}» и т.п.,
-// см. utils/remarkTableModifiers.js) должна стать ОТДЕЛЬНЫМ параграфом —
-// иначе она прилипнет к соседнему тексту и плагин её не увидит. Учителя
-// пустые строки вокруг расставляют не всегда, поэтому добавляем их сами.
-const DIRECTIVE_LINE_RE = /^\{\s*[^{}]+\s*\}$/;
-
+// Директива должна стать ОТДЕЛЬНЫМ параграфом — иначе она прилипнет к соседнему
+// тексту и плагин её не увидит. Учителя пустые строки вокруг расставляют не
+// всегда, поэтому добавляем их сами.
 export function normalizeTableDirectives(md) {
   if (!md || typeof md !== 'string' || md.indexOf('{') === -1) return md;
   const lines = md.split('\n');
@@ -120,6 +143,18 @@ export const TABLE_SNIPPETS = [
       '| 1. `numline: domain -6 6; ray left -4 open` | 3. `numline: domain -6 6; ray right -4 open` |',
       '| --- | --- |',
       '| 2. `numline: domain -6 6; ray left 4 open` | 4. `numline: domain -6 6; ray right 4 open` |',
+      '',
+    ].join('\n'),
+  },
+  {
+    key: 'gallery-row',
+    label: 'Ряд рисунков (одна строка)',
+    hint: 'А) … Б) … В) … Г) — чертежи в строку, без второй строки',
+    md: [
+      '',
+      '{галерея}',
+      '| А) `plot: x -3 3; y -2 4; f x^2-1` | Б) `plot: x -3 3; y -2 4; f x^2+1` '
+        + '| В) `plot: x -3 3; y -4 2; f -x^2+1` | Г) `plot: x -3 3; y -4 2; f -x^2-1` |',
       '',
     ].join('\n'),
   },

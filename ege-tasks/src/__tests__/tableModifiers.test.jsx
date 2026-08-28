@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import MathRenderer from '../shared/components/MathRenderer';
 import { parseTableDirective } from '../utils/remarkTableModifiers';
-import { normalizeTableDirectives, TABLE_SNIPPETS } from '../utils/markdownTables';
+import { normalizeTableDirectives, prepareMarkdownTables, TABLE_SNIPPETS } from '../utils/markdownTables';
 
 const ANSWER_BLANK = '| А | Б | В | Г |\n| --- | --- | --- | --- |\n|   |   |   |   |';
 const MATCHING = [
@@ -46,6 +46,18 @@ describe('normalizeTableDirectives', () => {
   it('не трогает фигурные скобки вне контекста таблицы', () => {
     const md = 'Множество {1; 2; 3}\nобычный текст';
     expect(normalizeTableDirectives(md)).toBe(md);
+  });
+});
+
+describe('autofixTableDelimiters — таблица в одну строку', () => {
+  it('после директивы одинокая строка становится таблицей', () => {
+    const md = '{галерея}\n| А) a | Б) b |';
+    expect(normalizeTableDirectives(md)).toContain('{галерея}');
+    expect(prepareMarkdownTables(md)).toContain('| --- | --- |');
+  });
+
+  it('без директивы одинокую строку с палками не трогаем', () => {
+    expect(prepareMarkdownTables('текст\n| А | Б |\nдальше')).not.toContain('---');
   });
 });
 
@@ -104,10 +116,31 @@ describe('MathRenderer — модификаторы таблиц', () => {
     expect(container.querySelector('thead').textContent).toContain('1. один');
   });
 
+  it('{галерея} работает и с таблицей в одну строку', () => {
+    const md = 'ГРАФИКИ\n{галерея}\n| А) один | Б) два | В) три | Г) четыре |\nЗапишите в ответ цифры:';
+    const { container } = render(<MathRenderer text={md} />);
+    const table = container.querySelector('table');
+    expect(table.className).toContain('md-table--gallery');
+    expect(table.querySelectorAll('th')).toHaveLength(4);
+    // соседний текст не должен втянуться в таблицу
+    expect(table.textContent).not.toContain('Запишите');
+    expect(container.textContent).toContain('Запишите в ответ цифры:');
+    expect(container.textContent).not.toContain('{галерея}');
+  });
+
   it('заготовка «Рисунки в клетках» рисует 4 чертежа в сетке', () => {
     const snippet = TABLE_SNIPPETS.find((s) => s.key === 'gallery');
     const { container } = render(<MathRenderer text={snippet.md} />);
     expect(container.querySelector('table').className).toContain('md-table--gallery');
     expect(container.querySelectorAll('table svg')).toHaveLength(4);
+  });
+
+  it('заготовка «Ряд рисунков» даёт 4 графика в одной строке', () => {
+    const snippet = TABLE_SNIPPETS.find((s) => s.key === 'gallery-row');
+    const { container } = render(<MathRenderer text={snippet.md} />);
+    const table = container.querySelector('table');
+    expect(table.className).toContain('md-table--gallery');
+    expect(table.querySelectorAll('tr')).toHaveLength(1);
+    expect(table.querySelectorAll('svg')).toHaveLength(4);
   });
 });

@@ -73,6 +73,11 @@ function fmtLabel(x) {
   return String(x).replace('.', ',');
 }
 
+// Зазор от оси до верха подписи. У обычного <text> (базовая линия axisY+15,
+// кегль 11) он около 7; дроби даём чуть больше — её верхняя цифра стоит прямо
+// под кружком точки и без запаса читается как приклеенная.
+const LABEL_TOP_GAP = 8.5;
+
 // SVG-подпись ПОД осью: дробь a/b — стопкой (числитель/черта/знаменатель),
 // иначе обычный <text>. Возвращает строку SVG-элементов.
 function belowLabelSvg(label, cx, axisY, fs, color) {
@@ -85,7 +90,11 @@ function belowLabelSvg(label, cx, axisY, fs, color) {
   const den = m[3];
   const ffs = fs - 0.5;
   const half = Math.max(num.length, den.length) * ffs * 0.34 + 1.5;
-  const barY = axisY + 13;
+  // Числитель начинается сразу под осью и налезал на кружок точки (r 3.4 +
+  // обводка 1.3 → низ кружка ≈ axisY + 4): дробь «слипалась» с точкой. Держим
+  // от оси тот же зазор, что у обычной подписи — 7 px до верха цифры.
+  // Высота цифры ≈ 0.72 кегля, черта на 2.5 ниже базовой линии числителя.
+  const barY = round2(axisY + LABEL_TOP_GAP + 0.72 * ffs + 2.5);
   const out = [];
   if (neg) {
     out.push(`<text x="${round2(cx - half - 2.5)}" y="${round2(barY + ffs * 0.36)}" font-size="${fs}" text-anchor="end" fill="${color}">−</text>`);
@@ -217,9 +226,11 @@ export function numberLineSvg(model, opts = {}) {
   const W = opts.width || 260;
   // Дробные подписи занимают больше места под осью → выше холст и больший отступ.
   const fracPresent = (model?.ticks || []).some((t) => t.label != null && FRAC_RE.test(String(t.label)));
-  const H = opts.height || (fracPresent ? 58 : 48);
+  const H = opts.height || (fracPresent ? 64 : 48);
   const PAD = 14;
-  const bottomPad = fracPresent ? 26 : 20;
+  // Дробь опущена ниже (не липнет к точке), поэтому знаменателю нужно больше
+  // места. AXIS_Y при этом не меняется — растёт только поле под осью.
+  const bottomPad = fracPresent ? 32 : 20;
   const AXIS_Y = H - bottomPad;
   const dom = (model && model.domain) || DEFAULT_DOMAIN;
   const [dmin, dmax] = dom;

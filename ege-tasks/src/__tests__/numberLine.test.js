@@ -107,7 +107,20 @@ describe('дробные значения', () => {
     expect(svg).toMatch(/>2<\/text>/);
     expect(svg).toMatch(/<line[^>]+stroke="#374151"[^>]+stroke-width="1"/);
     // холст выше обычного, чтобы знаменатель не обрезался
-    expect(svg).toContain('viewBox="0 0 260 58"');
+    expect(svg).toContain('viewBox="0 0 260 64"');
+  });
+
+  it('дробь не налезает на кружок точки', () => {
+    const svg = numberLineSvgFromSpec('domain 0 1\npoint 1/2 open');
+    const axisY = Number(/<circle[^>]*cy="([\d.]+)"[^>]*r="3\.4"/.exec(svg)[1]);
+    const [, numY, numFs] = /<text[^>]*y="([\d.]+)"[^>]*font-size="([\d.]+)"[^>]*>1<\/text>/.exec(svg);
+    // верх цифры ≈ базовая линия минус 0,72 кегля; низ кружка ≈ axisY + 4
+    const numTop = Number(numY) - 0.72 * Number(numFs);
+    expect(numTop).toBeGreaterThan(axisY + 6);
+    // знаменатель при этом остаётся внутри холста
+    const denY = Number(/<text[^>]*y="([\d.]+)"[^>]*>2<\/text>/.exec(svg)[1]);
+    const height = Number(/viewBox="0 0 \d+ (\d+)"/.exec(svg)[1]);
+    expect(denY).toBeLessThan(height);
   });
 
   it('отрицательная дробь рисует минус', () => {
