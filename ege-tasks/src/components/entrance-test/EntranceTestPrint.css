@@ -61,14 +61,17 @@
 }
 
 /* ── Лист ─────────────────────────────────────────────────────────────────── */
+/* min-height, а НЕ height + overflow:hidden. Если пагинация промахнётся
+   (например, чертёж догрузился уже после замера), лист вырастет и «лишняя»
+   задача уедет на следующую физическую страницу — некрасиво, но видно.
+   С обрезкой такие задачи молча ПРОПАДАЛИ с листа (поймано 28.08.2026). */
 .et-page {
   width: 210mm;
-  height: 297mm;
+  min-height: 297mm;
   padding: 12mm 14mm 8mm;
   box-sizing: border-box;
   background: #fff;
   position: relative;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: 0 6px 28px rgba(17, 24, 39, 0.10);
@@ -77,7 +80,6 @@
 .et-body {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
 }
 
 /* ── Колонтитулы ──────────────────────────────────────────────────────────── */
@@ -367,14 +369,6 @@
 }
 
 /* ── Лист ответов ─────────────────────────────────────────────────────────── */
-/* Ответов может быть больше одного листа (много вариантов) — даём странице
-   расти и разбиваться браузером, иначе overflow:hidden просто съест хвост. */
-.et-page--key {
-  height: auto;
-  min-height: 297mm;
-  overflow: visible;
-}
-
 .et-key-title {
   font-size: 5mm;
   font-weight: 650;
@@ -477,18 +471,12 @@
     max-width: 100%;
     /* 296mm, а не 297: доля миллиметра от округлений печати выдавливает
        пустую страницу после каждого листа. Пагинация уже держит SAFETY_MM. */
-    height: 296mm;
+    min-height: 296mm;
     margin: 0 auto;
     border: 0;
     box-shadow: none;
     break-after: page;
     page-break-after: always;
-  }
-
-  .et-page--key {
-    height: auto;
-    min-height: 296mm;
-    overflow: visible;
   }
 
   .et-page:last-of-type {

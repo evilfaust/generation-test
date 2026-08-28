@@ -258,7 +258,7 @@ function VariantPages({
 
   // Шрифты KaTeX догружаются асинхронно — после готовности меряем заново.
   useEffect(() => {
-    if (typeof document === 'undefined' || !document.fonts?.ready) return;
+    if (typeof document === 'undefined' || !document.fonts?.ready) return undefined;
     let alive = true;
     document.fonts.ready.then(() => { if (alive) setTick(t => t + 1); });
     return () => { alive = false; };
@@ -275,6 +275,29 @@ function VariantPages({
     const withFoot = options.showFooter !== false;
     const firstCap = Math.max(bodyFirstMm(withFoot) * MM - headPx, 40 * MM);
     setPages(paginateByHeight(tasks, heights, firstCap, bodyRestMm(withFoot) * MM));
+  }, [measureKey, tick]);
+
+  // 🚨 Чертежи грузятся асинхронно. Пока <img> не загружен, его высота — 0
+  // (kimImageImgStyle задаёт только max-height), и задача с чертежом меряется
+  // на несколько сантиметров короче, чем будет. Пагинация набивает страницу
+  // «лишними» задачами, после загрузки картинок хвост выезжает за лист.
+  // Поэтому ждём каждую картинку и перемеряем.
+  useEffect(() => {
+    const pending = Object.values(taskRefs.current)
+      .filter(Boolean)
+      .flatMap(el => [...el.querySelectorAll('img')])
+      .filter(img => !img.complete);
+    if (!pending.length) return undefined;
+
+    const bump = () => setTick(t => t + 1);
+    pending.forEach(img => {
+      img.addEventListener('load', bump);
+      img.addEventListener('error', bump);
+    });
+    return () => pending.forEach(img => {
+      img.removeEventListener('load', bump);
+      img.removeEventListener('error', bump);
+    });
   }, [measureKey, tick]);
 
   const list = pages || [];

@@ -6,6 +6,14 @@ import { App } from 'antd';
 import EntranceTestPrint, { paginateByHeight, BODY_W_MM } from '../components/entrance-test/EntranceTestPrint';
 import { getPreset, ENTRANCE_PRESETS, SOLUTION_SPACE_MM } from '../components/entrance-test/presets';
 
+// jsdom импортированный CSS не применяет, а `?raw` на .css в vitest отдаёт
+// пустую строку — поэтому печатные стили сторожим по исходнику с диска.
+const printCss = () =>
+  readFileSync(
+    resolve(process.cwd(), 'src/components/entrance-test/EntranceTestPrint.css'),
+    'utf-8'
+  ).replace(/\/\*[\s\S]*?\*\//g, '');
+
 const wrapper = ({ children }) => <App>{children}</App>;
 
 const task = (n, extra = {}) => ({
@@ -211,6 +219,41 @@ describe('EntranceTestPrint — формулы', () => {
     const css = readFileSync(cssPath, 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(css.length).toBeGreaterThan(1000);
     expect(css).not.toMatch(/\.et-task-text\s+svg\s*[,{]/);
+  });
+});
+
+describe('EntranceTestPrint — чертежи и пагинация', () => {
+  // image_url отдаётся getTaskImageUrl как есть — не требует живого PocketBase
+  const imgTask = {
+    id: 'img1',
+    code: 'EGE-09',
+    statement_md: 'Найдите площадь четырёхугольника (см. рис.).',
+    has_image: true,
+    image_url: 'https://example.test/figure.png',
+    kimImageSize: 'l',
+    answer: '12',
+  };
+
+  it('чертёж попадает и в зону измерения, и на лист', () => {
+    const { container } = render(
+      <EntranceTestPrint variants={[{ number: 1, tasks: [imgTask] }]} meta={meta} />,
+      { wrapper }
+    );
+    // без картинки в measure-зоне пагинации нечего дожидаться, и высота задачи
+    // будет посчитана без чертежа
+    expect(container.querySelectorAll('.et-measure img').length).toBe(1);
+    expect(container.querySelectorAll('.et-page img').length).toBe(1);
+  });
+
+  it('лист не обрезает контент: min-height вместо height + overflow:hidden', () => {
+    // Регрессия 28.08.2026: чертежи догружались уже после замера, задача
+    // вырастала, и хвост страницы молча съедался overflow:hidden — с листа
+    // пропадали целые задания. Лист обязан расти, а не резать.
+    const rule = printCss().match(/^\.et-page \{([^}]*)\}/m);
+    expect(rule).toBeTruthy();
+    expect(rule[1]).toMatch(/min-height:\s*297mm/);
+    expect(rule[1]).not.toMatch(/overflow:\s*hidden/);
+    expect(rule[1]).not.toMatch(/[^-]height:\s*297mm/);
   });
 });
 
