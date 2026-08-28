@@ -111,6 +111,19 @@ export const TABLE_SNIPPETS = [
     ].join('\n'),
   },
   {
+    key: 'gallery',
+    label: 'Рисунки в клетках (2 × 2)',
+    hint: 'Варианты ответа с чертежами: первая строка — не шапка',
+    md: [
+      '',
+      '{галерея}',
+      '| 1. `numline: domain -6 6; ray left -4 open` | 3. `numline: domain -6 6; ray right -4 open` |',
+      '| --- | --- |',
+      '| 2. `numline: domain -6 6; ray left 4 open` | 4. `numline: domain -6 6; ray right 4 open` |',
+      '',
+    ].join('\n'),
+  },
+  {
     key: 'grid',
     label: 'Обычная таблица с линиями',
     hint: 'Стандартная сетка 3 × 2',

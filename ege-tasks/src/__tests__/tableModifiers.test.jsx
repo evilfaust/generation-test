@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import MathRenderer from '../shared/components/MathRenderer';
 import { parseTableDirective } from '../utils/remarkTableModifiers';
-import { normalizeTableDirectives } from '../utils/markdownTables';
+import { normalizeTableDirectives, TABLE_SNIPPETS } from '../utils/markdownTables';
 
 const ANSWER_BLANK = '| А | Б | В | Г |\n| --- | --- | --- | --- |\n|   |   |   |   |';
 const MATCHING = [
@@ -19,6 +19,8 @@ describe('parseTableDirective', () => {
     expect(parseTableDirective('{plain}')).toEqual(['plain']);
     expect(parseTableDirective('{бланк}')).toEqual(['answers']);
     expect(parseTableDirective('{ Сетка }')).toEqual(['grid']);
+    expect(parseTableDirective('{галерея}')).toEqual(['gallery']);
+    expect(parseTableDirective('{варианты}')).toEqual(['gallery']);
   });
 
   it('понимает несколько модификаторов через запятую', () => {
@@ -93,5 +95,19 @@ describe('MathRenderer — модификаторы таблиц', () => {
   it('answerBoxes добавляет рамку-поле только пустым ячейкам', () => {
     const { container } = render(<MathRenderer text={ANSWER_BLANK} answerBoxes />);
     container.querySelectorAll('td').forEach((td) => expect(td.className).toContain('md-cell--box'));
+  });
+
+  it('{галерея} вешает класс — первая строка остаётся клеткой с содержимым', () => {
+    const md = '{галерея}\n\n| 1. один | 3. три |\n| --- | --- |\n| 2. два | 4. четыре |';
+    const { container } = render(<MathRenderer text={md} />);
+    expect(container.querySelector('table').className).toContain('md-table--gallery');
+    expect(container.querySelector('thead').textContent).toContain('1. один');
+  });
+
+  it('заготовка «Рисунки в клетках» рисует 4 чертежа в сетке', () => {
+    const snippet = TABLE_SNIPPETS.find((s) => s.key === 'gallery');
+    const { container } = render(<MathRenderer text={snippet.md} />);
+    expect(container.querySelector('table').className).toContain('md-table--gallery');
+    expect(container.querySelectorAll('table svg')).toHaveLength(4);
   });
 });

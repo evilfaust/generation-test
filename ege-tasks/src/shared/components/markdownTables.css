@@ -88,6 +88,36 @@ table.md-table--noheader thead {
   display: none !important;
 }
 
+/* ── {галерея} — клетки с чертежами ─────────────────────────────────────────
+   «На каком рисунке изображено множество решений»: 2 × 2 с графиками. GFM
+   всегда делает первую строку шапкой, а шапка — это серая заливка, центр и
+   полужирный. Здесь она снова становится обычной клеткой, а колонки —
+   одинаковой ширины, чтобы чертежи стояли ровной сеткой. */
+table.md-table--gallery {
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+table.md-table--gallery thead,
+table.md-table--gallery thead tr,
+table.md-table--gallery th,
+table.md-table--gallery td {
+  background: transparent !important;
+}
+table.md-table--gallery th {
+  font-weight: 400 !important;
+  text-align: left !important;
+}
+table.md-table--gallery th,
+table.md-table--gallery td {
+  vertical-align: middle !important;
+}
+/* чертёж шире колонки ужимается, а не ломает раскладку */
+table.md-table--gallery img,
+table.md-table--gallery svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ── {компактная} ───────────────────────────────────────────────────────────*/
 table.md-table--compact th,
 table.md-table--compact td {
@@ -101,7 +131,8 @@ table.md-table--compact td {
     border-color: #000 !important;
   }
   table.md-table--plain,
-  table.md-table--answers {
+  table.md-table--answers,
+  table.md-table--gallery {
     break-inside: avoid;
     page-break-inside: avoid;
   }

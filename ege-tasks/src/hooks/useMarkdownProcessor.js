@@ -11,6 +11,7 @@ import { numberLineSvgFromSpec } from '../utils/numberLine'
 import { coordPlotSvgFromSpec } from '../utils/coordPlot'
 import { prepareMarkdownTables } from '../utils/markdownTables'
 import remarkTableModifiers from '../utils/remarkTableModifiers'
+import '../shared/components/markdownTables.css'  // стили классов md-table--*
 
 // Декодирование HTML-сущностей внутри <code> (rehype экранирует < & " > ).
 function decodeEntities(s) {
