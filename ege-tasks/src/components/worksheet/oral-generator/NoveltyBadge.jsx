@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Tag, Tooltip, Spin, Button } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import { api } from '../../../services/pocketbase';
@@ -7,6 +7,11 @@ const PDF_SERVICE_URL = import.meta.env.VITE_PDF_SERVICE_URL || 'http://localhos
 
 // Сколько последних работ берём как «эталон уже выданного».
 const RECENT_WORKS = 5;
+
+// Правки набора идут пачками (drag&drop, удаление задач) — считаем новизну
+// не на каждое движение, иначе десятки запросов забивают соединения браузера
+// и мешают сохранению работы.
+const DEBOUNCE_MS = 700;
 
 function noveltyColor(pct) {
   if (pct >= 80) return 'green';
@@ -32,23 +37,33 @@ export default function NoveltyBadge({ variants = [], currentWorkId = null }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
+  // Растущий счётчик: результат устаревшего расчёта не перетирает свежий.
+  const runIdRef = useRef(0);
 
   // уникальные id задач набора
-  const taskIds = [...new Set(
-    variants.flatMap((v) => (v.tasks || []).map((t) => t.id).filter(Boolean))
-  )];
+  const taskIds = useMemo(
+    () => [...new Set(variants.flatMap((v) => (v.tasks || []).map((t) => t.id).filter(Boolean)))],
+    [variants]
+  );
   const key = taskIds.join(',');
 
-  const compute = useCallback(async () => {
+  const compute = useCallback(async (signal) => {
     if (taskIds.length === 0) { setData(null); return; }
+    const runId = ++runIdRef.current;
+    const isStale = () => runId !== runIdRef.current || signal?.aborted;
+
     setLoading(true); setError(false);
     try {
-      // последние работы → объединение их задач как эталон
-      const works = (await api.getWorks()) || [];
-      const recent = works.filter((w) => w.id !== currentWorkId).slice(0, RECENT_WORKS);
+      // Эталон — задачи последних работ. Списки берём лёгкими: у работ нужен
+      // только id, у вариантов — состав (без expand задач).
+      const recentWorks = await api.getRecentWorkIds(RECENT_WORKS + 1, currentWorkId);
+      if (isStale()) return;
+      const recent = recentWorks.filter((id) => id !== currentWorkId).slice(0, RECENT_WORKS);
+
       const refSet = new Set();
-      for (const w of recent) {
-        const vs = await api.getVariantsByWork(w.id);
+      if (recent.length) {
+        const vs = await api.getVariantsByWorks(recent, { fields: 'id,tasks' });
+        if (isStale()) return;
         vs.forEach((v) => (v.tasks || []).forEach((id) => refSet.add(id)));
       }
       // не сравнивать задачу саму с собой
@@ -58,20 +73,26 @@ export default function NoveltyBadge({ variants = [], currentWorkId = null }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ task_ids: taskIds, ref_task_ids: [...refSet] }),
-        signal: AbortSignal.timeout(15000),
+        signal: signal || AbortSignal.timeout(15000),
       });
+      if (isStale()) return;
       if (!res.ok) { setError(true); return; }
       const j = await res.json();
+      if (isStale()) return;
       if (j.error) { setError(true); return; }
       setData(j);
     } catch {
-      setError(true);
+      if (!isStale()) setError(true);
     } finally {
-      setLoading(false);
+      if (!isStale()) setLoading(false);
     }
   }, [key, currentWorkId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { compute(); }, [compute]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => compute(controller.signal), DEBOUNCE_MS);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [compute]);
 
   if (taskIds.length === 0) return null;
   if (loading) return <Tag icon={<Spin size="small" />} style={{ margin: 0 }}>оценка новизны…</Tag>;
@@ -90,7 +111,7 @@ export default function NoveltyBadge({ variants = [], currentWorkId = null }) {
           🆕 новизна {novelty_pct}% · {noveltyWord(novelty_pct)}
         </Tag>
         {dup > 0 && <Tag color="volcano" style={{ margin: 0 }}>повторов: {dup}</Tag>}
-        <Button size="small" type="text" icon={<ReloadOutlined />} onClick={compute} />
+        <Button size="small" type="text" icon={<ReloadOutlined />} onClick={() => compute()} />
       </span>
     </Tooltip>
   );

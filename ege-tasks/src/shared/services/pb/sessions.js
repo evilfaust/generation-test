@@ -1,4 +1,5 @@
 import { pb, _logAudit, withOwner } from './client.js';
+import { getFullListByOr } from './chunked.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
@@ -69,15 +70,15 @@ export const sessionsApi = {
     }
   },
 
+  // Список работ у учителя доходит до сотен — одним OR-фильтром такой запрос
+  // не проходит (400 от PB / 414 от nginx, в браузере видно как ошибку CORS),
+  // поэтому идём кусками через getFullListByOr.
   async getSessionsByWorks(workIds = []) {
     try {
-      if (!workIds.length) return [];
-      const filter = workIds.map(id => `work = "${escapeFilter(id)}"`).join(' || ');
-      return await pb.collection('work_sessions').getFullList({
-        filter,
-        sort: '-created',
+      const records = await getFullListByOr('work_sessions', 'work', workIds, {
         fields: 'id,work,created,is_open',
       });
+      return records.sort((a, b) => new Date(b.created) - new Date(a.created));
     } catch (error) {
       console.error('Error fetching sessions by works:', error);
       return [];
@@ -148,19 +149,7 @@ export const sessionsApi = {
   // (например статус и время сдачи для прогресса кампании).
   async getAttemptsBySessions(sessionIds = [], { fields = 'id,session,score,total' } = {}) {
     try {
-      if (!sessionIds.length) return [];
-      const CHUNK_SIZE = 50;
-      const chunks = [];
-      for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
-        chunks.push(sessionIds.slice(i, i + CHUNK_SIZE));
-      }
-      const results = await Promise.all(
-        chunks.map(chunk => {
-          const filter = chunk.map(id => `session = "${escapeFilter(id)}"`).join(' || ');
-          return pb.collection('attempts').getFullList({ filter, fields });
-        })
-      );
-      return results.flat();
+      return await getFullListByOr('attempts', 'session', sessionIds, { fields });
     } catch (error) {
       console.error('Error fetching attempts by sessions:', error);
       return [];
@@ -170,22 +159,9 @@ export const sessionsApi = {
   // Попытки по сессиям с именем ученика (для тепловой карты)
   async getAttemptsBySessionsWithStudent(sessionIds = []) {
     try {
-      if (!sessionIds.length) return [];
-      const CHUNK_SIZE = 50;
-      const chunks = [];
-      for (let i = 0; i < sessionIds.length; i += CHUNK_SIZE) {
-        chunks.push(sessionIds.slice(i, i + CHUNK_SIZE));
-      }
-      const results = await Promise.all(
-        chunks.map(chunk => {
-          const filter = chunk.map(id => `session = "${escapeFilter(id)}"`).join(' || ');
-          return pb.collection('attempts').getFullList({
-            filter,
-            fields: 'id,session,student,student_name,status',
-          });
-        })
-      );
-      return results.flat();
+      return await getFullListByOr('attempts', 'session', sessionIds, {
+        fields: 'id,session,student,student_name,status',
+      });
     } catch (error) {
       console.error('Error fetching attempts by sessions (with student):', error);
       return [];
@@ -197,12 +173,12 @@ export const sessionsApi = {
       const sessions = await this.getSessionsByWork(workId);
       if (sessions.length === 0) return 0;
 
-      const sessionFilters = sessions.map(s => `session = "${escapeFilter(s.id)}"`);
-      const filter = sessionFilters.join(' || ');
-      const attempts = await pb.collection('attempts').getFullList({
-        filter,
-        fields: 'id',
-      });
+      const attempts = await getFullListByOr(
+        'attempts',
+        'session',
+        sessions.map(s => s.id),
+        { fields: 'id' },
+      );
       return attempts.length;
     } catch (error) {
       console.error('Error fetching attempts count by work:', error);

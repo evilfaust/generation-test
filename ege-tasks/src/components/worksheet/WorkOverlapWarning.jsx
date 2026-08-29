@@ -49,7 +49,12 @@ export default function WorkOverlapWarning({ workId, variants = [], onOpenWork }
     }
   }, [key, workId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { check(); }, [check]);
+  // Дебаунс: при перетаскивании/удалении задач состав меняется пачками,
+  // а каждый пересчёт — запрос вариантов по всем задачам работы.
+  useEffect(() => {
+    const timer = setTimeout(() => check(), 600);
+    return () => clearTimeout(timer);
+  }, [check]);
 
   if (taskIds.length === 0) return null;
   if (loading && overlaps === null) {

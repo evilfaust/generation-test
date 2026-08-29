@@ -5,15 +5,20 @@ import { api } from '../services/pocketbase';
 const ReferenceDataContext = createContext(null);
 
 const CACHE_KEY = 'ege_ref_data_v3';
-const CACHE_TTL = 5 * 60 * 1000; // 5 минут
+const CACHE_TTL = 5 * 60 * 1000; // 5 минут — дольше кэш не показываем
+// Снимок каталога — это ~25 тыс. задач, полсотни запросов подряд. Если кэш
+// совсем свежий (открыли соседнюю вкладку, перезагрузили страницу), фоновое
+// обновление только занимает канал и тормозит то, что делает учитель.
+const REFRESH_AFTER = 2 * 60 * 1000;
 
 function loadFromCache() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const { data, timestamp } = JSON.parse(raw);
-    if (Date.now() - timestamp > CACHE_TTL) return null;
-    return data;
+    const age = Date.now() - timestamp;
+    if (age > CACHE_TTL) return null;
+    return { data, age };
   } catch {
     return null;
   }
@@ -157,15 +162,17 @@ export function ReferenceDataProvider({ children }) {
     const cached = loadFromCache();
     if (cached) {
       // Мгновенно показываем кэшированные данные
-      applyData(cached, setters);
+      applyData(cached.data, setters);
       setLoading(false);
-      // Тихое фоновое обновление
-      fetchAllData()
-        .then(data => {
-          applyData(data, setters);
-          saveToCache(data);
-        })
-        .catch(err => console.warn('Background refresh failed:', err));
+      // Тихое фоновое обновление — только если кэш уже подостыл
+      if (cached.age > REFRESH_AFTER) {
+        fetchAllData()
+          .then(data => {
+            applyData(data, setters);
+            saveToCache(data);
+          })
+          .catch(err => console.warn('Background refresh failed:', err));
+      }
     } else {
       // Нет кэша — грузим с индикатором
       setLoading(true);

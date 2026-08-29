@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Alert, Tag, Tooltip, Button } from 'antd';
 import { DownOutlined, UpOutlined } from '@ant-design/icons';
 
@@ -22,33 +22,40 @@ export default function VariantSimilarityWarning({ variants = [] }) {
   const [results, setResults] = useState([]); // [{ variantIdx, pairs:[{a,b,cos,pct}] }]
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!variants.length) { setResults([]); return; }
+  // Ключ по составам вариантов: массив variants пересоздаётся на каждый рендер
+  // родителя, и зависимость по ссылке гоняла /pairs вхолостую при любой правке.
+  const idsByVariant = useMemo(
+    () => variants.map((v) => (v.tasks || []).map((t) => t.id).filter(Boolean)),
+    [variants]
+  );
+  const key = idsByVariant.map((ids) => ids.join(',')).join('|');
 
-    (async () => {
+  useEffect(() => {
+    if (!idsByVariant.length) { setResults([]); return; }
+    const controller = new AbortController();
+    // Правки идут пачками — ждём паузы, иначе на каждое движение уходит запрос.
+    const timer = setTimeout(async () => {
       const out = [];
-      for (let vi = 0; vi < variants.length; vi++) {
-        const tasks = variants[vi].tasks || [];
-        const ids = tasks.map((t) => t.id).filter(Boolean);
+      for (let vi = 0; vi < idsByVariant.length; vi++) {
+        const ids = idsByVariant[vi];
         if (ids.length < 2) continue;
         try {
           const res = await fetch(`${PDF_SERVICE_URL}/pairs`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ task_ids: ids, min_cos: WARN_COS }),
-            signal: AbortSignal.timeout(10000),
+            signal: controller.signal,
           });
           if (!res.ok) continue;
           const data = await res.json();
           if (data.pairs?.length) out.push({ variantIdx: vi, pairs: data.pairs });
-        } catch { /* сервис недоступен — молчим */ }
+        } catch { /* сервис недоступен или запрос отменён — молчим */ }
       }
-      if (!cancelled) setResults(out);
-    })();
+      if (!controller.signal.aborted) setResults(out);
+    }, 700);
 
-    return () => { cancelled = true; };
-  }, [variants]);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!results.length) return null;
 

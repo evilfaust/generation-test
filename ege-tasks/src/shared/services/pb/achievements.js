@@ -1,6 +1,6 @@
 import { pb, _logAudit } from './client.js';
+import { getFullListByOr } from './chunked.js';
 import { shuffleArray } from '../../utils/shuffle';
-import { escapeFilter } from '../../utils/escapeFilter';
 
 export const achievementsApi = {
   // ============ АЧИВКИ (ACHIEVEMENTS) ============
@@ -27,14 +27,7 @@ export const achievementsApi = {
 
   async getAchievementsByIds(ids = []) {
     try {
-      const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
-      if (uniqueIds.length === 0) return [];
-
-      const filter = uniqueIds
-        .map((id) => `id = "${escapeFilter(id)}"`)
-        .join(' || ');
-
-      return await pb.collection('achievements').getFullList({ filter });
+      return await getFullListByOr('achievements', 'id', ids);
     } catch (error) {
       console.error('Error fetching achievements by ids:', error);
       return [];

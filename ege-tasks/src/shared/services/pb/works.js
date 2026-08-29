@@ -1,4 +1,5 @@
 import { pb, _logAudit, withOwner, andOwner } from './client.js';
+import { getFullListByOr } from './chunked.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
@@ -231,16 +232,19 @@ export const worksApi = {
   // фильтр строится OR-цепочкой.
   async getVariantsContainingTasks(taskIds = [], excludeWorkId = null) {
     try {
-      if (!taskIds.length) return [];
-      const orPart = '(' + taskIds.map(id => `tasks ~ "${escapeFilter(id)}"`).join(' || ') + ')';
-      const filter = excludeWorkId
-        ? `${orPart} && work != "${escapeFilter(excludeWorkId)}"`
-        : orPart;
-      return await pb.collection('variants').getFullList({
-        filter,
-        expand: 'work',
-        fields: 'id,work,tasks,expand.work.id,expand.work.title,expand.work.archived',
-      });
+      return await getFullListByOr(
+        'variants',
+        'tasks',
+        taskIds,
+        {
+          expand: 'work',
+          fields: 'id,work,tasks,expand.work.id,expand.work.title,expand.work.archived',
+        },
+        {
+          op: '~',
+          extraFilter: excludeWorkId ? `work != "${escapeFilter(excludeWorkId)}"` : '',
+        },
+      );
     } catch (error) {
       console.error('Error fetching variants containing tasks:', error);
       return [];
@@ -258,6 +262,36 @@ export const worksApi = {
       return records;
     } catch (error) {
       console.error('Error fetching variants:', error);
+      return [];
+    }
+  },
+
+  // Только id последних работ (для эталонов новизны и т.п.) — вместо полного
+  // getWorks с expand: список работ у учителя доходит до сотен записей.
+  async getRecentWorkIds(limit = 5, excludeId = null) {
+    try {
+      const filterArr = ['(archived = false || archived = null)'];
+      if (excludeId) filterArr.push(`id != "${escapeFilter(excludeId)}"`);
+      const res = await pb.collection('works').getList(1, limit, {
+        filter: andOwner(filterArr.join(' && ')),
+        sort: '-created',
+        fields: 'id',
+        skipTotal: true,
+      });
+      return res.items.map((w) => w.id);
+    } catch (error) {
+      console.error('Error fetching recent work ids:', error);
+      return [];
+    }
+  },
+
+  // Варианты сразу нескольких работ, без expand — когда нужны только составы
+  // (оценка новизны, эталонные наборы). Один запрос вместо N последовательных.
+  async getVariantsByWorks(workIds = [], { fields = 'id,work,number,tasks' } = {}) {
+    try {
+      return await getFullListByOr('variants', 'work', workIds, { fields, sort: 'number' });
+    } catch (error) {
+      console.error('Error fetching variants by works:', error);
       return [];
     }
   },

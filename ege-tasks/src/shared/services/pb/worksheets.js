@@ -1,6 +1,6 @@
 import { pb, _logAudit, withOwner, andOwner } from './client.js';
+import { getFullListByOr } from './chunked.js';
 import { shuffleArray } from '../../utils/shuffle';
-import { escapeFilter } from '../../utils/escapeFilter';
 
 export const worksheetsApi = {
   async getQrWorksheets() {
@@ -159,10 +159,8 @@ export const worksheetsApi = {
   },
 
   async getTasksByIds(ids) {
-    if (!ids.length) return [];
     try {
-      const filter = ids.map(id => `id="${id}"`).join(' || ');
-      return await pb.collection('tasks').getFullList({ filter });
+      return await getFullListByOr('tasks', 'id', ids);
     } catch (error) {
       console.error('Error fetching tasks by ids:', error);
       return [];
@@ -515,11 +513,8 @@ export const worksheetsApi = {
 
   // Получить task-записи по списку id (для рендера mc_test, т.к. task_id хранится в variants.json)
   async getTasksByIds(ids) {
-    if (!ids || !ids.length) return [];
     try {
-      const unique = [...new Set(ids.filter(Boolean))];
-      const filter = unique.map(id => `id = "${id}"`).join(' || ');
-      return await pb.collection('tasks').getFullList({ filter, batch: 500 });
+      return await getFullListByOr('tasks', 'id', ids, { batch: 500 });
     } catch (error) {
       console.error('Error fetching tasks by ids:', error);
       return [];
@@ -577,17 +572,20 @@ export const worksheetsApi = {
       });
       if (!sessions.length) return { attempts: [], answerStats: {} };
 
-      const sessionFilter = sessions.map(s => `session = "${s.id}"`).join(' || ');
-      const attempts = await pb.collection('attempts').getFullList({
-        filter: `(${sessionFilter}) && status = "submitted"`,
-        sort: '-created',
-      });
+      const attempts = await getFullListByOr(
+        'attempts',
+        'session',
+        sessions.map(s => s.id),
+        { sort: '-created' },
+        { extraFilter: 'status = "submitted"' },
+      );
       if (!attempts.length) return { attempts, answerStats: {} };
 
-      const attemptFilter = attempts.map(a => `attempt = "${a.id}"`).join(' || ');
-      const answers = await pb.collection('attempt_answers').getFullList({
-        filter: attemptFilter,
-      });
+      const answers = await getFullListByOr(
+        'attempt_answers',
+        'attempt',
+        attempts.map(a => a.id),
+      );
 
       const answerStats = {};
       for (const ans of answers) {

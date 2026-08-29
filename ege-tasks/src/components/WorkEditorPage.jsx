@@ -122,34 +122,30 @@ const WorkEditorPage = ({ initialWorkId = null }) => {
         time_limit: values.timeLimit ? parseInt(values.timeLimit, 10) : null,
       });
 
-      const existingVariants = await api.getVariantsByWork(currentWork.id);
+      // Для записи нужны только id и номера — полный список с expand задач
+      // (сотни килобайт) здесь ни к чему.
+      const existingVariants = await api.getVariantsByWorks([currentWork.id], { fields: 'id,number' });
       const existingByNumber = new Map(existingVariants.map(v => [v.number, v]));
-      const incomingNumbers = new Set();
+      const incomingNumbers = new Set(variants.map(v => v.number));
 
-      for (const variant of variants) {
-        const taskIds = variant.tasks.map(t => t.id);
-        const order = variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx }));
-        const payload = {
-          work: currentWork.id,
-          number: variant.number,
-          tasks: taskIds,
-          order,
-        };
-
-        incomingNumbers.add(variant.number);
-        const existing = existingByNumber.get(variant.number);
-        if (existing) {
-          await api.updateVariant(existing.id, payload);
-        } else {
-          await api.createVariant(payload);
-        }
-      }
-
-      for (const variant of existingVariants) {
-        if (!incomingNumbers.has(variant.number)) {
-          await api.deleteVariant(variant.id);
-        }
-      }
+      // Варианты независимы друг от друга — пишем их разом, а не по очереди.
+      await Promise.all([
+        ...variants.map((variant) => {
+          const payload = {
+            work: currentWork.id,
+            number: variant.number,
+            tasks: variant.tasks.map(t => t.id),
+            order: variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx })),
+          };
+          const existing = existingByNumber.get(variant.number);
+          return existing
+            ? api.updateVariant(existing.id, payload)
+            : api.createVariant(payload);
+        }),
+        ...existingVariants
+          .filter(v => !incomingNumbers.has(v.number))
+          .map(v => api.deleteVariant(v.id)),
+      ]);
 
       message.success('Работа сохранена');
       setDirty(false);
@@ -170,16 +166,12 @@ const WorkEditorPage = ({ initialWorkId = null }) => {
         archived: false,
       });
 
-      for (const variant of variants) {
-        const taskIds = variant.tasks.map(t => t.id);
-        const order = variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx }));
-        await api.createVariant({
-          work: newWork.id,
-          number: variant.number,
-          tasks: taskIds,
-          order,
-        });
-      }
+      await Promise.all(variants.map((variant) => api.createVariant({
+        work: newWork.id,
+        number: variant.number,
+        tasks: variant.tasks.map(t => t.id),
+        order: variant.tasks.map((t, idx) => ({ taskId: t.id, position: idx })),
+      })));
 
       message.success('Работа сохранена как новая');
       setDirty(false);

@@ -80,6 +80,7 @@ const WorkEditor = ({
   const [moveTargetVariantIndex, setMoveTargetVariantIndex] = useState(null);
   const [movingTaskRef, setMovingTaskRef] = useState(null);
   const [similarRef, setSimilarRef] = useState(null); // { variantIndex, taskIndex, task }
+  const [saving, setSaving] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [worksheetPrintOpen, setWorksheetPrintOpen] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
@@ -246,18 +247,30 @@ const WorkEditor = ({
     setActiveVariantKey(newActive);
   };
 
+  // Пока сохранение идёт, кнопки заблокированы: иначе повторный клик по
+  // «зависшей» кнопке отправлял второй комплект PATCH-ов.
   const handleSaveClick = async () => {
     const values = await form.validateFields();
-    if (hasAttempts) {
-      await onSaveAsNew(values);
-    } else {
-      await onSave(values);
+    setSaving(true);
+    try {
+      if (hasAttempts) {
+        await onSaveAsNew(values);
+      } else {
+        await onSave(values);
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleSaveAsNewClick = async () => {
     const values = await form.validateFields();
-    await onSaveAsNew(values);
+    setSaving(true);
+    try {
+      await onSaveAsNew(values);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleExportMD = () => {
@@ -321,16 +334,16 @@ const WorkEditor = ({
         <Space wrap>
           {hasAttempts ? (
             <Tooltip title="У работы есть попытки. Можно только сохранить как новую.">
-              <Button type="primary" icon={<CopyOutlined />} onClick={handleSaveAsNewClick}>
+              <Button type="primary" icon={<CopyOutlined />} loading={saving} onClick={handleSaveAsNewClick}>
                 Сохранить как новую
               </Button>
             </Tooltip>
           ) : (
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveClick}>
+            <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSaveClick}>
               Сохранить
             </Button>
           )}
-          <Button icon={<CopyOutlined />} onClick={handleSaveAsNewClick}>
+          <Button icon={<CopyOutlined />} disabled={saving} onClick={handleSaveAsNewClick}>
             Копия
           </Button>
           {totalTasksCount > 0 && (

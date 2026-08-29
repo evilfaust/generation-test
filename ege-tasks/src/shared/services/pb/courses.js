@@ -1,4 +1,5 @@
 import { pb, _logAudit, andOwner } from './client.js';
+import { getFullListByOr } from './chunked.js';
 import { escapeFilter } from '../../utils/escapeFilter';
 
 // Курсы (онлайн-интенсивы в малых группах) — надстройка над teaching_groups
@@ -95,9 +96,7 @@ export const coursesApi = {
       const members = (await this.getCourseMembers(courseId)).filter((m) => m.active !== false);
       const ids = members.map((m) => m.student).filter(Boolean);
       if (!ids.length) return [];
-      const filter = ids.map((id) => `id = "${escapeFilter(id)}"`).join(' || ');
-      const studs = await pb.collection('students').getFullList({ filter, sort: 'name' });
-      return studs;
+      return await getFullListByOr('students', 'id', ids, { sort: 'name' });
     } catch (error) {
       console.error('Error fetching course students:', error);
       return [];
@@ -148,11 +147,13 @@ export const coursesApi = {
     const ids = (courseIds || []).filter(Boolean);
     if (!ids.length) return [];
     try {
-      const groupFilter = ids.map((id) => `group = "${escapeFilter(id)}"`).join(' || ');
-      return await pb.collection('lesson_publications').getFullList({
-        filter: `published = true && (${groupFilter})`,
-        sort: 'date_plan',
-      });
+      return await getFullListByOr(
+        'lesson_publications',
+        'group',
+        ids,
+        { sort: 'date_plan' },
+        { extraFilter: 'published = true' },
+      );
     } catch (error) {
       console.error('Error fetching publications for courses:', error);
       return [];
