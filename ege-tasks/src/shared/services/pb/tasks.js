@@ -1,14 +1,21 @@
 import { pb, _logAudit } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
+import { searchCaseVariants, MIN_SEARCH_LENGTH } from '../../utils/searchVariants';
 
 export const tasksApi = {
   _buildTasksFilter(filters = {}) {
     const filterArr = [];
 
-    if (filters.search) {
-      const searchTerm = escapeFilter(filters.search);
-      filterArr.push(`(code ~ "${searchTerm}" || statement_md ~ "${searchTerm}")`);
+    // Поиск по коду и тексту. Кириллица в SQLite регистрозависима, поэтому
+    // перебираем написания — см. searchCaseVariants.
+    const search = String(filters.search || '').trim();
+    if (search.length >= MIN_SEARCH_LENGTH) {
+      const conds = searchCaseVariants(search).flatMap((v) => {
+        const term = escapeFilter(v);
+        return [`code ~ "${term}"`, `statement_md ~ "${term}"`];
+      });
+      filterArr.push(`(${conds.join(' || ')})`);
     }
 
     if (filters.topic) {

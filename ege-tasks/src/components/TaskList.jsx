@@ -59,6 +59,11 @@ const TaskList = ({
     }
   }, [initialFiltersToken]);
 
+  // Автоотмена запросов в SDK выключена глобально (pb.autoCancellation(false)),
+  // поэтому ответ на старый поиск может прийти позже свежего — применяем
+  // результат только последнего запроса.
+  const loadSeqRef = useRef(0);
+
   const loadTasks = async (newFilters = {}, options = {}) => {
     const {
       page = currentPage,
@@ -66,6 +71,7 @@ const TaskList = ({
       clearSelection = true,
     } = options;
 
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
       const pageData = await api.getTasksPage({
@@ -73,6 +79,7 @@ const TaskList = ({
         perPage,
         filters: newFilters,
       });
+      if (seq !== loadSeqRef.current) return; // пришёл ответ на устаревший запрос
 
       if (page > 1 && pageData.items.length === 0 && pageData.totalItems > 0) {
         const lastPage = Math.ceil(pageData.totalItems / perPage);
@@ -92,10 +99,11 @@ const TaskList = ({
 
       filtersRef.current = newFilters;
     } catch (error) {
+      if (seq !== loadSeqRef.current) return;
       console.error('Error loading tasks:', error);
       message.error('Ошибка при загрузке задач');
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   };
 

@@ -1,7 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, Form, Select, Button, Space, Row, Col, Radio, Statistic, Badge, Input, Tag } from 'antd';
 import { FilterOutlined, ClearOutlined, SearchOutlined, SortAscendingOutlined, PlusOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { MIN_SEARCH_LENGTH } from '../shared/utils/searchVariants';
+
+// Поиск по тексту — это LIKE по 25 тыс. условий; уходить в сеть на каждую
+// набранную букву не нужно, ждём паузы в наборе.
+const SEARCH_DEBOUNCE_MS = 400;
 
 const { Option } = Select;
 
@@ -45,7 +50,10 @@ const TaskFilters = ({
   const applyFilters = useCallback((values) => {
     const newFilters = {};
 
-    if (values.search)                        newFilters.search    = values.search;
+    // Строку короче минимума в фильтр не кладём — иначе чип «Поиск: т» висит,
+    // а на запросе он не сказывается (см. _buildTasksFilter).
+    const search = String(values.search || '').trim();
+    if (search.length >= MIN_SEARCH_LENGTH)   newFilters.search    = search;
     if (values.exam_type)                     newFilters.exam_type = values.exam_type;
     if (values.topic)                         newFilters.topic     = values.topic;
     if (values.subtopic)                      newFilters.subtopic  = values.subtopic;
@@ -80,7 +88,25 @@ const TaskFilters = ({
     applyFilters(values);
   }, [initialFiltersToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Правка строки поиска применяется с задержкой, остальные фильтры — сразу
+  // (там выбор из списка, «промежуточных» значений не бывает).
+  const searchTimerRef = useRef(null);
+  useEffect(() => () => clearTimeout(searchTimerRef.current), []);
+
   const handleFieldChange = (changedValues, allValues) => {
+    if (Object.keys(changedValues).length === 1 && changedValues.search !== undefined) {
+      clearTimeout(searchTimerRef.current);
+      const cleared = !changedValues.search;
+      // Очистку поля применяем сразу — учитель ждёт полный список немедленно.
+      if (cleared) {
+        applyFilters(allValues);
+      } else {
+        searchTimerRef.current = setTimeout(() => applyFilters(allValues), SEARCH_DEBOUNCE_MS);
+      }
+      return;
+    }
+    clearTimeout(searchTimerRef.current);
+
     // Смена контекста — сбрасываем тему и подтему
     if (changedValues.exam_type !== undefined) {
       setSelectedExamType(changedValues.exam_type || null);
@@ -167,7 +193,11 @@ const TaskFilters = ({
       >
         <Row gutter={16}>
           <Col xs={24} sm={18} md={18}>
-            <Form.Item name="search" label="Поиск по коду или тексту">
+            <Form.Item
+              name="search"
+              label="Поиск по коду или тексту"
+              extra={`Регистр не важен, минимум ${MIN_SEARCH_LENGTH} символа`}
+            >
               <Input
                 placeholder="Введите код задачи или текст..."
                 prefix={<SearchOutlined />}

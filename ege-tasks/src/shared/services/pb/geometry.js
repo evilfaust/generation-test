@@ -2,6 +2,7 @@ import { pb, _logAudit, withOwner, andOwner } from './client.js';
 import { PB_BASE_URL } from '../pocketbaseUrl';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
+import { searchCaseVariants, MIN_SEARCH_LENGTH } from '../../utils/searchVariants';
 
 export const geometryApi = {
   // ─── Geometry Topics ──────────────────────────────────────────────────────
@@ -128,9 +129,15 @@ export const geometryApi = {
           filterArr.push(`tags ~ "${escapeFilter(t)}"`);
         }
       }
-      if (filters.search) {
-        const s = escapeFilter(filters.search);
-        filterArr.push(`(code ~ "${s}" || title ~ "${s}" || statement_md ~ "${s}" || answer ~ "${s}" || source ~ "${s}")`);
+      // Кириллица в SQLite регистрозависима — перебираем написания
+      // (см. searchCaseVariants), иначе «Треугольник» не находит «треугольник».
+      const search = String(filters.search || '').trim();
+      if (search.length >= MIN_SEARCH_LENGTH) {
+        const conds = searchCaseVariants(search).flatMap((v) => {
+          const t = escapeFilter(v);
+          return [`code ~ "${t}"`, `title ~ "${t}"`, `statement_md ~ "${t}"`, `answer ~ "${t}"`, `source ~ "${t}"`];
+        });
+        filterArr.push(`(${conds.join(' || ')})`);
       }
 
       // Исключаем тяжёлые base64-поля из списка — они перенесены в файловое поле drawing_image.
