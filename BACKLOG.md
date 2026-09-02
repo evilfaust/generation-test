@@ -123,6 +123,26 @@ object/method/fact) + 2514 чертежей в `geometry_tasks`. Миграци�
 
 ## 💡 Идеи на будущее
 
+### Печать: та же грабля с порталами Ant в остальных печатных корнях (2026-09-02)
+
+В `print-sheet` починено (v3.9.151): портальные слои Ant (`.ant-tooltip`,
+`.ant-modal-wrap`, дропдауны) живут прямо в `<body>`, вне `.no-print`, и держат
+экранные координаты. `visibility: hidden` их прячет, но НЕ убирает из потока —
+Chrome считает ширину документа по ним и ужимает лист до ~60%, прижимая
+влево-вверх. Лечится в `@media print`: `display: none` для порталов +
+`html/body { width: 210mm; overflow: hidden }`.
+
+Те же корни уязвимы, но не проверены (у них на самом листе нет Ant-контролов,
+поэтому тултип возможен только от панели настроек рядом):
+`WorkPrintPreview` (`.wpv-overlay`), `WorksheetGridPrint` (`.wgp-root`),
+КИМ (`EgeVariantGenerator.css`), `TDFPrintView`, `MarathonWorksheetPrint`,
+`GeometryTaskPreview`, `KtpPrintView`, маршрутный лист.
+
+Проверять быстро и без браузера: собрать стенд с реальным CSS + `<div
+class="ant-tooltip" style="position:absolute;left:1050px">` и напечатать
+headless-Chrome'ом в PDF (`--headless=new --print-to-pdf`), затем `sips` в PNG.
+
+
 ### Сканирование бланков №1 — этап 2 (база v3.9.116 в проде, 2026-07-02)
 
 Базовый флоу готов и задеплоен (CHANGELOG [3.9.116]): 📷 в «Моих работах» →

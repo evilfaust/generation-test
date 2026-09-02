@@ -671,6 +671,39 @@
    Печать
    ═══════════════════════════════════════════════════════════════════════════ */
 @media print {
+  /* 🚨 Ширину печатной области Chrome берёт по ВСЕМУ документу, а не по одному
+     листу. visibility:hidden прячет интерфейс, но оставляет его в потоке —
+     любой элемент, торчащий правее 210 мм, включает shrink-to-fit: лист
+     печатается в ~60% масштаба, прижатый влево-вверх (поймано 02.09.2026 на
+     Генераторе). Отсюда жёсткая ширина корня и overflow:hidden — они обрезают
+     всё лишнее, не трогая сам лист: он position:absolute от начала печатной
+     области, и такой предок его не клипует. */
+  html:has(.ps-root),
+  body:has(.ps-root) {
+    width: 210mm !important;
+    min-width: 0 !important;
+    max-width: 210mm !important;
+    overflow: hidden !important;
+  }
+
+  /* Порталы Ant Design живут прямо в <body>, вне .no-print, и держат экранные
+     координаты (тултип у кнопок правки — левее некуда, но с left ~1000px).
+     Это и был главный «хвост», ронявший масштаб печати. */
+  body:has(.ps-root) .ant-tooltip,
+  body:has(.ps-root) .ant-popover,
+  body:has(.ps-root) .ant-dropdown,
+  body:has(.ps-root) .ant-select-dropdown,
+  body:has(.ps-root) .ant-picker-dropdown,
+  body:has(.ps-root) .ant-modal-root,
+  body:has(.ps-root) .ant-modal-wrap,
+  body:has(.ps-root) .ant-modal-mask,
+  body:has(.ps-root) .ant-drawer,
+  body:has(.ps-root) .ant-message,
+  body:has(.ps-root) .ant-notification,
+  body:has(.ps-root) .ant-image-preview-root {
+    display: none !important;
+  }
+
   body:has(.ps-root) {
     visibility: hidden;
     margin: 0 !important;

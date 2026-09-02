@@ -342,6 +342,21 @@ describe('Лист задач — чертежи', () => {
     expect(cellFigures.length).toBe(2);
   });
 
+  it('печать: порталы Ant скрыты, ширина документа ограничена листом', () => {
+    // Регрессия 02.09.2026: тултип Ant от кнопок правки висит порталом в body
+    // с экранными координатами. visibility:hidden прячет его, но не убирает из
+    // потока — Chrome считал документ шириной ~1300px и ужимал лист до 62%,
+    // прижимая к левому верхнему углу. Воспроизведено печатью в headless Chrome.
+    const css = readFileSync(
+      resolve(process.cwd(), 'src/components/print-sheet/printSheet.css'), 'utf-8'
+    );
+    const print = css.slice(css.lastIndexOf('@media print'));
+    expect(print).toMatch(/body:has\(\.ps-root\) \.ant-tooltip/);
+    expect(print).toMatch(/body:has\(\.ps-root\) \.ant-modal-wrap/);
+    expect(print).toMatch(/html:has\(\.ps-root\)[\s\S]{0,200}overflow:\s*hidden/);
+    expect(print).toMatch(/max-width:\s*210mm/);
+  });
+
   it('в CSS нет глобального правила по svg внутри условия', () => {
     // Регрессия 28.08.2026: `.ps-task-text svg { … }` схлопывает 400em-радикал
     // KaTeX. Масштабировать можно только наши чертежи — по .mr-figure и
