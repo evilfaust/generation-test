@@ -34,8 +34,8 @@ export default function FiltersAndDistribution({
 
   const filtersTab = (
     <>
-      <Form.Item name="search" label="Поиск по коду или тексту" style={{ marginBottom: 16 }}>
-        <Input placeholder="Введите код задачи или текст..." prefix={<SearchOutlined />} allowClear />
+      <Form.Item name="search" label="Поиск по коду, тексту или номеру решу" style={{ marginBottom: 16 }}>
+        <Input placeholder="Код, текст или номер задачи с Решу ЕГЭ/ОГЭ…" prefix={<SearchOutlined />} allowClear />
       </Form.Item>
 
       <Row gutter={16}>

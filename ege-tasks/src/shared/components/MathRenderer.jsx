@@ -78,7 +78,10 @@ const MathRenderer = ({ text, content, inline = true, answerBoxes = false }) => 
       const drawing = extractDrawingSpec(children);
       if (drawing) {
         return (
-          <span style={{ display: 'block', textAlign: 'center', margin: '8px 0' }}>
+          // `mr-figure` — зацепка для печатных листов: по ней (и только по ней)
+          // масштабируются встроенные чертежи. Общего правила по svg в тексте
+          // быть НЕ должно — оно схлопывает радикал KaTeX.
+          <span className="mr-figure" style={{ display: 'block', textAlign: 'center', margin: '8px 0' }}>
             {drawing.kind === 'plot'
               ? <CoordPlotSVG spec={drawing.spec} />
               : <NumberLineSVG spec={drawing.spec} />}

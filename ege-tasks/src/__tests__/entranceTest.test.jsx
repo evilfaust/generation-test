@@ -10,7 +10,7 @@ import { getPreset, ENTRANCE_PRESETS, SOLUTION_SPACE_MM } from '../components/en
 // пустую строку — поэтому печатные стили сторожим по исходнику с диска.
 const printCss = () =>
   readFileSync(
-    resolve(process.cwd(), 'src/components/entrance-test/EntranceTestPrint.css'),
+    resolve(process.cwd(), 'src/components/print-sheet/printSheet.css'),
     'utf-8'
   ).replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -105,7 +105,7 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
   it('поле «Класс» убирается отдельным тумблером, остальные остаются', () => {
     const withClass = render(<EntranceTestPrint variants={variants} meta={meta} />, { wrapper });
     const labels = (r) =>
-      [...r.container.querySelectorAll('.et-page .et-field-label')].map(el => el.textContent);
+      [...r.container.querySelectorAll('.ps-page .ps-field-label')].map(el => el.textContent);
     expect(labels(withClass)).toEqual(['Фамилия, имя', 'Класс', 'Дата']);
     withClass.unmount();
 
@@ -118,7 +118,7 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
 
   it('метаданные идут одной строкой с правильным склонением', () => {
     const { container } = render(<EntranceTestPrint variants={variants} meta={meta} />, { wrapper });
-    const line = container.querySelector('.et-page .et-meta').textContent;
+    const line = container.querySelector('.ps-page .ps-meta').textContent;
     expect(line).toContain('10 класс');
     expect(line).toContain('45 мин');
     expect(line).toContain('2 задания');
@@ -130,7 +130,7 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
     expect(screen.getAllByText('Работа состоит из 2 заданий.').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Калькулятором пользоваться нельзя.').length).toBeGreaterThan(0);
 
-    const labels = [...container.querySelectorAll('.et-page .et-note-label')].map(el => el.textContent.trim());
+    const labels = [...container.querySelectorAll('.ps-page .ps-note-label')].map(el => el.textContent.trim());
     expect(labels).toEqual(['Инструкция.', 'Дополнительная информация.']);
   });
 
@@ -138,7 +138,7 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
     const { container } = render(
       <EntranceTestPrint variants={variants} meta={meta} layout="workbook" />, { wrapper }
     );
-    const styled = [...container.querySelectorAll('.et-page [style]')]
+    const styled = [...container.querySelectorAll('.ps-page [style]')]
       .map(el => el.getAttribute('style'))
       .join(' ');
     expect(styled).not.toMatch(/#[0-9a-f]{3,8}|rgb|hsl/i);
@@ -146,8 +146,8 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
 
   it('в режиме «набор задач» есть строка ответа и нет зоны решения', () => {
     const { container } = render(<EntranceTestPrint variants={variants} meta={meta} />, { wrapper });
-    expect(container.querySelectorAll('.et-answer').length).toBeGreaterThan(0);
-    expect(container.querySelector('.et-solution')).toBeNull();
+    expect(container.querySelectorAll('.ps-answer').length).toBeGreaterThan(0);
+    expect(container.querySelector('.ps-solution')).toBeNull();
   });
 
   it('строку ответа можно выключить', () => {
@@ -155,36 +155,36 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
       <EntranceTestPrint variants={variants} meta={meta} options={{ answerLine: false }} />,
       { wrapper }
     );
-    expect(container.querySelector('.et-answer')).toBeNull();
+    expect(container.querySelector('.ps-answer')).toBeNull();
   });
 
   it('лист ответов показывает ответы задач и его можно отключить', () => {
     const { container, unmount } = render(
       <EntranceTestPrint variants={variants} meta={meta} />, { wrapper }
     );
-    expect(container.querySelector('.et-page--key')).toBeTruthy();
+    expect(container.querySelector('.ps-page--key')).toBeTruthy();
     expect(screen.getAllByText('Ответы').length).toBeGreaterThan(0);
-    expect(container.querySelectorAll('.et-page--key .et-key-cell').length).toBe(2);
+    expect(container.querySelectorAll('.ps-page--key .ps-key-cell').length).toBe(2);
     unmount();
 
     const second = render(
       <EntranceTestPrint variants={variants} meta={meta} showAnswersPage={false} />, { wrapper }
     );
-    expect(second.container.querySelector('.et-page--key')).toBeNull();
+    expect(second.container.querySelector('.ps-page--key')).toBeNull();
   });
 
   it('нижний колонтитул печатается по умолчанию и выключается тумблером', () => {
     const on = render(<EntranceTestPrint variants={variants} meta={meta} />, { wrapper });
-    expect(on.container.querySelectorAll('.et-page .et-foot').length).toBeGreaterThan(0);
+    expect(on.container.querySelectorAll('.ps-page .ps-foot').length).toBeGreaterThan(0);
     on.unmount();
 
     const off = render(
       <EntranceTestPrint variants={variants} meta={meta} options={{ showFooter: false }} />,
       { wrapper }
     );
-    expect(off.container.querySelector('.et-foot')).toBeNull();
+    expect(off.container.querySelector('.ps-foot')).toBeNull();
     // шапка и задачи на месте — выключается только подвал
-    expect(off.container.querySelectorAll('.et-page .et-task').length).toBe(2);
+    expect(off.container.querySelectorAll('.ps-page .ps-task').length).toBe(2);
   });
 
   it('номер варианта показывается, когда вариантов больше одного', () => {
@@ -195,12 +195,12 @@ describe('EntranceTestPrint — макет «набор задач»', () => {
       />,
       { wrapper }
     );
-    expect(container.querySelectorAll('.et-page .et-variant').length).toBe(2);
+    expect(container.querySelectorAll('.ps-page .ps-variant').length).toBe(2);
   });
 
   it('без вариантов ничего не рендерит', () => {
     const { container } = render(<EntranceTestPrint variants={[]} meta={meta} />, { wrapper });
-    expect(container.querySelector('.et-root')).toBeNull();
+    expect(container.querySelector('.ps-root')).toBeNull();
   });
 });
 
@@ -217,22 +217,22 @@ describe('EntranceTestPrint — формулы', () => {
       <EntranceTestPrint variants={[{ number: 1, tasks: [sqrtTask] }]} meta={meta} />,
       { wrapper }
     );
-    const page = container.querySelector('.et-page');
+    const page = container.querySelector('.ps-page');
     expect(page.querySelector('.katex .sqrt')).toBeTruthy();
     // KaTeX рисует знак корня инлайновым <svg> внутри .hide-tail
     expect(page.querySelectorAll('.katex .hide-tail svg').length).toBeGreaterThan(0);
   });
 
   it('в CSS нет глобального правила по svg внутри условия', () => {
-    // Регрессия 28.08.2026: `.et-task-text svg { max-width: 100% }` (добавлено
+    // Регрессия 28.08.2026: `.ps-task-text svg { max-width: 100% }` (добавлено
     // ради встроенных numline/plot) схлопывало 400em-радикал KaTeX в ноль —
     // на печати вместо «−4√3 sin(−780°)» выходило «−4  3 sin(−780°)».
     // jsdom импортированный CSS не применяет, а `?raw` на .css отдаёт пустую
     // строку (vitest глушит CSS) — поэтому читаем файл с диска.
-    const cssPath = resolve(process.cwd(), 'src/components/entrance-test/EntranceTestPrint.css');
+    const cssPath = resolve(process.cwd(), 'src/components/print-sheet/printSheet.css');
     const css = readFileSync(cssPath, 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(css.length).toBeGreaterThan(1000);
-    expect(css).not.toMatch(/\.et-task-text\s+svg\s*[,{]/);
+    expect(css).not.toMatch(/\.ps-task-text\s+svg\s*[,{]/);
   });
 });
 
@@ -255,15 +255,15 @@ describe('EntranceTestPrint — чертежи и пагинация', () => {
     );
     // без картинки в measure-зоне пагинации нечего дожидаться, и высота задачи
     // будет посчитана без чертежа
-    expect(container.querySelectorAll('.et-measure img').length).toBe(1);
-    expect(container.querySelectorAll('.et-page img').length).toBe(1);
+    expect(container.querySelectorAll('.ps-measure img').length).toBe(1);
+    expect(container.querySelectorAll('.ps-page img').length).toBe(1);
   });
 
   it('лист не обрезает контент: min-height вместо height + overflow:hidden', () => {
     // Регрессия 28.08.2026: чертежи догружались уже после замера, задача
     // вырастала, и хвост страницы молча съедался overflow:hidden — с листа
     // пропадали целые задания. Лист обязан расти, а не резать.
-    const rule = printCss().match(/^\.et-page \{([^}]*)\}/m);
+    const rule = printCss().match(/^\.ps-page \{([^}]*)\}/m);
     expect(rule).toBeTruthy();
     expect(rule[1]).toMatch(/min-height:\s*297mm/);
     expect(rule[1]).not.toMatch(/overflow:\s*hidden/);
@@ -282,11 +282,11 @@ describe('EntranceTestPrint — макет «рабочая тетрадь»', (
       />,
       { wrapper }
     );
-    const solution = container.querySelector('.et-page .et-solution');
+    const solution = container.querySelector('.ps-page .ps-solution');
     expect(solution).toBeTruthy();
     expect(solution.style.height).toBe(`${SOLUTION_SPACE_MM.l}mm`);
     // линии клетки считаются точно под блок, без запаса (иначе Chrome ужимает лист)
-    const vLines = solution.querySelectorAll('.et-fill-v');
+    const vLines = solution.querySelectorAll('.ps-fill-v');
     expect(vLines.length).toBe(Math.ceil((BODY_W_MM - 10) / 5) - 1);
     const lastLeft = parseFloat(vLines[vLines.length - 1].style.left);
     expect(lastLeft).toBeLessThan(BODY_W_MM - 10);
@@ -302,8 +302,8 @@ describe('EntranceTestPrint — макет «рабочая тетрадь»', (
       />,
       { wrapper }
     );
-    expect(container.querySelectorAll('.et-page .et-fill-h').length).toBeGreaterThan(0);
-    expect(container.querySelectorAll('.et-page .et-fill-v').length).toBe(0);
+    expect(container.querySelectorAll('.ps-page .ps-fill-h').length).toBeGreaterThan(0);
+    expect(container.querySelectorAll('.ps-page .ps-fill-v').length).toBe(0);
   });
 
   it('разлиновка «пусто» не рисует линий', () => {
@@ -316,7 +316,7 @@ describe('EntranceTestPrint — макет «рабочая тетрадь»', (
       />,
       { wrapper }
     );
-    expect(container.querySelector('.et-fill')).toBeNull();
+    expect(container.querySelector('.ps-fill')).toBeNull();
   });
 
   it('«Нет места для решения» убирает зону целиком', () => {
@@ -329,6 +329,6 @@ describe('EntranceTestPrint — макет «рабочая тетрадь»', (
       />,
       { wrapper }
     );
-    expect(container.querySelector('.et-solution')).toBeNull();
+    expect(container.querySelector('.ps-solution')).toBeNull();
   });
 });

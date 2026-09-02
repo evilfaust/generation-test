@@ -283,7 +283,7 @@ const TaskSelectModal = ({
             </Button>
             <Input
               allowClear
-              placeholder="Поиск по коду или условию"
+              placeholder="Поиск по коду, условию или номеру решу"
               prefix={<SearchOutlined />}
               value={search}
               onChange={(e) => setSearch(e.target.value)}

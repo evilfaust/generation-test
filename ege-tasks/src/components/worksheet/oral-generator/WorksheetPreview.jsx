@@ -1,24 +1,36 @@
 import PrintableWorksheet from '../../PrintableWorksheet';
-import VariantRenderer from '../VariantRenderer';
-import AnswersPage from '../AnswersPage';
+import PrintSheet from '../../print-sheet/PrintSheet';
+import SheetCryptogram from './SheetCryptogram';
 
 export default function WorksheetPreview({
   printRef,
   variants,
   outputMode,
   // sheet
+  columns,
+  margins,
+  figureSize,
+  showFigures,
+  headerMode,
+  sheetMeta,
   hideTaskPrefixes,
   variantLabel,
-  fontSize,
-  columns,
-  compactMode,
+  fontScale,
+  fontFamily,
+  answerStyle,
+  solutionSpace,
+  solutionFill,
+  tasksPerPage,
+  showFooter,
+  showTaskCode,
   showStudentInfo,
   showAnswersInline,
   showAnswersPage,
-  solutionSpace,
   cryptogramEnabled,
   cryptogramPhrase,
   dragDropHandlers,
+  onSetFigureSize,
+  workTitle,
   // cards
   cardFormat,
   showCardAnswers,
@@ -35,32 +47,45 @@ export default function WorksheetPreview({
   if (outputMode === 'sheet') {
     return (
       <div ref={printRef}>
-        {variants.map((variant, idx) => (
-          <VariantRenderer
-            key={variant.number || idx}
-            variant={variant}
-            variantIndex={idx}
-            compactMode={compactMode}
-            fontSize={fontSize}
-            columns={columns}
-            showStudentInfo={showStudentInfo}
-            showAnswersInline={showAnswersInline}
-            solutionSpace={solutionSpace}
-            variantLabel={variantLabel}
-            hideTaskPrefixes={hideTaskPrefixes}
-            dragDropHandlers={dragDropHandlers}
-            onEditTask={taskEditing.handleEditTask}
-            onReplaceTask={taskEditing.handleReplaceTask}
-            cryptogramEnabled={cryptogramEnabled}
-            cryptogramPhrase={cryptogramPhrase}
-          />
-        ))}
-        <AnswersPage
+        <PrintSheet
           variants={variants}
-          variantLabel={variantLabel}
-          show={showAnswersPage}
-          cryptogramEnabled={cryptogramEnabled}
-          cryptogramPhrase={cryptogramPhrase}
+          variantLabel={variantLabel || 'Вариант'}
+          headerMode={headerMode}
+          layout="workbook"
+          columns={columns}
+          margins={margins}
+          showAnswersPage={showAnswersPage}
+          meta={{
+            ...sheetMeta,
+            // Пустой заголовок = название работы: учителю не надо дублировать
+            // его руками, но переопределить можно.
+            title: sheetMeta.title || workTitle || 'Лист задач',
+            showStudentFields: showStudentInfo,
+            alwaysShowVariant: false,
+          }}
+          options={{
+            answerStyle,
+            solutionSpace,
+            solutionFill,
+            tasksPerPage,
+            hideTaskPrefixes,
+            showTaskCode,
+            showAnswersInline,
+            fontScale,
+            fontFamily,
+            showFooter,
+            figureSize,
+            showFigures,
+          }}
+          editing={{
+            dragDropHandlers,
+            onEditTask: taskEditing.handleEditTask,
+            onReplaceTask: taskEditing.handleReplaceTask,
+            onSetFigureSize,
+          }}
+          renderTail={cryptogramEnabled
+            ? (variant) => <SheetCryptogram variant={variant} phrase={cryptogramPhrase} />
+            : null}
         />
       </div>
     );
@@ -84,7 +109,7 @@ export default function WorksheetPreview({
       tags={tags}
       subtopics={subtopics}
       hideTaskPrefixes={hideTaskPrefixes}
-      fontSize={fontSize}
+      fontSize={12}
       showStudentInfo={showCardStudentInfo}
       onEditTask={taskEditing.handleEditTask}
       onCardsChange={(newCards) => {

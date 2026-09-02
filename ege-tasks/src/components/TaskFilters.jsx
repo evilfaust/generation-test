@@ -195,11 +195,11 @@ const TaskFilters = ({
           <Col xs={24} sm={18} md={18}>
             <Form.Item
               name="search"
-              label="Поиск по коду или тексту"
-              extra={`Регистр не важен, минимум ${MIN_SEARCH_LENGTH} символа`}
+              label="Поиск по коду, тексту или номеру решу"
+              extra={`Регистр не важен, минимум ${MIN_SEARCH_LENGTH} символа. Номер с «Решу ЕГЭ/ОГЭ» можно вставить целиком — ссылкой или «№ 311151»`}
             >
               <Input
-                placeholder="Введите код задачи или текст..."
+                placeholder="Код, текст или номер задачи с Решу ЕГЭ/ОГЭ…"
                 prefix={<SearchOutlined />}
                 allowClear
               />

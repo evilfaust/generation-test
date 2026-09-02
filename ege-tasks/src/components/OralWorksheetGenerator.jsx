@@ -14,7 +14,6 @@ import WorksheetVectorTools from './worksheet/oral-generator/WorksheetVectorTool
 import SelectionMethodPanel from './worksheet/oral-generator/SelectionMethodPanel';
 import { api } from '../services/pocketbase';
 import WorksheetPreview from './worksheet/oral-generator/WorksheetPreview';
-import WorksheetGridPrint from './worksheet/WorksheetGridPrint';
 import {
   useWorksheetGeneration,
   useTaskDragDrop,
@@ -53,11 +52,55 @@ const TaskSheetGenerator = () => {
 
   // Output mode + appearance
   const [outputMode, setOutputMode] = useState('sheet');
-  const [sheetFormat, setSheetFormat] = useState('A4');
+  // Лист печатается движком print-sheet (общий с входной контрольной): честная
+  // пагинация по измеренным высотам, A4, монохром. Компактно по умолчанию —
+  // шапка в строку, без места для решения.
+  const [headerMode, setHeaderMode] = useState('compact');
   const [columns, setColumns] = useState(1);
-  const [fontSize, setFontSize] = useState(12);
-  const [solutionSpace, setSolutionSpace] = useState('medium');
-  const [compactMode, setCompactMode] = useState(false);
+  const [margins, setMargins] = useState('narrow');
+  const [figureSize, setFigureSize] = useState('m');
+  const [showFigures, setShowFigures] = useState(true);
+  const [sheetMeta, setSheetMeta] = useState({
+    title: '',                 // пусто → название работы
+    eyebrow: '',
+    subtitle: '',
+    classLabel: '',
+    duration: null,
+    dateLabel: '',
+    instruction: '',
+    notesTitle: 'Дополнительная информация',
+    notes: '',
+    footerNote: '',
+    showClassField: true,
+    showTasksCount: true,
+  });
+  const patchSheetMeta = (patch) => setSheetMeta(prev => ({ ...prev, ...patch }));
+
+  // «N на лист» делит остаток высоты страницы между заданиями — в двух
+  // колонках делить нечего, поэтому режим сбрасывается явно, а не молча.
+  const handleColumnsChange = (value) => {
+    setColumns(value);
+    if (value > 1 && solutionSpace === 'fit') setSolutionSpace('none');
+  };
+
+  // Размер чертежа у одной задачи (кнопка на карточке в превью) — пишется в
+  // task.kimImageSize и переживает пересборку листа вместе с вариантом.
+  const handleSetFigureSize = (variantIndex, taskIndex, size) => {
+    setVariants(prev => prev.map((v, vi) => (
+      vi !== variantIndex ? v : {
+        ...v,
+        tasks: v.tasks.map((t, ti) => (ti === taskIndex ? { ...t, kimImageSize: size } : t)),
+      }
+    )));
+  };
+  const [fontScale, setFontScale] = useState(1);
+  const [fontFamily, setFontFamily] = useState('sans');
+  const [answerStyle, setAnswerStyle] = useState('line');
+  const [solutionSpace, setSolutionSpace] = useState('none');
+  const [solutionFill, setSolutionFill] = useState('grid');
+  const [tasksPerPage, setTasksPerPage] = useState(6);
+  const [showFooter, setShowFooter] = useState(true);
+  const [showTaskCode, setShowTaskCode] = useState(false);
   const [hideTaskPrefixes, setHideTaskPrefixes] = useState(false);
   const [showStudentInfo, setShowStudentInfo] = useState(true);
   const [showAnswersInline, setShowAnswersInline] = useState(false);
@@ -79,7 +122,6 @@ const TaskSheetGenerator = () => {
   const [savedWorks, setSavedWorks] = useState([]);
   const [loadingWorks, setLoadingWorks] = useState(false);
   const [currentWork, setCurrentWork] = useState(null);
-  const [worksheetOpen, setWorksheetOpen] = useState(false);
 
   const printRef = useRef();
   const worksheetActions = useWorksheetActions();
@@ -98,7 +140,6 @@ const TaskSheetGenerator = () => {
 
   useEffect(() => {
     if (!cryptogramEnabled) return;
-    setCompactMode(false);
     setShowAnswersInline(false);
   }, [cryptogramEnabled]);
 
@@ -286,12 +327,15 @@ const TaskSheetGenerator = () => {
     message.success('Markdown успешно сохранён');
   };
 
+  // Поля листа задаёт сам движок (padding .ps-page), поэтому @page нулевой.
+  // Инъекция последним стилем в <head> перебивает глобальный
+  // `@page { margin: 10mm 8mm }` из TaskWorksheet.css — иначе поля удваиваются.
   const handleSheetPrint = () => {
     const styleId = 'sheet-print-page-style';
     document.getElementById(styleId)?.remove();
     const style = document.createElement('style');
     style.id = styleId;
-    style.textContent = `@media print { @page { size: ${sheetFormat} portrait; margin: 8mm 5mm; } }`;
+    style.textContent = '@page { size: A4 portrait; margin: 0; }';
     document.head.appendChild(style);
     const cleanup = () => {
       document.getElementById(styleId)?.remove();
@@ -301,41 +345,15 @@ const TaskSheetGenerator = () => {
     window.print();
   };
 
-  const sheetPDFOptions = {
-    format: sheetFormat,
-    marginTop: '5mm', marginBottom: '5mm', marginLeft: '5mm', marginRight: '5mm',
-    extraCSS: '.sheet-pages-preview { display: block !important; padding: 0 !important; background: none !important; } .sheet-page { box-shadow: none !important; break-after: avoid !important; page-break-after: avoid !important; border-bottom: 0.3mm solid #ccc; padding-bottom: 3mm !important; margin-bottom: 3mm !important; } .sheet-page:last-child { border-bottom: none !important; } .sheet-page-a4, .sheet-page-a5 { min-height: 0 !important; width: 100% !important; padding: 0 !important; } .sheet-page-label { display: none !important; } .sheet-page .variant-container { padding-top: 0 !important; } .variant-header { padding: 3px 5px !important; } .task-item { margin-bottom: 4px !important; }',
-  };
-
-  const cardsPDFOptions = {
-    marginTop: '5mm', marginBottom: '5mm', marginLeft: '5mm', marginRight: '5mm',
-    extraCSS: `
-      .printable-worksheet { min-height: 0 !important; padding: 0 !important; }
-      .title-page { min-height: 0 !important; }
-      .variant-container { padding-top: 0 !important; margin-bottom: 6px !important; }
-      .variant-header { padding: 4px 8px !important; margin-bottom: 4px !important; }
-      .tasks-content { margin-top: 6px !important; }
-      .task-item { margin-bottom: 8px !important; padding-bottom: 6px !important; }
-      .answers-page { padding: 8px !important; }
-      .variant-answers { margin-bottom: 12px !important; }
-    `,
-  };
-
   const workTitle = form.getFieldValue('workTitle') || 'Лист задач';
 
-  if (worksheetOpen) {
-    return (
-      <WorksheetGridPrint
-        pages={variants.map(v => ({
-          title: workTitle,
-          label: `${variantLabel} ${v.number}`,
-          tasks: v.tasks,
-        }))}
-        hideTaskPrefixes={hideTaskPrefixes}
-        onBack={() => setWorksheetOpen(false)}
-      />
-    );
-  }
+  // Подпись режима в панели действий: «A4 · компактно» / «A4 · 6 на лист» и т.п.
+  const spaceLabel = {
+    none: 'компактно', s: 'решение S', m: 'решение M', l: 'решение L', xl: 'решение XL',
+    fit: `${tasksPerPage} на лист`,
+  }[solutionSpace] || 'компактно';
+  const colLabel = columns > 1 ? ` · ${columns} колонки` : '';
+  const sheetSummary = `A4${margins === 'narrow' ? ' узкие поля' : ''}${colLabel} · ${spaceLabel}`;
 
   return (
     <div className="task-worksheet-container">
@@ -406,16 +424,34 @@ const TaskSheetGenerator = () => {
 
           <AppearanceSection
             outputMode={outputMode}
-            sheetFormat={sheetFormat}
-            setSheetFormat={setSheetFormat}
             columns={columns}
-            setColumns={setColumns}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
+            setColumns={handleColumnsChange}
+            margins={margins}
+            setMargins={setMargins}
+            figureSize={figureSize}
+            setFigureSize={setFigureSize}
+            showFigures={showFigures}
+            setShowFigures={setShowFigures}
+            headerMode={headerMode}
+            setHeaderMode={setHeaderMode}
+            sheetMeta={sheetMeta}
+            patchSheetMeta={patchSheetMeta}
+            fontScale={fontScale}
+            setFontScale={setFontScale}
+            fontFamily={fontFamily}
+            setFontFamily={setFontFamily}
+            answerStyle={answerStyle}
+            setAnswerStyle={setAnswerStyle}
             solutionSpace={solutionSpace}
             setSolutionSpace={setSolutionSpace}
-            compactMode={compactMode}
-            setCompactMode={setCompactMode}
+            solutionFill={solutionFill}
+            setSolutionFill={setSolutionFill}
+            tasksPerPage={tasksPerPage}
+            setTasksPerPage={setTasksPerPage}
+            showFooter={showFooter}
+            setShowFooter={setShowFooter}
+            showTaskCode={showTaskCode}
+            setShowTaskCode={setShowTaskCode}
             hideTaskPrefixes={hideTaskPrefixes}
             setHideTaskPrefixes={setHideTaskPrefixes}
             showStudentInfo={showStudentInfo}
@@ -446,20 +482,15 @@ const TaskSheetGenerator = () => {
           variants={variants}
           outputMode={outputMode}
           variantLabel={variantLabel}
-          sheetFormat={sheetFormat}
           cardFormat={cardFormat}
           showAnswersPage={showAnswersPage}
+          sheetSummary={sheetSummary}
           onSave={() => setSaveModalVisible(true)}
           onOpenLoad={handleOpenLoadModal}
           onPrint={outputMode === 'sheet' ? handleSheetPrint : worksheetActions.handlePrint}
-          onExportPDF={() => worksheetActions.handleExportPDF(
-            printRef,
-            workTitle,
-            outputMode === 'sheet' ? sheetPDFOptions : cardsPDFOptions
-          )}
+          onExportPDF={() => worksheetActions.handleExportPDF(printRef, workTitle)}
           onExportMD={handleExportMD}
           onReset={handleReset}
-          onOpenWorksheet={() => setWorksheetOpen(true)}
           worksheetActions={worksheetActions}
         />
 
@@ -477,10 +508,19 @@ const TaskSheetGenerator = () => {
         variants={variants}
         outputMode={outputMode}
         workTitle={workTitle}
-        sheetFormat={sheetFormat}
         columns={columns}
-        fontSize={fontSize}
-        compactMode={compactMode}
+        margins={margins}
+        figureSize={figureSize}
+        showFigures={showFigures}
+        headerMode={headerMode}
+        sheetMeta={sheetMeta}
+        fontScale={fontScale}
+        fontFamily={fontFamily}
+        answerStyle={answerStyle}
+        solutionFill={solutionFill}
+        tasksPerPage={tasksPerPage}
+        showFooter={showFooter}
+        showTaskCode={showTaskCode}
         hideTaskPrefixes={hideTaskPrefixes}
         showStudentInfo={showStudentInfo}
         showAnswersInline={showAnswersInline}
@@ -490,6 +530,7 @@ const TaskSheetGenerator = () => {
         cryptogramEnabled={cryptogramEnabled}
         cryptogramPhrase={cryptogramPhrase}
         dragDropHandlers={dragDropHandlers}
+        onSetFigureSize={handleSetFigureSize}
         taskEditing={taskEditing}
         cardFormat={cardFormat}
         showCardAnswers={showCardAnswers}

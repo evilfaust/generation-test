@@ -2,19 +2,30 @@ import { pb, _logAudit } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 import { searchCaseVariants, MIN_SEARCH_LENGTH } from '../../utils/searchVariants';
+import { parseSdamgiaSearch } from '../../utils/sdamgiaSearch';
 
 export const tasksApi = {
   _buildTasksFilter(filters = {}) {
     const filterArr = [];
 
-    // Поиск по коду и тексту. Кириллица в SQLite регистрозависима, поэтому
-    // перебираем написания — см. searchCaseVariants.
+    // Поиск по коду, тексту и номеру с «Решу ЕГЭ/ОГЭ». Кириллица в SQLite
+    // регистрозависима, поэтому перебираем написания — см. searchCaseVariants.
     const search = String(filters.search || '').trim();
-    if (search.length >= MIN_SEARCH_LENGTH) {
+    const sdamgia = parseSdamgiaSearch(search);
+    if (sdamgia.exact) {
+      // Ссылка или «№ 311151» — по тексту такое искать нечего.
+      // `!= ""` обязательно: PocketBase создаёт индекс необязательного поля
+      // частичным (WHERE sdamgia_id != ''), а SQLite берёт такой индекс только
+      // если это условие есть и в запросе — иначе скан 25 тыс. строк.
+      filterArr.push(`(sdamgia_id != "" && sdamgia_id = "${escapeFilter(sdamgia.id)}")`);
+    } else if (search.length >= MIN_SEARCH_LENGTH) {
       const conds = searchCaseVariants(search).flatMap((v) => {
         const term = escapeFilter(v);
         return [`code ~ "${term}"`, `statement_md ~ "${term}"`];
       });
+      // Голое число могло быть и куском условия — номер решу добавляем как
+      // ещё один вариант, а не вместо текстового поиска.
+      if (sdamgia.id) conds.push(`sdamgia_id = "${escapeFilter(sdamgia.id)}"`);
       filterArr.push(`(${conds.join(' || ')})`);
     }
 
@@ -322,7 +333,9 @@ export const tasksApi = {
       const CHUNK = 40;
       for (let i = 0; i < ids.length; i += CHUNK) {
         const chunk = ids.slice(i, i + CHUNK);
-        const filter = chunk.map((s) => `sdamgia_id = "${escapeFilter(s)}"`).join(' || ');
+        // `!= ""` снаружи — иначе частичный индекс idx_tasks_sdamgia_id не берётся.
+        const ors = chunk.map((s) => `sdamgia_id = "${escapeFilter(s)}"`).join(' || ');
+        const filter = `sdamgia_id != "" && (${ors})`;
         const recs = await pb.collection('tasks').getFullList({ filter, fields: 'id,sdamgia_id' });
         for (const r of recs) if (r.sdamgia_id) map[r.sdamgia_id] = r.id;
       }
@@ -447,7 +460,7 @@ export const tasksApi = {
     try {
       const safe = String(sdamgiaId).replace(/"/g, '');
       const items = await pb.collection('tasks').getList(1, 1, {
-        filter: `sdamgia_id = "${safe}"`,
+        filter: `sdamgia_id != "" && sdamgia_id = "${safe}"`,
       });
       return items.items[0] || null;
     } catch (error) {

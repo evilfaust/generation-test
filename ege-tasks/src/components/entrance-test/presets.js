@@ -90,26 +90,11 @@ export const DEFAULT_PRESET_ID = 'oge_9_10';
 export const getPreset = (id) =>
   ENTRANCE_PRESETS.find(p => p.id === id) || ENTRANCE_PRESETS[0];
 
-/** Высота зоны решения в режиме «рабочая тетрадь», мм. */
-export const SOLUTION_SPACE_MM = {
-  none: 0,
-  s: 22,
-  m: 38,
-  l: 58,
-  xl: 82,
-};
-
-export const SOLUTION_SPACE_OPTIONS = [
-  { label: 'Нет',  value: 'none' },
-  { label: 'S',    value: 's' },
-  { label: 'M',    value: 'm' },
-  { label: 'L',    value: 'l' },
-  { label: 'XL',   value: 'xl' },
-];
-
-/** Фон зоны решения. */
-export const SOLUTION_FILL_OPTIONS = [
-  { label: 'Пусто',   value: 'blank' },
-  { label: 'Линейка', value: 'lines' },
-  { label: 'Клетка',  value: 'grid' },
-];
+/* Высота зоны решения и варианты разлиновки живут в геометрии печатного
+   листа (components/print-sheet/geometry.js) — здесь только реэкспорт, чтобы
+   не плодить второй источник правды. */
+export {
+  SOLUTION_SPACE_MM,
+  SOLUTION_SPACE_OPTIONS,
+  SOLUTION_FILL_OPTIONS,
+} from '../print-sheet/geometry';

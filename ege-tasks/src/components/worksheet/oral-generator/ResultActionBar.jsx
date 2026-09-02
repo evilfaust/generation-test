@@ -1,29 +1,29 @@
-import { Affix, Button } from 'antd';
-import { CheckCircleFilled, TableOutlined } from '@ant-design/icons';
+import { Affix, Tooltip } from 'antd';
+import { CheckCircleFilled } from '@ant-design/icons';
 import ActionButtons from '../ActionButtons';
 
 export default function ResultActionBar({
   variants,
   outputMode,
   variantLabel,
-  sheetFormat,
   cardFormat,
   showAnswersPage,
+  sheetSummary,
   onSave,
   onOpenLoad,
   onPrint,
   onExportPDF,
   onExportMD,
   onReset,
-  onOpenWorksheet,
   worksheetActions,
 }) {
   if (!variants || variants.length === 0) return null;
 
   const totalTasks = variants.reduce((sum, v) => sum + (v.tasks?.length || 0), 0);
   const tasksPerVariant = variants[0]?.tasks?.length || 0;
-  const formatLabel = outputMode === 'sheet' ? sheetFormat : cardFormat;
-  const modeLabel = outputMode === 'sheet' ? 'Лист задач' : 'Карточки';
+  const isSheet = outputMode === 'sheet';
+  const formatLabel = isSheet ? sheetSummary : cardFormat;
+  const modeLabel = isSheet ? 'Лист задач' : 'Карточки';
 
   return (
     <Affix offsetTop={8} style={{ zIndex: 10 }}>
@@ -58,16 +58,18 @@ export default function ResultActionBar({
                 maxWidth: 360,
               }}
             >
-              {modeLabel} · {formatLabel}{showAnswersPage && outputMode === 'sheet' ? ' · с листом ответов' : ''}
+              {modeLabel} · {formatLabel}{showAnswersPage && isSheet ? ' · с листом ответов' : ''}
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
-          {onOpenWorksheet && (
-            <Button icon={<TableOutlined />} onClick={onOpenWorksheet}>
-              Рабочий лист
-            </Button>
+          {isSheet && (
+            <Tooltip title="Лист свёрстан по миллиметрам — растровый html2pdf его портит. Печать → «Сохранить как PDF» даёт векторный файл.">
+              <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>
+                PDF — через «Печать»
+              </span>
+            </Tooltip>
           )}
           <ActionButtons
             hasVariants={true}
@@ -75,7 +77,7 @@ export default function ResultActionBar({
             onOpenLoad={onOpenLoad}
             onSave={onSave}
             onPrint={onPrint}
-            onExportPDF={onExportPDF}
+            onExportPDF={isSheet ? undefined : onExportPDF}
             onExportMD={onExportMD}
             onReset={onReset}
             exporting={worksheetActions.exporting}
