@@ -18,6 +18,10 @@ export const GENERATOR_LABELS = {
   trig_equations_advanced: 'Уравнения f(kx+b)=a',
   reduction_formulas:      'Формулы приведения',
   addition_formulas:       'Формулы сложения',
+  oral_counting:           'Устный счёт',
+  log_exp_equations:       'Степени и логарифмы',
+  linear_equations:        'Линейные уравнения',
+  linear_inequalities:     'Линейные неравенства',
 };
 
 // Инструкция-префикс, записываемая в statement_md задачи
@@ -29,6 +33,9 @@ const GENERATOR_INSTRUCTIONS = {
   trig_equations_advanced: 'Решите уравнение:',
   reduction_formulas:      'Упростите выражение:',
   addition_formulas:       'Вычислите или упростите:',
+  log_exp_equations:       'Решите уравнение:',
+  linear_equations:        'Решите уравнение:',
+  linear_inequalities:     'Решите неравенство:',
 };
 
 // Соответствие generator_type → title темы (должно совпадать с migration 1772000023)

@@ -5,28 +5,35 @@ import './OralCountingPrintLayout.css';
 const LABELS = Array.from({ length: 30 }, (_, i) => String(i + 1));
 
 
+// Чем заканчивается строка задания:
+//   'eq'     — «=» (вычислите)
+//   'var'    — «x =» (решите уравнение)
+//   'answer' — «Ответ:» (решите неравенство — ответ не начинается с «x =»)
+function resolvePrompt(promptMode, equationMode) {
+  return promptMode || (equationMode ? 'var' : 'eq');
+}
+
 // ─── Одно задание ─────────────────────────────────────────────────────────────
-function TaskRow({ q, qi, equationMode }) {
+function TaskRow({ q, qi, prompt }) {
   return (
     <div className="oral-task">
       <span className="oral-task-num">{LABELS[qi]})</span>
-      <span className={equationMode ? 'oral-task-expr oral-task-expr--eq' : 'oral-task-expr'}>
+      <span className={prompt === 'eq' ? 'oral-task-expr' : 'oral-task-expr oral-task-expr--eq'}>
         <MathInline latex={q.exprLatex} />
       </span>
-      {equationMode
-        ? (
-          <span className="oral-task-x-prompt">
-            <MathInline latex="x" /> =
-          </span>
-        )
-        : <span className="oral-task-eq">=</span>
-      }
+      {prompt === 'var' && (
+        <span className="oral-task-x-prompt">
+          <MathInline latex={q.varLatex || 'x'} /> =
+        </span>
+      )}
+      {prompt === 'answer' && <span className="oral-task-x-prompt">Ответ:</span>}
+      {prompt === 'eq' && <span className="oral-task-eq">=</span>}
     </div>
   );
 }
 
 // ─── Страница ученика ─────────────────────────────────────────────────────────
-function StudentPage({ variant, variantIndex, title, mode, columnsCount, equationMode }) {
+function StudentPage({ variant, variantIndex, title, mode, columnsCount, prompt, instruction }) {
   const pageClass =
     mode === 'side' ? 'oral-page oral-page--side' :
     mode === 'half' ? 'oral-page oral-page--half' :
@@ -48,12 +55,12 @@ function StudentPage({ variant, variantIndex, title, mode, columnsCount, equatio
 
       {title && <div className="oral-subtitle">{title}</div>}
       <div className="oral-instruction">
-        {equationMode ? 'Решите уравнения:' : 'Вычислите:'}
+        {instruction || (prompt === 'eq' ? 'Вычислите:' : 'Решите уравнения:')}
       </div>
 
       <div className={gridClass}>
         {variant.map((q, qi) => (
-          <TaskRow key={qi} q={q} qi={qi} equationMode={equationMode} />
+          <TaskRow key={qi} q={q} qi={qi} prompt={prompt} />
         ))}
       </div>
     </div>
@@ -61,7 +68,7 @@ function StudentPage({ variant, variantIndex, title, mode, columnsCount, equatio
 }
 
 // ─── Страница ответов для учителя ─────────────────────────────────────────────
-function TeacherKeyPage({ tasksData, title, equationMode }) {
+function TeacherKeyPage({ tasksData, title, prompt }) {
   return (
     <div className="oral-key-page">
       <div className="oral-key-header">{title} — Ответы (для учителя)</div>
@@ -76,7 +83,12 @@ function TeacherKeyPage({ tasksData, title, equationMode }) {
                   <span className="oral-key-expr">
                     <MathInline latex={q.exprLatex} />
                   </span>
-                  <span className="oral-key-eq">{equationMode ? 'x =' : '='}</span>
+                  <span className="oral-key-eq">
+                    {prompt === 'var' && !q.hideKeyPrompt && (
+                      <><MathInline latex={q.varLatex || 'x'} /> =</>
+                    )}
+                    {prompt === 'eq' && '='}
+                  </span>
                   <span className="oral-key-ans">
                     <MathInline latex={`\\color{#c0392b}{${q.resultLatex}}`} />
                   </span>
@@ -94,11 +106,14 @@ function TeacherKeyPage({ tasksData, title, equationMode }) {
 export default function OralCountingPrintLayout({
   tasksData, settings, title,
   equationMode = false,
+  promptMode,          // 'eq' | 'var' | 'answer' — чем кончается строка задания
+  instruction,         // текст над списком заданий
   screenMode = false,
   fontSize = 's',
 }) {
   if (!tasksData) return null;
   const { twoPerPage, sideBySide, showTeacherKey, columnsCount = 2 } = settings;
+  const prompt = resolvePrompt(promptMode, equationMode);
 
   let pages;
 
@@ -116,7 +131,8 @@ export default function OralCountingPrintLayout({
               title={title}
               mode="side"
               columnsCount={1}
-              equationMode={equationMode}
+              prompt={prompt}
+              instruction={instruction}
             />
           ))}
         </div>
@@ -136,7 +152,8 @@ export default function OralCountingPrintLayout({
               title={title}
               mode="half"
               columnsCount={columnsCount}
-              equationMode={equationMode}
+              prompt={prompt}
+              instruction={instruction}
             />
           ))}
         </div>
@@ -151,7 +168,8 @@ export default function OralCountingPrintLayout({
         title={title}
         mode="full"
         columnsCount={columnsCount}
-        equationMode={equationMode}
+        prompt={prompt}
+        instruction={instruction}
       />
     ));
   }
@@ -160,7 +178,7 @@ export default function OralCountingPrintLayout({
     <>
       {pages}
       {showTeacherKey && (
-        <TeacherKeyPage tasksData={tasksData} title={title} equationMode={equationMode} />
+        <TeacherKeyPage tasksData={tasksData} title={title} prompt={prompt} />
       )}
     </>
   );

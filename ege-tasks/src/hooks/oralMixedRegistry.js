@@ -40,6 +40,18 @@ import {
   DEFAULT_SETTINGS_FR,
 } from './useOralFractions';
 
+import {
+  generateLinearEquationVariants,
+  CATEGORY_LABELS_LINEQ,
+  DEFAULT_SETTINGS_LINEQ,
+} from './useLinearEquations';
+
+import {
+  generateLinearInequalityVariants,
+  CATEGORY_LABELS_INEQ,
+  DEFAULT_SETTINGS_INEQ,
+} from './useLinearInequalities';
+
 // Дефолтный набор включённых категорий (все true)
 const allTrue = (labels) => Object.fromEntries(Object.keys(labels).map(k => [k, true]));
 
@@ -103,6 +115,27 @@ export const ORAL_TYPES = [
     categoryLabels: CATEGORY_LABELS_LOGEXP,
     defaultCategories: allTrue(CATEGORY_LABELS_LOGEXP),
     defaultSettings: DEFAULT_SETTINGS_LOGEXP,
+  },
+  {
+    type:         'linear_equations',
+    label:        'Линейные уравнения',
+    instruction:  'Решите уравнения:',
+    equationMode: true,
+    generator:    generateLinearEquationVariants,
+    categoryLabels: CATEGORY_LABELS_LINEQ,
+    defaultCategories: DEFAULT_SETTINGS_LINEQ.categories,
+    defaultSettings: DEFAULT_SETTINGS_LINEQ,
+  },
+  {
+    type:         'linear_inequalities',
+    label:        'Линейные неравенства',
+    instruction:  'Решите неравенства:',
+    equationMode: true,
+    promptMode:   'answer',   // ответ — «x > 5», подсказка «x =» не подходит
+    generator:    generateLinearInequalityVariants,
+    categoryLabels: CATEGORY_LABELS_INEQ,
+    defaultCategories: DEFAULT_SETTINGS_INEQ.categories,
+    defaultSettings: DEFAULT_SETTINGS_INEQ,
   },
 ];
 

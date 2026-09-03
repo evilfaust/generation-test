@@ -96,6 +96,8 @@ const OralLogarithmsGenerator = lazy(() => import('./components/OralLogarithmsGe
 const OralEgeBaseGenerator = lazy(() => import('./components/OralEgeBaseGenerator'));
 const OralFractionsGenerator = lazy(() => import('./components/OralFractionsGenerator'));
 const OralMixedGenerator = lazy(() => import('./components/OralMixedGenerator'));
+const LinearEquationsGenerator = lazy(() => import('./components/LinearEquationsGenerator'));
+const LinearInequalitiesGenerator = lazy(() => import('./components/LinearInequalitiesGenerator'));
 const MarathonGenerator = lazy(() => import('./components/MarathonGenerator'));
 const CrosswordGenerator = lazy(() => import('./components/CrosswordGenerator'));
 const EgeScoreCalculator = lazy(() => import('./components/EgeScoreCalculator'));
@@ -197,6 +199,9 @@ export const R = {
   EGE_BASE_ORAL:       '/app/arith/ege-base',
   FRACTIONS_ORAL:      '/app/arith/fractions',
   ORAL_MIXED:          '/app/arith/mixed',
+  // Уравнения
+  LINEAR_EQUATIONS:    '/app/equations/linear',
+  LINEAR_INEQUALITIES: '/app/equations/inequalities',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',
@@ -303,6 +308,8 @@ const ROUTE_META = [
   { re: /^\/app\/arith\/ege-base/,        menuKey: 'ege-base-oral',    menuGroup: 'arith', title: 'Устный счёт — Действия с десятичными' },
   { re: /^\/app\/arith\/fractions/,       menuKey: 'fractions-oral',   menuGroup: 'arith', title: 'Устный счёт — Действия с обыкновенными дробями' },
   { re: /^\/app\/arith\/mixed/,           menuKey: 'oral-mixed',       menuGroup: 'arith', title: 'Устный счёт — Смешанная работа' },
+  { re: /^\/app\/equations\/linear/,      menuKey: 'linear-equations', menuGroup: 'equations', title: 'Уравнения — Линейные уравнения' },
+  { re: /^\/app\/equations\/inequalities/, menuKey: 'linear-inequalities', menuGroup: 'equations', title: 'Уравнения — Линейные неравенства' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
   { re: /^\/app\/theory$/,                 menuKey: 'theory-browser',   menuGroup: 'theory', title: 'Теория — Библиотека' },
@@ -378,6 +385,8 @@ const MENU_KEY_PATH = {
   'ege-base-oral':          R.EGE_BASE_ORAL,
   'fractions-oral':         R.FRACTIONS_ORAL,
   'oral-mixed':             R.ORAL_MIXED,
+  'linear-equations':       R.LINEAR_EQUATIONS,
+  'linear-inequalities':    R.LINEAR_INEQUALITIES,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -748,6 +757,13 @@ function AppLayout() {
       ],
     },
     {
+      key: 'equations', icon: <FunctionOutlined />, label: 'Уравнения', section: 'equations',
+      children: [
+        { key: 'linear-equations', icon: <CalculatorOutlined />, label: 'Линейные уравнения' },
+        { key: 'linear-inequalities', icon: <LineChartOutlined />, label: 'Линейные неравенства' },
+      ],
+    },
+    {
       key: 'theory', icon: <BookOutlined />, label: 'Теория', section: 'theory',
       children: [
         { key: 'theory-browser',    icon: <ReadOutlined />,    label: 'Библиотека' },
@@ -1032,6 +1048,10 @@ function App() {
               <Route path={R.EGE_BASE_ORAL} element={<OralEgeBaseGenerator />} />
               <Route path={R.FRACTIONS_ORAL} element={<OralFractionsGenerator />} />
               <Route path={R.ORAL_MIXED} element={<OralMixedGenerator />} />
+
+              {/* Уравнения */}
+              <Route path={R.LINEAR_EQUATIONS} element={<LinearEquationsGenerator />} />
+              <Route path={R.LINEAR_INEQUALITIES} element={<LinearInequalitiesGenerator />} />
 
               {/* Теория — просмотр (viewer тоже) */}
               <Route path={R.THEORY}            element={<TheoryPage />} />

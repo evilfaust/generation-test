@@ -43,6 +43,7 @@ const SECTION_LABELS = {
   tdf:          'ТДФ',
   trig:         'Тригонометрия',
   arith:        'Устный счёт',
+  equations:    'Уравнения',
   theory:       'Теория',
   listki:       'Листки',
   lab:          'Лаборатория',

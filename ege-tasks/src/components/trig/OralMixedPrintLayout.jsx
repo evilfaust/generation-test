@@ -6,17 +6,22 @@ import './OralMixedPrintLayout.css';
 const LABELS = Array.from({ length: 60 }, (_, i) => String(i + 1));
 
 
-// Одно задание — поддерживает обычный режим и режим уравнений
-function TaskRow({ q, qi, equationMode }) {
+// Чем кончается строка: 'eq' — «=», 'var' — «x =», 'answer' — «Ответ:»
+const sectionPrompt = (sec) => sec.promptMode || (sec.equationMode ? 'var' : 'eq');
+
+// Одно задание — поддерживает вычисления, уравнения и неравенства
+function TaskRow({ q, qi, prompt }) {
   return (
     <div className="oral-task">
       <span className="oral-task-num">{LABELS[qi]})</span>
-      <span className={`oral-task-expr${equationMode ? ' oral-task-expr--eq' : ''}`}>
+      <span className={`oral-task-expr${prompt === 'eq' ? '' : ' oral-task-expr--eq'}`}>
         <MathInline latex={q.exprLatex} />
       </span>
-      {equationMode
-        ? <span className="oral-task-x-prompt"><MathInline latex="x" /> =</span>
-        : <span className="oral-task-eq">=</span>}
+      {prompt === 'var' && (
+        <span className="oral-task-x-prompt"><MathInline latex={q.varLatex || 'x'} /> =</span>
+      )}
+      {prompt === 'answer' && <span className="oral-task-x-prompt">Ответ:</span>}
+      {prompt === 'eq' && <span className="oral-task-eq">=</span>}
     </div>
   );
 }
@@ -50,7 +55,7 @@ function VariantPage({ variant, title, mode, showSectionHeaders, columnsCount })
           {sec.instruction && <div className="oral-instruction">{sec.instruction}</div>}
           <div className={columnsCount === 2 ? 'oral-grid oral-grid--2col' : 'oral-grid oral-grid--1col'}>
             {sec.tasks.map((q, qi) => {
-              const row = <TaskRow key={qi} q={q} qi={globalIdx} equationMode={sec.equationMode} />;
+              const row = <TaskRow key={qi} q={q} qi={globalIdx} prompt={sectionPrompt(sec)} />;
               globalIdx++;
               return row;
             })}
@@ -79,7 +84,12 @@ function TeacherKeyPage({ variants, title }) {
                       <div key={`${sec.id}-${qi}`} className="oral-key-row">
                         <span className="oral-key-num">{LABELS[idx]})</span>
                         <span className="oral-key-expr"><MathInline latex={q.exprLatex} /></span>
-                        <span className="oral-key-eq">{sec.equationMode ? <><MathInline latex="x" /> =</> : '='}</span>
+                        <span className="oral-key-eq">
+                          {sectionPrompt(sec) === 'var' && !q.hideKeyPrompt && (
+                            <><MathInline latex={q.varLatex || 'x'} /> =</>
+                          )}
+                          {sectionPrompt(sec) === 'eq' && '='}
+                        </span>
                         <span className="oral-key-ans">
                           <MathInline latex={`\\color{#c0392b}{${q.resultLatex}}`} />
                         </span>

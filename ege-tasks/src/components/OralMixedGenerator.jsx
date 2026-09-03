@@ -200,6 +200,7 @@ export default function OralMixedGenerator() {
         label: meta.label,
         instruction: meta.instruction,
         equationMode: meta.equationMode,
+        promptMode: meta.promptMode,
         tasks: variants[vi] || [],
       })),
     }));

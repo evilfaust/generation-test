@@ -31,6 +31,9 @@ const GENERATOR_LABELS = {
   reduction_formulas:      'Формулы приведения',
   addition_formulas:       'Формулы сложения',
   oral_counting:           'Устный счёт',
+  log_exp_equations:       'Степени и логарифмы',
+  linear_equations:        'Линейные уравнения',
+  linear_inequalities:     'Линейные неравенства',
 };
 
 function SourceBadge({ test }) {

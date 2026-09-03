@@ -1,4 +1,4 @@
-import { Input } from 'antd';
+import { Input, Checkbox } from 'antd';
 import { SplitLayout, ConfigLabel } from '../../ui';
 
 export function TrigGeneratorLayout({
@@ -63,6 +63,25 @@ export function TrigSettingsSection({ label, children, style }) {
     }}>
       {label ? <ConfigLabel>{label}</ConfigLabel> : null}
       {children}
+    </div>
+  );
+}
+
+/**
+ * Заголовок блока категорий с чекбоксом на весь блок. Когда категорий много и
+ * они разложены по блокам сложности, учителю чаще нужен блок целиком, а не
+ * отдельная категория. Передаётся в `label` у TrigSettingsSection.
+ */
+export function TrigBlockToggle({ label, keys, categories, onToggleBlock }) {
+  const on = keys.filter(k => categories[k]).length;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <Checkbox
+        checked={on === keys.length}
+        indeterminate={on > 0 && on < keys.length}
+        onChange={e => onToggleBlock(keys, e.target.checked)}
+      />
+      <span>{label}</span>
     </div>
   );
 }
