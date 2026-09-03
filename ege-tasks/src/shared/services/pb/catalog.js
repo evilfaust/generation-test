@@ -2,6 +2,12 @@ import { pb, _logAudit, withOwner, andOwner } from './client.js';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
 
+const TAG_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+  '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B500', '#52BE80',
+];
+const randomTagColor = () => TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
+
 export const catalogApi = {
   // ============ КАРТОЧКИ ============
 
@@ -73,6 +79,49 @@ export const catalogApi = {
       return records.length > 0 ? records[0] : null;
     } catch (error) {
       console.error('Error finding tag:', error);
+      return null;
+    }
+  },
+
+  // Найти тег по названию или создать новый. Общее для импорта задач и импорта
+  // работы целиком; `cache` (Map title→id) избавляет от повторных запросов
+  // внутри одного импорта.
+  async getOrCreateTag(title, cache = null) {
+    const trimmed = String(title || '').trim();
+    if (!trimmed) return null;
+    if (cache?.has(trimmed)) return cache.get(trimmed);
+
+    const existing = await this.findTagByTitle(trimmed);
+    if (existing) {
+      cache?.set(trimmed, existing.id);
+      return existing.id;
+    }
+
+    try {
+      const created = await pb.collection('tags').create({ title: trimmed, color: randomTagColor() });
+      cache?.set(trimmed, created.id);
+      return created.id;
+    } catch (error) {
+      console.error(`Error creating tag "${trimmed}":`, error);
+      return null;
+    }
+  },
+
+  // Найти подтему темы по названию или создать новую.
+  // `known` — уже загруженный список подтем (из ReferenceDataContext), чтобы
+  // не ходить в сеть за тем, что и так есть на клиенте.
+  async getOrCreateSubtopic(name, topicId, known = []) {
+    const trimmed = String(name || '').trim();
+    if (!trimmed || !topicId) return null;
+
+    const existing = known.find((st) => st.topic === topicId && st.name === trimmed);
+    if (existing) return existing.id;
+
+    try {
+      const created = await this.createSubtopic({ name: trimmed, topic: topicId, order: 0 });
+      return created.id;
+    } catch (error) {
+      console.error(`Error creating subtopic "${trimmed}":`, error);
       return null;
     }
   },

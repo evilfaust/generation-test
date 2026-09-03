@@ -187,6 +187,23 @@ export const worksApi = {
   // Обновить работу. Название работы копируется в план каникулярной программы
   // (study_program_items.title) и в заголовок выдачи (work_sessions.student_title) —
   // при переименовании подтягиваем эти снимки, см. syncWorkTitleSnapshots.
+  // Прикрепить фото/скан оригинала к работе (импорт работы целиком).
+  // Файлы идут в works.original_files — при спорной формуле всегда можно
+  // свериться с рукописью. Ошибка загрузки не должна ронять импорт: работа
+  // и задачи к этому моменту уже созданы.
+  async uploadWorkOriginals(workId, files = []) {
+    const list = Array.from(files || []).filter(Boolean);
+    if (!workId || list.length === 0) return null;
+    try {
+      const formData = new FormData();
+      list.forEach((file) => formData.append('original_files', file));
+      return await pb.collection('works').update(workId, formData);
+    } catch (error) {
+      console.error('Error uploading work originals:', error);
+      return null;
+    }
+  },
+
   async updateWork(id, data) {
     try {
       let prevTitle = null;

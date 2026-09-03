@@ -8,7 +8,7 @@ import { hybridTheme } from './theme/hybrid';
 import ErrorBoundary from './components/ErrorBoundary';
 import {
   FileTextOutlined, FileSearchOutlined, BookOutlined, FileAddOutlined,
-  UploadOutlined, PieChartOutlined, SolutionOutlined, EditOutlined,
+  UploadOutlined, ImportOutlined, PieChartOutlined, SolutionOutlined, EditOutlined,
   TeamOutlined, TrophyOutlined, BarChartOutlined, ReadOutlined,
   SnippetsOutlined, FolderOutlined, CompassOutlined, UnorderedListOutlined, CheckSquareOutlined,
   FormOutlined, QrcodeOutlined, PictureOutlined, HeatMapOutlined,
@@ -60,6 +60,7 @@ const ListokView = lazy(() => import('./components/listki/ListokView'));
 const ListokEditor = lazy(() => import('./components/listki/ListokEditor'));
 const TaskImporter = lazy(() => import('./components/TaskImporter'));
 const WorkManager = lazy(() => import('./components/WorkManager'));
+const WorkImporter = lazy(() => import('./components/work-import/WorkImporter'));
 const WorkEditorPage = lazy(() => import('./components/WorkEditorPage'));
 const StudentProgressDashboard = lazy(() => import('./components/StudentProgressDashboard'));
 const StudentDetailPage = lazy(() => import('./components/StudentDetailPage'));
@@ -159,6 +160,7 @@ export const R = {
   CROSSWORD:           '/app/gamification/crossword',
   // Работы
   WORKS:               '/app/works',
+  WORK_IMPORT:         '/app/works/import',
   WORK_EDITOR:         '/app/works/:workId/edit',
   // Ученики
   STUDENTS:            '/app/students',
@@ -348,6 +350,7 @@ const MENU_KEY_PATH = {
   marathon:                 R.MARATHON,
   crossword:                R.CROSSWORD,
   'work-manager':           R.WORKS,
+  'work-import':            R.WORK_IMPORT,
   students:                 R.STUDENTS,
   heatmap:                  R.STUDENTS_HEATMAP,
   achievements:             R.ACHIEVEMENTS,
@@ -406,6 +409,7 @@ const GROUP_META = {
 // Явные родители для страниц без menuGroup
 const PARENT_META = {
   'work-editor': { label: 'Мои работы', path: R.WORKS },
+  'work-import': { label: 'Мои работы', path: R.WORKS },
   catalog:       { label: 'Аналитика',  path: R.STATS },
 };
 
@@ -699,6 +703,7 @@ function AppLayout() {
       ],
     },
     { key: 'import', icon: <UploadOutlined />, label: 'Импорт задач', section: 'import', editOnly: true },
+    { key: 'work-import', icon: <ImportOutlined />, label: 'Импорт работы', section: 'import', editOnly: true },
     {
       key: 'geometry', icon: <CompassOutlined />, label: 'Геометрия', section: 'geometry',
       children: [
@@ -1059,6 +1064,7 @@ function App() {
             {/* Маршруты ТОЛЬКО для editor/superadmin — viewer редиректится на /app/tasks */}
             <Route element={<ProtectedRoute requireEdit />}>
               <Route element={<AppLayout />}>
+                <Route path={R.WORK_IMPORT}      element={<WorkImporter />} />
                 <Route path={R.WORK_EDITOR}      element={<WorkEditorRoute />} />
                 <Route path={R.LISTOK_EDIT}      element={<ListokEditor />} />
                 <Route path={R.IMPORT}           element={<TaskImporter />} />

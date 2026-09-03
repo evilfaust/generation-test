@@ -13,6 +13,32 @@ function nextCode(existingCodes, prefix) {
 }
 
 /**
+ * Префикс кодов темы: `T{N}-` для тригонометрии, `{ege_number}-` для остальных.
+ * Бросает, если у обычной темы нет номера ЕГЭ.
+ */
+export function taskCodePrefix(topic) {
+  if (!topic) throw new Error('taskCodePrefix: тема не передана');
+  if (topic.exam_type === 'trig') {
+    const idMatch = String(topic.id || '').match(/(\d+)$/);
+    return `T${idMatch ? parseInt(idMatch[1], 10) : 0}-`;
+  }
+  const egeNumber = topic.ege_number;
+  if (!egeNumber && egeNumber !== 0) {
+    throw new Error(`У темы "${topic.title || topic.id}" не указан ege_number`);
+  }
+  return `${egeNumber}-`;
+}
+
+/**
+ * Следующий код по уже занятым кодам темы — без обращения к сети.
+ * Нужен при импорте пачкой: коды темы читаются один раз, дальше счётчик
+ * крутится локально.
+ */
+export function nextCodeFromCodes(existingCodes, prefix) {
+  return nextCode(existingCodes || [], prefix);
+}
+
+/**
  * Генерирует следующий код задачи для заданной темы.
  * Для тригонометрических тем (exam_type='trig'): T{N}-{seq}
  * Для остальных тем: {ege_number}-{seq}

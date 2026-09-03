@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import pb, { api, aiHeaders } from '../services/pocketbase';
 import { parseMarkdownFile, parseSdamgiaResult, getRandomTagColor } from '../utils/markdownTaskParser';
 import { rewriteImageUrls } from '../components/TaskStatementRenderer';
-import { normalizeTopicTitle } from '../utils/normalize';
+import { matchTopicByName, matchSubtopicByName } from '../utils/topicMatch';
 
 const getPdfServiceUrl = () => {
   const envUrl = import.meta.env.VITE_PDF_SERVICE_URL;
@@ -15,11 +15,6 @@ const getPdfServiceUrl = () => {
 };
 
 const PDF_SERVICE_URL = getPdfServiceUrl();
-
-// Минимальная длина названия темы для частичного совпадения. Короткие
-// («Марафон», «Планиметрия») слишком часто встречаются внутри длинных
-// заголовков из файла и дают ложный автовыбор темы.
-const MIN_PARTIAL_MATCH_LEN = 8;
 
 /**
  * Хук для импорта задач из markdown файлов.
@@ -51,53 +46,17 @@ export function useTaskImport({ topics = [], tags: existingTags = [], subtopics:
     existingTags.forEach(t => tagCacheRef.current.set(t.title, t.id));
   }
 
-  /**
-   * Ищет тему по названию из YAML.
-   * Сначала точное совпадение, затем частичное.
-   */
-  const matchTopic = useCallback((topicName) => {
-    if (!topicName || topics.length === 0) return null;
+  // Подбор темы/подтемы по названию — общая логика с импортом работы целиком
+  // (utils/topicMatch.js).
+  const matchTopic = useCallback(
+    (topicName) => matchTopicByName(topicName, topics),
+    [topics],
+  );
 
-    const norm = normalizeTopicTitle(topicName);
-    if (!norm) return null;
-
-    // Точное совпадение (с точностью до регистра, ё/е, «№» и пунктуации)
-    const exact = topics.find(t => normalizeTopicTitle(t.title) === norm);
-    if (exact) return exact.id;
-
-    // Частичное совпадение (содержит подстроку). Совсем короткие названия
-    // пропускаем — «Планиметрия» внутри длинной фразы даёт ложные попадания.
-    const partial = topics.filter(t => {
-      const title = normalizeTopicTitle(t.title);
-      if (title.length < MIN_PARTIAL_MATCH_LEN) return false;
-      return title.includes(norm) || norm.includes(title);
-    });
-    if (partial.length === 1) return partial[0].id;
-
-    // Если несколько — вернём null, пользователь выберет сам
-    return null;
-  }, [topics]);
-
-  /**
-   * Ищет подтему по названию для указанной темы.
-   */
-  const matchSubtopic = useCallback((subtopicName, forTopicId) => {
-    if (!subtopicName || !forTopicId) return null;
-
-    const norm = normalizeTopicTitle(subtopicName);
-    if (!norm) return null;
-
-    const topicSubtopics = existingSubtopics.filter(st => st.topic === forTopicId);
-    const exact = topicSubtopics.find(st => normalizeTopicTitle(st.name) === norm);
-    if (exact) return exact.id;
-
-    const partial = topicSubtopics.filter(st =>
-      normalizeTopicTitle(st.name).includes(norm)
-    );
-    if (partial.length === 1) return partial[0].id;
-
-    return null;
-  }, [existingSubtopics]);
+  const matchSubtopic = useCallback(
+    (subtopicName, forTopicId) => matchSubtopicByName(subtopicName, existingSubtopics, forTopicId),
+    [existingSubtopics],
+  );
 
   /**
    * Устанавливает parsedData и автоматически подбирает тему/подтему.

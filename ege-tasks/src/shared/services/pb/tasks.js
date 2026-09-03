@@ -324,6 +324,23 @@ export const tasksApi = {
     }
   },
 
+  // Лёгкий индекс задач темы для поиска дублей при импорте работы целиком
+  // (WORK_IMPORT_FORMAT.md). Отличается от getTaskStatementsAndCodes наличием
+  // id и answer: найденную задачу нужно не только опознать, но и подставить
+  // в вариант вместо создания копии.
+  async getTasksForDedup(topicId) {
+    if (!topicId) return [];
+    try {
+      return await pb.collection('tasks').getFullList({
+        filter: `topic = "${escapeFilter(topicId)}"`,
+        fields: 'id,code,statement_md,answer',
+      });
+    } catch (error) {
+      console.error('Error fetching tasks for dedup:', error);
+      return [];
+    }
+  },
+
   // Карта sdamgia_id → task.id для набора решу-id (для связки внешних результатов).
   async getTaskIdsBySdamgiaIds(sdamgiaIds = []) {
     const map = {};

@@ -5,11 +5,12 @@ import {
   RightOutlined, InboxOutlined, SolutionOutlined, TeamOutlined,
   ClockCircleOutlined, SearchOutlined, SortAscendingOutlined, FormOutlined,
   PushpinOutlined, PushpinFilled, FolderOutlined, DownOutlined, CameraOutlined,
-  ShareAltOutlined, CopyOutlined, UserOutlined, SwapOutlined,
+  ShareAltOutlined, CopyOutlined, UserOutlined, SwapOutlined, ImportOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import SessionPanel from './worksheet/SessionPanel';
 import ParallelVariantsModal from './worksheet/ParallelVariantsModal';
 import ScanBlankModal from './worksheet/ScanBlankModal';
@@ -25,6 +26,7 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   const { message, modal } = App.useApp();
   const { topics } = useReferenceData();
   const { canEdit, canDelete, aiEnabled, teacher, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState('works');
   const [mcTests, setMcTests] = useState([]);
@@ -628,6 +630,13 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         <span style={{ fontSize: 12, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
           {filteredWorks.length} из {works.length}
         </span>
+        {canEdit && (
+          <Tooltip title="Загрузить готовую работу текстом: задачи разойдутся по темам">
+            <Button icon={<ImportOutlined />} onClick={() => navigate('/app/works/import')}>
+              Импорт работы
+            </Button>
+          </Tooltip>
+        )}
       </FilterRow>
 
       {/* Work Cards */}
@@ -636,7 +645,8 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
           <div className="wm-empty-icon"><SolutionOutlined /></div>
           <div className="wm-empty-text">Нет работ</div>
           <div className="wm-empty-hint">
-            Создайте контрольную работу в разделе «Контрольные работы» и сохраните её
+            Создайте контрольную работу в разделе «Контрольные работы» и сохраните её —
+            или загрузите готовую работу коллеги кнопкой «Импорт работы»
           </div>
         </div>
       ) : (
