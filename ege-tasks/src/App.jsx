@@ -16,7 +16,7 @@ import {
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, TableOutlined, FileMarkdownOutlined,
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
-  PercentageOutlined, HomeOutlined, CalendarOutlined, ProfileOutlined,
+  PercentageOutlined, HomeOutlined, CalendarOutlined, ProfileOutlined, ColumnWidthOutlined
 } from '@ant-design/icons';
 // ── Ленивая загрузка страниц-компонентов ────────────────────────────────────
 // Все компоненты ниже используются ТОЛЬКО как элементы маршрутов (через page-
@@ -98,6 +98,7 @@ const OralFractionsGenerator = lazy(() => import('./components/OralFractionsGene
 const OralMixedGenerator = lazy(() => import('./components/OralMixedGenerator'));
 const LinearEquationsGenerator = lazy(() => import('./components/LinearEquationsGenerator'));
 const LinearInequalitiesGenerator = lazy(() => import('./components/LinearInequalitiesGenerator'));
+const DoubleInequalitiesGenerator = lazy(() => import('./components/DoubleInequalitiesGenerator'));
 const MarathonGenerator = lazy(() => import('./components/MarathonGenerator'));
 const CrosswordGenerator = lazy(() => import('./components/CrosswordGenerator'));
 const EgeScoreCalculator = lazy(() => import('./components/EgeScoreCalculator'));
@@ -202,6 +203,7 @@ export const R = {
   // Уравнения
   LINEAR_EQUATIONS:    '/app/equations/linear',
   LINEAR_INEQUALITIES: '/app/equations/inequalities',
+  DOUBLE_INEQUALITIES: '/app/equations/double-inequalities',
   // Теория
   THEORY:              '/app/theory',
   THEORY_NEW:          '/app/theory/articles/new',
@@ -309,6 +311,7 @@ const ROUTE_META = [
   { re: /^\/app\/arith\/fractions/,       menuKey: 'fractions-oral',   menuGroup: 'arith', title: 'Устный счёт — Действия с обыкновенными дробями' },
   { re: /^\/app\/arith\/mixed/,           menuKey: 'oral-mixed',       menuGroup: 'arith', title: 'Устный счёт — Смешанная работа' },
   { re: /^\/app\/equations\/linear/,      menuKey: 'linear-equations', menuGroup: 'equations', title: 'Уравнения — Линейные уравнения' },
+  { re: /^\/app\/equations\/double-inequalities/, menuKey: 'double-inequalities', menuGroup: 'equations', title: 'Уравнения — Двойные неравенства' },
   { re: /^\/app\/equations\/inequalities/, menuKey: 'linear-inequalities', menuGroup: 'equations', title: 'Уравнения — Линейные неравенства' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
   { re: /^\/app\/theory\/categories/,      menuKey: 'theory-categories', menuGroup: 'theory', title: 'Теория — Категории' },
@@ -387,6 +390,7 @@ const MENU_KEY_PATH = {
   'oral-mixed':             R.ORAL_MIXED,
   'linear-equations':       R.LINEAR_EQUATIONS,
   'linear-inequalities':    R.LINEAR_INEQUALITIES,
+  'double-inequalities':    R.DOUBLE_INEQUALITIES,
   'theory-browser':         R.THEORY,
   'theory-editor':          R.THEORY_NEW,
   'theory-print':           R.THEORY_PRINT,
@@ -761,6 +765,7 @@ function AppLayout() {
       children: [
         { key: 'linear-equations', icon: <CalculatorOutlined />, label: 'Линейные уравнения' },
         { key: 'linear-inequalities', icon: <LineChartOutlined />, label: 'Линейные неравенства' },
+        { key: 'double-inequalities', icon: <ColumnWidthOutlined />, label: 'Двойные неравенства' },
       ],
     },
     {
@@ -1052,6 +1057,7 @@ function App() {
               {/* Уравнения */}
               <Route path={R.LINEAR_EQUATIONS} element={<LinearEquationsGenerator />} />
               <Route path={R.LINEAR_INEQUALITIES} element={<LinearInequalitiesGenerator />} />
+              <Route path={R.DOUBLE_INEQUALITIES} element={<DoubleInequalitiesGenerator />} />
 
               {/* Теория — просмотр (viewer тоже) */}
               <Route path={R.THEORY}            element={<TheoryPage />} />

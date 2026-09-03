@@ -34,6 +34,7 @@ const GENERATOR_LABELS = {
   log_exp_equations:       'Степени и логарифмы',
   linear_equations:        'Линейные уравнения',
   linear_inequalities:     'Линейные неравенства',
+  double_inequalities:     'Двойные неравенства',
 };
 
 function SourceBadge({ test }) {

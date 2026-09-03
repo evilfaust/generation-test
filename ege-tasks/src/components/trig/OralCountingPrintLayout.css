@@ -71,6 +71,60 @@
     padding: 8mm 7mm 8mm 5mm;
   }
 
+  /* Четыре варианта на листе: сетка 2×2 */
+  .oral-quad-page {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    min-height: 100vh;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .oral-page--quad {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 5mm 4mm 5mm 6mm;
+    border-right: 1px dashed #aaa;
+    border-bottom: 1px dashed #aaa;
+    font-size: 9.5pt;
+    /* overflow:hidden здесь был бы опасен: лишние задания просто исчезли бы
+       с листа. Пусть лучше квадрант вырастет и это будет видно. */
+    break-inside: avoid;
+  }
+  .oral-page--quad:nth-child(2n)   { border-right: none; }
+  .oral-page--quad:nth-child(n+3)  { border-bottom: none; }
+
+  .oral-page--quad .oral-variant-badge { font-size: 9pt; }
+  .oral-page--quad .oral-field         { font-size: 8pt; }
+  .oral-page--quad .oral-line--name    { min-width: 20mm; }
+  .oral-page--quad .oral-line--short   { width: 12mm; }
+  .oral-page--quad .oral-subtitle      { font-size: 8.5pt; }
+  .oral-page--quad .oral-instruction   { font-size: 9pt; margin-bottom: 1mm; }
+  /* Квадрант — 105×148,5 мм. За вычетом полей, шапки и инструкции под задания
+     остаётся ~120 мм, поэтому строка здесь плотнее: 20 заданий устного счёта
+     при интервале 1 занимают ~108 мм и помещаются. */
+  .oral-page--quad .oral-task {
+    padding: calc(0.4mm * var(--sheet-line-scale, 1)) 0;
+    min-height: calc(4.6mm * var(--sheet-line-scale, 1));
+    margin-bottom: calc((var(--sheet-line-scale, 1) - 1) * 3.5mm);
+  }
+  .oral-page--quad .oral-header      { gap: 1mm; margin-bottom: 1mm; padding-bottom: 1mm; }
+  .oral-page--quad .oral-subtitle    { margin-bottom: 1mm; }
+  .oral-page--quad .oral-task-num,
+  .oral-page--quad .oral-task-expr,
+  .oral-page--quad .oral-task-eq,
+  .oral-page--quad .oral-task-x-prompt { font-size: 9pt; }
+  .oral-page--quad .oral-task-x-prompt { min-width: 18mm; }
+
+  /* Разделительная черта между заданиями */
+  .oral-divider {
+    grid-column: 1 / -1;
+    border-top: 1.2px solid #000;
+    margin: 2mm 0 1.5mm;
+    height: 0;
+  }
+
   /* ─── Шапка ──────────────────────────────────────────────────────────────── */
   .oral-header {
     display: flex;
@@ -160,9 +214,13 @@
     display: flex;
     align-items: baseline;
     gap: 2px;
-    padding: 1mm 0;
+    padding: calc(1mm * var(--sheet-line-scale, 1)) 0;
     border-bottom: 1px dotted #ccc;
-    min-height: 7mm;
+    min-height: calc(7mm * var(--sheet-line-scale, 1));
+    /* Интервал должен добавлять место НАД высотой формулы: строка с дробью
+       сама по себе выше 7 мм, и одной min-height ползунок было не заметить.
+       При масштабе 1 добавка нулевая — прежний вид листа. */
+    margin-bottom: calc((var(--sheet-line-scale, 1) - 1) * 6mm);
     break-inside: avoid;
   }
   .oral-task:last-child {
@@ -368,6 +426,55 @@
   padding: 8mm 7mm 8mm 5mm;
 }
 
+.oral-screen-root .oral-quad-page {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 210mm;
+  min-height: 297mm;
+  background: #fff;
+  border: 1.5px solid #bbb;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
+}
+.oral-screen-root .oral-page--quad {
+  /* Ячейка сетки: ширину даёт grid, поэтому 210mm от .oral-page снимаем.
+     Рамку и тень тоже — они принадлежат листу целиком, а не квадранту. */
+  width: auto;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 5mm 4mm 5mm 6mm;
+  border: none;
+  border-right: 1px dashed #aaa;
+  border-bottom: 1px dashed #aaa;
+  box-shadow: none;
+  font-size: 0.9em;
+}
+.oral-screen-root .oral-page--quad:nth-child(2n)  { border-right: none; }
+.oral-screen-root .oral-page--quad:nth-child(n+3) { border-bottom: none; }
+.oral-screen-root .oral-page--quad .oral-variant-badge { font-size: 0.85em; }
+.oral-screen-root .oral-page--quad .oral-field         { font-size: 0.78em; }
+.oral-screen-root .oral-page--quad .oral-line--name    { min-width: 20mm; }
+.oral-screen-root .oral-page--quad .oral-line--short   { width: 12mm; }
+.oral-screen-root .oral-page--quad .oral-task {
+  padding: calc(0.4mm * var(--sheet-line-scale, 1)) 0;
+  min-height: calc(4.6mm * var(--sheet-line-scale, 1));
+  margin-bottom: calc((var(--sheet-line-scale, 1) - 1) * 3.5mm);
+}
+.oral-screen-root .oral-page--quad .oral-header {
+  gap: 1mm;
+  margin-bottom: 1mm;
+  padding-bottom: 1mm;
+}
+.oral-screen-root .oral-page--quad .oral-subtitle { margin-bottom: 1mm; }
+.oral-screen-root .oral-page--quad .oral-task-x-prompt { min-width: 18mm; }
+
+.oral-screen-root .oral-divider {
+  grid-column: 1 / -1;
+  border-top: 1.2px solid #000;
+  margin: 2mm 0 1.5mm;
+  height: 0;
+}
+
 /* ── Шапка ──────────────────────────────────────────────────────────────── */
 .oral-screen-root .oral-header {
   display: flex;
@@ -428,9 +535,10 @@
   display: flex;
   align-items: baseline;
   gap: 2px;
-  padding: 1mm 0;
+  padding: calc(1mm * var(--sheet-line-scale, 1)) 0;
   border-bottom: 1px dotted #ccc;
-  min-height: 7mm;
+  min-height: calc(7mm * var(--sheet-line-scale, 1));
+  margin-bottom: calc((var(--sheet-line-scale, 1) - 1) * 6mm);
 }
 .oral-screen-root .oral-task:last-child { border-bottom: none; }
 .oral-screen-root .oral-task-num     { font-weight: bold; min-width: 18px; flex-shrink: 0; font-size: 0.95em; }

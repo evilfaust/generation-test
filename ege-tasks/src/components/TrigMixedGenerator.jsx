@@ -1,8 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { MathInline } from './shared/MathInline';
 import {
-  Button, Switch, Slider, Select, Checkbox, Space,
-  Input, Row, Col, Typography, InputNumber, Tabs, Dropdown,
+  Button, Switch, Slider, Select, Checkbox, Space, Input, Row, Col, Typography, InputNumber, Tabs, Dropdown, Divider,
 } from 'antd';
 import {
   PrinterOutlined, ThunderboltOutlined, FunctionOutlined,
@@ -11,6 +10,7 @@ import {
 import { SplitLayout, ConfigLabel } from '../ui';
 import UnitCircleSVG from './trig/UnitCircleSVG';
 import TrigMixedPrintLayout from './trig/TrigMixedPrintLayout';
+import { SheetLayoutOptions, SHEET_DEFAULTS } from './trig/sheetOptions';
 import { TRIG_TYPES, getTrigType } from '../hooks/trigMixedRegistry';
 
 const { Text } = Typography;
@@ -437,6 +437,9 @@ export default function TrigMixedGenerator() {
   const [showWorkSpace,    setShowWorkSpace]    = useState(false);
   const [workSpaceSize,    setWorkSpaceSize]    = useState(25);
   const [showTeacherKey,   setShowTeacherKey]   = useState(true);
+  // Общие настройки листа (шапка, класс, название, интервал)
+  const [sheet, setSheet] = useState({ ...SHEET_DEFAULTS });
+  const updateSheet = (k, v) => setSheet(p => ({ ...p, [k]: v }));
   const [twoPerPage,       setTwoPerPage]       = useState(false);
 
   const [sections, setSections] = useState(() => [
@@ -538,6 +541,7 @@ export default function TrigMixedGenerator() {
     workSpaceSize,
     showTeacherKey,
     twoPerPage,
+    ...sheet,
   };
 
   const totalTasks = useMemo(() => {
@@ -630,6 +634,8 @@ export default function TrigMixedGenerator() {
                   />
                 </div>
               )}
+              <Divider style={{ margin: '10px 0' }} />
+              <SheetLayoutOptions settings={sheet} onChange={updateSheet} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

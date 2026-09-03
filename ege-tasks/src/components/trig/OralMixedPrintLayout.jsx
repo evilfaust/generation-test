@@ -1,5 +1,6 @@
 import React from 'react';
 import { MathInline } from '../shared/MathInline';
+import { sheetOptions, sheetSpacingStyle } from './sheetOptions';
 import './OralCountingPrintLayout.css';
 import './OralMixedPrintLayout.css';
 
@@ -7,14 +8,17 @@ const LABELS = Array.from({ length: 60 }, (_, i) => String(i + 1));
 
 
 // Чем кончается строка: 'eq' — «=», 'var' — «x =», 'answer' — «Ответ:»
-const sectionPrompt = (sec) => sec.promptMode || (sec.equationMode ? 'var' : 'eq');
+const sectionPrompt = (sec, showAnswerSpace = true) => {
+  if (!showAnswerSpace) return 'none';
+  return sec.promptMode || (sec.equationMode ? 'var' : 'eq');
+};
 
 // Одно задание — поддерживает вычисления, уравнения и неравенства
 function TaskRow({ q, qi, prompt }) {
   return (
     <div className="oral-task">
       <span className="oral-task-num">{LABELS[qi]})</span>
-      <span className={`oral-task-expr${prompt === 'eq' ? '' : ' oral-task-expr--eq'}`}>
+      <span className={`oral-task-expr${prompt === 'eq' || prompt === 'none' ? '' : ' oral-task-expr--eq'}`}>
         <MathInline latex={q.exprLatex} />
       </span>
       {prompt === 'var' && (
@@ -26,7 +30,7 @@ function TaskRow({ q, qi, prompt }) {
   );
 }
 
-function VariantPage({ variant, title, mode, showSectionHeaders, columnsCount }) {
+function VariantPage({ variant, title, mode, showSectionHeaders, columnsCount, opts }) {
   const pageClass =
     mode === 'side' ? 'oral-page oral-page--side' :
     mode === 'half' ? 'oral-page oral-page--half' :
@@ -36,26 +40,32 @@ function VariantPage({ variant, title, mode, showSectionHeaders, columnsCount })
 
   return (
     <div className={pageClass}>
-      <div className="oral-header">
-        <div className="oral-header-row1">
-          <span className="oral-variant-badge">Вариант {variant.number}</span>
-          <span className="oral-field oral-field--fio">ФИО: <span className="oral-line oral-line--name" /></span>
+      {opts.showHeader && (
+        <div className="oral-header">
+          <div className="oral-header-row1">
+            <span className="oral-variant-badge">Вариант {variant.number}</span>
+            <span className="oral-field oral-field--fio">ФИО: <span className="oral-line oral-line--name" /></span>
+          </div>
+          <div className="oral-header-row2">
+            {opts.showClassField && (
+              <span className="oral-field">Класс: <span className="oral-line oral-line--short" /></span>
+            )}
+            <span className="oral-field">Дата: <span className="oral-line oral-line--short" /></span>
+          </div>
         </div>
-        <div className="oral-header-row2">
-          <span className="oral-field">Класс: <span className="oral-line oral-line--short" /></span>
-          <span className="oral-field">Дата: <span className="oral-line oral-line--short" /></span>
-        </div>
-      </div>
+      )}
 
-      {title && <div className="oral-subtitle">{title}</div>}
+      {opts.showTitle && title && <div className="oral-subtitle">{title}</div>}
 
       {variant.sections.map((sec, si) => (
         <div key={si} className="oral-mixed-section">
           {showSectionHeaders && <div className="oral-mixed-section-title">{sec.label}</div>}
-          {sec.instruction && <div className="oral-instruction">{sec.instruction}</div>}
+          {opts.showInstruction && sec.instruction && (
+            <div className="oral-instruction">{sec.instruction}</div>
+          )}
           <div className={columnsCount === 2 ? 'oral-grid oral-grid--2col' : 'oral-grid oral-grid--1col'}>
             {sec.tasks.map((q, qi) => {
-              const row = <TaskRow key={qi} q={q} qi={globalIdx} prompt={sectionPrompt(sec)} />;
+              const row = <TaskRow key={qi} q={q} qi={globalIdx} prompt={sectionPrompt(sec, opts.showAnswerSpace)} />;
               globalIdx++;
               return row;
             })}
@@ -117,6 +127,7 @@ export default function OralMixedPrintLayout({
     columnsCount = 2,
     showSectionHeaders = true,
   } = settings || {};
+  const opts = sheetOptions(settings || {});
 
   let pages;
 
@@ -134,6 +145,7 @@ export default function OralMixedPrintLayout({
               mode="side"
               showSectionHeaders={showSectionHeaders}
               columnsCount={1}
+              opts={opts}
             />
           ))}
         </div>
@@ -153,6 +165,7 @@ export default function OralMixedPrintLayout({
               mode="half"
               showSectionHeaders={showSectionHeaders}
               columnsCount={columnsCount}
+              opts={opts}
             />
           ))}
         </div>
@@ -167,6 +180,7 @@ export default function OralMixedPrintLayout({
         mode="full"
         showSectionHeaders={showSectionHeaders}
         columnsCount={columnsCount}
+        opts={opts}
       />
     ));
   }
@@ -180,14 +194,17 @@ export default function OralMixedPrintLayout({
 
   if (screenMode) {
     return (
-      <div className={`oral-screen-root oral-screen-root--fs-${fontSize}`}>
+      <div
+        className={`oral-screen-root oral-screen-root--fs-${fontSize}`}
+        style={sheetSpacingStyle(opts.lineSpacing)}
+      >
         {inner}
       </div>
     );
   }
 
   return (
-    <div className="oral-print-root" data-fs={fontSize}>
+    <div className="oral-print-root" data-fs={fontSize} style={sheetSpacingStyle(opts.lineSpacing)}>
       {inner}
     </div>
   );

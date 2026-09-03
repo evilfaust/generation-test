@@ -1,6 +1,7 @@
 import React from 'react';
 import katex from 'katex';
 import UnitCircleSVG from './UnitCircleSVG';
+import { sheetOptions, sheetSpacingStyle } from './sheetOptions';
 import './TrigMixedPrintLayout.css';
 
 function MathLine({ latex }) {
@@ -52,8 +53,9 @@ function ucInstruction(taskType) {
 }
 
 // ─── Секция одного генератора ─────────────────────────────────────────────────
-function SectionBlock({ section, startIndex, showSectionHeaders, showWorkSpace, workSpaceSize }) {
-  const { label, instruction, questionMode, tasks, ucSettings, twoColumns } = section;
+function SectionBlock({ section, startIndex, showSectionHeaders, showWorkSpace, workSpaceSize, showInstruction = true, showAnswerSpace = true }) {
+  const { label, instruction, tasks, ucSettings, twoColumns } = section;
+  const questionMode = showAnswerSpace === false ? 'plain' : section.questionMode;
 
   const isUC = questionMode === 'unitcircle';
   const endIndex = startIndex + tasks.length - 1;
@@ -126,7 +128,9 @@ function SectionBlock({ section, startIndex, showSectionHeaders, showWorkSpace, 
         </div>
       ) : (
         <>
-          {instructionText && <div className="tmixed-instruction">{instructionText}</div>}
+          {showInstruction && instructionText && (
+            <div className="tmixed-instruction">{instructionText}</div>
+          )}
           <div className={`tmixed-questions${twoColumns ? ' tmixed-questions--compact' : ''}`}>
             {tasks.map((q, i) => (
               <RegularTaskRow
@@ -148,6 +152,7 @@ function SectionBlock({ section, startIndex, showSectionHeaders, showWorkSpace, 
 // ─── Одна страница варианта (ученик) ──────────────────────────────────────────
 function VariantPage({ variant, title, settings, mode }) {
   const { showSectionHeaders, showWorkSpace, workSpaceSize } = settings;
+  const opts = sheetOptions(settings);
   const pageClass = mode === 'half'
     ? 'tmixed-page tmixed-page--half'
     : 'tmixed-page';
@@ -162,20 +167,24 @@ function VariantPage({ variant, title, settings, mode }) {
 
   return (
     <div className={pageClass}>
-      <div className="tmixed-header">
-        <span className="tmixed-variant-badge">Вариант {variant.number}</span>
-        <span className={`tmixed-field tmixed-field--name`}>
-          ФИО: <span className="tmixed-line tmixed-line--name" />
-        </span>
-        <span className="tmixed-field">
-          Класс: <span className="tmixed-line tmixed-line--short" />
-        </span>
-        <span className="tmixed-field">
-          Дата: <span className="tmixed-line tmixed-line--short" />
-        </span>
-      </div>
+      {opts.showHeader && (
+        <div className="tmixed-header">
+          <span className="tmixed-variant-badge">Вариант {variant.number}</span>
+          <span className={`tmixed-field tmixed-field--name`}>
+            ФИО: <span className="tmixed-line tmixed-line--name" />
+          </span>
+          {opts.showClassField && (
+            <span className="tmixed-field">
+              Класс: <span className="tmixed-line tmixed-line--short" />
+            </span>
+          )}
+          <span className="tmixed-field">
+            Дата: <span className="tmixed-line tmixed-line--short" />
+          </span>
+        </div>
+      )}
 
-      {title && <div className="tmixed-work-title">{title}</div>}
+      {opts.showTitle && title && <div className="tmixed-work-title">{title}</div>}
 
       {sectionsWithStart.map((sec, si) => (
         <SectionBlock
@@ -185,6 +194,8 @@ function VariantPage({ variant, title, settings, mode }) {
           showSectionHeaders={showSectionHeaders}
           showWorkSpace={showWorkSpace}
           workSpaceSize={workSpaceSize}
+          showInstruction={opts.showInstruction}
+          showAnswerSpace={opts.showAnswerSpace}
         />
       ))}
     </div>
@@ -283,6 +294,7 @@ export default function TrigMixedPrintLayout({ variants, title, settings }) {
   if (!variants || !variants.length) return null;
 
   const { twoPerPage, showTeacherKey } = settings;
+  const rootOpts = sheetOptions(settings);
 
   let pages;
   if (twoPerPage) {
@@ -316,7 +328,7 @@ export default function TrigMixedPrintLayout({ variants, title, settings }) {
   }
 
   return (
-    <div className="tmixed-print-root">
+    <div className="tmixed-print-root" style={sheetSpacingStyle(rootOpts.lineSpacing)}>
       {pages}
       {showTeacherKey && (
         <TeacherKeyPage variants={variants} title={title} />

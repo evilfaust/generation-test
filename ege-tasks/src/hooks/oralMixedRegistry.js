@@ -52,6 +52,12 @@ import {
   DEFAULT_SETTINGS_INEQ,
 } from './useLinearInequalities';
 
+import {
+  generateDoubleInequalityVariants,
+  CATEGORY_LABELS_DBL,
+  DEFAULT_SETTINGS_DBL,
+} from './useDoubleInequalities';
+
 // Дефолтный набор включённых категорий (все true)
 const allTrue = (labels) => Object.fromEntries(Object.keys(labels).map(k => [k, true]));
 
@@ -136,6 +142,17 @@ export const ORAL_TYPES = [
     categoryLabels: CATEGORY_LABELS_INEQ,
     defaultCategories: DEFAULT_SETTINGS_INEQ.categories,
     defaultSettings: DEFAULT_SETTINGS_INEQ,
+  },
+  {
+    type:         'double_inequalities',
+    label:        'Двойные неравенства',
+    instruction:  'Решите двойные неравенства:',
+    equationMode: true,
+    promptMode:   'answer',
+    generator:    generateDoubleInequalityVariants,
+    categoryLabels: CATEGORY_LABELS_DBL,
+    defaultCategories: DEFAULT_SETTINGS_DBL.categories,
+    defaultSettings: DEFAULT_SETTINGS_DBL,
   },
 ];
 

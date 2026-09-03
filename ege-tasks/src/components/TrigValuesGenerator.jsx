@@ -20,6 +20,7 @@ import {
   TrigPreviewCard,
   TrigStatBadge,
 } from './trig/TrigGeneratorLayout';
+import { SheetLayoutOptions } from './trig/sheetOptions';
 
 const { Text } = Typography;
 
@@ -158,6 +159,13 @@ export default function TrigValuesGenerator() {
                   Лист ответов
                 </Checkbox>
               </Space>
+              <Divider style={{ margin: '10px 0' }} />
+              <SheetLayoutOptions
+                settings={settings}
+                onChange={updateSetting}
+                showSpacing={false}
+                showInstructionToggle={false}
+              />
             </TrigSettingsSection>
 
             <TrigActions>

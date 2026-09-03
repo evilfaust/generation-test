@@ -149,7 +149,8 @@
   .tmixed-question {
     display: flex;
     flex-direction: column;
-    padding: 1mm 0;
+    padding: calc(1mm * var(--sheet-line-scale, 1)) 0;
+    margin-bottom: calc((var(--sheet-line-scale, 1) - 1) * 6mm);
     break-inside: avoid;
   }
 
@@ -157,7 +158,7 @@
     display: flex;
     align-items: baseline;
     gap: 3px;
-    min-height: 8mm;
+    min-height: calc(8mm * var(--sheet-line-scale, 1));
   }
 
   .tmixed-q-label {
@@ -183,7 +184,7 @@
 
   /* Двухстрочный режим (уравнения) */
   .tmixed-question--twoLine .tmixed-question-top {
-    min-height: 12mm;
+    min-height: calc(12mm * var(--sheet-line-scale, 1));
   }
 
   .tmixed-question-answer {

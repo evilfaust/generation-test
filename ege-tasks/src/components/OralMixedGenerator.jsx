@@ -10,6 +10,7 @@ import {
 import { SplitLayout, ConfigLabel } from '../ui';
 import OralMixedPrintLayout from './trig/OralMixedPrintLayout';
 import { ORAL_TYPES, getOralType } from '../hooks/oralMixedRegistry';
+import { SheetLayoutOptions, SHEET_DEFAULTS } from './trig/sheetOptions';
 
 const { Text } = Typography;
 
@@ -124,6 +125,10 @@ export default function OralMixedGenerator() {
   const [showSectionHeaders, setShowSectionHeaders] = useState(true);
   const [columnsCount, setColumnsCount] = useState(2);
   const [fontSize, setFontSize] = useState('s');
+  // Общие настройки листа (шапка, класс, название, интервал) — как в остальных
+  // генераторах; здесь они лежат отдельным объектом, а не в settings хука.
+  const [sheet, setSheet] = useState({ ...SHEET_DEFAULTS });
+  const updateSheet = (k, v) => setSheet(p => ({ ...p, [k]: v }));
 
   const [generated, setGenerated] = useState(null); // массив variants для печати
   const [dragId, setDragId] = useState(null);
@@ -234,6 +239,7 @@ export default function OralMixedGenerator() {
     showTeacherKey,
     columnsCount,
     showSectionHeaders,
+    ...sheet,
   };
 
   return (
@@ -343,6 +349,8 @@ export default function OralMixedGenerator() {
                   />
                 </div>
               </Space>
+              <Divider style={{ margin: '10px 0' }} />
+              <SheetLayoutOptions settings={sheet} onChange={updateSheet} />
             </div>
 
             {/* Кнопки */}

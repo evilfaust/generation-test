@@ -1,6 +1,7 @@
 import React from 'react';
 import katex from 'katex';
 import TrigValuesSVG from './TrigValuesSVG';
+import { sheetOptions } from './sheetOptions';
 import './TrigValuesPrintLayout.css';
 
 function MathCell({ latex }) {
@@ -63,19 +64,26 @@ function TrigTable({ points, showSin, showCos, showTan, showCot, isAnswer }) {
 // ─── Одна страница ученика ───────────────────────────────────────────────────
 function StudentPage({ variant, variantIndex, settings, title }) {
   const { showSin, showCos, showTan, showCot, showHelperLines, showAngleLabels } = settings;
+  const opts = sheetOptions(settings);
 
   return (
     <div className={`tvg-page tvg-page--${settings.layout}`}>
       {/* Шапка */}
-      <div className="tvg-page-header">
-        <div className="tvg-page-title">{title}</div>
-        <div className="tvg-page-meta">
-          <span className="tvg-variant-badge">Вариант {variantIndex + 1}</span>
-          <span className="tvg-field">ФИО: <span className="tvg-line tvg-line--long" /></span>
-          <span className="tvg-field">Класс: <span className="tvg-line tvg-line--short" /></span>
-          <span className="tvg-field">Дата: <span className="tvg-line tvg-line--short" /></span>
+      {(opts.showTitle || opts.showHeader) && (
+        <div className="tvg-page-header">
+          {opts.showTitle && <div className="tvg-page-title">{title}</div>}
+          {opts.showHeader && (
+            <div className="tvg-page-meta">
+              <span className="tvg-variant-badge">Вариант {variantIndex + 1}</span>
+              <span className="tvg-field">ФИО: <span className="tvg-line tvg-line--long" /></span>
+              {opts.showClassField && (
+                <span className="tvg-field">Класс: <span className="tvg-line tvg-line--short" /></span>
+              )}
+              <span className="tvg-field">Дата: <span className="tvg-line tvg-line--short" /></span>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Контент: окружность + таблица */}
       <div className="tvg-page-body">

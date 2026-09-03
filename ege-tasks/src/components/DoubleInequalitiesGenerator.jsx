@@ -4,13 +4,13 @@ import {
 } from 'antd';
 import {
   PrinterOutlined, CheckSquareOutlined, ThunderboltOutlined,
-  CalculatorOutlined, FormOutlined,
+  ColumnWidthOutlined, FormOutlined,
 } from '@ant-design/icons';
 import {
-  useLinearEquations,
-  CATEGORY_LABELS_LINEQ,
-  CATEGORY_GROUPS_LINEQ,
-} from '../hooks/useLinearEquations';
+  useDoubleInequalities,
+  CATEGORY_LABELS_DBL,
+  CATEGORY_GROUPS_DBL,
+} from '../hooks/useDoubleInequalities';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import OralCountingPrintLayout from './trig/OralCountingPrintLayout';
 import { SheetOrderPanel } from './trig/SheetOrderPanel';
@@ -28,6 +28,11 @@ import {
 } from './trig/TrigGeneratorLayout';
 import { SheetLayoutOptions } from './trig/sheetOptions';
 
+const ANSWER_FORMS = [
+  { value: 'ineq',     label: 'a ⩽ x < b' },
+  { value: 'interval', label: '[a; b)' },
+];
+
 const ANSWER_STYLES = [
   { value: 'auto', label: 'Авто' },
   { value: 'frac', label: 'Дробь' },
@@ -40,13 +45,13 @@ const VARS_MODES = [
   { value: 'mixed', label: 'Разные' },
 ];
 
-export default function LinearEquationsGenerator() {
+export default function DoubleInequalitiesGenerator() {
   const {
     title, setTitle,
     settings, updateSetting, updateCategory,
     tasksData,
     generate, reset,
-  } = useLinearEquations();
+  } = useDoubleInequalities();
 
   const { modalOpen, setModalOpen, printTest, handlePrint: handleMCPrint } = useTrigMCModal();
   const [mcFillMode, setMcFillMode] = useState(false);
@@ -84,7 +89,7 @@ export default function LinearEquationsGenerator() {
   return (
     <>
       <TrigGeneratorLayout
-        icon={<CalculatorOutlined style={{ fontSize: 14 }} />}
+        icon={<ColumnWidthOutlined style={{ fontSize: 14 }} />}
         title={title}
         onTitleChange={setTitle}
         titlePlaceholder="Название листа"
@@ -92,8 +97,8 @@ export default function LinearEquationsGenerator() {
         left={
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>
 
-            {/* Категории заданий */}
-            {CATEGORY_GROUPS_LINEQ.map(group => (
+            {/* Блоки заданий по нарастанию сложности */}
+            {CATEGORY_GROUPS_DBL.map(group => (
               <TrigSettingsSection
                 key={group.label}
                 label={
@@ -107,7 +112,7 @@ export default function LinearEquationsGenerator() {
               >
                 <CategoryChecklist
                   keys={group.keys}
-                  labels={CATEGORY_LABELS_LINEQ}
+                  labels={CATEGORY_LABELS_DBL}
                   categories={settings.categories}
                   counts={settings.categoryCounts || {}}
                   onToggle={updateCategory}
@@ -156,18 +161,35 @@ export default function LinearEquationsGenerator() {
                 <span style={{ fontSize: 13 }}>Ответ:</span>
                 <Segmented
                   size="small"
+                  options={ANSWER_FORMS}
+                  value={settings.answerForm}
+                  onChange={v => updateSetting('answerForm', v)}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 13 }}>Границы:</span>
+                <Segmented
+                  size="small"
                   options={ANSWER_STYLES}
                   value={settings.answerStyle}
                   onChange={v => updateSetting('answerStyle', v)}
                   disabled={settings.integerOnly}
                 />
               </div>
-              <Checkbox
-                checked={!!settings.integerOnly}
-                onChange={e => updateSetting('integerOnly', e.target.checked)}
-              >
-                <span style={{ fontSize: 13 }}>Только целые корни</span>
-              </Checkbox>
+              <Space direction="vertical" size={4}>
+                <Checkbox
+                  checked={!!settings.strictOnly}
+                  onChange={e => updateSetting('strictOnly', e.target.checked)}
+                >
+                  <span style={{ fontSize: 13 }}>Только строгие знаки {'<'}</span>
+                </Checkbox>
+                <Checkbox
+                  checked={!!settings.integerOnly}
+                  onChange={e => updateSetting('integerOnly', e.target.checked)}
+                >
+                  <span style={{ fontSize: 13 }}>Только целые границы</span>
+                </Checkbox>
+              </Space>
             </TrigSettingsSection>
 
             {/* Печать и вид */}
@@ -209,7 +231,7 @@ export default function LinearEquationsGenerator() {
 
                 layout={order.layout}
 
-                categoryLabels={CATEGORY_LABELS_LINEQ}
+                categoryLabels={CATEGORY_LABELS_DBL}
 
                 sample={tasksData[0] || []}
 
@@ -266,7 +288,7 @@ export default function LinearEquationsGenerator() {
         right={
           <TrigPreviewPane
             hasData={Boolean(tasksData)}
-            emptyIcon={<CalculatorOutlined />}
+            emptyIcon={<ColumnWidthOutlined />}
             emptyTitle="Настройте параметры и нажмите «Сформировать»"
             emptyHint={`Активных категорий: ${enabledCount}`}
             summary={[
@@ -282,7 +304,8 @@ export default function LinearEquationsGenerator() {
                 settings={settings}
                 title={title}
                 layout={order.layout}
-                equationMode
+                promptMode="answer"
+                instruction="Решите двойное неравенство:"
                 screenMode
                 fontSize={settings.fontSize || 's'}
               />
@@ -298,7 +321,8 @@ export default function LinearEquationsGenerator() {
           settings={settings}
           title={title}
           layout={order.layout}
-          equationMode
+          promptMode="answer"
+          instruction="Решите двойное неравенство:"
           fontSize={settings.fontSize || 's'}
         />
       )}
@@ -309,7 +333,7 @@ export default function LinearEquationsGenerator() {
         printTest={printTest}
         onPrint={handleMCPrint}
         tasksData={tasksData}
-        generatorType="linear_equations"
+        generatorType="double_inequalities"
         generatorTitle={title}
         settings={settings}
         fillMode={mcFillMode}

@@ -1,5 +1,6 @@
 import React from 'react';
 import katex from 'katex';
+import { sheetOptions, sheetSpacingStyle } from './sheetOptions';
 import './TrigExprPrintLayout.css';
 
 const LABELS = Array.from({ length: 20 }, (_, i) => String(i + 1));
@@ -63,20 +64,26 @@ function QuestionRow({ q, qi, questionMode, showWorkSpace, workSpaceSize }) {
 }
 
 // ─── Одна страница ученика ────────────────────────────────────────────────────
-function StudentPage({ variant, variantIndex, title, mode, instruction, questionMode, showWorkSpace, workSpaceSize }) {
+function StudentPage({ variant, variantIndex, title, mode, instruction, questionMode, showWorkSpace, workSpaceSize, opts }) {
   const pageClass = mode === 'half' ? 'texpr-page texpr-page--half' : 'texpr-page texpr-page--full';
 
   return (
     <div className={pageClass}>
-      <div className="texpr-header">
-        <span className="texpr-variant-badge">Вариант {variantIndex + 1}</span>
-        <span className="texpr-field">ФИО: <span className="texpr-line texpr-line--name" /></span>
-        <span className="texpr-field">Класс: <span className="texpr-line texpr-line--short" /></span>
-        <span className="texpr-field">Дата: <span className="texpr-line texpr-line--short" /></span>
-      </div>
-      <div className="texpr-subtitle">{title}</div>
+      {opts.showHeader && (
+        <div className="texpr-header">
+          <span className="texpr-variant-badge">Вариант {variantIndex + 1}</span>
+          <span className="texpr-field">ФИО: <span className="texpr-line texpr-line--name" /></span>
+          {opts.showClassField && (
+            <span className="texpr-field">Класс: <span className="texpr-line texpr-line--short" /></span>
+          )}
+          <span className="texpr-field">Дата: <span className="texpr-line texpr-line--short" /></span>
+        </div>
+      )}
+      {opts.showTitle && <div className="texpr-subtitle">{title}</div>}
 
-      <div className="texpr-instruction">{instruction || 'Вычислите:'}</div>
+      {opts.showInstruction && (
+        <div className="texpr-instruction">{instruction || 'Вычислите:'}</div>
+      )}
 
       <div className="texpr-questions">
         {variant.map((q, qi) => (
@@ -124,7 +131,9 @@ export default function TrigExprPrintLayout({
 }) {
   if (!tasksData) return null;
   const { twoPerPage, showTeacherKey, showWorkSpace = false, workSpaceSize = 25 } = settings;
-  const qMode = questionMode || 'inline';
+  const opts = sheetOptions(settings);
+  // Без места для ответа печатаем только условия — ученик решает в тетради
+  const qMode = opts.showAnswerSpace === false ? 'plain' : (questionMode || 'inline');
 
   let pages;
   if (twoPerPage) {
@@ -144,6 +153,7 @@ export default function TrigExprPrintLayout({
               questionMode={qMode}
               showWorkSpace={showWorkSpace}
               workSpaceSize={workSpaceSize}
+              opts={opts}
             />
           ))}
         </div>
@@ -161,12 +171,13 @@ export default function TrigExprPrintLayout({
         questionMode={qMode}
         showWorkSpace={showWorkSpace}
         workSpaceSize={workSpaceSize}
+        opts={opts}
       />
     ));
   }
 
   return (
-    <div className="texpr-print-root">
+    <div className="texpr-print-root" style={sheetSpacingStyle(opts.lineSpacing)}>
       {pages}
       {showTeacherKey && (
         <TeacherKeyPage tasksData={tasksData} title={title} questionMode={qMode} />

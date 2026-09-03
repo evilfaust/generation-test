@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { generateByCategories } from '../utils/questionPlan';
 import { isFiniteDecimalAnswer } from '../utils/oralAnswerFilter';
 
 // ─── Вспомогательные ─────────────────────────────────────────────────────────
@@ -378,26 +379,21 @@ export const DEFAULT_SETTINGS_PR = {
 // ─── Чистая функция генерации (для смешанных работ) ──────────────────────────
 export function generatePowersRootsVariants(settings) {
   const s = { ...DEFAULT_SETTINGS_PR, ...settings };
-  const { variantsCount, questionsCount, categories, decimalOnly } = s;
-  const enabledCats = Object.entries(categories || {})
-    .filter(([, v]) => v)
-    .map(([k]) => k);
-  if (enabledCats.length === 0) return [];
-  const maxAttempts = decimalOnly ? questionsCount * 30 : questionsCount * 5;
-  return Array.from({ length: variantsCount }, () => {
-    const questions = [];
-    let catIdx = 0;
-    while (questions.length < questionsCount && catIdx < maxAttempts) {
-      const cat = enabledCats[catIdx % enabledCats.length];
-      catIdx++;
-      const gen = GENERATORS_PR[cat];
-      if (!gen) continue;
-      const q = gen();
-      if (q && (!decimalOnly || isFiniteDecimalAnswer(q.resultLatex))) {
-        questions.push({ ...q, cat });
-      }
-    }
-    return questions;
+  const { decimalOnly } = s;
+
+  return generateByCategories({
+    categories: s.categories,
+    counts: s.categoryCounts,
+    known: (k) => Boolean(GENERATORS_PR[k]),
+    questionsCount: s.questionsCount,
+    variantsCount: s.variantsCount,
+    attempts: decimalOnly ? 300 : 80,
+    make: (cat) => {
+      const q = GENERATORS_PR[cat]();
+      if (!q) return null;
+      if (decimalOnly && !isFiniteDecimalAnswer(q.resultLatex)) return null;
+      return { ...q, cat };
+    },
   });
 }
 
@@ -417,35 +413,9 @@ export function useOralPowersRoots() {
     })), []);
 
   const generate = useCallback((override) => {
-    const s = override
-      ? { ...DEFAULT_SETTINGS_PR, ...settings, ...override }
-      : settings;
-    const { variantsCount, questionsCount, categories, decimalOnly } = s;
-
-    const enabledCats = Object.entries(categories)
-      .filter(([, v]) => v)
-      .map(([k]) => k);
-
-    if (enabledCats.length === 0) return;
-
-    const maxAttempts = decimalOnly ? questionsCount * 30 : questionsCount * 5;
-
-    const variants = Array.from({ length: variantsCount }, () => {
-      const questions = [];
-      let catIdx = 0;
-      while (questions.length < questionsCount && catIdx < maxAttempts) {
-        const cat = enabledCats[catIdx % enabledCats.length];
-        catIdx++;
-        const gen = GENERATORS_PR[cat];
-        if (!gen) continue;
-        const q = gen();
-        if (q && (!decimalOnly || isFiniteDecimalAnswer(q.resultLatex))) {
-          questions.push({ ...q, cat });
-        }
-      }
-      return questions;
-    });
-
+    const s = override ? { ...settings, ...override } : settings;
+    const variants = generatePowersRootsVariants(s);
+    if (variants.length === 0) return;
     setTasksData(variants);
   }, [settings]);
 

@@ -20,6 +20,7 @@ import {
   formBrackets, formBracketsBoth, formExpandTwo,
   formFracDenom, formFracTwoDen, formFracBothSides, formDegenerate,
 } from '../utils/linearForms';
+import { generateByCategories } from '../utils/questionPlan';
 
 // ─── Генераторы категорий ────────────────────────────────────────────────────
 
@@ -411,33 +412,19 @@ function buildQuestion(cat, varTex, { answerStyle, integerOnly }) {
 // ─── Чистая функция генерации (для смешанных работ и тестов) ─────────────────
 export function generateLinearEquationVariants(settings) {
   const s = { ...DEFAULT_SETTINGS_LINEQ, ...settings };
-  const { variantsCount, questionsCount, categories, integerOnly, varsMode } = s;
+  const { integerOnly, varsMode } = s;
   // Смешанная работа передаёт общий для всех разделов флаг decimalOnly
   const answerStyle = s.decimalOnly ? 'dec' : s.answerStyle;
-
-  const enabledCats = Object.entries(categories || {})
-    .filter(([, v]) => v)
-    .map(([k]) => k)
-    .filter(k => GENERATORS[k]);
-
-  if (enabledCats.length === 0) return [];
-
   const vars = VAR_POOLS[varsMode] || VAR_POOLS.xy;
-  const maxFails = integerOnly || answerStyle === 'dec' ? 900 : 300;
 
-  return Array.from({ length: variantsCount }, () => {
-    const questions = [];
-    let failCount = 0;
-    let catIdx = 0;
-
-    while (questions.length < questionsCount && failCount < maxFails) {
-      const cat = enabledCats[catIdx % enabledCats.length];
-      catIdx++;
-      const q = buildQuestion(cat, rand(vars), { answerStyle, integerOnly });
-      if (q) questions.push(q);
-      else failCount++;
-    }
-    return questions;
+  return generateByCategories({
+    categories: s.categories,
+    counts: s.categoryCounts,
+    known: (k) => Boolean(GENERATORS[k]),
+    questionsCount: s.questionsCount,
+    variantsCount: s.variantsCount,
+    attempts: integerOnly || answerStyle === 'dec' ? 200 : 80,
+    make: (cat) => buildQuestion(cat, rand(vars), { answerStyle, integerOnly }),
   });
 }
 

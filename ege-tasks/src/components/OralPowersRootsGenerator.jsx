@@ -9,6 +9,10 @@ import {
 import { useOralPowersRoots, CATEGORY_LABELS_PR } from '../hooks/useOralPowersRoots';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import OralCountingPrintLayout from './trig/OralCountingPrintLayout';
+import { SheetOrderPanel } from './trig/SheetOrderPanel';
+import { CategoryChecklist } from './trig/CategoryChecklist';
+import { plannedTotal } from '../utils/questionPlan';
+import { useSheetLayout } from '../hooks/useSheetLayout';
 import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
@@ -17,6 +21,7 @@ import {
   TrigPreviewPane,
   TrigStatBadge,
 } from './trig/TrigGeneratorLayout';
+import { SheetLayoutOptions } from './trig/sheetOptions';
 
 const CATEGORY_GROUPS = [
   {
@@ -39,6 +44,18 @@ export default function OralPowersRootsGenerator() {
 
   const { modalOpen, setModalOpen, printTest, handlePrint: handleMCPrint } = useTrigMCModal();
   const [mcFillMode, setMcFillMode] = useState(false);
+  const order = useSheetLayout(tasksData);
+
+  // Сколько заданий каждого типа: пусто — «сколько получится»
+  const updateCount = (cat, value) => updateSetting('categoryCounts', {
+    ...(settings.categoryCounts || {}),
+    [cat]: value || undefined,
+  });
+
+  // Сколько заданий реально будет на листе: квоты типов могут превысить ползунок
+  const plannedCount = plannedTotal(
+    settings.categories, settings.questionsCount, settings.categoryCounts,
+  );
 
   const handlePrint = () => {
     const style = document.createElement('style');
@@ -54,7 +71,7 @@ export default function OralPowersRootsGenerator() {
 
   const enabledCount = Object.values(settings.categories).filter(Boolean).length;
   const varCount = tasksData?.length ?? 0;
-  const qCount = tasksData?.[0]?.length ?? settings.questionsCount;
+  const qCount = tasksData?.[0]?.length ?? plannedCount;
 
   return (
     <>
@@ -69,26 +86,26 @@ export default function OralPowersRootsGenerator() {
 
             {CATEGORY_GROUPS.map(group => (
               <TrigSettingsSection key={group.label} label={group.label}>
-                <Space direction="vertical" size={4}>
-                  {group.keys.map(cat => (
-                    <Checkbox
-                      key={cat}
-                      checked={settings.categories[cat]}
-                      onChange={e => updateCategory(cat, e.target.checked)}
-                    >
-                      <span style={{ fontSize: 12 }}>{CATEGORY_LABELS_PR[cat]}</span>
-                    </Checkbox>
-                  ))}
-                </Space>
+                <CategoryChecklist
+                  keys={group.keys}
+                  labels={CATEGORY_LABELS_PR}
+                  categories={settings.categories}
+                  counts={settings.categoryCounts || {}}
+                  onToggle={updateCategory}
+                  onCount={updateCount}
+                />
               </TrigSettingsSection>
             ))}
 
             <TrigSettingsSection label="Параметры">
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 6 }}>
-                Заданий в варианте: <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>{settings.questionsCount}</b>
+                Заданий в варианте: <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>{plannedCount}</b>
+                {plannedCount !== settings.questionsCount && (
+                  <span style={{ color: 'var(--ink-4)' }}> — по количеству типов</span>
+                )}
               </div>
               <Slider
-                min={5} max={30} step={5}
+                min={2} max={30} step={1}
                 value={settings.questionsCount}
                 onChange={v => updateSetting('questionsCount', v)}
                 marks={{ 5: '5', 10: '10', 20: '20', 30: '30' }}
@@ -118,18 +135,6 @@ export default function OralPowersRootsGenerator() {
                   <span style={{ fontSize: 13 }}>2 колонки на листе</span>
                 </div>
                 <Checkbox
-                  checked={settings.sideBySide}
-                  onChange={e => updateSetting('sideBySide', e.target.checked)}
-                >
-                  2 варианта рядом (лево/право)
-                </Checkbox>
-                <Checkbox
-                  checked={settings.twoPerPage}
-                  onChange={e => updateSetting('twoPerPage', e.target.checked)}
-                >
-                  2 варианта на листе A4 (верх/низ)
-                </Checkbox>
-                <Checkbox
                   checked={settings.showTeacherKey}
                   onChange={e => updateSetting('showTeacherKey', e.target.checked)}
                 >
@@ -151,7 +156,34 @@ export default function OralPowersRootsGenerator() {
                   />
                 </div>
               </Space>
+              <Divider style={{ margin: '10px 0' }} />
+              <SheetLayoutOptions settings={settings} onChange={updateSetting} showPerPage />
             </TrigSettingsSection>
+
+            {/* Порядок заданий и черта — только когда есть что переставлять */}
+
+            {tasksData && (
+
+              <SheetOrderPanel
+
+                layout={order.layout}
+
+                categoryLabels={CATEGORY_LABELS_PR}
+
+                sample={tasksData[0] || []}
+
+                onMove={order.move}
+
+                onAddDivider={order.addDivider}
+
+                onRemoveAt={order.removeAt}
+
+                onReset={order.reset}
+
+              />
+
+            )}
+
 
             <TrigActions>
               <Button
@@ -207,6 +239,7 @@ export default function OralPowersRootsGenerator() {
                 tasksData={tasksData}
                 settings={settings}
                 title={title}
+                layout={order.layout}
                 screenMode
                 fontSize={settings.fontSize || 's'}
               />
@@ -220,6 +253,7 @@ export default function OralPowersRootsGenerator() {
           tasksData={tasksData}
           settings={settings}
           title={title}
+          layout={order.layout}
           fontSize={settings.fontSize || 's'}
         />
       )}

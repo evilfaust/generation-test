@@ -10,6 +10,7 @@ import {
   formBrackets, formBracketsBoth, formExpandTwo,
   formFracDenom, formFracTwoDen, formFracBothSides, formDegenerate,
 } from '../utils/linearForms';
+import { generateByCategories } from '../utils/questionPlan';
 
 /**
  * Генератор линейных неравенств (раздел «Уравнения»).
@@ -21,92 +22,11 @@ import {
  */
 
 // ─── Знаки неравенств ────────────────────────────────────────────────────────
-export const OPS = {
-  lt: { tex: '<',            flip: 'gt', strict: true,  test: (a, b) => a <  b },
-  gt: { tex: '>',            flip: 'lt', strict: true,  test: (a, b) => a >  b },
-  le: { tex: '\\leqslant',   flip: 'ge', strict: false, test: (a, b) => a <= b },
-  ge: { tex: '\\geqslant',   flip: 'le', strict: false, test: (a, b) => a >= b },
-};
+import {
+  OPS, ALL_OPS, STRICT_OPS, randOp, solveSimple, solveDouble, answerTex,
+} from '../utils/inequalityCore';
 
-const ALL_OPS    = ['lt', 'gt', 'le', 'ge'];
-const STRICT_OPS = ['lt', 'gt'];
-
-function randOp(strictOnly) {
-  return rand(strictOnly ? STRICT_OPS : ALL_OPS);
-}
-
-// Знак «меньше» любого вида — нужен, чтобы строить двойные неравенства
-const isLess = (op) => op === 'lt' || op === 'le';
-
-// ─── Решение ─────────────────────────────────────────────────────────────────
-// k·x OP m  →  луч; при k < 0 знак переворачивается, при k = 0 — вырожденный
-// случай: «нет решений» или «любое число».
-function solveSimple(left, right, op) {
-  const L = linearOfSide(left);
-  const R = linearOfSide(right);
-  const k = subR(L.a, R.a);
-  const m = subR(R.b, L.b);
-
-  if (isZero(k)) {
-    return OPS[op].test(0, toNum(m)) ? { kind: 'all' } : { kind: 'empty' };
-  }
-  const value = divR(m, k);
-  return { kind: 'ray', op: k.n < 0 ? OPS[op].flip : op, value };
-}
-
-// lo OP1 (a·x + b) OP2 hi  →  двойное неравенство
-function solveDouble({ lo, opLeft, middle, opRight, hi }) {
-  const M = linearOfSide(middle);
-  if (isZero(M.a)) return null;
-  const loBound = divR(subR(lo, M.b), M.a);
-  const hiBound = divR(subR(hi, M.b), M.a);
-
-  // При a < 0 границы меняются местами. Знаки при этом НЕ переворачиваются:
-  // деление на отрицательное разворачивает их один раз, а перестановка сторон
-  // («x > a» → «a < x») — второй. Меняется только порядок, строгость та же.
-  return M.a.n > 0
-    ? { kind: 'between', opLo: opLeft,  lo: loBound, opHi: opRight, hi: hiBound }
-    : { kind: 'between', opLo: opRight, lo: hiBound, opHi: opLeft,  hi: loBound };
-}
-
-// ─── Запись ответа ───────────────────────────────────────────────────────────
-function fmtValue(v, answerStyle) {
-  if (v.d === 1) return String(v.n);
-  if (answerStyle === 'dec' || (answerStyle !== 'frac' && niceDecimal(v, 2))) {
-    const s = decTex(v);
-    if (s) return s;
-  }
-  return v.n < 0 ? `-\\dfrac{${-v.n}}{${v.d}}` : `\\dfrac{${v.n}}{${v.d}}`;
-}
-
-// Скобка промежутка: строгий знак — круглая, нестрогий — квадратная
-const openBr  = (op) => (OPS[op].strict ? '\\left(' : '\\left[');
-const closeBr = (op) => (OPS[op].strict ? '\\right)' : '\\right]');
-
-function answerTex(solution, varTex, { answerForm, answerStyle }) {
-  if (solution.kind === 'empty') return '\\varnothing';
-  if (solution.kind === 'all')   return `${varTex} \\in \\mathbb{R}`;
-
-  if (solution.kind === 'ray') {
-    const { op, value } = solution;
-    const v = fmtValue(value, answerStyle);
-    if (answerForm === 'interval') {
-      return isLess(op)
-        ? `\\left(-\\infty; ${v}${closeBr(op)}`
-        : `${openBr(op)}${v}; +\\infty\\right)`;
-    }
-    return `${varTex} ${OPS[op].tex} ${v}`;
-  }
-
-  // between
-  const { opLo, lo, opHi, hi } = solution;
-  const loTex = fmtValue(lo, answerStyle);
-  const hiTex = fmtValue(hi, answerStyle);
-  if (answerForm === 'interval') {
-    return `${openBr(opLo)}${loTex}; ${hiTex}${closeBr(opHi)}`;
-  }
-  return `${loTex} ${OPS[opLo].tex} ${varTex} ${OPS[opHi].tex} ${hiTex}`;
-}
+export { OPS };
 
 // ─── Конструкторы заданий для категорий ──────────────────────────────────────
 const ineq = (left, right, op, opts = {}) => ({ kind: 'simple', left, right, op, ...opts });
@@ -456,37 +376,22 @@ function buildQuestion(cat, varTex, opts) {
 // ─── Чистая функция генерации (для смешанных работ и тестов) ─────────────────
 export function generateLinearInequalityVariants(settings) {
   const s = { ...DEFAULT_SETTINGS_INEQ, ...settings };
-  const { variantsCount, questionsCount, categories } = s;
   const opts = {
     answerForm:  s.answerForm,
     answerStyle: s.decimalOnly ? 'dec' : s.answerStyle,
     strictOnly:  s.strictOnly,
     integerOnly: s.integerOnly,
   };
-
-  const enabledCats = Object.entries(categories || {})
-    .filter(([, v]) => v)
-    .map(([k]) => k)
-    .filter(k => GENERATORS[k]);
-
-  if (enabledCats.length === 0) return [];
-
   const vars = VAR_POOLS[s.varsMode] || VAR_POOLS.xy;
-  const maxFails = opts.integerOnly || opts.answerStyle === 'dec' ? 1200 : 400;
 
-  return Array.from({ length: variantsCount }, () => {
-    const questions = [];
-    let failCount = 0;
-    let catIdx = 0;
-
-    while (questions.length < questionsCount && failCount < maxFails) {
-      const cat = enabledCats[catIdx % enabledCats.length];
-      catIdx++;
-      const q = buildQuestion(cat, rand(vars), opts);
-      if (q) questions.push(q);
-      else failCount++;
-    }
-    return questions;
+  return generateByCategories({
+    categories: s.categories,
+    counts: s.categoryCounts,
+    known: (k) => Boolean(GENERATORS[k]),
+    questionsCount: s.questionsCount,
+    variantsCount: s.variantsCount,
+    attempts: opts.integerOnly || opts.answerStyle === 'dec' ? 250 : 100,
+    make: (cat) => buildQuestion(cat, rand(vars), opts),
   });
 }
 

@@ -19,6 +19,7 @@ import {
   TrigPreviewCard,
   TrigStatBadge,
 } from './trig/TrigGeneratorLayout';
+import { SheetLayoutOptions } from './trig/sheetOptions';
 
 
 const LABELS = Array.from({ length: 20 }, (_, i) => String(i + 1));
@@ -137,7 +138,9 @@ export default function TrigExpressionsGenerator() {
                 <Slider min={2} max={50} value={settings.workSpaceSize} onChange={v => updateSetting('workSpaceSize', v)} marks={{ 2: '2', 15: '15', 30: '30', 50: '50' }} size="small" />
               </div>
             )}
-          </TrigSettingsSection>
+              <Divider style={{ margin: '10px 0' }} />
+              <SheetLayoutOptions settings={settings} onChange={updateSetting} />
+            </TrigSettingsSection>
 
           <TrigActions>
             <Button type="primary" block icon={<ThunderboltOutlined />} onClick={generate}>
