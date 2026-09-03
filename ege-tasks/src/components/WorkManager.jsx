@@ -6,6 +6,7 @@ import {
   ClockCircleOutlined, SearchOutlined, SortAscendingOutlined, FormOutlined,
   PushpinOutlined, PushpinFilled, FolderOutlined, DownOutlined, CameraOutlined,
   ShareAltOutlined, CopyOutlined, UserOutlined, SwapOutlined, ImportOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
@@ -14,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import SessionPanel from './worksheet/SessionPanel';
 import ParallelVariantsModal from './worksheet/ParallelVariantsModal';
 import ScanBlankModal from './worksheet/ScanBlankModal';
+import GeneratorSheetsTab from './worksheet/GeneratorSheetsTab';
 import TeacherResultsDashboard from './worksheet/TeacherResultsDashboard';
 import MathRenderer from './MathRenderer';
 import { PageHeader, StatRow, Stat, FilterRow } from '../ui';
@@ -1144,6 +1146,9 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
           { key: 'works', label: <span><SolutionOutlined /> Контрольные работы</span>, children: worksContent },
           { key: 'mc', label: <span><FormOutlined /> Тесты с выбором</span>, children: mcContent },
           { key: 'shared', label: <span><ShareAltOutlined /> Общие работы</span>, children: sharedContent },
+          // Листы генераторов — отдельная сущность (generator_sheets), не работы:
+          // задания живут снимком внутри листа и в банк задач не попадают.
+          { key: 'sheets', label: <span><ExperimentOutlined /> Листы генераторов</span>, children: <GeneratorSheetsTab /> },
         ]}
       />
       <ParallelVariantsModal

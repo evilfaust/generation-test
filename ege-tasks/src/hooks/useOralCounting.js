@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { isFiniteDecimalAnswer } from '../utils/oralAnswerFilter';
 import { generateByCategories } from '../utils/questionPlan';
+import { useApplySheet } from './useApplySheet';
 
 // ─── Вспомогательные функции ──────────────────────────────────────────────────
 function gcd(a, b) {
@@ -540,6 +541,9 @@ export function useOralCounting() {
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -567,5 +571,6 @@ export function useOralCounting() {
     settings, updateSetting, updateCategory,
     tasksData,
     generate, reset,
+    setTasksData, applySheet,
   };
 }

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { generateByCategories } from '../utils/questionPlan';
 import { isFiniteDecimalAnswer } from '../utils/oralAnswerFilter';
+import { useApplySheet } from './useApplySheet';
 
 // ─── Вспомогательные функции ──────────────────────────────────────────────────
 
@@ -391,6 +392,9 @@ export function useLogExpEquations() {
   const [settings, setSettings]   = useState({ ...DEFAULT_SETTINGS_LOGEXP });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS_LOGEXP });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -418,5 +422,6 @@ export function useLogExpEquations() {
     settings, updateSetting, updateCategory,
     tasksData,
     generate, reset,
+    setTasksData, applySheet,
   };
 }

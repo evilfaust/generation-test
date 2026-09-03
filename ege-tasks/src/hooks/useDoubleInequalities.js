@@ -7,6 +7,7 @@ import {
 } from '../utils/linearExpr';
 import { OPS, solveDouble, answerTex } from '../utils/inequalityCore';
 import { generateByCategories } from '../utils/questionPlan';
+import { useApplySheet } from './useApplySheet';
 
 /**
  * Генератор двойных неравенств вида `lo ⩽ f(x) < hi`.
@@ -315,6 +316,9 @@ export function useDoubleInequalities() {
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS_DBL });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS_DBL });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -339,5 +343,6 @@ export function useDoubleInequalities() {
     settings, updateSetting, updateCategory,
     tasksData,
     generate, reset,
+    setTasksData, applySheet,
   };
 }

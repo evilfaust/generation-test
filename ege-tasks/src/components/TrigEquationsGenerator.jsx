@@ -6,6 +6,9 @@ import { PrinterOutlined, FunctionOutlined, CheckSquareOutlined, ThunderboltOutl
 import { useTrigEquations } from '../hooks/useTrigEquations';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import TrigExprPrintLayout from './trig/TrigExprPrintLayout';
+import { useSheetTools } from '../hooks/useSheetTools';
+import { SheetStorageActions } from './trig/SheetStorageActions';
+import { SheetToolsModals, SheetTasksPanel } from './trig/SheetTools';
 import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
@@ -21,7 +24,15 @@ import { SheetLayoutOptions } from './trig/sheetOptions';
 const LABELS = Array.from({ length: 20 }, (_, i) => String(i + 1));
 
 export default function TrigEquationsGenerator() {
-  const { title, setTitle, settings, updateSetting, tasksData, generate, reset } = useTrigEquations();
+  const {
+    title, setTitle, settings, updateSetting, tasksData, generate, reset,
+    setTasksData, applySheet,
+  } = useTrigEquations();
+  // Сохранение листа + правка отдельных заданий
+  const sheet = useSheetTools({
+    generator: 'trig_equations',
+    hook: { title, settings, tasksData, setTasksData, applySheet },
+  });
   const { modalOpen, setModalOpen, printTest, handlePrint: handleMCPrint } = useTrigMCModal();
 
   const handlePrint = () => printPaged();
@@ -87,6 +98,8 @@ export default function TrigEquationsGenerator() {
               <SheetLayoutOptions settings={settings} onChange={updateSetting} />
             </TrigSettingsSection>
 
+            {tasksData && <SheetTasksPanel sheet={sheet} />}
+
             <TrigActions>
               <Button type="primary" block icon={<ThunderboltOutlined />} onClick={generate}>
                 Сформировать
@@ -97,6 +110,11 @@ export default function TrigEquationsGenerator() {
                   <Button block icon={<CheckSquareOutlined />} onClick={() => setModalOpen(true)}>Тест</Button>
                 </div>
               )}
+              <SheetStorageActions
+                storage={sheet.storage}
+                hasData={Boolean(tasksData)}
+                generator="trig_equations"
+              />
               {tasksData && <Button block onClick={reset}>Сбросить</Button>}
             </TrigActions>
           </div>
@@ -148,6 +166,8 @@ export default function TrigEquationsGenerator() {
           questionMode="plain"
         />
       )}
+
+      <SheetToolsModals sheet={sheet} />
 
       <TrigMCSection
         open={modalOpen}

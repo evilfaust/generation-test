@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { generateByCategories } from '../utils/questionPlan';
 import { isFiniteDecimalAnswer } from '../utils/oralAnswerFilter';
+import { useApplySheet } from './useApplySheet';
 
 // ─── Вспомогательные ─────────────────────────────────────────────────────────
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -403,6 +404,9 @@ export function useOralPowersRoots() {
   const [settings, setSettings]   = useState({ ...DEFAULT_SETTINGS_PR });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS_PR });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -430,5 +434,6 @@ export function useOralPowersRoots() {
     settings, updateSetting, updateCategory,
     tasksData,
     generate, reset,
+    setTasksData, applySheet,
   };
 }

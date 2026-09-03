@@ -6,6 +6,9 @@ import { PrinterOutlined, FunctionOutlined, CheckSquareOutlined, ThunderboltOutl
 import { useAdditionFormulas } from '../hooks/useAdditionFormulas';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import TrigExprPrintLayout from './trig/TrigExprPrintLayout';
+import { useSheetTools } from '../hooks/useSheetTools';
+import { SheetStorageActions } from './trig/SheetStorageActions';
+import { SheetToolsModals, SheetTasksPanel } from './trig/SheetTools';
 import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
@@ -41,7 +44,15 @@ function getInstruction(taskTypes) {
 }
 
 export default function AdditionFormulasGenerator() {
-  const { title, setTitle, settings, updateSetting, tasksData, generate, reset } = useAdditionFormulas();
+  const {
+    title, setTitle, settings, updateSetting, tasksData, generate, reset,
+    setTasksData, applySheet,
+  } = useAdditionFormulas();
+  // Сохранение листа + правка отдельных заданий
+  const sheet = useSheetTools({
+    generator: 'addition_formulas',
+    hook: { title, settings, tasksData, setTasksData, applySheet },
+  });
   const { modalOpen, setModalOpen, printTest, handlePrint: handleMCPrint } = useTrigMCModal();
 
   const handlePrint = () => printPaged();
@@ -132,6 +143,8 @@ export default function AdditionFormulasGenerator() {
               <SheetLayoutOptions settings={settings} onChange={updateSetting} />
             </TrigSettingsSection>
 
+            {tasksData && <SheetTasksPanel sheet={sheet} />}
+
             <TrigActions>
               <Button type="primary" block icon={<ThunderboltOutlined />} onClick={generate}>
                 Сформировать
@@ -142,6 +155,11 @@ export default function AdditionFormulasGenerator() {
                   <Button block icon={<CheckSquareOutlined />} onClick={() => setModalOpen(true)}>Тест</Button>
                 </div>
               )}
+              <SheetStorageActions
+                storage={sheet.storage}
+                hasData={Boolean(tasksData)}
+                generator="addition_formulas"
+              />
               {tasksData && <Button block onClick={reset}>Сбросить</Button>}
             </TrigActions>
           </div>
@@ -193,6 +211,8 @@ export default function AdditionFormulasGenerator() {
           questionMode="inline"
         />
       )}
+
+      <SheetToolsModals sheet={sheet} />
 
       <TrigMCSection
         open={modalOpen}

@@ -17,6 +17,9 @@ import { SheetOrderPanel } from './trig/SheetOrderPanel';
 import { CategoryChecklist } from './trig/CategoryChecklist';
 import { plannedTotal } from '../utils/questionPlan';
 import { useSheetLayout } from '../hooks/useSheetLayout';
+import { useSheetTools } from '../hooks/useSheetTools';
+import { SheetStorageActions } from './trig/SheetStorageActions';
+import { SheetToolsModals } from './trig/SheetTools';
 import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
@@ -51,11 +54,18 @@ export default function DoubleInequalitiesGenerator() {
     settings, updateSetting, updateCategory,
     tasksData,
     generate, reset,
+    setTasksData, applySheet,
   } = useDoubleInequalities();
 
   const { modalOpen, setModalOpen, printTest, handlePrint: handleMCPrint } = useTrigMCModal();
   const [mcFillMode, setMcFillMode] = useState(false);
   const order = useSheetLayout(tasksData);
+  // Сохранение листа + правка отдельных заданий
+  const sheet = useSheetTools({
+    generator: 'double_inequalities',
+    hook: { title, settings, tasksData, setTasksData, applySheet },
+    order,
+  });
 
   // Сколько заданий каждого типа: пусто — «сколько получится»
   const updateCount = (cat, value) => updateSetting('categoryCounts', {
@@ -243,6 +253,10 @@ export default function DoubleInequalitiesGenerator() {
 
                 onReset={order.reset}
 
+                onEditTask={sheet.openTask}
+
+                onAddTask={sheet.openAdd}
+
               />
 
             )}
@@ -263,6 +277,11 @@ export default function DoubleInequalitiesGenerator() {
                   <Button block icon={<PrinterOutlined />} onClick={handlePrint}>
                     Печать
                   </Button>
+                  <SheetStorageActions
+                    storage={sheet.storage}
+                    hasData={Boolean(tasksData)}
+                    generator="double_inequalities"
+                  />
                   <div style={{ display: 'flex', gap: 6 }}>
                     <Button
                       block
@@ -326,6 +345,8 @@ export default function DoubleInequalitiesGenerator() {
           fontSize={settings.fontSize || 's'}
         />
       )}
+
+      <SheetToolsModals sheet={sheet} />
 
       <TrigMCSection
         open={modalOpen}

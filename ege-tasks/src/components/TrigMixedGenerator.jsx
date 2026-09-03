@@ -12,6 +12,8 @@ import UnitCircleSVG from './trig/UnitCircleSVG';
 import TrigMixedPrintLayout from './trig/TrigMixedPrintLayout';
 import { SheetLayoutOptions, SHEET_DEFAULTS } from './trig/sheetOptions';
 import { TRIG_TYPES, getTrigType } from '../hooks/trigMixedRegistry';
+import { useSheetTools } from '../hooks/useSheetTools';
+import { SheetStorageActions } from './trig/SheetStorageActions';
 
 const { Text } = Typography;
 
@@ -450,6 +452,36 @@ export default function TrigMixedGenerator() {
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
 
+  // Сохранение листа (generator_sheets). Состояние смешанной работы разложено
+  // по отдельным useState — собираем его в один объект настроек и обратно.
+  const applySheet = useCallback((s) => {
+    const st = s.settings || {};
+    if (st.workTitle) setWorkTitle(st.workTitle);
+    if (typeof st.variantsCount === 'number') setVariantsCount(st.variantsCount);
+    if (Array.isArray(st.sections)) setSections(st.sections);
+    if (typeof st.showSectionHeaders === 'boolean') setShowSectionHeaders(st.showSectionHeaders);
+    if (typeof st.showWorkSpace === 'boolean') setShowWorkSpace(st.showWorkSpace);
+    if (typeof st.workSpaceSize === 'number') setWorkSpaceSize(st.workSpaceSize);
+    if (typeof st.showTeacherKey === 'boolean') setShowTeacherKey(st.showTeacherKey);
+    if (typeof st.twoPerPage === 'boolean') setTwoPerPage(st.twoPerPage);
+    setSheet({ ...SHEET_DEFAULTS, ...(st.sheet || {}) });
+    setGenerated(s.tasksData ?? null);
+  }, []);
+
+  const sheetTools = useSheetTools({
+    generator: 'trig_mixed',
+    hook: {
+      title: workTitle,
+      settings: {
+        workTitle, variantsCount, sections, showSectionHeaders, showWorkSpace,
+        workSpaceSize, showTeacherKey, twoPerPage, sheet,
+      },
+      tasksData: generated,
+      setTasksData: setGenerated,
+      applySheet,
+    },
+  });
+
   const addMenuItems = TRIG_TYPES.map(t => ({ key: t.type, label: t.label }));
 
   const addSection = (type) => {
@@ -657,6 +689,11 @@ export default function TrigMixedGenerator() {
                   </Button>
                 </div>
               )}
+              <SheetStorageActions
+                storage={sheetTools.storage}
+                hasData={Boolean(generated)}
+                generator="trig_mixed"
+              />
             </div>
           </div>
         }

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useApplySheet } from './useApplySheet';
 
 // ─── Таблица уравнений sin t = a ──────────────────────────────────────────────
 // Для каждого a: главное решение (arcsin a) + общая формула
@@ -252,6 +253,9 @@ export function useTrigEquations() {
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -277,5 +281,8 @@ export function useTrigEquations() {
     setSettings({ ...DEFAULT_SETTINGS });
   }, []);
 
-  return { title, setTitle, settings, updateSetting, tasksData, generate, reset };
+  return {
+    title, setTitle, settings, updateSetting, tasksData, generate, reset,
+    setTasksData, applySheet,
+  };
 }

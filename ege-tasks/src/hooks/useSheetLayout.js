@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { layoutWithoutTask } from '../utils/sheetTasks';
 
 /**
  * План листа: порядок заданий и разделительные черты.
@@ -13,11 +14,33 @@ import { useState, useEffect, useCallback } from 'react';
 const naturalLayout = (count) =>
   Array.from({ length: count }, (_, i) => ({ kind: 'task', idx: i }));
 
+// Порядок из сохранённого листа мог устареть (лист правили в другой вкладке):
+// оставляем только существующие задания и дописываем те, которых в нём нет.
+const normalizeLayout = (saved, count) => {
+  const seen = new Set();
+  const kept = (Array.isArray(saved) ? saved : []).filter((item) => {
+    if (item?.kind === 'divider') return true;
+    if (item?.kind !== 'task') return false;
+    if (item.idx < 0 || item.idx >= count || seen.has(item.idx)) return false;
+    seen.add(item.idx);
+    return true;
+  });
+  for (let i = 0; i < count; i++) {
+    if (!seen.has(i)) kept.push({ kind: 'task', idx: i });
+  }
+  return kept;
+};
+
 export function useSheetLayout(tasksData) {
   const [layout, setLayout] = useState([]);
+  // Для какого набора заданий порядок уже задан. Загрузка сохранённого листа
+  // выставляет порядок вместе с заданиями — эффект ниже не должен его затирать.
+  const appliedFor = useRef(null);
 
   // Новая генерация — новый естественный порядок
   useEffect(() => {
+    if (appliedFor.current === tasksData) return;
+    appliedFor.current = tasksData;
     setLayout(naturalLayout(tasksData?.[0]?.length ?? 0));
   }, [tasksData]);
 
@@ -50,7 +73,20 @@ export function useSheetLayout(tasksData) {
     setLayout(naturalLayout(tasksData?.[0]?.length ?? 0));
   }, [tasksData]);
 
-  return { layout, move, addDivider, removeAt, reset };
+  // Задание убрали с листа: его позиция уходит, а номера следующих съезжают
+  // на единицу — иначе порядок стал бы ссылаться на чужие задания.
+  const removeTask = useCallback((idx) => {
+    setLayout(prev => layoutWithoutTask(prev, idx));
+  }, []);
+
+  // Порядок из сохранённого листа. Вызывается вместе с setTasksData — поэтому
+  // принимает те же данные, для которых порядок посчитан.
+  const apply = useCallback((srcTasksData, savedLayout) => {
+    appliedFor.current = srcTasksData;
+    setLayout(normalizeLayout(savedLayout, srcTasksData?.[0]?.length ?? 0));
+  }, []);
+
+  return { layout, move, addDivider, removeAt, removeTask, reset, apply };
 }
 
 export default useSheetLayout;

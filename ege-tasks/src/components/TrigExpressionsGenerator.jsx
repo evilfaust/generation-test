@@ -10,6 +10,9 @@ import {
 import { useTrigExpressions } from '../hooks/useTrigExpressions';
 import { useTrigMCModal } from '../hooks/useTrigMCModal';
 import TrigExprPrintLayout from './trig/TrigExprPrintLayout';
+import { useSheetTools } from '../hooks/useSheetTools';
+import { SheetStorageActions } from './trig/SheetStorageActions';
+import { SheetToolsModals, SheetTasksPanel } from './trig/SheetTools';
 import { TrigMCSection } from './trig/TrigMCSection';
 import {
   TrigGeneratorLayout,
@@ -34,9 +37,15 @@ export default function TrigExpressionsGenerator() {
   const {
     title, setTitle,
     settings, updateSetting,
-    tasksData,
+    tasksData, setTasksData, applySheet,
     generate, reset,
   } = useTrigExpressions();
+
+  // Сохранение листа + правка отдельных заданий
+  const sheet = useSheetTools({
+    generator: 'trig_expressions',
+    hook: { title, settings, tasksData, setTasksData, applySheet },
+  });
 
   const { modalOpen, setModalOpen, printTest, handlePrint: handleMCPrint } = useTrigMCModal();
 
@@ -142,6 +151,8 @@ export default function TrigExpressionsGenerator() {
               <SheetLayoutOptions settings={settings} onChange={updateSetting} />
             </TrigSettingsSection>
 
+          {tasksData && <SheetTasksPanel sheet={sheet} />}
+
           <TrigActions>
             <Button type="primary" block icon={<ThunderboltOutlined />} onClick={generate}>
               Сформировать
@@ -152,6 +163,11 @@ export default function TrigExpressionsGenerator() {
                 <Button block icon={<CheckSquareOutlined />} onClick={() => setModalOpen(true)}>Тест</Button>
               </div>
             )}
+            <SheetStorageActions
+              storage={sheet.storage}
+              hasData={Boolean(tasksData)}
+              generator="trig_expressions"
+            />
             {tasksData && <Button block onClick={reset}>Сбросить</Button>}
           </TrigActions>
         </div>
@@ -203,6 +219,8 @@ export default function TrigExpressionsGenerator() {
           title={title}
         />
       )}
+
+      <SheetToolsModals sheet={sheet} />
 
       <TrigMCSection
         open={modalOpen}

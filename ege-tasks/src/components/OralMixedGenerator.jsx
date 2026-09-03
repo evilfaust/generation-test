@@ -11,6 +11,8 @@ import { SplitLayout, ConfigLabel } from '../ui';
 import OralMixedPrintLayout from './trig/OralMixedPrintLayout';
 import { ORAL_TYPES, getOralType } from '../hooks/oralMixedRegistry';
 import { SheetLayoutOptions, SHEET_DEFAULTS } from './trig/sheetOptions';
+import { useSheetTools } from '../hooks/useSheetTools';
+import { SheetStorageActions } from './trig/SheetStorageActions';
 
 const { Text } = Typography;
 
@@ -133,6 +135,37 @@ export default function OralMixedGenerator() {
   const [generated, setGenerated] = useState(null); // массив variants для печати
   const [dragId, setDragId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
+
+  // Сохранение листа (generator_sheets). У смешанной работы состояние размазано
+  // по отдельным useState — собираем его в один объект настроек и обратно.
+  const applySheet = useCallback((s) => {
+    const st = s.settings || {};
+    if (st.workTitle) setWorkTitle(st.workTitle);
+    if (typeof st.variantsCount === 'number') setVariantsCount(st.variantsCount);
+    if (Array.isArray(st.sections)) setSections(st.sections);
+    if (typeof st.twoPerPage === 'boolean') setTwoPerPage(st.twoPerPage);
+    if (typeof st.sideBySide === 'boolean') setSideBySide(st.sideBySide);
+    if (typeof st.showTeacherKey === 'boolean') setShowTeacherKey(st.showTeacherKey);
+    if (typeof st.showSectionHeaders === 'boolean') setShowSectionHeaders(st.showSectionHeaders);
+    if (typeof st.columnsCount === 'number') setColumnsCount(st.columnsCount);
+    if (st.fontSize) setFontSize(st.fontSize);
+    setSheet({ ...SHEET_DEFAULTS, ...(st.sheet || {}) });
+    setGenerated(s.tasksData ?? null);
+  }, []);
+
+  const sheetTools = useSheetTools({
+    generator: 'oral_mixed',
+    hook: {
+      title: workTitle,
+      settings: {
+        workTitle, variantsCount, sections, twoPerPage, sideBySide,
+        showTeacherKey, showSectionHeaders, columnsCount, fontSize, sheet,
+      },
+      tasksData: generated,
+      setTasksData: setGenerated,
+      applySheet,
+    },
+  });
 
   // Добавление новой секции через dropdown
   const addMenuItems = ORAL_TYPES.map(t => ({
@@ -373,6 +406,11 @@ export default function OralMixedGenerator() {
                   </Button>
                 </div>
               )}
+              <SheetStorageActions
+                storage={sheetTools.storage}
+                hasData={Boolean(generated)}
+                generator="oral_mixed"
+              />
             </div>
           </div>
         }

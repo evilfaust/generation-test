@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useApplySheet } from './useApplySheet';
 
 // ─── Форматирование результата (угол) ─────────────────────────────────────────
 const P = Math.PI;
@@ -283,6 +284,9 @@ export function useInverseTrig() {
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -329,5 +333,8 @@ export function useInverseTrig() {
     setSettings({ ...DEFAULT_SETTINGS });
   }, []);
 
-  return { title, setTitle, settings, updateSetting, tasksData, generate, reset };
+  return {
+    title, setTitle, settings, updateSetting, tasksData, generate, reset,
+    setTasksData, applySheet,
+  };
 }

@@ -11,6 +11,7 @@ import {
   formFracDenom, formFracTwoDen, formFracBothSides, formDegenerate,
 } from '../utils/linearForms';
 import { generateByCategories } from '../utils/questionPlan';
+import { useApplySheet } from './useApplySheet';
 
 /**
  * Генератор линейных неравенств (раздел «Уравнения»).
@@ -401,6 +402,9 @@ export function useLinearInequalities() {
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS_INEQ });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS_INEQ });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -428,5 +432,6 @@ export function useLinearInequalities() {
     settings, updateSetting, updateCategory,
     tasksData,
     generate, reset,
+    setTasksData, applySheet,
   };
 }

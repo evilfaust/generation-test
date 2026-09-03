@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Button, Tooltip } from 'antd';
 import {
   HolderOutlined, ArrowUpOutlined, ArrowDownOutlined,
-  CloseOutlined, LineOutlined, ReloadOutlined,
+  CloseOutlined, LineOutlined, ReloadOutlined, EditOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import { TrigSettingsSection } from './TrigGeneratorLayout';
 
 /**
- * Порядок заданий на листе: перетаскивание строк и разделительные черты.
+ * Порядок заданий на листе: перетаскивание строк, разделительные черты и
+ * правка отдельного задания (✏️ — если генератор передал onEditTask).
  *
  * Порядок общий для всех вариантов — задания одного типа стоят на одинаковых
  * местах, поэтому и черта («отсюда — задания посложнее») проходит через все
@@ -21,6 +22,8 @@ export function SheetOrderPanel({
   onAddDivider,
   onRemoveAt,
   onReset,
+  onEditTask,   // (idx) => void — открыть правку задания этой позиции
+  onAddTask,    // () => void — вписать своё задание
 }) {
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
@@ -36,6 +39,8 @@ export function SheetOrderPanel({
   // Короткая подпись задания: название категории без примера после двоеточия
   const label = (item) => {
     const q = sample[item.idx];
+    // Задание, вписанное учителем руками, категории не имеет
+    if (q?.cat === 'manual') return 'своё задание';
     const raw = categoryLabels[q?.cat] || q?.cat || 'задание';
     return raw.split(':')[0];
   };
@@ -95,6 +100,14 @@ export function SheetOrderPanel({
                   }}>
                     {label(item)}
                   </span>
+                  {onEditTask && (
+                    <Tooltip title="Править задание: текст, ответ, заново">
+                      <Button
+                        type="text" size="small" icon={<EditOutlined />}
+                        onClick={() => onEditTask(item.idx)}
+                      />
+                    </Tooltip>
+                  )}
                   <Button
                     type="text" size="small" icon={<ArrowUpOutlined />}
                     disabled={i === 0}
@@ -122,6 +135,15 @@ export function SheetOrderPanel({
           Сбросить
         </Button>
       </div>
+
+      {onAddTask && (
+        <Button
+          block size="small" type="dashed" icon={<PlusOutlined />}
+          onClick={onAddTask} style={{ marginTop: 6 }}
+        >
+          Своё задание
+        </Button>
+      )}
     </TrigSettingsSection>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useApplySheet } from './useApplySheet';
 
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
@@ -245,6 +246,9 @@ export function useReductionFormulas() {
   const [settings, setSettings] = useState(DEFAULT_RF_SETTINGS);
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_RF_SETTINGS });
+
   const updateSetting = useCallback((key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   }, []);
@@ -262,5 +266,8 @@ export function useReductionFormulas() {
 
   const reset = useCallback(() => setTasksData(null), []);
 
-  return { title, setTitle, settings, updateSetting, tasksData, generate, reset };
+  return {
+    title, setTitle, settings, updateSetting, tasksData, generate, reset,
+    setTasksData, applySheet,
+  };
 }

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useApplySheet } from './useApplySheet';
 
 // ─── Type 1: f(kx) = a ───────────────────────────────────────────────────────
 // Уравнения с линейным аргументом (без сдвига)
@@ -311,6 +312,9 @@ export function useTrigEquationsAdvanced() {
   const [settings, setSettings] = useState({ ...DEFAULT_SETTINGS });
   const [tasksData, setTasksData] = useState(null);
 
+  // Загрузка сохранённого листа (generator_sheets) и правка заданий на месте
+  const applySheet = useApplySheet({ setTitle, setSettings, setTasksData, defaults: DEFAULT_SETTINGS });
+
   const updateSetting = useCallback((k, v) =>
     setSettings(p => ({ ...p, [k]: v })), []);
 
@@ -338,5 +342,8 @@ export function useTrigEquationsAdvanced() {
     setSettings({ ...DEFAULT_SETTINGS });
   }, []);
 
-  return { title, setTitle, settings, updateSetting, tasksData, generate, reset };
+  return {
+    title, setTitle, settings, updateSetting, tasksData, generate, reset,
+    setTasksData, applySheet,
+  };
 }
