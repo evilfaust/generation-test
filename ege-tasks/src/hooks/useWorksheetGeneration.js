@@ -447,6 +447,7 @@ export const useWorksheetGeneration = () => {
       subtopic,
       avoidTaskIds = [],
       maxCos = 0.85,
+      allowedIds = null,
     } = params;
     const {
       variantsMode = 'different',
@@ -461,16 +462,23 @@ export const useWorksheetGeneration = () => {
     try {
       const poolNeeded = variantsMode === 'different' ? tasksPerVariant * variantsCount : tasksPerVariant;
 
+      // Фильтры каталога (сложность, теги, год, источник) считает фронт по снимку
+      // и передаёт белым списком — у pdf-service этой логики нет.
+      const allowed = allowedIds && allowedIds.length ? { allowed_task_ids: allowedIds } : {};
+      if (allowedIds && allowedIds.length === 0) {
+        return fail('Под выбранные фильтры не подходит ни одна задача — ослабьте фильтры');
+      }
+
       let body;
       if (method === 'seed') {
         if (!seedTaskId) return fail('Выберите задачу-эталон');
-        body = { task_id: seedTaskId, count: poolNeeded, similarity, same_topic_only: true };
+        body = { task_id: seedTaskId, count: poolNeeded, similarity, same_topic_only: true, ...allowed };
       } else if (method === 'diverse') {
         if (!topic) return fail('Выберите тему');
-        body = { topic_id: topic, subtopic_id: subtopic || undefined, count: poolNeeded, method: diverseMethod };
+        body = { topic_id: topic, subtopic_id: subtopic || undefined, count: poolNeeded, method: diverseMethod, ...allowed };
       } else if (method === 'novelty') {
         if (!topic) return fail('Выберите тему');
-        body = { topic_id: topic, subtopic_id: subtopic || undefined, count: poolNeeded, avoid_task_ids: avoidTaskIds, max_cos: maxCos };
+        body = { topic_id: topic, subtopic_id: subtopic || undefined, count: poolNeeded, avoid_task_ids: avoidTaskIds, max_cos: maxCos, ...allowed };
       } else {
         message.error('Неизвестный режим подбора');
         return [];
@@ -491,7 +499,11 @@ export const useWorksheetGeneration = () => {
       }
 
       if (data.error === 'not_indexed') return fail('Задача-эталон ещё не в семантическом индексе. Прогоните индексатор (vector-benchmark → npm run index).');
-      if (data.error === 'empty' || data.error === 'no_topic') return fail('В этой теме нет проиндексированных задач. Прогоните индексатор.');
+      if (data.error === 'empty' || data.error === 'no_topic') {
+        return fail(allowedIds
+          ? 'Под выбранные фильтры в этой теме нет проиндексированных задач — ослабьте фильтры или прогоните индексатор.'
+          : 'В этой теме нет проиндексированных задач. Прогоните индексатор.');
+      }
 
       const items = data.items || [];
       if (items.length === 0) {
@@ -515,14 +527,22 @@ export const useWorksheetGeneration = () => {
 
       const generatedVariants = [];
       if (variantsMode === 'different') {
-        for (let i = 0; i < variantsCount; i++) {
-          const slice = ordered.slice(i * tasksPerVariant, (i + 1) * tasksPerVariant);
-          if (slice.length === 0) break;
-          if (slice.length < tasksPerVariant) {
-            message.warning(`Вариант ${i + 1}: найдено только ${slice.length} из ${tasksPerVariant} задач`);
+        // Раскладываем по кругу, а не подряд: список идёт по убыванию похожести на
+        // эталон (seed) либо по порядку MMR-отбора, и нарезка срезами дала бы
+        // вариант 1 «из самых похожих», вариант N «из самых далёких». Варианты
+        // одной работы обязаны быть равноценными.
+        const buckets = Array.from({ length: variantsCount }, () => []);
+        ordered.forEach((t, idx) => {
+          const bucket = buckets[idx % variantsCount];
+          if (bucket.length < tasksPerVariant) bucket.push(t);
+        });
+        buckets.forEach((tasks, i) => {
+          if (tasks.length === 0) return;
+          if (tasks.length < tasksPerVariant) {
+            message.warning(`Вариант ${i + 1}: найдено только ${tasks.length} из ${tasksPerVariant} задач`);
           }
-          generatedVariants.push({ number: i + 1, tasks: slice });
-        }
+          generatedVariants.push({ number: generatedVariants.length + 1, tasks });
+        });
       } else {
         const baseTasks = ordered.slice(0, tasksPerVariant);
         if (baseTasks.length < tasksPerVariant) {

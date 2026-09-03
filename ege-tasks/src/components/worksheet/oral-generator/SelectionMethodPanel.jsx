@@ -3,6 +3,7 @@ import { Segmented, Slider, Radio, Button, Select, Space, Tag, Empty, Alert, Spi
 import { AimOutlined, SwapOutlined } from '@ant-design/icons';
 import MathRenderer from '../../MathRenderer';
 import TaskSelectModal from '../../TaskSelectModal';
+import VectorIndexNote from '../VectorIndexNote';
 import { api } from '../../../services/pocketbase';
 
 /**
@@ -45,8 +46,8 @@ export default function SelectionMethodPanel({
   diverseMethod,
   setDiverseMethod,
   // novelty
-  avoidWorkId,
-  setAvoidWorkId,
+  avoidWorkIds = [],
+  setAvoidWorkIds,
   noveltyMaxCos,
   setNoveltyMaxCos,
   // контекст темы (для подсказок)
@@ -80,6 +81,13 @@ export default function SelectionMethodPanel({
       {method === 'filters' && (
         <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
           Случайный набор по заданным фильтрам (классический режим).
+        </div>
+      )}
+
+      {method !== 'filters' && (
+        <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
+          Фильтры ниже (сложность, теги, год, источник) действуют и здесь — подбор идёт внутри них.
+          <VectorIndexNote />
         </div>
       )}
 
@@ -155,18 +163,33 @@ export default function SelectionMethodPanel({
             <Alert type="info" showIcon style={{ marginBottom: 10 }}
               message="Выберите тему выше — из неё подберём задачи, не похожие на выбранную работу." />
           )}
-          <div style={{ fontSize: 13, marginBottom: 6 }}>Не повторять задачи из работы:</div>
+          <div style={{ fontSize: 13, marginBottom: 6 }}>Не повторять задачи из работ:</div>
           <Select
-            style={{ width: '100%', maxWidth: 420 }}
-            placeholder={loadingWorks ? 'Загрузка работ…' : 'Выберите ранее выданную работу'}
-            value={avoidWorkId || undefined}
-            onChange={setAvoidWorkId}
+            mode="multiple"
+            style={{ width: '100%', maxWidth: 560 }}
+            placeholder={loadingWorks ? 'Загрузка работ…' : 'Выберите одну или несколько ранее выданных работ'}
+            value={avoidWorkIds}
+            onChange={setAvoidWorkIds}
             allowClear
             showSearch
+            maxTagCount="responsive"
             optionFilterProp="label"
             notFoundContent={loadingWorks ? <Spin size="small" /> : null}
             options={works.map((w) => ({ value: w.id, label: w.title || w.id }))}
           />
+          <Space size={6} wrap style={{ marginTop: 8 }}>
+            <Button size="small" disabled={!works.length}
+              onClick={() => setAvoidWorkIds(works.slice(0, 5).map((w) => w.id))}>
+              Последние 5 работ
+            </Button>
+            <Button size="small" disabled={!works.length}
+              onClick={() => setAvoidWorkIds(works.slice(0, 10).map((w) => w.id))}>
+              Последние 10
+            </Button>
+            {avoidWorkIds.length > 0 && (
+              <Button size="small" type="text" onClick={() => setAvoidWorkIds([])}>Очистить</Button>
+            )}
+          </Space>
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#8c8c8c' }}>
               <span>← строже (только совсем другое)</span>

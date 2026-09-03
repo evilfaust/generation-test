@@ -58,33 +58,33 @@ export default function FillSimilarModal({ open, onClose, variants = [], setVari
     const existing = new Set(tasks.map((t) => t.id).filter(Boolean));
     if (existing.size === 0) { setGroups([]); return; }
     setLoading(true); setError(null);
-    const seen = new Set(existing); // не предлагать дубли между группами
-    const out = [];
+    const ids = tasks.map((t) => t.id).filter(Boolean);
+    const codeById = new Map(tasks.filter((t) => t.id).map((t) => [t.id, t.code]));
     try {
-      for (const t of tasks) {
-        if (!t.id) continue;
-        try {
-          const res = await fetch(`${PDF_SERVICE_URL}/similar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ task_id: t.id, limit: perTask, same_topic_only: sameTopicOnly }),
-            signal: AbortSignal.timeout(10000),
-          });
-          if (!res.ok) continue;
-          const data = await res.json();
-          if (data.error) continue;
-          const items = (data.items || []).filter((it) => {
-            if (seen.has(it.task_id)) return false;
-            seen.add(it.task_id);
-            return true;
-          });
-          if (items.length) out.push({ base: { id: t.id, code: t.code }, items });
-        } catch { /* пропускаем задачу */ }
-      }
+      // Одна ручка на весь вариант: раньше на каждую задачу летел свой /similar
+      // (20 задач = 20 round-trip'ов и столько же KNN на сервере).
+      const res = await fetch(`${PDF_SERVICE_URL}/similar-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_ids: ids, limit: perTask, same_topic_only: sameTopicOnly,
+          exclude_task_ids: [...existing],
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`Сервис ответил ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const out = (data.groups || [])
+        .filter((g) => g.items?.length)
+        .map((g) => ({ base: { id: g.task_id, code: codeById.get(g.task_id) }, items: g.items }));
       setGroups(out);
       if (out.length === 0) {
         setError('Похожих задач не найдено (либо задачи ещё не проиндексированы, либо сервис поиска недоступен).');
       }
+    } catch {
+      setGroups([]);
+      setError('Не удалось получить похожие задачи — сервис семантического поиска недоступен.');
     } finally {
       setLoading(false);
     }

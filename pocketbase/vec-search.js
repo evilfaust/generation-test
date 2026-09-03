@@ -14,6 +14,11 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
+import {
+  cosF32, shuffled, normalizeAnswer, isDiscriminativeAnswer, applyAllowed,
+  seedTargetCos, pickByTargetCos, distributeParallel, mmrSelect, kmeansMedoids,
+  taskSignature, signaturesCompatible,
+} from './vec-lib.mjs';
 
 const DATA_DB = process.env.PB_DATA_DB || '/opt/pocketbase/pb_data/data.db';
 const VEC_DB = process.env.VEC_DB || '/opt/pocketbase/pdf-service/vec.db';
@@ -33,6 +38,8 @@ let openError = null;
 function invalidateDb() {
   if (db) { try { db.close(); } catch { /* ignore */ } }
   db = null; openError = null;
+  clearTopicPools(); // индекс изменился — кэшированные пулы тем устарели
+  _indexStats = null;
 }
 
 function getDb() {
@@ -96,6 +103,61 @@ export function findSimilar({ taskId, limit = 8, sameTopicOnly = true, minCos = 
     if (out.length >= limit) break;
   }
   return { error: null, source_topic: srcTopic, items: out };
+}
+
+/**
+ * Похожие сразу для набора задач (A1 «дополнить лист»): один вызов вместо
+ * запроса на каждую задачу. При sameTopicOnly (штатный режим) считаем по пулам
+ * тем — KNN стоит ~45 мс независимо от k, и на 20 задачах это была секунда
+ * блокировки event loop плюс 20 round-trip'ов из браузера.
+ *
+ * @param {string[]} taskIds
+ * @param {object} o { limit=3, sameTopicOnly=true, minCos=0, excludeIds=[] }
+ * @returns {{ groups: [{ task_id, items:[] }] }}
+ */
+export async function findSimilarBatch(taskIds, { limit = 3, sameTopicOnly = true, minCos = 0, excludeIds = [] } = {}) {
+  const d = getDb();
+  const info = d.prepare('SELECT id, topic FROM main.tasks WHERE id = ?');
+  const getVec = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
+
+  // Кандидат, уже стоящий в листе или предложенный для другой задачи, не нужен.
+  const seen = new Set([...taskIds, ...excludeIds]);
+  const groups = [];
+  let loadedTopics = 0;
+
+  for (const id of taskIds) {
+    const src = info.get(id);
+    if (!src) { groups.push({ task_id: id, items: [] }); continue; }
+    if (!sameTopicOnly || !src.topic) {
+      const single = findSimilar({ taskId: id, limit, sameTopicOnly, minCos });
+      const items = (single.items || []).filter((it) => !seen.has(it.task_id)).slice(0, limit);
+      items.forEach((it) => seen.add(it.task_id));
+      groups.push({ task_id: id, items });
+      continue;
+    }
+    const cold = !_topicPools.has(`${src.topic}|`);
+    if (cold && loadedTopics > 0 && loadedTopics % 3 === 0) await new Promise((r) => setImmediate(r));
+    if (cold) loadedTopics++;
+    const pool = loadTopicVectorsCached(d, src.topic, null);
+    const self = pool.find((p) => p.id === id);
+    const rawVec = self ? null : getVec.get(id);
+    if (!self && !rawVec) { groups.push({ task_id: id, items: [] }); continue; }
+    const srcVec = self ? self.vec : bufToF32(rawVec.embedding);
+
+    const items = pool
+      .filter((p) => p.id !== id && !seen.has(p.id))
+      .map((p) => ({ p, cos: cosF32(srcVec, p.vec) }))
+      .filter((x) => x.cos >= minCos)
+      .sort((a, b) => b.cos - a.cos)
+      .slice(0, limit)
+      .map(({ p, cos }) => ({
+        task_id: p.id, cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)),
+        code: p.code, topic: src.topic, statement: p.statement,
+      }));
+    items.forEach((it) => seen.add(it.task_id));
+    groups.push({ task_id: id, items });
+  }
+  return { error: null, groups };
 }
 
 // --- Дедуп-кластеры (B2): предвычисленный файл + живой JOIN к data.db ---
@@ -262,111 +324,178 @@ export function indexVectors(rows) {
  * cos в полосе [minCos,maxCos] — «тот же тип, другие числа», но не байт-в-байт),
  * и собирает `count` вариантов, где позиция i везде одного типа.
  *
+ * Пул кандидатов — ВСЯ тема позиции, а не top-k соседей: KNN в sqlite-vec это
+ * полный скан индекса (~45 мс на 22k векторов независимо от k), поэтому на 20
+ * позиций он стоил бы ~1 с, а полоса cos резала бы уже усечённую выдачу
+ * (замер: при k=27 полоса «Разные» 0.70–0.90 давала пустой пул у 24% позиций
+ * против 5% при полном пуле). Загрузка темы + косинусы в JS — десятки мс.
+ *
  * @param {string[]} baseIds  - задачи базового варианта (по позициям)
  * @param {object} o
  * @param {number} [o.count=2]    - сколько ПАРАЛЛЕЛЬНЫХ вариантов (помимо базового)
  * @param {number} [o.minCos=0.85]
  * @param {number} [o.maxCos=0.995] - выше — это байт-в-байт дубль (те же числа), не нужен
+ * @param {string[]} [o.excludeIds=[]] - не выдавать эти задачи (напр. другие варианты той же работы)
+ * @param {object} [o.rejectPairs] - { [baseTaskId]: [taskId] } — пары, отвергнутые учителем вручную
+ * @param {boolean} [o.structural=true] - требовать совпадения структурной подписи (форма ответа,
+ *        объём условия, таблица/формулы/чертёж). Несовместимые уходят в хвост пула, а не в мусор.
  * @returns {{ base:[], variants:[[]], shortage:[] }}
  */
-export function buildParallelVariants(baseIds, { count = 2, minCos = 0.85, maxCos = 0.995 } = {}) {
+export async function buildParallelVariants(baseIds, { count = 2, minCos = 0.85, maxCos = 0.995, excludeIds = [], rejectPairs = null, structural = true } = {}) {
   const d = getDb();
   const getVec = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
-  const info = d.prepare('SELECT id, code, answer, topic, statement_md FROM main.tasks WHERE id = ?');
-  const knn = d.prepare(`
-    SELECT v.task_id AS task_id, v.distance AS distance, t.topic AS topic
-    FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
-    WHERE v.embedding MATCH ? AND v.k = ? ORDER BY v.distance`);
+  const cols = taskColumns(d);
+  const info = d.prepare(`SELECT id, code, answer, topic, statement_md,
+      ${cols.has('has_image') ? 'has_image' : 'NULL AS has_image'},
+      ${cols.has('image') ? 'image' : 'NULL AS image'},
+      ${cols.has('exam_part') ? 'exam_part' : 'NULL AS exam_part'}
+    FROM main.tasks WHERE id = ?`);
 
   const baseSet = new Set(baseIds);
-  const used = new Set(baseIds); // сиблинги не должны повторять базу и друг друга
-  const fmt = (id, cos) => {
+  // Исключения: сам образец, явно переданные (другие варианты работы) и
+  // задачи, уже помеченные дублями образца в B2 — они не параллель, а тот же текст.
+  const blocked = new Set([...baseIds, ...excludeIds, ...dedupTwinsOf(d, baseIds)]);
+  const stats = loadTaskStats(d);
+  const fmt = (id, cos, extra = {}) => {
     const r = info.get(id);
-    return r ? { task_id: id, code: r.code, answer: r.answer,
-      statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 160),
-      ...(cos != null ? { cos: Number(cos.toFixed(4)) } : {}) } : { task_id: id, missing: true };
-  };
-
-  // пул кандидатов для каждой позиции
-  const pools = baseIds.map((id) => {
-    const row = getVec.get(id);
-    if (!row) return [];
-    const src = info.get(id);
-    const topic = src?.topic || '';
-    const rows = knn.all(row.embedding, count * 6 + 15);
-    return rows
-      .filter((r) => r.task_id !== id && r.topic === topic)
-      .map((r) => ({ id: r.task_id, cos: 1 - r.distance }))
-      .filter((r) => r.cos >= minCos && r.cos <= maxCos);
-  });
-
-  const variants = [];
-  const shortage = [];
-  for (let v = 0; v < count; v++) {
-    const variant = [];
-    for (let i = 0; i < baseIds.length; i++) {
-      const pick = pools[i].find((c) => !used.has(c.id));
-      if (pick) { used.add(pick.id); variant.push(fmt(pick.id, pick.cos)); }
-      else { variant.push({ position: i + 1, missing: true }); shortage.push({ position: i + 1, base: baseIds[i] }); }
-    }
-    variants.push(variant);
-  }
-
-  return { base: baseIds.map((id) => fmt(id, null)), variants, shortage };
-}
-
-/**
- * C4 — «работа над ошибками»: по проваленным задачам подобрать похожие для
- * отработки (тот же навык, не клон). Сгруппировано по исходной задаче.
- *
- * @param {string[]} failedIds - проваленные задачи
- * @param {object} o
- * @param {number} [o.perTask=2]   - сколько похожих на каждую провальную
- * @param {string[]} [o.excludeIds=[]] - дополнительно исключить (напр. уже выданные)
- * @param {number} [o.minCos=0.70] - нижняя граница «тот же навык»
- * @param {number} [o.maxCos=0.97] - верхняя (исключаем байт-в-байт клоны)
- * @returns {{ groups:[{source, picks:[]}], all:[], missing:[] }}
- */
-export function buildRemediation(failedIds, { perTask = 2, excludeIds = [], minCos = 0.70, maxCos = 0.97 } = {}) {
-  const d = getDb();
-  const getVec = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?');
-  const info = d.prepare('SELECT id, code, answer, topic, statement_md FROM main.tasks WHERE id = ?');
-  const knn = d.prepare(`
-    SELECT v.task_id AS task_id, v.distance AS distance, t.topic AS topic
-    FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
-    WHERE v.embedding MATCH ? AND v.k = ? ORDER BY v.distance`);
-
-  const used = new Set([...failedIds, ...excludeIds]); // не выдаём оригиналы и исключённые
-  const fmt = (id, cos) => {
-    const r = info.get(id);
+    const rate = rateOf(stats, id);
     return r ? { task_id: id, code: r.code, answer: r.answer, topic: r.topic,
       statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 160),
-      ...(cos != null ? { cos: Number(cos.toFixed(4)), pct: Math.round(toPct(cos)) } : {}) } : { task_id: id, missing: true };
+      ...(cos != null ? { cos: Number(cos.toFixed(4)) } : {}),
+      ...(rate != null ? { solve_rate: Number(rate.toFixed(2)) } : {}), ...extra } : { task_id: id, missing: true };
   };
 
-  const groups = [];
-  const all = [];
-  const missing = [];
-  for (const fid of failedIds) {
-    const row = getVec.get(fid);
-    const src = info.get(fid);
-    if (!row || !src) { missing.push(fid); groups.push({ source: fmt(fid, null), picks: [] }); continue; }
-    const topic = src.topic || '';
-    const cands = knn.all(row.embedding, perTask * 8 + 15)
-      .filter((r) => r.task_id !== fid && r.topic === topic)
-      .map((r) => ({ id: r.task_id, cos: 1 - r.distance }))
-      .filter((r) => r.cos >= minCos && r.cos <= maxCos && !used.has(r.id));
-    const picks = [];
-    for (const c of cands) {
-      if (picks.length >= perTask) break;
-      used.add(c.id);
-      const f = fmt(c.id, c.cos);
-      picks.push(f); all.push(f);
+  // Кандидаты для каждой позиции: вся тема в полосе cos, отсортировано по cos ↓.
+  // Задачи с тем же ответом, что у образца, идут в конец: в параллельном варианте
+  // совпадающий ответ обесценивает защиту от списывания. Совсем не выбрасываем —
+  // это лучше, чем «нет замены», но помечаем флагом same_answer для UI.
+  // Вариант ЕГЭ — это 20 РАЗНЫХ тем, то есть до 20 загрузок пула по ~60 мс;
+  // между темами отпускаем event loop, иначе на это время встаёт весь
+  // backend-helper (/latex-fix, /scan-blank идут в том же процессе).
+  const pools = [];
+  let loadedTopics = 0;
+  for (const id of baseIds) {
+    const src = info.get(id);
+    if (!src?.topic) { pools.push([]); continue; }
+    const cold = !_topicPools.has(`${src.topic}|`);
+    if (cold && loadedTopics > 0 && loadedTopics % 3 === 0) await new Promise((r) => setImmediate(r));
+    if (cold) loadedTopics++;
+    const pool = loadTopicVectorsCached(d, src.topic, null);
+    // Вектор образца берём из пула его темы: точечный SELECT по vec_tasks — это
+    // скан виртуальной таблицы (~25 мс), на 20 позициях он стоил бы полсекунды.
+    const self = pool.find((p) => p.id === id);
+    const row = self ? null : getVec.get(id);
+    if (!self && !row) { pools.push([]); continue; }
+    const srcVec = self ? self.vec : bufToF32(row.embedding);
+    const srcAns = normalizeAnswer(src.answer);
+    // Решаемость образца: параллель должна быть не только про то же, но и
+    // сопоставимой трудности — иначе «эквивалентные» варианты не эквивалентны.
+    const srcRate = rateOf(stats, id);
+    // Пары, которые учитель уже отверг вручную именно для этой задачи.
+    const rejected = rejectPairs?.[id] ? new Set(rejectPairs[id]) : null;
+    // Структурная подпись образца: форма ответа, объём условия, таблица,
+    // формулы, чертёж. Косинус один этого не различает (см. vec-lib).
+    const srcSig = structural ? taskSignature({
+      answer: src.answer, statement_md: src.statement_md,
+      hasImage: hasFigure(src), examPart: src.exam_part,
+    }) : null;
+
+    const cands = [];
+    const offSpec = []; // структурно иные — запасной пул, если основной пуст
+    for (const p of pool) {
+      if (p.id === id || blocked.has(p.id)) continue;
+      if (rejected?.has(p.id)) continue;
+      const cos = cosF32(srcVec, p.vec);
+      if (cos < minCos || cos > maxCos) continue;
+      const rate = rateOf(stats, p.id);
+      // Отсекаем только при данных с обеих сторон: у большинства задач ответов
+      // пока нет, и жёсткий фильтр обнулил бы пул.
+      if (srcRate != null && rate != null && Math.abs(rate - srcRate) > RATE_TOLERANCE) continue;
+      const sameAnswer = !!srcAns && isDiscriminativeAnswer(srcAns) && normalizeAnswer(p.answer) === srcAns;
+      const cand = { id: p.id, cos, sameAnswer };
+      if (srcSig && !signaturesCompatible(srcSig, p.sig)) offSpec.push({ ...cand, offSpec: true });
+      else cands.push(cand);
     }
-    if (picks.length === 0) missing.push(fid);
-    groups.push({ source: fmt(fid, null), picks });
+    const byFit = (a, b) => (a.sameAnswer === b.sameAnswer ? b.cos - a.cos : (a.sameAnswer ? 1 : -1));
+    cands.sort(byFit);
+    offSpec.sort(byFit);
+    // Структурно иная замена всё же лучше пустой ячейки — держим их в хвосте.
+    pools.push([...cands, ...offSpec]);
   }
-  return { groups, all, missing };
+
+  // Раздача по позициям, а не по вариантам. Прежний жадный проход «вариант за
+  // вариантом» брал для варианта 1 всегда ближайшего кандидата, для варианта 2 —
+  // следующего и т.д.: параллели получались неравноценными (первая ближе к
+  // образцу), а повторное «Подобрать» давало ровно тот же результат.
+  // Теперь на каждую позицию берём окно лучших кандидатов, тасуем его и
+  // раздаём вариантам в случайном порядке — варианты равноценны, а прогоны разные.
+  const { variants: picked, shortage: gaps } = distributeParallel(pools, count);
+  const variants = picked.map((variant) => variant.map((pick, i) => (
+    pick
+      ? fmt(pick.id, pick.cos, {
+        ...(pick.sameAnswer ? { same_answer: true } : {}),
+        ...(pick.offSpec ? { off_spec: true } : {}),
+      })
+      : { position: i + 1, missing: true }
+  )));
+  const shortage = gaps.map((g) => ({ ...g, base: baseIds[g.position - 1] }));
+
+  return { base: baseIds.map((id) => fmt(id, null)), variants, shortage, base_count: baseSet.size };
+}
+
+// Решаемость задач из внутренних ответов учеников — тем же readonly-соединением,
+// что и задачи. Фронт считает это же для колонки «Успеваемость» (utils/successStats),
+// но подбору параллелей нужны сырые доли на сервере, а не в браузере учителя.
+// Один проход по attempt_answers (~десятки тысяч строк) с кэшем на 10 минут.
+const TASK_STATS_TTL_MS = 10 * 60 * 1000;
+let _taskStats = null; // { at, map: Map(taskId → {c, n}) }
+
+function loadTaskStats(d) {
+  if (_taskStats && Date.now() - _taskStats.at < TASK_STATS_TTL_MS) return _taskStats.map;
+  const map = new Map();
+  try {
+    for (const r of d.prepare('SELECT task, is_correct FROM main.attempt_answers').iterate()) {
+      if (!r.task) continue;
+      const st = map.get(r.task) || { c: 0, n: 0 };
+      st.n += 1;
+      if (r.is_correct) st.c += 1;
+      map.set(r.task, st);
+    }
+  } catch { /* коллекции нет — подбор работает без учёта решаемости */ }
+  _taskStats = { at: Date.now(), map };
+  return map;
+}
+
+// Ниже этого числа ответов доля слишком шумная, чтобы на неё опираться
+// (та же граница, что LOW_CONFIDENCE_N на фронте).
+const STATS_MIN_N = 5;
+// Насколько кандидат может отличаться по решаемости от образца, когда данные
+// есть у обоих. 0.3 = «лёгкая вместо трудной» отсекается, шум внутри уровня — нет.
+const RATE_TOLERANCE = 0.3;
+
+function rateOf(stats, id) {
+  const st = stats.get(id);
+  return st && st.n >= STATS_MIN_N ? st.c / st.n : null;
+}
+
+// Все задачи, лежащие с данными в одном dedup-кластере (B2) — это тот же текст,
+// а не параллель. Пустой Set, если разметки нет.
+function dedupTwinsOf(d, taskIds) {
+  const out = new Set();
+  if (!taskIds.length) return out;
+  let stmt;
+  try {
+    stmt = d.prepare(`
+      SELECT DISTINCT m2.task AS task
+      FROM main.task_family_members m1
+      JOIN main.task_families f ON f.id = m1.family AND f.type = 'dedup_cluster'
+      JOIN main.task_family_members m2 ON m2.family = m1.family
+      WHERE m1.task = ?`);
+  } catch { return out; }
+  for (const id of taskIds) {
+    try { for (const r of stmt.all(id)) out.add(r.task); } catch { /* нет коллекции — не мешаем подбору */ }
+  }
+  return out;
 }
 
 // === Подбор задач для «Генератора» (v3.9.41) ===========================
@@ -381,19 +510,66 @@ function bufToF32(buf) {
   return Float32Array.from(view);
 }
 
-// Косинус между двумя Float32Array одинаковой длины.
-function cosF32(a, b) {
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
-  return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
+// Пулы векторов по темам живут дольше одного запроса: чтение blob'ов темы стоит
+// ~50-90 мс, а Генератор и модалка параллелей дёргают одни и те же темы подряд
+// (смена пресета, «Подобрать» ещё раз, соседние режимы подбора).
+// LRU с бюджетом по числу векторов, а не по числу тем: вариант ЕГЭ трогает 20 тем
+// сразу, и лимит «N тем» вытеснял бы их на каждом прогоне. 12 000 векторов ×
+// 4 КБ ≈ 48 МБ — потолок кэша.
+const TOPIC_POOL_BUDGET = 12000;
+const TOPIC_POOL_TTL_MS = 5 * 60 * 1000;
+const _topicPools = new Map(); // `${topic}|${subtopic}` → { at, rows }
+let _topicPoolSize = 0;
+
+function clearTopicPools() { _topicPools.clear(); _topicPoolSize = 0; }
+
+function loadTopicVectorsCached(d, topicId, subtopicId) {
+  const key = `${topicId}|${subtopicId || ''}`;
+  const hit = _topicPools.get(key);
+  if (hit && Date.now() - hit.at < TOPIC_POOL_TTL_MS) {
+    _topicPools.delete(key); _topicPools.set(key, hit); // освежаем позицию в LRU
+    return hit.rows;
+  }
+  if (hit) { _topicPools.delete(key); _topicPoolSize -= hit.rows.length; } // протух
+  const rows = loadTopicVectors(d, topicId, subtopicId);
+  _topicPools.set(key, { at: Date.now(), rows });
+  _topicPoolSize += rows.length;
+  while (_topicPoolSize > TOPIC_POOL_BUDGET && _topicPools.size > 1) {
+    const oldestKey = _topicPools.keys().next().value;
+    _topicPoolSize -= _topicPools.get(oldestKey).rows.length;
+    _topicPools.delete(oldestKey);
+  }
+  return rows;
+}
+
+// Какие необязательные колонки есть в tasks: has_image/image/exam_part заводились
+// в разное время (часть — руками через админку), и на чужой копии БД их может
+// не быть. Спрашиваем схему один раз, а не ловим исключение на каждом запросе.
+let _taskColumns = null;
+function taskColumns(d) {
+  if (_taskColumns) return _taskColumns;
+  try {
+    _taskColumns = new Set(d.prepare('PRAGMA main.table_info(tasks)').all().map((r) => r.name));
+  } catch {
+    _taskColumns = new Set();
+  }
+  return _taskColumns;
 }
 
 // Загрузить все векторы темы (опц. подтемы) вместе с лёгкими полями задачи.
 // subtopic в tasks — JSON-массив id → matching через LIKE.
+// Полный текст условия в пул НЕ кладём (пулы кэшируются) — из него сразу
+// считается структурная подпись, а наружу идёт только сниппет.
 function loadTopicVectors(d, topicId, subtopicId) {
+  const cols = taskColumns(d);
+  const extra = [
+    cols.has('has_image') ? 't.has_image AS has_image' : 'NULL AS has_image',
+    cols.has('image') ? 't.image AS image' : 'NULL AS image',
+    cols.has('exam_part') ? 't.exam_part AS exam_part' : 'NULL AS exam_part',
+  ].join(', ');
   let sql = `
     SELECT v.task_id AS id, v.embedding AS embedding,
-           t.code AS code, t.answer AS answer, t.statement_md AS statement_md
+           t.code AS code, t.answer AS answer, t.statement_md AS statement_md, ${extra}
     FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
     WHERE t.topic = ?`;
   const args = [topicId];
@@ -401,76 +577,83 @@ function loadTopicVectors(d, topicId, subtopicId) {
   return d.prepare(sql).all(...args).map((r) => ({
     id: r.id, code: r.code, answer: r.answer,
     statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 200),
+    sig: taskSignature({
+      answer: r.answer,
+      statement_md: r.statement_md,
+      hasImage: hasFigure(r),
+      examPart: r.exam_part,
+    }),
     vec: bufToF32(r.embedding),
   }));
 }
 
-// Жадный MMR (max-min): из пула выбрать count максимально разных задач.
-// Старт — случайный элемент (разнообразие между перегенерациями).
-// items: [{vec:Float32Array, ...}]. Возвращает выбранные элементы (с полем _cos —
-// похожесть на ближайшего уже выбранного, для отладки/бейджей).
-function mmrSelect(items, count) {
-  if (items.length === 0) return [];
-  const n = Math.min(count, items.length);
-  const chosenIdx = [Math.floor(Math.random() * items.length)];
-  const minSim = items.map((it) => cosF32(it.vec, items[chosenIdx[0]].vec));
-  while (chosenIdx.length < n) {
-    let best = -1, bestSim = Infinity;
-    for (let i = 0; i < items.length; i++) {
-      if (chosenIdx.includes(i)) continue;
-      if (minSim[i] < bestSim) { bestSim = minSim[i]; best = i; }
-    }
-    if (best < 0) break;
-    chosenIdx.push(best);
-    const bv = items[best].vec;
-    for (let i = 0; i < items.length; i++) {
-      const s = cosF32(items[i].vec, bv);
-      if (s < minSim[i]) minSim[i] = s;
-    }
-  }
-  return chosenIdx.map((i) => ({ ...items[i], _cos: minSim[i] }));
+// Чертёж у задачи: свежие задачи держат файл в `image`, у части стоит флаг
+// has_image, у импортированных картинка приходит markdown-ссылкой в условии.
+function hasFigure(row) {
+  if (row.has_image != null && row.has_image !== '') return !!row.has_image;
+  if (row.image) return true;
+  if (/!\[/.test(row.statement_md || '')) return true;
+  return false;
 }
 
+// Ползунок «похожести» в UI линеен, а косинус — нет: внутри одной темы случайная
+// пара задач даёт ≈0.70 (замер по 22k векторов), почти-клон ≈0.98. Поэтому
+// положение ползунка маппим на ЦЕЛЕВОЙ косинус в этой полосе, а не на ранг в
+// списке соседей: раньше левые 80% хода ничего не меняли (0% ползунка = cos 0.699,
+// 50% = 0.762 — обе величины неотличимы от случайной задачи темы).
 /**
  * «По образцу» — подобрать count задач вокруг эталона, регулируя один ползунок.
- * similarity ∈ [0,1]: 1 → самые близкие (клоны-тренажёр), 0 → самые далёкие внутри темы.
- * @returns {{error, source_topic, items:[{task_id,cos,pct,code,statement}]}}
+ * similarity ∈ [0,1]: 1 → самые близкие (клоны-тренажёр), 0 → «тот же раздел, другой сюжет».
+ * @returns {{error, source_topic, items:[{task_id,cos,pct,code,statement}], target_cos}}
  */
-export function selectBySeed({ taskId, count = 20, similarity = 0.5, sameTopicOnly = true }) {
+export function selectBySeed({ taskId, count = 20, similarity = 0.5, sameTopicOnly = true, allowedIds = null }) {
   const d = getDb();
-  const row = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?').get(taskId);
-  if (!row) return { error: 'not_indexed', items: [] };
   const src = d.prepare('SELECT topic FROM main.tasks WHERE id = ?').get(taskId);
   const srcTopic = src?.topic || '';
 
-  const k = Math.max(count * 10 + 60, 120);
-  const rows = d.prepare(`
-    SELECT v.task_id AS task_id, v.distance AS distance,
-           t.topic AS topic, t.code AS code, t.statement_md AS statement_md
-    FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
-    WHERE v.embedding MATCH ? AND v.k = ?
-    ORDER BY v.distance`).all(row.embedding, k);
-
-  // кандидаты, отсортированные по cos ↓ (KNN уже по distance ↑ = cos ↓)
-  const pool = [];
-  for (const r of rows) {
-    if (r.task_id === taskId) continue;
-    if (sameTopicOnly && srcTopic && r.topic !== srcTopic) continue;
-    const cos = 1 - r.distance;
-    pool.push({ task_id: r.task_id, cos, code: r.code,
-      statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 200) });
+  // Пул: вся тема (через кэш) — по ней ползунок ходит честно. Без фильтра темы
+  // остаёмся на KNN, но с глубоким k, иначе полоса срежет всё.
+  let pool = [];
+  let srcVec = null;
+  if (sameTopicOnly && srcTopic) {
+    const rows = loadTopicVectorsCached(d, srcTopic, null);
+    const self = rows.find((r) => r.id === taskId);
+    if (!self) {
+      const raw = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?').get(taskId);
+      if (!raw) return { error: 'not_indexed', items: [] };
+      srcVec = bufToF32(raw.embedding);
+    } else {
+      srcVec = self.vec;
+    }
+    pool = applyAllowed(rows, allowedIds)
+      .filter((r) => r.id !== taskId)
+      .map((r) => ({ task_id: r.id, cos: cosF32(srcVec, r.vec), code: r.code, statement: r.statement }));
+  } else {
+    const raw = d.prepare('SELECT embedding FROM vdb.vec_tasks WHERE task_id = ?').get(taskId);
+    if (!raw) return { error: 'not_indexed', items: [] };
+    const k = Math.max(count * 10 + 200, 400);
+    const rows = d.prepare(`
+      SELECT v.task_id AS task_id, v.distance AS distance,
+             t.topic AS topic, t.code AS code, t.statement_md AS statement_md
+      FROM vdb.vec_tasks v JOIN main.tasks t ON t.id = v.task_id
+      WHERE v.embedding MATCH ? AND v.k = ?
+      ORDER BY v.distance`).all(raw.embedding, k);
+    const allowSet = allowedIds ? new Set(allowedIds) : null;
+    pool = rows
+      .filter((r) => r.task_id !== taskId && (!allowSet || allowSet.has(r.task_id)))
+      .map((r) => ({ task_id: r.task_id, cos: 1 - r.distance, code: r.code,
+        statement: (r.statement_md || '').replace(/\s+/g, ' ').slice(0, 200) }));
   }
-  if (pool.length === 0) return { error: null, source_topic: srcTopic, items: [] };
+  if (pool.length === 0) return { error: null, source_topic: srcTopic, items: [], target_cos: null };
 
-  // окно по ползунку: similarity=1 → с начала (близкие), 0 → с конца (далёкие)
-  const s = Math.max(0, Math.min(1, Number(similarity)));
-  const start = Math.round((1 - s) * Math.max(0, pool.length - count));
-  const slice = pool.slice(start, start + count);
-  const items = slice.map((r) => ({
-    task_id: r.task_id, cos: Number(r.cos.toFixed(4)), pct: Math.round(toPct(r.cos)),
-    code: r.code, statement: r.statement,
-  }));
-  return { error: null, source_topic: srcTopic, items };
+  const targetCos = seedTargetCos(similarity);
+  // Ближайшие к целевой похожести; при ползунке «в упор» это просто топ соседей.
+  const items = pickByTargetCos(pool, targetCos, count)
+    .map((r) => ({
+      task_id: r.task_id, cos: Number(r.cos.toFixed(4)), pct: Math.round(toPct(r.cos)),
+      code: r.code, statement: r.statement,
+    }));
+  return { error: null, source_topic: srcTopic, items, target_cos: Number(targetCos.toFixed(3)) };
 }
 
 /**
@@ -478,10 +661,10 @@ export function selectBySeed({ taskId, count = 20, similarity = 0.5, sameTopicOn
  * method='mmr' (жадный max-min) | 'clusters' (k-means → медоиды).
  * @returns {{error, items:[{task_id,code,answer,statement}], pool_size}}
  */
-export function selectDiverse({ topicId, subtopicId = null, count = 20, method = 'mmr' }) {
+export function selectDiverse({ topicId, subtopicId = null, count = 20, method = 'mmr', allowedIds = null }) {
   const d = getDb();
   if (!topicId) return { error: 'no_topic', items: [], pool_size: 0 };
-  const pool = loadTopicVectors(d, topicId, subtopicId);
+  const pool = applyAllowed(loadTopicVectorsCached(d, topicId, subtopicId), allowedIds);
   if (pool.length === 0) return { error: 'empty', items: [], pool_size: 0 };
 
   let picked;
@@ -494,63 +677,16 @@ export function selectDiverse({ topicId, subtopicId = null, count = 20, method =
   return { error: null, items, pool_size: pool.length };
 }
 
-// k-means (k=count) по векторам темы → медоид каждого кластера (по одной задаче «сюжета»).
-function kmeansMedoids(items, count) {
-  const k = Math.min(count, items.length);
-  if (k <= 1) return items.slice(0, k);
-  const dim = items[0].vec.length;
-  // инициализация: k случайных различных задач
-  const order = items.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, k);
-  let centroids = order.map((i) => Float32Array.from(items[i].vec));
-  let assign = new Array(items.length).fill(0);
-  for (let iter = 0; iter < 10; iter++) {
-    let changed = false;
-    for (let i = 0; i < items.length; i++) {
-      let best = 0, bestSim = -Infinity;
-      for (let c = 0; c < k; c++) {
-        const s = cosF32(items[i].vec, centroids[c]);
-        if (s > bestSim) { bestSim = s; best = c; }
-      }
-      if (assign[i] !== best) { assign[i] = best; changed = true; }
-    }
-    if (!changed && iter > 0) break;
-    const sums = Array.from({ length: k }, () => new Float64Array(dim));
-    const cnts = new Array(k).fill(0);
-    for (let i = 0; i < items.length; i++) {
-      const c = assign[i]; cnts[c]++;
-      const v = items[i].vec;
-      for (let j = 0; j < dim; j++) sums[c][j] += v[j];
-    }
-    centroids = sums.map((s, c) => {
-      const out = new Float32Array(dim);
-      if (cnts[c] > 0) for (let j = 0; j < dim; j++) out[j] = s[j] / cnts[c];
-      return out;
-    });
-  }
-  // медоид каждого непустого кластера
-  const medoids = [];
-  for (let c = 0; c < k; c++) {
-    let best = -1, bestSim = -Infinity;
-    for (let i = 0; i < items.length; i++) {
-      if (assign[i] !== c) continue;
-      const s = cosF32(items[i].vec, centroids[c]);
-      if (s > bestSim) { bestSim = s; best = i; }
-    }
-    if (best >= 0) medoids.push(items[best]);
-  }
-  return medoids;
-}
-
 /**
  * «Анти-дубль» — набор из темы, не похожий на задачи ранее выданной работы.
  * Оставляет кандидатов с maxSim(cand, avoid) ≤ maxCos, среди них — MMR до count.
  * @returns {{error, items:[...], pool_size, filtered_out}}
  */
-export function selectNovelty({ topicId, subtopicId = null, count = 20, avoidTaskIds = [], maxCos = 0.85 }) {
+export function selectNovelty({ topicId, subtopicId = null, count = 20, avoidTaskIds = [], maxCos = 0.85, allowedIds = null }) {
   const d = getDb();
   if (!topicId) return { error: 'no_topic', items: [], pool_size: 0, filtered_out: 0 };
   const avoid = new Set(avoidTaskIds);
-  const pool = loadTopicVectors(d, topicId, subtopicId).filter((p) => !avoid.has(p.id));
+  const pool = applyAllowed(loadTopicVectorsCached(d, topicId, subtopicId), allowedIds).filter((p) => !avoid.has(p.id));
   if (pool.length === 0) return { error: 'empty', items: [], pool_size: 0, filtered_out: 0 };
 
   // векторы задач, которых надо избегать (могут быть из любой темы)
@@ -607,6 +743,37 @@ export function scoreNovelty({ taskIds = [], refTaskIds = [], dupCos = 0.95, fre
   }
   const novelty_pct = scored > 0 ? Math.round((fresh / scored) * 100) : 100;
   return { error: null, items, novelty_pct, fresh, dup, scored, ref_count: refVecs.length };
+}
+
+/**
+ * Состояние индекса (v3.9.152) — чтобы фронт мог объяснить учителю, почему
+ * «нет подходящей замены»: индекс отстал от каталога или задач просто нет.
+ * Индексация ручная (vector-benchmark → npm run index), поэтому разрыв нормален.
+ * @returns {{ indexed, tasks_total, missing, indexed_at, geometry_indexed }}
+ */
+const INDEX_STATS_TTL_MS = 60 * 1000;
+let _indexStats = null;
+
+export function getIndexStats() {
+  if (_indexStats && Date.now() - _indexStats.at < INDEX_STATS_TTL_MS) return _indexStats.data;
+  const d = getDb();
+  const one = (sql) => { try { return d.prepare(sql).get(); } catch { return null; } };
+  const all = (sql) => { try { return d.prepare(sql).all(); } catch { return []; } };
+  const tasksTotal = one('SELECT count(*) c FROM main.tasks')?.c ?? 0;
+  const indexedAt = one('SELECT max(indexed_at) m FROM vdb.vec_meta')?.m || null;
+  const geometry = one('SELECT count(*) c FROM vdb.vec_geometry')?.c ?? 0;
+  // Задачи каталога, которых нет в индексе. Через SQL-антиджойн нельзя: vec0 —
+  // виртуальная таблица без индекса по task_id, и подзапрос на задачу выливается
+  // в полный скан индекса на каждую (17k × 22k — минуты). Сверяем множества в JS.
+  const vecIds = new Set(all('SELECT task_id FROM vdb.vec_tasks').map((r) => r.task_id));
+  const taskIds = all('SELECT id FROM main.tasks').map((r) => r.id);
+  const missing = taskIds.reduce((acc, id) => acc + (vecIds.has(id) ? 0 : 1), 0);
+  const data = {
+    indexed: vecIds.size, tasks_total: tasksTotal, missing, indexed_at: indexedAt,
+    geometry_indexed: geometry,
+  };
+  _indexStats = { at: Date.now(), data };
+  return data;
 }
 
 /**

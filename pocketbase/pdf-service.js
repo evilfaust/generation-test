@@ -18,8 +18,9 @@ let findSimilar = null, vecHealth = null, getDuplicateClusters = null, findPairs
 let selectBySeed = null, selectDiverse = null, selectNovelty = null, scoreNovelty = null;
 let findSimilarGeometry = null, indexGeometryVectors = null, pruneGeometryVectors = null, findGeometryBankDuplicates = null;
 let searchGeometryByText = null, reindexGeometry = null, geoReindexStatus = null;
+let getIndexStats = null, findSimilarBatch = null;
 try {
-  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty, findSimilarGeometry, indexGeometryVectors, pruneGeometryVectors, findGeometryBankDuplicates, searchGeometryByText, reindexGeometry, geoReindexStatus } = await import('./vec-search.js'));
+  ({ findSimilar, vecHealth, getDuplicateClusters, findPairs, indexVectors, buildParallelVariants, buildRemediation, pruneVectors, setClusters, selectBySeed, selectDiverse, selectNovelty, scoreNovelty, findSimilarGeometry, indexGeometryVectors, pruneGeometryVectors, findGeometryBankDuplicates, searchGeometryByText, reindexGeometry, geoReindexStatus, getIndexStats, findSimilarBatch } = await import('./vec-search.js'));
 } catch (e) {
   console.warn('[pdf-service] vec-search недоступен:', e.message);
 }
@@ -1472,18 +1473,59 @@ app.post('/remediation', (req, res) => {
 });
 
 /**
- * POST /parallel-variants — семейство параллельных вариантов «по образцу» (A4).
- * body: { task_ids: [...базовый набор], count?, min_cos?, max_cos? }
+ * POST /similar-batch — похожие сразу для набора задач (A1 «Дополнить похожими»).
+ * body: { task_ids:[...], limit?, same_topic_only?, min_cos?, exclude_task_ids? }
  */
-app.post('/parallel-variants', (req, res) => {
-  if (!buildParallelVariants) return res.status(503).json({ error: 'vec-search не инициализирован' });
-  const { task_ids, count, min_cos, max_cos } = req.body || {};
+app.post('/similar-batch', async (req, res) => {
+  if (!findSimilarBatch) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_ids, limit, same_topic_only, min_cos, exclude_task_ids } = req.body || {};
   if (!Array.isArray(task_ids) || task_ids.length === 0) return res.status(400).json({ error: 'task_ids обязателен' });
   try {
-    res.json(buildParallelVariants(task_ids, {
+    res.json(await findSimilarBatch(task_ids.slice(0, 100), {
+      limit: Math.min(Math.max(Number(limit) || 3, 1), 20),
+      sameTopicOnly: same_topic_only !== false,
+      minCos: min_cos != null ? Number(min_cos) : 0,
+      excludeIds: Array.isArray(exclude_task_ids) ? exclude_task_ids : [],
+      rejectPairs: reject_pairs && typeof reject_pairs === 'object' ? reject_pairs : null,
+      structural: structural !== false,
+    }));
+  } catch (e) {
+    console.error('[similar-batch]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /vec-stats — состояние семантического индекса (сколько задач проиндексировано,
+ * когда обновлялся). Индексация ручная, поэтому фронту нужно уметь объяснить
+ * учителю разрыв между каталогом и индексом.
+ */
+app.get('/vec-stats', (req, res) => {
+  if (!getIndexStats) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  try {
+    res.json(getIndexStats());
+  } catch (e) {
+    console.error('[vec-stats]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /parallel-variants — семейство параллельных вариантов «по образцу» (A4).
+ * body: { task_ids: [...базовый набор], count?, min_cos?, max_cos?, exclude_task_ids?, reject_pairs?, structural? }
+ */
+app.post('/parallel-variants', async (req, res) => {
+  if (!buildParallelVariants) return res.status(503).json({ error: 'vec-search не инициализирован' });
+  const { task_ids, count, min_cos, max_cos, exclude_task_ids, reject_pairs, structural } = req.body || {};
+  if (!Array.isArray(task_ids) || task_ids.length === 0) return res.status(400).json({ error: 'task_ids обязателен' });
+  try {
+    res.json(await buildParallelVariants(task_ids, {
       count: Math.min(Math.max(Number(count) || 2, 1), 5),
       minCos: min_cos != null ? Number(min_cos) : 0.85,
       maxCos: max_cos != null ? Number(max_cos) : 0.995,
+      excludeIds: Array.isArray(exclude_task_ids) ? exclude_task_ids : [],
+      rejectPairs: reject_pairs && typeof reject_pairs === 'object' ? reject_pairs : null,
+      structural: structural !== false,
     }));
   } catch (e) {
     console.error('[parallel-variants]', e.message);
@@ -1497,7 +1539,7 @@ app.post('/parallel-variants', (req, res) => {
  */
 app.post('/seed-select', (req, res) => {
   if (!selectBySeed) return res.status(503).json({ error: 'vec-search не инициализирован' });
-  const { task_id, count, similarity, same_topic_only } = req.body || {};
+  const { task_id, count, similarity, same_topic_only, allowed_task_ids } = req.body || {};
   if (!task_id) return res.status(400).json({ error: 'task_id обязателен' });
   try {
     res.json(selectBySeed({
@@ -1505,6 +1547,7 @@ app.post('/seed-select', (req, res) => {
       count: Math.min(Math.max(Number(count) || 20, 1), 200),
       similarity: similarity != null ? Math.min(Math.max(Number(similarity), 0), 1) : 0.5,
       sameTopicOnly: same_topic_only !== false,
+      allowedIds: Array.isArray(allowed_task_ids) ? allowed_task_ids : null,
     }));
   } catch (e) {
     console.error('[seed-select]', e.message);
@@ -1518,7 +1561,7 @@ app.post('/seed-select', (req, res) => {
  */
 app.post('/diverse', (req, res) => {
   if (!selectDiverse) return res.status(503).json({ error: 'vec-search не инициализирован' });
-  const { topic_id, subtopic_id, count, method } = req.body || {};
+  const { topic_id, subtopic_id, count, method, allowed_task_ids } = req.body || {};
   if (!topic_id) return res.status(400).json({ error: 'topic_id обязателен' });
   try {
     res.json(selectDiverse({
@@ -1526,6 +1569,7 @@ app.post('/diverse', (req, res) => {
       subtopicId: subtopic_id || null,
       count: Math.min(Math.max(Number(count) || 20, 1), 200),
       method: method === 'clusters' ? 'clusters' : 'mmr',
+      allowedIds: Array.isArray(allowed_task_ids) ? allowed_task_ids : null,
     }));
   } catch (e) {
     console.error('[diverse]', e.message);
@@ -1539,7 +1583,7 @@ app.post('/diverse', (req, res) => {
  */
 app.post('/novelty', (req, res) => {
   if (!selectNovelty) return res.status(503).json({ error: 'vec-search не инициализирован' });
-  const { topic_id, subtopic_id, count, avoid_task_ids, max_cos } = req.body || {};
+  const { topic_id, subtopic_id, count, avoid_task_ids, max_cos, allowed_task_ids } = req.body || {};
   if (!topic_id) return res.status(400).json({ error: 'topic_id обязателен' });
   try {
     res.json(selectNovelty({
@@ -1548,6 +1592,7 @@ app.post('/novelty', (req, res) => {
       count: Math.min(Math.max(Number(count) || 20, 1), 200),
       avoidTaskIds: Array.isArray(avoid_task_ids) ? avoid_task_ids : [],
       maxCos: max_cos != null ? Math.min(Math.max(Number(max_cos), 0), 1) : 0.85,
+      allowedIds: Array.isArray(allowed_task_ids) ? allowed_task_ids : null,
     }));
   } catch (e) {
     console.error('[novelty]', e.message);

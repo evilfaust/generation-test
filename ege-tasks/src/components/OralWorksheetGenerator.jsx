@@ -24,6 +24,7 @@ import {
   useTaskCounter,
 } from '../hooks';
 import { useReferenceData } from '../contexts/ReferenceDataContext';
+import { filterTaskIds, hasNarrowingFilters } from '../utils/taskFilterIds';
 import './TaskWorksheet.css';
 
 const DIFFICULTY_OPTIONS = [
@@ -37,7 +38,7 @@ const DIFFICULTY_OPTIONS = [
 const TaskSheetGenerator = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const { topics, tags, years, sources, subtopics } = useReferenceData();
+  const { topics, tags, years, sources, subtopics, tasksSnapshot } = useReferenceData();
   const [form] = Form.useForm();
   const worksheetGen = useWorksheetGeneration();
   const { variants, setVariants, loading, generateFromFilters, generateFromVector } = worksheetGen;
@@ -47,7 +48,7 @@ const TaskSheetGenerator = () => {
   const [seedTask, setSeedTask] = useState(null);
   const [similarity, setSimilarity] = useState(0.5);
   const [diverseMethod, setDiverseMethod] = useState('mmr');
-  const [avoidWorkId, setAvoidWorkId] = useState(null);
+  const [avoidWorkIds, setAvoidWorkIds] = useState([]);
   const [noveltyMaxCos, setNoveltyMaxCos] = useState(0.85);
 
   // Output mode + appearance
@@ -191,15 +192,29 @@ const TaskSheetGenerator = () => {
       }
       let avoidTaskIds = [];
       if (selectionMethod === 'novelty') {
-        if (!avoidWorkId) {
-          message.warning('Выберите работу, задачи которой не нужно повторять');
+        if (!avoidWorkIds.length) {
+          message.warning('Выберите работы, задачи которых не нужно повторять');
           return;
         }
-        const variantsOfWork = await api.getVariantsByWork(avoidWorkId);
+        // Учитель обычно избегает повторов не с одной работой, а со всем, что
+        // класс уже решал: берём состав всех выбранных работ одним запросом.
+        const variantsOfWorks = await api.getVariantsByWorks(avoidWorkIds, { fields: 'id,tasks' });
         const idset = new Set();
-        variantsOfWork.forEach(v => (v.tasks || []).forEach(id => idset.add(id)));
+        variantsOfWorks.forEach(v => (v.tasks || []).forEach(id => idset.add(id)));
         avoidTaskIds = [...idset];
       }
+      // Фильтры каталога должны действовать и в векторных режимах: считаем
+      // белый список по снимку (без запроса) и отдаём его подбору.
+      const vectorFilters = {
+        difficulty: values.difficulty,
+        source: values.source,
+        year: values.year,
+        tags: values.filterTags,
+      };
+      const allowedIds = hasNarrowingFilters(vectorFilters)
+        ? filterTaskIds(tasksSnapshot, { ...vectorFilters, topic: values.topic, subtopic: values.subtopic })
+        : null;
+
       await generateFromVector({
         method: selectionMethod,
         seedTaskId: seedTask?.id,
@@ -209,6 +224,7 @@ const TaskSheetGenerator = () => {
         subtopic: values.subtopic,
         avoidTaskIds,
         maxCos: noveltyMaxCos,
+        allowedIds,
       }, commonOpts);
       return;
     }
@@ -399,8 +415,8 @@ const TaskSheetGenerator = () => {
                 setSimilarity={setSimilarity}
                 diverseMethod={diverseMethod}
                 setDiverseMethod={setDiverseMethod}
-                avoidWorkId={avoidWorkId}
-                setAvoidWorkId={setAvoidWorkId}
+                avoidWorkIds={avoidWorkIds}
+                setAvoidWorkIds={setAvoidWorkIds}
                 noveltyMaxCos={noveltyMaxCos}
                 setNoveltyMaxCos={setNoveltyMaxCos}
                 selectedTopic={selectedTopic}

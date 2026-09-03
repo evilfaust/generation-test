@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
-import { Modal, Button, InputNumber, Input, Space, Spin, Alert, Tag, Empty, Tooltip, Segmented, App } from 'antd';
+import { Modal, Button, InputNumber, Input, Space, Spin, Alert, Tag, Empty, Tooltip, Segmented, Checkbox, App } from 'antd';
 import { ReloadOutlined, SaveOutlined, SwapOutlined, PlusOutlined, EditOutlined } from '@ant-design/icons';
 import MathRenderer from '../MathRenderer';
 import TaskSelectModal from '../TaskSelectModal';
 import TaskEditModal from '../TaskEditModal';
+import VectorIndexNote from './VectorIndexNote';
 import { api } from '../../services/pocketbase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReferenceData } from '../../contexts/ReferenceDataContext';
@@ -45,6 +46,21 @@ const TaskCell = ({ t, onPick, onEdit, editing }) => {
               <Tag color={cosColor(t.cos)} style={{ margin: 0 }}>{Math.round(t.cos * 100)}%</Tag>
             </Tooltip>
           ) : t.manual ? <Tag color="blue" style={{ margin: 0 }}>вручную</Tag> : null}
+          {t.same_answer && (
+            <Tooltip title="Ответ совпадает с образцом — по нему списывание не отличить. Замените, если это важно.">
+              <Tag color="volcano" style={{ margin: 0 }}>тот же ответ</Tag>
+            </Tooltip>
+          )}
+          {t.off_spec && (
+            <Tooltip title="Структурно задача отличается от образца (форма ответа, объём условия, таблица/чертёж). Взята потому, что более подходящей в базе не нашлось.">
+              <Tag color="gold" style={{ margin: 0 }}>иная структура</Tag>
+            </Tooltip>
+          )}
+          {t.solve_rate != null && (
+            <Tooltip title="Доля верных ответов учеников по этой задаче — параллели подбираются сопоставимой трудности">
+              <Tag style={{ margin: 0, color: '#666' }}>решают {Math.round(t.solve_rate * 100)}%</Tag>
+            </Tooltip>
+          )}
         </Space>
         <Space size={0}>
           {onEdit && (
@@ -71,8 +87,10 @@ const TaskCell = ({ t, onPick, onEdit, editing }) => {
  * @param {boolean} open
  * @param {function} onClose
  * @param {Array} baseTasks - [{id, code, ...}] базовый вариант
+ * @param {string[]} excludeTaskIds - задачи, которые нельзя выдавать в параллели
+ *        (остальные варианты той же работы — иначе «дубль» повторит вариант 2 оригинала)
  */
-export default function ParallelVariantsModal({ open, onClose, baseTasks = [], baseWorkId = null, baseTitle = '', classNumber = null, onOpenWork }) {
+export default function ParallelVariantsModal({ open, onClose, baseTasks = [], baseWorkId = null, baseTitle = '', classNumber = null, excludeTaskIds = [], onOpenWork }) {
   const { message, modal } = App.useApp();
   const { canEdit } = useAuth();
   const { topics, tags, subtopics, years, sources } = useReferenceData();
@@ -87,6 +105,21 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
   const [pickTarget, setPickTarget] = useState(null); // { vi, pos } — какую ячейку заполняем
   const [editTask, setEditTask] = useState(null); // полная задача для TaskEditModal
   const [editingId, setEditingId] = useState(null); // task_id, пока грузим полную задачу
+
+  const [rejectPairs, setRejectPairs] = useState({}); // baseTaskId → [отвергнутые вручную]
+  const [families, setFamilies] = useState([]); // прошлые семейства A4 по этим задачам
+  const [avoidPrevious, setAvoidPrevious] = useState(true);
+
+  // Массив-проп пересоздаётся на каждом рендере родителя — держим стабильный ключ.
+  const excludeKey = excludeTaskIds.filter(Boolean).join(',');
+
+  // Задачи прошлых параллелей: их незачем предлагать снова, если учитель делает
+  // ещё один комплект дублей к той же работе.
+  const previousIds = avoidPrevious
+    ? [...new Set(families.flatMap((f) => f.taskIds))].filter((id) => !baseTasks.some((t) => t.id === id))
+    : [];
+  const previousKey = previousIds.join(',');
+  const rejectKey = JSON.stringify(rejectPairs);
 
   // Патч одной задачи (по task_id) во всём семействе — образец + все параллели.
   const patchFamilyTask = (taskId, patch) => {
@@ -154,9 +187,23 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
     return [...s];
   })();
 
+  // Тема образца в той же строке — ею предзаполняем выбор ручной замены.
+  const pickTopic = pickTarget && result ? (result.base[pickTarget.pos]?.topic || null) : null;
+
   const handlePick = (task) => {
     if (!pickTarget) return;
     const { vi, pos } = pickTarget;
+    // Ручная замена = сигнал «подобрано плохо». Запоминаем пару, чтобы следующий
+    // подбор по этому образцу её не предлагал.
+    const replaced = result?.variants?.[vi]?.[pos];
+    const baseId = result?.base?.[pos]?.task_id;
+    if (replaced?.task_id && baseId && replaced.task_id !== task.id) {
+      setRejectPairs((prev) => ({
+        ...prev,
+        [baseId]: [...new Set([...(prev[baseId] || []), replaced.task_id])],
+      }));
+      api.markRejectedParallel(baseId, replaced.task_id);
+    }
     setResult((prev) => {
       const variants = prev.variants.map((v) => v.slice());
       variants[vi][pos] = {
@@ -178,7 +225,14 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
       const res = await fetch(`${PDF_SERVICE_URL}/parallel-variants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ task_ids: ids, count, min_cos: band.min_cos, max_cos: band.max_cos }),
+        body: JSON.stringify({
+          task_ids: ids, count, min_cos: band.min_cos, max_cos: band.max_cos,
+          reject_pairs: rejectPairs,
+          exclude_task_ids: [
+            ...(excludeKey ? excludeKey.split(',') : []),
+            ...(previousKey ? previousKey.split(',') : []),
+          ],
+        }),
         signal: AbortSignal.timeout(20000),
       });
       if (!res.ok) throw new Error(`Сервис ответил ${res.status}`);
@@ -189,17 +243,30 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
     } finally {
       setLoading(false);
     }
-  }, [baseTasks, count, simPreset]);
+  }, [baseTasks, count, simPreset, excludeKey, previousKey, rejectKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (open) { setTitle(baseTitle || 'Вариант'); setCreated(null); generate(); }
+    if (!open) return;
+    setTitle(baseTitle || 'Вариант');
+    setCreated(null);
+    const ids = baseTasks.map((t) => t.id).filter(Boolean);
+    api.getVariantFamiliesByTasks(ids).then((list) => setFamilies(list || [])).catch(() => setFamilies([]));
+    api.getRejectedParallels(ids).then((map) => setRejectPairs(map || {})).catch(() => setRejectPairs({}));
     /* eslint-disable-next-line */
   }, [open]);
+
+  // Первый подбор — после того, как узнали про прошлые семейства (иначе первый
+  // прогон шёл бы без их исключения и сразу перерисовывался).
+  useEffect(() => {
+    if (open) generate();
+    /* eslint-disable-next-line */
+  }, [open, previousKey]);
 
   // Создать работы в «Мои работы»: оригинал + дубль 1..N, связать в variant_family.
   const createWorks = async () => {
     if (!result) return;
     setSaving(true);
+    const createdIds = []; // для отката, если оборвёмся на середине семейства
     try {
       const mkVariant = (workId, ids) =>
         api.createVariant({ work: workId, number: 1, tasks: ids, order: ids.map((id, i) => ({ taskId: id, position: i })) });
@@ -208,9 +275,11 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
       // 1) оригинал — переиспользуем исходную работу, либо создаём из образца
       const baseIds = result.base.filter((t) => t && !t.missing).map((t) => t.task_id);
       if (baseWorkId) {
-        works.push({ id: baseWorkId, role: 'оригинал', title: `${title} (исходная)` });
+        // Исходную работу не переименовываем — показываем её настоящее название.
+        works.push({ id: baseWorkId, role: 'оригинал', title: baseTitle || 'исходная работа' });
       } else {
         const w = await api.createWork({ title: `${title} — оригинал`, ...(classNumber ? { class: classNumber } : {}) });
+        createdIds.push(w.id);
         await mkVariant(w.id, baseIds);
         works.push({ id: w.id, role: 'оригинал', title: w.title });
       }
@@ -220,6 +289,7 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
         const ids = result.variants[i].filter((t) => t && !t.missing).map((t) => t.task_id);
         if (!ids.length) continue;
         const w = await api.createWork({ title: `${title} — дубль ${i + 1}`, ...(classNumber ? { class: classNumber } : {}) });
+        createdIds.push(w.id);
         await mkVariant(w.id, ids);
         works.push({ id: w.id, role: `дубль ${i + 1}`, title: w.title });
       }
@@ -233,7 +303,12 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
       setCreated(works);
       message.success(`Создано работ: ${works.length}`);
     } catch (e) {
-      message.error(`Не удалось создать: ${e.message}`);
+      // Полусемейство хуже, чем ничего: пользователь не поймёт, какие дубли
+      // созданы, а какие нет. Убираем всё, что успели создать этим запуском.
+      for (const id of createdIds) {
+        try { await api.deleteWork(id); } catch { /* уже удалено или нет прав */ }
+      }
+      message.error(`Не удалось создать работы: ${e.message}. Созданное откачено.`);
     } finally {
       setSaving(false);
     }
@@ -276,6 +351,18 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
         type="info" showIcon style={{ marginBottom: 12 }}
         message="Для каждой задачи образца подбирается похожая (та же тема и тип, другие числа). Получаются параллельные варианты: подготовка → контрольная → пересдача."
       />
+      {families.length > 0 && (
+        <Alert
+          type="info" showIcon style={{ marginBottom: 12 }}
+          message={`Для этих задач параллели уже создавались (${families.length === 1 ? 'семейство' : 'семейств'}: ${families.length}${families[0]?.label ? `, «${families[0].label}»` : ''}).`}
+          description={
+            <Checkbox checked={avoidPrevious} onChange={(e) => setAvoidPrevious(e.target.checked)}>
+              Не предлагать задачи из прошлых параллелей ({[...new Set(families.flatMap((f) => f.taskIds))].length} шт.)
+            </Checkbox>
+          }
+        />
+      )}
+
       <Space style={{ marginBottom: 12, width: '100%' }} wrap>
         <span>Название:</span>
         <Input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: 220 }} placeholder="Название работ" />
@@ -293,7 +380,8 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
       {!loading && result?.shortage?.length > 0 && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 12 }}
-          message={`Для ${result.shortage.length} позиц. не хватило похожих задач в базе — отмечены красным. Добавь больше задач этого типа или уменьши число вариантов.`}
+          message={`Для ${result.shortage.length} позиц. не хватило похожих задач в базе — отмечены красным. Ослабьте похожесть, уменьшите число параллелей или добавьте задач этого типа.`}
+          description={<VectorIndexNote alwaysShow />}
         />
       )}
 
@@ -341,6 +429,7 @@ export default function ParallelVariantsModal({ open, onClose, baseTasks = [], b
         onCancel={() => setPickTarget(null)}
         onSelect={handlePick}
         excludeIds={usedIds}
+        initialFilters={pickTopic ? { topic: pickTopic } : null}
       />
 
       {editTask && (

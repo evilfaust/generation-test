@@ -45,7 +45,8 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
   // Filters
   const [parallelOpen, setParallelOpen] = useState(false);
   const [parallelBase, setParallelBase] = useState([]);
-  const [parallelWork, setParallelWork] = useState({ id: null, title: '' });
+  const [parallelWork, setParallelWork] = useState({ id: null, title: '', classNumber: null });
+  const [parallelExclude, setParallelExclude] = useState([]);
   const openParallel = async (e, work) => {
     e.stopPropagation();
     try {
@@ -53,7 +54,12 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
       const tasks = vars[0]?.expand?.tasks || [];
       if (!tasks.length) { message.warning('В первом варианте работы нет задач'); return; }
       setParallelBase(tasks.map(t => ({ id: t.id })));
-      setParallelWork({ id: work.id, title: work.title || 'Работа' });
+      // Задачи ОСТАЛЬНЫХ вариантов работы в параллели попадать не должны —
+      // иначе «дубль» повторит вариант 2 оригинала и списывание не отследить.
+      const baseIds = new Set(tasks.map(t => t.id));
+      const others = vars.slice(1).flatMap(v => v.tasks || []).filter(id => !baseIds.has(id));
+      setParallelExclude([...new Set(others)]);
+      setParallelWork({ id: work.id, title: work.title || 'Работа', classNumber: work.class || null });
       setParallelOpen(true);
     } catch (err) {
       message.error('Не удалось загрузить работу');
@@ -1136,6 +1142,8 @@ const WorkManager = ({ onEditWork, onEditMCTest }) => {
         baseTasks={parallelBase}
         baseWorkId={parallelWork.id}
         baseTitle={parallelWork.title}
+        classNumber={parallelWork.classNumber}
+        excludeTaskIds={parallelExclude}
         onOpenWork={onEditWork}
       />
       <ScanBlankModal

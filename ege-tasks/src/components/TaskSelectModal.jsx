@@ -24,6 +24,8 @@ const TaskSelectModal = ({
   onSelect,
   // topics/subtopics/tags props kept for backward compat but not used internally
   excludeIds = [],
+  // Предзаполнение фильтров при открытии (например, темой заменяемой задачи).
+  initialFilters = null,
 }) => {
   const { topics: allTopics, subtopics: allSubtopics, tags: allTags } = useReferenceData();
 
@@ -43,6 +45,16 @@ const TaskSelectModal = ({
   const [totalItems, setTotalItems] = useState(0);
   const [loadedPages, setLoadedPages] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  // Открытие с предзаполненными фильтрами: ручная замена задачи должна сразу
+  // показывать её тему, а не весь каталог.
+  const initialKey = initialFilters ? JSON.stringify(initialFilters) : '';
+  useEffect(() => {
+    if (!visible || !initialKey) return;
+    const preset = JSON.parse(initialKey);
+    form.setFieldsValue(preset);
+    setFilters(preset);
+  }, [visible, initialKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buildFilterObj = (f) => {
     const obj = {};

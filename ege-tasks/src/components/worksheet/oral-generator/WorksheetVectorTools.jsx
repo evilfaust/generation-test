@@ -46,6 +46,7 @@ export default function WorksheetVectorTools({ variants, setVariants, workTitle,
         open={parallelOpen}
         onClose={() => setParallelOpen(false)}
         baseTasks={baseTasks}
+        excludeTaskIds={variants.slice(1).flatMap((v) => (v.tasks || []).map((t) => t.id))}
         baseTitle={workTitle}
         onOpenWork={onOpenWork}
       />

@@ -839,6 +839,7 @@ const OgeVariantGenerator = () => {
             open={parallelOpen}
             onClose={() => setParallelOpen(false)}
             baseTasks={variants[0]?.tasks || []}
+            excludeTaskIds={variants.slice(1).flatMap((v) => (v.tasks || []).map((t) => t.id))}
             baseTitle="Вариант ОГЭ"
           />
 

@@ -466,6 +466,7 @@ const TestWorkGenerator = () => {
           open={parallelOpen}
           onClose={() => setParallelOpen(false)}
           baseTasks={variants[0]?.tasks || []}
+          excludeTaskIds={variants.slice(1).flatMap((v) => (v.tasks || []).map((t) => t.id))}
           baseTitle={form.getFieldValue('workTitle') || 'Контрольная работа'}
         />
       </div>
