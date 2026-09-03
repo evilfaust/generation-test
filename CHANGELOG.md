@@ -47,6 +47,12 @@
 **База:** миграция `1784100000` — `works.source`, `works.import_meta`,
 `works.original_files`.
 
+**Деплой выполнен 03.09.2026:** миграция `1784100000` применена на боевой БД
+(поля появились в схеме `works`), `pocketbase-ege` перезапущен, фронт на
+`l.oipav.ru` обновлён до 3.9.153. Бэкап перед миграцией —
+`backup_2026-09-03_11-43-06.tar.gz`. Рестарт `pdf-service-ege` не требуется —
+серверная часть не менялась.
+
 **Код:** `utils/workImportFormat.js` (парсер/сериализатор/промпт),
 `utils/workImportPlan.js` (план и дедуп), `utils/topicMatch.js` (общий подбор
 тем — «Импорт задач» переведён на него), `hooks/useWorkImport.js`,
