@@ -269,6 +269,62 @@ describe('вариантов на листе', () => {
     expect(container.querySelectorAll('.oral-grid--1col')).toHaveLength(4);
   });
 
+  it('шесть и восемь на листе — та же сетка, но три и четыре ряда', () => {
+    expect(variantsPerPage({ variantsPerPage: 6 })).toBe(6);
+    expect(variantsPerPage({ variantsPerPage: 8 })).toBe(8);
+
+    const make = (n) => Array.from({ length: n }, (_, v) => [
+      { exprLatex: `${v}x = 1`, resultLatex: '1', varLatex: 'x' },
+    ]);
+
+    const six = render(
+      <OralCountingPrintLayout
+        tasksData={make(6)}
+        settings={{ variantsPerPage: 6, showTeacherKey: false }}
+        title="Лист"
+        screenMode
+      />,
+    );
+    expect(six.container.querySelectorAll('.oral-quad-page--r3')).toHaveLength(1);
+    expect(six.container.querySelectorAll('.oral-page--quad')).toHaveLength(6);
+
+    const eight = render(
+      <OralCountingPrintLayout
+        tasksData={make(8)}
+        settings={{ variantsPerPage: 8, showTeacherKey: false }}
+        title="Лист"
+        screenMode
+      />,
+    );
+    expect(eight.container.querySelectorAll('.oral-quad-page--r4')).toHaveLength(1);
+    expect(eight.container.querySelectorAll('.oral-page--quad')).toHaveLength(8);
+
+    // остаток уходит на второй лист, а не досыпается в первый
+    const seven = render(
+      <OralCountingPrintLayout
+        tasksData={make(7)}
+        settings={{ variantsPerPage: 6, showTeacherKey: false }}
+        title="Лист"
+        screenMode
+      />,
+    );
+    expect(seven.container.querySelectorAll('.oral-quad-page--r3')).toHaveLength(2);
+  });
+
+  it('у плотных сеток свои ряды и линии реза', () => {
+    const { rule } = quadCss();
+    expect(rule('.oral-quad-page--r3 {')).toContain('grid-template-rows: 1fr 1fr 1fr');
+    expect(rule('.oral-quad-page--r4 {')).toContain('grid-template-rows: 1fr 1fr 1fr 1fr');
+    // последний ряд без нижней черты: у 2×3 это ячейки 5-6, у 2×4 — 7-8
+    expect(rule('.oral-quad-page--r3 > .oral-page--quad:nth-child(n+5)'))
+      .toContain('border-bottom: none');
+    expect(rule('.oral-quad-page--r4 > .oral-page--quad:nth-child(n+7)'))
+      .toContain('border-bottom: none');
+    // ...а средним рядам черта возвращается (базовое правило рассчитано на 2×2)
+    expect(rule('.oral-quad-page--r3 > .oral-page--quad:nth-child(-n+4)'))
+      .toContain('border-bottom: 1px dashed');
+  });
+
   it('восемь вариантов — два листа по четыре', () => {
     const eight = Array.from({ length: 8 }, (_, v) => [
       { exprLatex: `${v}x = 1`, resultLatex: '1', varLatex: 'x' },

@@ -95,6 +95,46 @@
   .oral-page--quad:nth-child(2n)   { border-right: none; }
   .oral-page--quad:nth-child(n+3)  { border-bottom: none; }
 
+  /* Шесть и восемь вариантов: та же сетка в две колонки, но 3 и 4 ряда.
+     Ячейка 105×99 мм и 105×74 мм — влезает примерно 12 и 9 заданий
+     (расчёт и предупреждение — utils/sheetCapacity.js). */
+  .oral-quad-page--r3 { grid-template-rows: 1fr 1fr 1fr; }
+  .oral-quad-page--r4 { grid-template-rows: 1fr 1fr 1fr 1fr; }
+
+  /* Линия реза идёт между рядами, а у последнего ряда её быть не должно.
+     Базовое правило выше рассчитано на 2×2 — здесь возвращаем черту средним
+     рядам и снимаем у последнего. */
+  .oral-quad-page--r3 > .oral-page--quad:nth-child(-n+4),
+  .oral-quad-page--r4 > .oral-page--quad:nth-child(-n+6) {
+    border-bottom: 1px dashed #aaa;
+  }
+  .oral-quad-page--r3 > .oral-page--quad:nth-child(n+5),
+  .oral-quad-page--r4 > .oral-page--quad:nth-child(n+7) {
+    border-bottom: none;
+  }
+
+  /* Ряды ниже — теснее: поля ячейки и строка задания ужимаются, шрифт мельче */
+  .oral-quad-page--r3 > .oral-page--quad { padding: 4mm 4mm 4mm 5mm; font-size: 9pt; }
+  .oral-quad-page--r4 > .oral-page--quad { padding: 3mm 3mm 3mm 4mm; font-size: 9pt; }
+
+  .oral-quad-page--r3 > .oral-page--quad .oral-task {
+    min-height: calc(4.4mm * var(--sheet-line-scale, 1));
+  }
+  .oral-quad-page--r4 > .oral-page--quad .oral-task {
+    padding: calc(0.3mm * var(--sheet-line-scale, 1)) 0;
+    min-height: calc(4mm * var(--sheet-line-scale, 1));
+  }
+  .oral-quad-page--r4 > .oral-page--quad .oral-task-num,
+  .oral-quad-page--r4 > .oral-page--quad .oral-task-expr,
+  .oral-quad-page--r4 > .oral-page--quad .oral-task-eq,
+  .oral-quad-page--r4 > .oral-page--quad .oral-task-x-prompt { font-size: 8.5pt; }
+  .oral-quad-page--r4 > .oral-page--quad .oral-task-x-prompt { min-width: 15mm; }
+  .oral-quad-page--r4 > .oral-page--quad .oral-instruction { font-size: 8.5pt; }
+  .oral-quad-page--r4 > .oral-page--quad .oral-subtitle    { font-size: 8pt; }
+  .oral-quad-page--r4 > .oral-page--quad .oral-header {
+    gap: 0.7mm; margin-bottom: 0.7mm; padding-bottom: 0.7mm;
+  }
+
   .oral-page--quad .oral-variant-badge { font-size: 9pt; }
   .oral-page--quad .oral-field         { font-size: 8pt; }
   .oral-page--quad .oral-line--name    { min-width: 20mm; }
@@ -451,6 +491,34 @@
 }
 .oral-screen-root .oral-page--quad:nth-child(2n)  { border-right: none; }
 .oral-screen-root .oral-page--quad:nth-child(n+3) { border-bottom: none; }
+
+/* Шесть и восемь вариантов на листе — 3 и 4 ряда той же сетки */
+.oral-screen-root .oral-quad-page--r3 { grid-template-rows: repeat(3, 1fr); }
+.oral-screen-root .oral-quad-page--r4 { grid-template-rows: repeat(4, 1fr); }
+.oral-screen-root .oral-quad-page--r3 > .oral-page--quad:nth-child(-n+4),
+.oral-screen-root .oral-quad-page--r4 > .oral-page--quad:nth-child(-n+6) {
+  border-bottom: 1px dashed #aaa;
+}
+.oral-screen-root .oral-quad-page--r3 > .oral-page--quad:nth-child(n+5),
+.oral-screen-root .oral-quad-page--r4 > .oral-page--quad:nth-child(n+7) {
+  border-bottom: none;
+}
+.oral-screen-root .oral-quad-page--r3 > .oral-page--quad { padding: 4mm 4mm 4mm 5mm; }
+.oral-screen-root .oral-quad-page--r4 > .oral-page--quad {
+  padding: 3mm 3mm 3mm 4mm;
+  font-size: 0.85em;
+}
+.oral-screen-root .oral-quad-page--r3 > .oral-page--quad .oral-task {
+  min-height: calc(4.4mm * var(--sheet-line-scale, 1));
+}
+.oral-screen-root .oral-quad-page--r4 > .oral-page--quad .oral-task {
+  padding: calc(0.3mm * var(--sheet-line-scale, 1)) 0;
+  min-height: calc(4mm * var(--sheet-line-scale, 1));
+}
+.oral-screen-root .oral-quad-page--r4 > .oral-page--quad .oral-task-x-prompt { min-width: 15mm; }
+.oral-screen-root .oral-quad-page--r4 > .oral-page--quad .oral-header {
+  gap: 0.7mm; margin-bottom: 0.7mm; padding-bottom: 0.7mm;
+}
 .oral-screen-root .oral-page--quad .oral-variant-badge { font-size: 0.85em; }
 .oral-screen-root .oral-page--quad .oral-field         { font-size: 0.78em; }
 .oral-screen-root .oral-page--quad .oral-line--name    { min-width: 20mm; }

@@ -1,4 +1,5 @@
-import { Checkbox, Slider, Space, Segmented } from 'antd';
+import { Checkbox, Slider, Space, Segmented, Tooltip } from 'antd';
+import { sheetCapacity } from '../../utils/sheetCapacity';
 
 /**
  * Общие настройки печатного листа для всех генераторов: что показывать в шапке
@@ -47,11 +48,19 @@ export function sheetSpacingStyle(lineSpacing, extra) {
   return { '--sheet-line-scale': lineSpacing ?? 1, ...extra };
 }
 
+// Ant центрирует подпись под точкой (transform: translateX(-50%)), поэтому
+// «Плотно» и «Просторно» на краях шкалы вылезали за панель настроек. Крайним
+// меткам сдвиг переопределяем: первая выравнивается по левому краю ползунка,
+// последняя — по правому.
+const MARK_EDGE_LEFT  = { transform: 'translateX(-6%)',  whiteSpace: 'nowrap', fontSize: 11 };
+const MARK_EDGE_RIGHT = { transform: 'translateX(-94%)', whiteSpace: 'nowrap', fontSize: 11 };
+const MARK_MID        = { fontSize: 11 };
+
 const SPACING_MARKS = {
-  0.75: 'Плотно',
-  1:    '1',
-  1.5:  '1,5',
-  2.5:  'Просторно',
+  0.75: { style: MARK_EDGE_LEFT,  label: 'Плотно' },
+  1:    { style: MARK_MID,        label: '1' },
+  1.5:  { style: MARK_MID,        label: '1,5' },
+  2.5:  { style: MARK_EDGE_RIGHT, label: 'Просторно' },
 };
 
 /**
@@ -65,11 +74,15 @@ export const PER_PAGE_OPTIONS = [
   { value: '2side',  label: '2 ↔' },
   { value: '2half',  label: '2 ↕' },
   { value: 4,        label: '4' },
+  { value: 6,        label: '6' },
+  { value: 8,        label: '8' },
 ];
+
+const PER_PAGE_VALUES = new Set([1, 4, 6, 8, '2side', '2half']);
 
 export function currentPerPage(settings = {}) {
   const v = settings.variantsPerPage;
-  if (v === 1 || v === 4 || v === '2side' || v === '2half') return v;
+  if (PER_PAGE_VALUES.has(v)) return v;
   if (settings.sideBySide) return '2side';
   if (settings.twoPerPage) return '2half';
   return 1;
@@ -84,6 +97,15 @@ export function SheetLayoutOptions({
 }) {
   const o = sheetOptions(settings);
 
+  // Сколько заданий помещается в один вариант при выбранной раскладке.
+  // Раскладка переполнение не режет (иначе задания пропадали бы молча),
+  // поэтому предупреждаем заранее — см. utils/sheetCapacity.js.
+  const plannedCount = Number(settings.questionsCount ?? settings.tasksPerVariant) || 0;
+  const capacity = showPerPage
+    ? sheetCapacity(currentPerPage(settings), { ...o, columnsCount: settings.columnsCount })
+    : null;
+  const tooMany = Boolean(capacity && plannedCount && plannedCount > capacity.total);
+
   const handlePerPage = (v) => {
     // старые ключи держим в согласии с новым — их читают смешанные работы
     onChange('variantsPerPage', v);
@@ -94,14 +116,29 @@ export function SheetLayoutOptions({
   return (
     <>
       {showPerPage && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 13 }}>Вариантов на листе:</span>
-          <Segmented
-            size="small"
-            options={PER_PAGE_OPTIONS}
-            value={currentPerPage(settings)}
-            onChange={handlePerPage}
-          />
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13 }}>Вариантов на листе:</span>
+            <Segmented
+              size="small"
+              options={PER_PAGE_OPTIONS}
+              value={currentPerPage(settings)}
+              onChange={handlePerPage}
+            />
+          </div>
+          {capacity && (
+            <Tooltip title="Лишние задания не обрезаются — они выдавят вариант за край листа">
+              <div style={{
+                fontSize: 11,
+                marginTop: 4,
+                color: tooMany ? 'var(--danger, #cf1322)' : 'var(--ink-3)',
+              }}>
+                {tooMany
+                  ? `В ячейку влезает ~${capacity.total} заданий, а в варианте ${plannedCount} — лист переполнится`
+                  : `В ячейку влезает ~${capacity.total} заданий`}
+              </div>
+            </Tooltip>
+          )}
         </div>
       )}
 
@@ -142,7 +179,7 @@ export function SheetLayoutOptions({
       </Space>
 
       {showSpacing && (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 10, padding: '0 4px' }}>
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 2 }}>
             Межстрочный интервал:{' '}
             <b style={{ color: 'var(--ink)', fontFamily: 'var(--font-mono)' }}>

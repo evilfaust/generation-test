@@ -134,13 +134,26 @@ function TeacherKeyPage({ tasksData, title, prompt }) {
 }
 
 /**
- * Сколько вариантов помещаем на лист: 1 · '2side' (рядом) · '2half' (верх/низ) · 4.
+ * Сеточные раскладки: сколько рядов вариантов на листе и класс-модификатор.
+ * Две колонки у всех — при трёх ячейка сужается до 70 мм, и строка «задание +
+ * место для ответа» перестаёт помещаться.
+ */
+export const GRID_MODES = {
+  4: { rows: 2, mod: '' },      // четверть листа — базовая сетка (--quad)
+  6: { rows: 3, mod: 'r3' },
+  8: { rows: 4, mod: 'r4' },
+};
+
+/**
+ * Сколько вариантов помещаем на лист: 1 · '2side' (рядом) · '2half' (верх/низ) ·
+ * 4 · 6 · 8 (сетка в две колонки).
  * Новый ключ `variantsPerPage`; старые `sideBySide` / `twoPerPage` продолжают
  * работать — сохранённые настройки и смешанные работы их ещё используют.
  */
 export function variantsPerPage(settings = {}) {
   const v = settings.variantsPerPage;
-  if (v === 1 || v === 4 || v === '2side' || v === '2half') return v;
+  if (v === 1 || v === '2side' || v === '2half') return v;
+  if (v in GRID_MODES) return v;
   if (settings.sideBySide) return '2side';
   if (settings.twoPerPage) return '2half';
   return 1;
@@ -197,10 +210,13 @@ export default function OralCountingPrintLayout({
         {pair.map((v, j) => page(v, i + j, 'half', columnsCount))}
       </div>
     ));
-  } else if (perPage === 4) {
-    pages = chunk(4).map(([i, quad]) => (
-      <div key={i} className="oral-quad-page">
-        {quad.map((v, j) => page(v, i + j, 'quad', 1))}
+  } else if (perPage in GRID_MODES) {
+    // Сетка в две колонки: 4 (2×2), 6 (2×3), 8 (2×4). Ячейки одинаковые,
+    // модификатор ряда лишь уплотняет строки и переносит линии реза.
+    const { mod } = GRID_MODES[perPage];
+    pages = chunk(perPage).map(([i, group]) => (
+      <div key={i} className={`oral-quad-page${mod ? ` oral-quad-page--${mod}` : ''}`}>
+        {group.map((v, j) => page(v, i + j, 'quad', 1))}
       </div>
     ));
   } else {

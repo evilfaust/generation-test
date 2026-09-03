@@ -8,7 +8,10 @@ import {
   SHEET_DEFAULTS,
   LINE_SPACING_MIN,
   LINE_SPACING_MAX,
+  PER_PAGE_OPTIONS,
+  currentPerPage,
 } from '../components/trig/sheetOptions';
+import { sheetCapacity } from '../utils/sheetCapacity';
 import OralCountingPrintLayout from '../components/trig/OralCountingPrintLayout';
 import TrigExprPrintLayout from '../components/trig/TrigExprPrintLayout';
 
@@ -199,5 +202,75 @@ describe('тригонометрическая раскладка уважает
     expect(screen.queryByText(/ФИО:/)).not.toBeInTheDocument();
     expect(screen.queryByText('Значения функций')).not.toBeInTheDocument();
     expect(screen.queryByText('Вычислите:')).not.toBeInTheDocument();
+  });
+});
+
+describe('сколько вариантов помещается на лист', () => {
+  it('переключатель предлагает 1 · 2 ↔ · 2 ↕ · 4 · 6 · 8', () => {
+    expect(PER_PAGE_OPTIONS.map(o => o.value)).toEqual([1, '2side', '2half', 4, 6, 8]);
+  });
+
+  it('новые значения переживают чтение настроек', () => {
+    expect(currentPerPage({ variantsPerPage: 6 })).toBe(6);
+    expect(currentPerPage({ variantsPerPage: 8 })).toBe(8);
+    // старые ключи по-прежнему работают
+    expect(currentPerPage({ sideBySide: true })).toBe('2side');
+    expect(currentPerPage({})).toBe(1);
+  });
+
+  it('прикидка ёмкости совпадает с настоящей печатью', () => {
+    // Числа сняты с реальной печати (headless Chrome --print-to-pdf по этому же
+    // CSS): столько заданий помещается, пока лист не уезжает на вторую страницу.
+    // Формула обязана давать те же значения — иначе подсказка врёт учителю.
+    expect(sheetCapacity(4, { lineSpacing: 1 }).total).toBe(20);
+    expect(sheetCapacity(6, { lineSpacing: 1 }).total).toBe(12);
+    expect(sheetCapacity(8, { lineSpacing: 1 }).total).toBe(9);
+
+    expect(sheetCapacity(6, { lineSpacing: 1.5 }).total).toBe(7);
+    expect(sheetCapacity(8, { lineSpacing: 1.5 }).total).toBe(5);
+  });
+
+  it('чем больше вариантов на листе, тем меньше заданий в каждом', () => {
+    const cap = (p) => sheetCapacity(p, { lineSpacing: 1 }).total;
+    expect(cap(4)).toBeGreaterThan(cap(6));
+    expect(cap(6)).toBeGreaterThan(cap(8));
+    // ради чего всё затевалось: лист по 5 заданий влезает и вшестером, и ввосьмером
+    expect(cap(6)).toBeGreaterThanOrEqual(5);
+    expect(cap(8)).toBeGreaterThanOrEqual(5);
+  });
+
+  it('интервал и блоки шапки меняют ёмкость', () => {
+    const dense  = sheetCapacity(8, { lineSpacing: 1 }).total;
+    const loose  = sheetCapacity(8, { lineSpacing: 2 }).total;
+    expect(loose).toBeLessThan(dense);
+
+    const bare = sheetCapacity(8, {
+      lineSpacing: 1, showHeader: false, showTitle: false, showInstruction: false,
+    }).total;
+    expect(bare).toBeGreaterThan(dense);
+  });
+
+  it('две колонки заданий считаются только там, где вариант широкий', () => {
+    // Лист целиком: две колонки удваивают ёмкость
+    expect(sheetCapacity(1, { columnsCount: 2 }).total)
+      .toBe(sheetCapacity(1, { columnsCount: 1 }).total * 2);
+    // В сетке 2×2 и мельче раскладка печатает одну колонку
+    expect(sheetCapacity(4, { columnsCount: 2 }).total)
+      .toBe(sheetCapacity(4, { columnsCount: 1 }).total);
+  });
+});
+
+describe('подписи ползунка интервала', () => {
+  // «Плотно» и «Просторно» стоят на краях шкалы: с центрирующим transform
+  // Ant они вылезали за панель настроек.
+  it('крайние метки сдвинуты внутрь блока', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'src/components/trig/sheetOptions.jsx'),
+      'utf-8',
+    );
+    expect(src).toMatch(/MARK_EDGE_LEFT\s*=\s*\{[^}]*translateX\(-6%\)/);
+    expect(src).toMatch(/MARK_EDGE_RIGHT\s*=\s*\{[^}]*translateX\(-94%\)/);
+    expect(src).toMatch(/0\.75:\s*\{ style: MARK_EDGE_LEFT/);
+    expect(src).toMatch(/2\.5:\s*\{ style: MARK_EDGE_RIGHT/);
   });
 });
