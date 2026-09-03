@@ -1486,8 +1486,6 @@ app.post('/similar-batch', async (req, res) => {
       sameTopicOnly: same_topic_only !== false,
       minCos: min_cos != null ? Number(min_cos) : 0,
       excludeIds: Array.isArray(exclude_task_ids) ? exclude_task_ids : [],
-      rejectPairs: reject_pairs && typeof reject_pairs === 'object' ? reject_pairs : null,
-      structural: structural !== false,
     }));
   } catch (e) {
     console.error('[similar-batch]', e.message);
