@@ -37,6 +37,14 @@ import {
   CATEGORY_LABELS_LINEQ,
 } from '../hooks/useLinearEquations';
 import {
+  generateQuadraticVariants,
+  CATEGORY_LABELS_QUAD,
+} from '../hooks/useQuadraticEquations';
+import {
+  generateQuadraticInequalityVariants,
+  CATEGORY_LABELS_QINEQ,
+} from '../hooks/useQuadraticInequalities';
+import {
   generateLinearInequalityVariants,
   CATEGORY_LABELS_INEQ,
 } from '../hooks/useLinearInequalities';
@@ -107,6 +115,20 @@ export const SHEET_GENERATORS = {
     instruction: 'Решите уравнение:',
     categoryLabels: CATEGORY_LABELS_LINEQ,
     generate: generateLinearEquationVariants,
+  },
+  quadratic_equations: {
+    label: 'Квадратные уравнения',
+    route: '/app/equations/quadratic',
+    instruction: 'Решите уравнение:',
+    categoryLabels: CATEGORY_LABELS_QUAD,
+    generate: generateQuadraticVariants,
+  },
+  quadratic_inequalities: {
+    label: 'Квадратные неравенства',
+    route: '/app/equations/quadratic-inequalities',
+    instruction: 'Решите неравенство:',
+    categoryLabels: CATEGORY_LABELS_QINEQ,
+    generate: generateQuadraticInequalityVariants,
   },
   linear_inequalities: {
     label: 'Линейные неравенства',

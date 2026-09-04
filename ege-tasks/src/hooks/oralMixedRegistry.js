@@ -47,6 +47,18 @@ import {
 } from './useLinearEquations';
 
 import {
+  generateQuadraticVariants,
+  CATEGORY_LABELS_QUAD,
+  DEFAULT_SETTINGS_QUAD,
+} from './useQuadraticEquations';
+
+import {
+  generateQuadraticInequalityVariants,
+  CATEGORY_LABELS_QINEQ,
+  DEFAULT_SETTINGS_QINEQ,
+} from './useQuadraticInequalities';
+
+import {
   generateLinearInequalityVariants,
   CATEGORY_LABELS_INEQ,
   DEFAULT_SETTINGS_INEQ,
@@ -131,6 +143,28 @@ export const ORAL_TYPES = [
     categoryLabels: CATEGORY_LABELS_LINEQ,
     defaultCategories: DEFAULT_SETTINGS_LINEQ.categories,
     defaultSettings: DEFAULT_SETTINGS_LINEQ,
+  },
+  {
+    type:         'quadratic_equations',
+    label:        'Квадратные уравнения',
+    instruction:  'Решите уравнения:',
+    equationMode: true,
+    promptMode:   'answer',   // корней два — подсказка «x =» не подходит
+    generator:    generateQuadraticVariants,
+    categoryLabels: CATEGORY_LABELS_QUAD,
+    defaultCategories: DEFAULT_SETTINGS_QUAD.categories,
+    defaultSettings: DEFAULT_SETTINGS_QUAD,
+  },
+  {
+    type:         'quadratic_inequalities',
+    label:        'Квадратные неравенства',
+    instruction:  'Решите неравенства:',
+    equationMode: true,
+    promptMode:   'answer',   // ответ — промежуток, подсказка «x =» не подходит
+    generator:    generateQuadraticInequalityVariants,
+    categoryLabels: CATEGORY_LABELS_QINEQ,
+    defaultCategories: DEFAULT_SETTINGS_QINEQ.categories,
+    defaultSettings: DEFAULT_SETTINGS_QINEQ,
   },
   {
     type:         'linear_inequalities',

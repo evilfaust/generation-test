@@ -33,6 +33,8 @@ const GENERATOR_LABELS = {
   oral_counting:           'Устный счёт',
   log_exp_equations:       'Степени и логарифмы',
   linear_equations:        'Линейные уравнения',
+  quadratic_equations:     'Квадратные уравнения',
+  quadratic_inequalities:  'Квадратные неравенства',
   linear_inequalities:     'Линейные неравенства',
   double_inequalities:     'Двойные неравенства',
 };

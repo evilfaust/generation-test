@@ -16,7 +16,8 @@ import {
   FunctionOutlined, AppstoreOutlined, BulbOutlined, MenuOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, TableOutlined, FileMarkdownOutlined,
   CalculatorOutlined, ExperimentOutlined, LineChartOutlined, FieldNumberOutlined,
-  PercentageOutlined, HomeOutlined, CalendarOutlined, ProfileOutlined, ColumnWidthOutlined
+  PercentageOutlined, HomeOutlined, CalendarOutlined, ProfileOutlined, ColumnWidthOutlined,
+  BorderHorizontalOutlined
 } from '@ant-design/icons';
 // ── Ленивая загрузка страниц-компонентов ────────────────────────────────────
 // Все компоненты ниже используются ТОЛЬКО как элементы маршрутов (через page-
@@ -97,6 +98,8 @@ const OralEgeBaseGenerator = lazy(() => import('./components/OralEgeBaseGenerato
 const OralFractionsGenerator = lazy(() => import('./components/OralFractionsGenerator'));
 const OralMixedGenerator = lazy(() => import('./components/OralMixedGenerator'));
 const LinearEquationsGenerator = lazy(() => import('./components/LinearEquationsGenerator'));
+const QuadraticEquationsGenerator = lazy(() => import('./components/QuadraticEquationsGenerator'));
+const QuadraticInequalitiesGenerator = lazy(() => import('./components/QuadraticInequalitiesGenerator'));
 const LinearInequalitiesGenerator = lazy(() => import('./components/LinearInequalitiesGenerator'));
 const DoubleInequalitiesGenerator = lazy(() => import('./components/DoubleInequalitiesGenerator'));
 const MarathonGenerator = lazy(() => import('./components/MarathonGenerator'));
@@ -202,6 +205,8 @@ export const R = {
   ORAL_MIXED:          '/app/arith/mixed',
   // Уравнения
   LINEAR_EQUATIONS:    '/app/equations/linear',
+  QUADRATIC_EQUATIONS: '/app/equations/quadratic',
+  QUADRATIC_INEQUALITIES: '/app/equations/quadratic-inequalities',
   LINEAR_INEQUALITIES: '/app/equations/inequalities',
   DOUBLE_INEQUALITIES: '/app/equations/double-inequalities',
   // Теория
@@ -311,6 +316,8 @@ const ROUTE_META = [
   { re: /^\/app\/arith\/fractions/,       menuKey: 'fractions-oral',   menuGroup: 'arith', title: 'Устный счёт — Действия с обыкновенными дробями' },
   { re: /^\/app\/arith\/mixed/,           menuKey: 'oral-mixed',       menuGroup: 'arith', title: 'Устный счёт — Смешанная работа' },
   { re: /^\/app\/equations\/linear/,      menuKey: 'linear-equations', menuGroup: 'equations', title: 'Уравнения — Линейные уравнения' },
+  { re: /^\/app\/equations\/quadratic-inequalities/, menuKey: 'quadratic-inequalities', menuGroup: 'equations', title: 'Уравнения — Квадратные неравенства' },
+  { re: /^\/app\/equations\/quadratic/,   menuKey: 'quadratic-equations', menuGroup: 'equations', title: 'Уравнения — Квадратные уравнения' },
   { re: /^\/app\/equations\/double-inequalities/, menuKey: 'double-inequalities', menuGroup: 'equations', title: 'Уравнения — Двойные неравенства' },
   { re: /^\/app\/equations\/inequalities/, menuKey: 'linear-inequalities', menuGroup: 'equations', title: 'Уравнения — Линейные неравенства' },
   { re: /^\/app\/theory\/print/,           menuKey: 'theory-print',     menuGroup: 'theory', title: 'Теория — Конспекты', noMargin: true },
@@ -389,6 +396,8 @@ const MENU_KEY_PATH = {
   'fractions-oral':         R.FRACTIONS_ORAL,
   'oral-mixed':             R.ORAL_MIXED,
   'linear-equations':       R.LINEAR_EQUATIONS,
+  'quadratic-equations':    R.QUADRATIC_EQUATIONS,
+  'quadratic-inequalities': R.QUADRATIC_INEQUALITIES,
   'linear-inequalities':    R.LINEAR_INEQUALITIES,
   'double-inequalities':    R.DOUBLE_INEQUALITIES,
   'theory-browser':         R.THEORY,
@@ -764,6 +773,8 @@ function AppLayout() {
       key: 'equations', icon: <FunctionOutlined />, label: 'Уравнения', section: 'equations',
       children: [
         { key: 'linear-equations', icon: <CalculatorOutlined />, label: 'Линейные уравнения' },
+        { key: 'quadratic-equations', icon: <ExperimentOutlined />, label: 'Квадратные уравнения' },
+        { key: 'quadratic-inequalities', icon: <BorderHorizontalOutlined />, label: 'Квадратные неравенства' },
         { key: 'linear-inequalities', icon: <LineChartOutlined />, label: 'Линейные неравенства' },
         { key: 'double-inequalities', icon: <ColumnWidthOutlined />, label: 'Двойные неравенства' },
       ],
@@ -1056,6 +1067,8 @@ function App() {
 
               {/* Уравнения */}
               <Route path={R.LINEAR_EQUATIONS} element={<LinearEquationsGenerator />} />
+              <Route path={R.QUADRATIC_EQUATIONS} element={<QuadraticEquationsGenerator />} />
+              <Route path={R.QUADRATIC_INEQUALITIES} element={<QuadraticInequalitiesGenerator />} />
               <Route path={R.LINEAR_INEQUALITIES} element={<LinearInequalitiesGenerator />} />
               <Route path={R.DOUBLE_INEQUALITIES} element={<DoubleInequalitiesGenerator />} />
 

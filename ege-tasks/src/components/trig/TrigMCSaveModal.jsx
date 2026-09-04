@@ -21,6 +21,8 @@ export const GENERATOR_LABELS = {
   oral_counting:           'Устный счёт',
   log_exp_equations:       'Степени и логарифмы',
   linear_equations:        'Линейные уравнения',
+  quadratic_equations:     'Квадратные уравнения',
+  quadratic_inequalities:  'Квадратные неравенства',
   linear_inequalities:     'Линейные неравенства',
   double_inequalities:     'Двойные неравенства',
 };
@@ -36,6 +38,8 @@ const GENERATOR_INSTRUCTIONS = {
   addition_formulas:       'Вычислите или упростите:',
   log_exp_equations:       'Решите уравнение:',
   linear_equations:        'Решите уравнение:',
+  quadratic_equations:     'Решите уравнение:',
+  quadratic_inequalities:  'Решите неравенство:',
   linear_inequalities:     'Решите неравенство:',
   double_inequalities:     'Решите двойное неравенство:',
 };
