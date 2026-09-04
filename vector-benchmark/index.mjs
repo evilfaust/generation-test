@@ -25,7 +25,9 @@ import { buildText, buildGeoText } from './2-embed.mjs';
 
 const DIM = 1024;
 const VEC_DB = new URL('./data/vec.db', import.meta.url).pathname;
-const PUSH_BATCH = 200;
+// Пачка пуша: 200 векторов VPS вставлял дольше 30-секундного таймаута ниже —
+// клиент считал пачку потерянной и слал повтор, хотя вставка уже прошла (04.09.2026).
+const PUSH_BATCH = 50;
 const START = Date.now();
 
 const FULL = process.argv.includes('--full');
@@ -128,7 +130,7 @@ async function pushVectors(rows) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(INDEX_TOKEN ? { 'X-Index-Token': INDEX_TOKEN } : {}) },
     body: JSON.stringify({ vectors: rows }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(120000), // вставка пачки в vec0 небыстрая, ждём терпеливо
   });
   if (!res.ok) throw new Error(`index-vectors ${res.status}: ${await res.text()}`);
   return res.json();
