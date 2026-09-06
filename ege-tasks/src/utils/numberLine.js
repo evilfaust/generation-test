@@ -24,7 +24,10 @@
 //   ray left 2 fill       — луч влево до 2, конец закрашен
 //   seg 1 2 open open     — отрезок [1;2], концы open|fill
 //   point 2 fill          — отдельная точка
+//   all                   — заштриховать всю прямую (решение — любое число)
 //   tick 1.5 1,5          — подпись под осью (label опционален)
+//   nolabels              — не подписывать координаты под осью (точки без чисел)
+//                           синонимы: labels off / labels on
 
 const DEFAULT_DOMAIN = [0, 5];
 // Строгий монохромный стиль: чернильная ось, штриховка чуть светлее серым,
@@ -125,7 +128,7 @@ function escapeXml(s) {
 export function parseNumberLine(spec) {
   const model = {
     domain: [...DEFAULT_DOMAIN], bars: [], points: [], ticks: [],
-    axisLabel: 'x', scale: null, marks: [],
+    axisLabel: 'x', scale: null, marks: [], hideLabels: false,
   };
   if (!spec || typeof spec !== 'string') return model;
   let domainSet = false;
@@ -153,6 +156,15 @@ export function parseNumberLine(spec) {
       const a = parseCoord(p[1]);
       const b = parseCoord(p[2]);
       if (Number.isFinite(a) && Number.isFinite(b) && a < b) { model.domain = [a, b]; domainSet = true; }
+    } else if (cmd === 'all') {
+      // Вся прямая заштрихована целиком: ни точек, ни подписей.
+      model.bars.push({ from: -Infinity, to: Infinity });
+    } else if (cmd === 'nolabels') {
+      // Точки/концы лучей рисуем, но координаты под осью не подписываем —
+      // нужно для задач «определите знаки коэффициентов по рисунку».
+      model.hideLabels = true;
+    } else if (cmd === 'labels') {
+      model.hideLabels = String(p[1] || '').toLowerCase() === 'off';
     } else if (cmd === 'axis' || cmd === 'label') {
       if (p[1]) model.axisLabel = p.slice(1).join(' ');
     } else if (cmd === 'scale') {
@@ -224,16 +236,27 @@ function hatchSegments(x1, yt, x2, yb, gap = 5) {
  */
 export function numberLineSvg(model, opts = {}) {
   const W = opts.width || 260;
-  // Дробные подписи занимают больше места под осью → выше холст и больший отступ.
-  const fracPresent = (model?.ticks || []).some((t) => t.label != null && FRAC_RE.test(String(t.label)));
-  const H = opts.height || (fracPresent ? 64 : 48);
   const PAD = 14;
-  // Дробь опущена ниже (не липнет к точке), поэтому знаменателю нужно больше
-  // места. AXIS_Y при этом не меняется — растёт только поле под осью.
-  const bottomPad = fracPresent ? 32 : 20;
-  const AXIS_Y = H - bottomPad;
   const dom = (model && model.domain) || DEFAULT_DOMAIN;
   const [dmin, dmax] = dom;
+  // Точка за пределами видимого диапазона не рисуется вовсе: раньше её
+  // прижимало клампом к краю оси и на прямой появлялся кружок из ниоткуда.
+  // Штриховки это не касается — она честно доходит до края (уход в ±∞).
+  const visible = (x) => Number.isFinite(x) && x >= dmin - 1e-9 && x <= dmax + 1e-9;
+  const points = (model?.points || []).filter((pt) => visible(pt.x));
+  // Без подписей поле под осью не нужно: холст ниже, но AXIS_Y тот же (28) —
+  // штриховка и точки встают ровно там же, где у подписанной прямой.
+  const hideLabels = !!(model && model.hideLabels);
+  const ticks = hideLabels ? [] : (model?.ticks || []).filter((t) => visible(t.x));
+  // Дробные подписи занимают больше места под осью → выше холст и больший отступ.
+  const fracPresent = ticks.some((t) => t.label != null && FRAC_RE.test(String(t.label)));
+  // eslint-disable-next-line no-nested-ternary
+  const H = opts.height || (fracPresent ? 64 : (hideLabels ? 36 : 48));
+  // Дробь опущена ниже (не липнет к точке), поэтому знаменателю нужно больше
+  // места. AXIS_Y при этом не меняется — растёт только поле под осью.
+  // eslint-disable-next-line no-nested-ternary
+  const bottomPad = fracPresent ? 32 : (hideLabels ? 8 : 20);
+  const AXIS_Y = H - bottomPad;
   const span = dmax - dmin || 1;
   const sx = (v) => PAD + ((clampNum(v, dmin, dmax) - dmin) / span) * (W - 2 * PAD);
 
@@ -290,14 +313,15 @@ export function numberLineSvg(model, opts = {}) {
   }
 
   // 5) Точки интервалов (выколотые ○ / закрашенные ●)
-  for (const pt of model?.points || []) {
+  for (const pt of points) {
     parts.push(
       `<circle cx="${round2(sx(pt.x))}" cy="${AXIS_Y}" r="3.4" fill="${pt.filled ? COLORS.axis : '#fff'}" stroke="${COLORS.axis}" stroke-width="1.3"/>`,
     );
   }
 
-  // 6) Подписи под осью (ticks интервалов; дроби — стопкой)
-  for (const t of model?.ticks || []) {
+  // 6) Подписи под осью (ticks интервалов; дроби — стопкой).
+  //     При nolabels список пуст — цифр под точками нет.
+  for (const t of ticks) {
     const label = t.label != null ? t.label : fmtLabel(t.x);
     parts.push(belowLabelSvg(label, round2(sx(t.x)), AXIS_Y, 11, COLORS.tick));
   }
@@ -312,16 +336,21 @@ export function numberLineSvgFromSpec(spec, opts) {
 
 /**
  * Сериализация состояния конструктора в текст DSL.
- * @param {{domain:[number,number], shapes:Array}} state
+ * @param {{domain:[number,number], shapes:Array, axisLabel?:string, showLabels?:boolean}} state
  */
-export function shapesToSpec({ domain = DEFAULT_DOMAIN, shapes = [], axisLabel = 'x' } = {}) {
+export function shapesToSpec({
+  domain = DEFAULT_DOMAIN, shapes = [], axisLabel = 'x', showLabels = true,
+} = {}) {
   const lines = [`domain ${coordToken(domain[0])} ${coordToken(domain[1])}`];
   if (axisLabel && axisLabel !== 'x') lines.push(`axis ${axisLabel}`);
+  if (!showLabels) lines.push('nolabels');
   for (const s of shapes) {
     if (s.type === 'ray') {
       lines.push(`ray ${s.dir === 'left' ? 'left' : 'right'} ${coordToken(s.x)} ${s.filled ? 'fill' : 'open'}`);
     } else if (s.type === 'seg') {
       lines.push(`seg ${coordToken(s.a)} ${coordToken(s.b)} ${s.ea ? 'fill' : 'open'} ${s.eb ? 'fill' : 'open'}`);
+    } else if (s.type === 'all') {
+      lines.push('all');
     } else if (s.type === 'point') {
       lines.push(`point ${coordToken(s.x)} ${s.filled ? 'fill' : 'open'}`);
     } else if (s.type === 'tick') {

@@ -17,6 +17,8 @@ const SHAPE_DEFAULTS = {
   ray: { type: 'ray', dir: 'right', x: '1', filled: false },
   seg: { type: 'seg', a: '1', b: '2', ea: false, eb: false },
   point: { type: 'point', x: '0', filled: true },
+  // «Вся прямая» параметров не имеет: штриховка от края до края, точек нет.
+  all: { type: 'all' },
 };
 
 // Готовый к вставке сниппет: блочный fenced (```numline) или inline-код
@@ -58,6 +60,9 @@ function ShapeRow({ shape, onChange, onRemove }) {
             <Input size="small" style={{ width: 60 }} value={shape.b} onChange={(e) => patch({ b: e.target.value })} placeholder="2" />
             <Switch size="small" checkedChildren="●" unCheckedChildren="○" checked={shape.eb} onChange={(eb) => patch({ eb })} />
           </>
+        )}
+        {shape.type === 'all' && (
+          <span style={{ color: '#888' }}>Вся прямая — решение любое число</span>
         )}
         {shape.type === 'point' && (
           <>
@@ -101,6 +106,9 @@ export default function NumberLineModal({ open, onCancel, onInsert, defaultForma
   // тип «Неравенства»
   const [domain, setDomain] = useState(DEFAULT_INTERVALS.domain);
   const [shapes, setShapes] = useState(DEFAULT_INTERVALS.shapes);
+  // Подписи координат под осью. Обычно нужны, но для задач «определите знаки
+  // коэффициентов по рисунку» точки должны остаться без чисел.
+  const [showLabels, setShowLabels] = useState(true);
 
   // тип «Точки на прямой»
   const [scale, setScale] = useState(DEFAULT_POINTS.scale);
@@ -109,8 +117,8 @@ export default function NumberLineModal({ open, onCancel, onInsert, defaultForma
   const spec = useMemo(() => (
     kind === 'points'
       ? pointsToSpec({ scale, marks, axisLabel })
-      : shapesToSpec({ domain, shapes, axisLabel })
-  ), [kind, scale, marks, domain, shapes, axisLabel]);
+      : shapesToSpec({ domain, shapes, axisLabel, showLabels })
+  ), [kind, scale, marks, domain, shapes, axisLabel, showLabels]);
 
   const addShape = (type) => setShapes((arr) => [...arr, { ...SHAPE_DEFAULTS[type] }]);
   const updateShape = (i, next) => setShapes((arr) => arr.map((s, idx) => (idx === i ? next : s)));
@@ -128,6 +136,7 @@ export default function NumberLineModal({ open, onCancel, onInsert, defaultForma
     setFormat(defaultFormat);
     setDomain(DEFAULT_INTERVALS.domain);
     setShapes([{ ...SHAPE_DEFAULTS.ray }]);
+    setShowLabels(true);
     setScale(DEFAULT_POINTS.scale);
     setMarks([{ label: 'A', x: 0 }, { label: 'B', x: 2 }]);
   };
@@ -176,10 +185,24 @@ export default function NumberLineModal({ open, onCancel, onInsert, defaultForma
               <InputNumber size="small" style={{ width: 80 }} value={domain[1]} onChange={(v) => setDomain([domain[0], v ?? 1])} />
             </Space>
 
+            {/* Подписи координат — выключаются целиком (точки без чисел) */}
+            <Space>
+              <span style={{ color: '#888' }}>Подписи координат:</span>
+              <Tooltip title="Выключите, если по рисунку нужно определить знаки коэффициентов: точки и штриховка останутся, чисел под осью не будет">
+                <Switch
+                  size="small"
+                  checkedChildren="1"
+                  unCheckedChildren="—"
+                  checked={showLabels}
+                  onChange={setShowLabels}
+                />
+              </Tooltip>
+            </Space>
+
             {/* Список фигур */}
             <div>
               {shapes.length === 0 ? (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Добавьте луч, отрезок или точку" />
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Пустая прямая — решений нет. Или добавьте луч, отрезок, точку" />
               ) : (
                 shapes.map((s, i) => (
                   <ShapeRow key={i} shape={s} onChange={(next) => updateShape(i, next)} onRemove={() => removeShape(i)} />
@@ -191,6 +214,9 @@ export default function NumberLineModal({ open, onCancel, onInsert, defaultForma
               <Button size="small" icon={<PlusOutlined />} onClick={() => addShape('ray')}>Луч</Button>
               <Button size="small" icon={<PlusOutlined />} onClick={() => addShape('seg')}>Отрезок</Button>
               <Button size="small" icon={<PlusOutlined />} onClick={() => addShape('point')}>Точка</Button>
+              <Tooltip title="Заштрихованная прямая целиком, без точек — когда решением служит любое число">
+                <Button size="small" icon={<PlusOutlined />} onClick={() => addShape('all')}>Вся прямая</Button>
+              </Tooltip>
             </Space>
             <span style={{ color: '#bbb', fontSize: 12 }}>В координате можно вводить дроби: 1/2, -3/4 (отрисуются дробью под осью)</span>
           </>

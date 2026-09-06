@@ -193,3 +193,90 @@ describe('shapesToSpec (round-trip конструктора)', () => {
     expect(m.bars).toContainEqual({ from: 1, to: 2 });
   });
 });
+
+describe('nolabels — прямая без подписей координат', () => {
+  it('parseNumberLine поднимает флаг и не трогает точки', () => {
+    const m = parseNumberLine('domain 0 3\nnolabels\nray right 1 open');
+    expect(m.hideLabels).toBe(true);
+    expect(m.points).toEqual([{ x: 1, filled: false }]);
+    expect(m.ticks).toEqual([{ x: 1, label: '1' }]);
+  });
+
+  it('labels off / labels on', () => {
+    expect(parseNumberLine('labels off\npoint 1 fill').hideLabels).toBe(true);
+    expect(parseNumberLine('labels on\npoint 1 fill').hideLabels).toBe(false);
+  });
+
+  it('«label» остаётся буквой оси, а не переключателем подписей', () => {
+    const m = parseNumberLine('label y\npoint 1 fill');
+    expect(m.axisLabel).toBe('y');
+    expect(m.hideLabels).toBe(false);
+  });
+
+  it('SVG без чисел под осью, но с кружком точки и штриховкой', () => {
+    const svg = numberLineSvgFromSpec('domain 0 3\nnolabels\nray right 1 open');
+    expect(svg).toContain('<circle');
+    expect(svg).not.toMatch(/>1<\/text>/);
+    // остаётся только буква оси
+    expect(svg.match(/<text/g)).toHaveLength(1);
+  });
+
+  it('без подписей холст ниже, ось на прежнем уровне', () => {
+    const withLabels = numberLineSvgFromSpec('domain 0 3\nray right 1 open');
+    const without = numberLineSvgFromSpec('domain 0 3\nnolabels\nray right 1 open');
+    expect(withLabels).toContain('viewBox="0 0 260 48"');
+    expect(without).toContain('viewBox="0 0 260 36"');
+    // AXIS_Y = 28 в обоих случаях
+    expect(withLabels).toContain('y1="28"');
+    expect(without).toContain('y1="28"');
+  });
+
+  it('shapesToSpec пишет nolabels при showLabels=false и молчит по умолчанию', () => {
+    const off = shapesToSpec({ domain: [0, 3], shapes: [{ type: 'point', x: '1', filled: true }], showLabels: false });
+    expect(off).toContain('nolabels');
+    expect(parseNumberLine(off).hideLabels).toBe(true);
+    expect(shapesToSpec({ domain: [0, 3], shapes: [] })).not.toContain('nolabels');
+  });
+});
+
+describe('all — вся прямая заштрихована', () => {
+  it('parseNumberLine даёт полосу от −∞ до +∞ без точек', () => {
+    const m = parseNumberLine('domain -3 3\nall');
+    expect(m.bars).toEqual([{ from: -Infinity, to: Infinity }]);
+    expect(m.points).toEqual([]);
+    expect(m.ticks).toEqual([]);
+  });
+
+  it('SVG: штриховка есть, кружков нет', () => {
+    const svg = numberLineSvgFromSpec('domain -3 3\nall');
+    expect(svg).not.toContain('<circle');
+    // диагонали штриховки — обычные <line>, ось тоже line: штрихов должно быть много
+    expect((svg.match(/<line/g) || []).length).toBeGreaterThan(10);
+  });
+
+  it('shapesToSpec сериализует фигуру «вся прямая»', () => {
+    const spec = shapesToSpec({ domain: [-3, 3], shapes: [{ type: 'all' }] });
+    expect(spec).toContain('all');
+    expect(parseNumberLine(spec).bars).toEqual([{ from: -Infinity, to: Infinity }]);
+  });
+});
+
+describe('точки вне видимого диапазона', () => {
+  it('точка за границей domain не рисуется и не подписывается', () => {
+    const svg = numberLineSvgFromSpec('domain 0 3\npoint 7 fill');
+    expect(svg).not.toContain('<circle');
+    expect(svg).not.toMatch(/>7<\/text>/);
+  });
+
+  it('штриховка луча с началом за границей всё равно видна', () => {
+    const svg = numberLineSvgFromSpec('domain 0 3\nray left 7 fill');
+    expect(svg).not.toContain('<circle');
+    expect((svg.match(/<line/g) || []).length).toBeGreaterThan(10);
+  });
+
+  it('точка внутри диапазона рисуется как прежде', () => {
+    const svg = numberLineSvgFromSpec('domain 0 3\npoint 2 fill');
+    expect(svg).toContain('<circle');
+    expect(svg).toMatch(/>2<\/text>/);
+  });
+});
