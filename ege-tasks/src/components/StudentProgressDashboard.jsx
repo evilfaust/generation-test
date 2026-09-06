@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Alert, Button, Collapse, Empty, Modal, Popover, Progress, Select, Space, Spin, Table, Tag, Typography } from 'antd';
+import { App, Alert, Button, Checkbox, Collapse, Empty, Modal, Popover, Progress, Select, Space, Spin, Table, Tag, Typography } from 'antd';
 import { MergeCellsOutlined, ReloadOutlined, UserOutlined, TeamOutlined } from '@ant-design/icons';
 import { api } from '../services/pocketbase';
 import { PageHeader, StatRow, Stat } from '../ui';
@@ -62,6 +62,32 @@ const normalizeUnlockedIds = (value) => {
   return [];
 };
 
+// Что переносится при объединении аккаунтов — порядок влияет на текст сводки.
+const MERGE_ENTITY_LABELS = [
+  ['attempts', 'попыток'],
+  ['study_programs', 'учебных программ'],
+  ['course_members', 'участий в курсах'],
+  ['lesson_attendance', 'отметок посещаемости'],
+  ['teacher_todos', 'дел'],
+];
+
+const MERGE_PROFILE_LABELS = {
+  name: 'имя',
+  student_class: 'класс',
+  teaching_group: 'группа',
+  telegram_id: 'telegram',
+  owner: 'владелец',
+};
+
+// Ключ для поиска дублей: регистр и порядок слов не важны
+// («Яна Сергеева» и «Сергеева Яна» — один человек).
+const nameKey = (name) => (name || '')
+  .toLowerCase()
+  .split(/\s+/)
+  .filter(Boolean)
+  .sort()
+  .join(' ');
+
 const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
   const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(true);
@@ -72,9 +98,15 @@ const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
 
   // Состояние объединения аккаунтов
   const [mergeOpen, setMergeOpen] = useState(false);
-  const [mergeSource, setMergeSource] = useState(null); // старый аккаунт (удалить)
+  const [mergeSource, setMergeSource] = useState(null); // аккаунт-донор (удалить)
   const [mergeTarget, setMergeTarget] = useState(null); // основной аккаунт (сохранить)
   const [merging, setMerging] = useState(false);
+  // Логин и пароль донора переезжают на оставшийся аккаунт: ученик помнит именно
+  // их, когда сливаем самостоятельно заведённый аккаунт в старый (с группой,
+  // историей и каникулярной программой).
+  const [mergeKeepCreds, setMergeKeepCreds] = useState(true);
+  const [mergePreview, setMergePreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
 
   const loadData = useCallback(async () => {
@@ -102,17 +134,46 @@ const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
     loadData();
   }, [loadData]);
 
+  // Предпросмотр берём с сервера (dryRun): он один знает про все связи ученика —
+  // не только попытки, но и учебные программы, курсы, посещаемость.
+  useEffect(() => {
+    if (!mergeOpen || !mergeSource || !mergeTarget || mergeSource === mergeTarget) {
+      setMergePreview(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    api.previewMergeStudents(mergeSource, mergeTarget, { keepCredentials: mergeKeepCreds })
+      .then((data) => { if (!cancelled) setMergePreview(data); })
+      .catch((err) => {
+        if (!cancelled) {
+          setMergePreview({ error: err.message });
+        }
+      })
+      .finally(() => { if (!cancelled) setPreviewLoading(false); });
+    return () => { cancelled = true; };
+  }, [mergeOpen, mergeSource, mergeTarget, mergeKeepCreds]);
+
   const handleMerge = useCallback(async () => {
     if (!mergeSource || !mergeTarget || mergeSource === mergeTarget) return;
     const sourceStudent = students.find(s => s.id === mergeSource);
     const targetStudent = students.find(s => s.id === mergeTarget);
-    const sourceAttempts = attempts.filter(a => a.student === mergeSource);
+    const counts = mergePreview?.counts || {};
+    const lines = MERGE_ENTITY_LABELS
+      .filter(([key]) => counts[key] > 0)
+      .map(([key, label]) => `${counts[key]} ${label}`);
 
     modal.confirm({
       title: 'Подтвердите объединение аккаунтов',
       content: (
         <div>
-          <p>Все попытки (<strong>{sourceAttempts.length}</strong>) от аккаунта <strong>@{sourceStudent?.username}</strong> будут перенесены на <strong>@{targetStudent?.username}</strong>.</p>
+          <p>
+            На аккаунт <strong>@{targetStudent?.username}</strong> будет перенесено всё, что связано
+            с <strong>@{sourceStudent?.username}</strong>{lines.length ? `: ${lines.join(', ')}` : ''}.
+          </p>
+          {mergeKeepCreds && (
+            <p>Оставшийся аккаунт получит логин <strong>@{sourceStudent?.username}</strong> и его пароль — ученик войдёт теми данными, которые помнит.</p>
+          )}
           <p style={{ color: 'var(--lvl-3)' }}>Аккаунт <strong>@{sourceStudent?.username}</strong> будет удалён. Это действие необратимо.</p>
         </div>
       ),
@@ -122,11 +183,16 @@ const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
       onOk: async () => {
         setMerging(true);
         try {
-          const result = await api.mergeStudents(mergeSource, mergeTarget);
-          message.success(`Перенесено ${result.moved} попыток. Аккаунт @${result.deletedUsername} удалён.`);
+          const result = await api.mergeStudents(mergeSource, mergeTarget, { keepCredentials: mergeKeepCreds });
+          const movedTotal = result.movedTotal ?? result.moved ?? 0;
+          message.success(
+            `Перенесено записей: ${movedTotal}. Аккаунт @${result.deletedUsername} удалён.` +
+            (result.credentialsMoved ? ` Ученик входит под @${result.resultUsername}.` : '')
+          );
           setMergeOpen(false);
           setMergeSource(null);
           setMergeTarget(null);
+          setMergePreview(null);
           await loadData();
         } catch (err) {
           message.error(`Ошибка объединения: ${err.message}`);
@@ -135,7 +201,30 @@ const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
         }
       },
     });
-  }, [mergeSource, mergeTarget, students, attempts, modal, message, loadData]);
+  }, [mergeSource, mergeTarget, students, mergePreview, mergeKeepCreds, modal, message, loadData]);
+
+  // Аккаунты с одинаковым именем — почти всегда ученик, который забыл пароль и
+  // зарегистрировался заново. Основным предлагаем тот, где есть группа (он же
+  // держит каникулярную программу и старую историю).
+  const duplicateCandidates = useMemo(() => {
+    const byKey = new Map();
+    students.forEach((student) => {
+      const key = nameKey(student.name);
+      if (!key) return;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(student);
+    });
+    return [...byKey.values()]
+      .filter((group) => group.length > 1)
+      .map((group) => {
+        const sorted = [...group].sort((a, b) => {
+          const groupDiff = (b.teaching_group ? 1 : 0) - (a.teaching_group ? 1 : 0);
+          if (groupDiff !== 0) return groupDiff;
+          return new Date(a.created) - new Date(b.created);
+        });
+        return { keep: sorted[0], drop: sorted.slice(1) };
+      });
+  }, [students]);
 
   const worksById = useMemo(() => {
     const map = new Map();
@@ -431,10 +520,43 @@ const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Используйте, когда ученик случайно зарегистрировал два аккаунта. Все попытки будут перенесены на основной аккаунт, дублирующий — удалён."
+          message="Используйте, когда ученик забыл пароль и завёл второй аккаунт."
+          description={
+            <>
+              На основной аккаунт переедет всё, что связано с удаляемым: попытки, каникулярные
+              и летние программы, участие в курсах, посещаемость. Пустые поля профиля (группа,
+              класс, telegram) тоже подтянутся.
+              <br />
+              Основным лучше оставлять <strong>старый</strong> аккаунт — на нём висят группа и
+              выданные программы, — а логин с паролем перенести с нового (галочка ниже).
+            </>
+          }
         />
+
+        {duplicateCandidates.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 4, fontWeight: 500 }}>Похоже на дубли</div>
+            <Space direction="vertical" size={4} style={{ width: '100%' }}>
+              {duplicateCandidates.map(({ keep, drop }) => (
+                <div key={keep.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <Text>{keep.name || '—'}</Text>
+                  {drop.map((student) => (
+                    <Button
+                      key={student.id}
+                      size="small"
+                      onClick={() => { setMergeSource(student.id); setMergeTarget(keep.id); }}
+                    >
+                      @{student.username} → @{keep.username}
+                    </Button>
+                  ))}
+                </div>
+              ))}
+            </Space>
+          </div>
+        )}
+
         <div style={{ marginBottom: 12 }}>
-          <div style={{ marginBottom: 4, fontWeight: 500 }}>Старый / дублирующий аккаунт <span style={{ color: 'var(--lvl-3)' }}>(удалить)</span></div>
+          <div style={{ marginBottom: 4, fontWeight: 500 }}>Удаляемый аккаунт <span style={{ color: 'var(--lvl-3)' }}>(его данные переедут)</span></div>
           <Select
             style={{ width: '100%' }}
             placeholder="Выберите аккаунт для удаления"
@@ -467,15 +589,49 @@ const StudentProgressDashboard = ({ onOpenWork, onOpenStudent }) => {
               }))}
           />
         </div>
+        <Checkbox
+          checked={mergeKeepCreds}
+          onChange={(e) => setMergeKeepCreds(e.target.checked)}
+          style={{ marginBottom: 12 }}
+        >
+          Перенести логин и пароль удаляемого аккаунта
+          <div style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+            Ученик продолжит входить теми данными, которые помнит
+          </div>
+        </Checkbox>
+
         {mergeSource && mergeTarget && mergeSource !== mergeTarget && (() => {
           const src = students.find(s => s.id === mergeSource);
           const tgt = students.find(s => s.id === mergeTarget);
-          const srcAttempts = attempts.filter(a => a.student === mergeSource).length;
+
+          if (previewLoading) {
+            return <Alert type="info" showIcon message="Считаем, что переедет…" icon={<Spin size="small" />} />;
+          }
+          if (mergePreview?.error) {
+            return <Alert type="error" showIcon message={`Не удалось посчитать: ${mergePreview.error}`} />;
+          }
+          if (!mergePreview) return null;
+
+          const counts = mergePreview.counts || {};
+          const moved = MERGE_ENTITY_LABELS
+            .filter(([key]) => counts[key] > 0)
+            .map(([key, label]) => `${counts[key]} ${label}`);
+          const profile = (mergePreview.profileFields || [])
+            .map((field) => MERGE_PROFILE_LABELS[field] || field);
+
           return (
             <Alert
               type="info"
               showIcon
-              message={`${srcAttempts} попыток @${src?.username} → @${tgt?.username}. Аккаунт @${src?.username} будет удалён.`}
+              message={`@${src?.username} → @${tgt?.username}`}
+              description={
+                <div style={{ fontSize: 13 }}>
+                  <div>Переедет: {moved.length ? moved.join(', ') : 'нечего переносить'}</div>
+                  {profile.length > 0 && <div>Дополнится профиль: {profile.join(', ')}</div>}
+                  <div>После объединения ученик входит под <strong>@{mergePreview.resultUsername}</strong></div>
+                  <div style={{ color: 'var(--lvl-3)' }}>Аккаунт @{src?.username} будет удалён</div>
+                </div>
+              }
             />
           );
         })()}

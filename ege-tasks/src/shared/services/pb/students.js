@@ -1,4 +1,4 @@
-import { pb, _logAudit, withOwner, andOwnerOrFree, andRelOwnerOrFree } from './client.js';
+import { pb, _logAudit, withOwner, andOwnerOrFree, andRelOwnerOrFree, authHeaders } from './client.js';
 import { PB_BASE_URL } from '../pocketbaseUrl';
 import { shuffleArray } from '../../utils/shuffle';
 import { escapeFilter } from '../../utils/escapeFilter';
@@ -323,20 +323,35 @@ export const studentsApi = {
     }
   },
 
-  // Объединяет два аккаунта: переносит все попытки fromStudentId → toStudentId,
-  // затем удаляет fromStudentId. Выполняется через серверный hook с правами суперпользователя.
-  // Возвращает { moved, deletedUsername, targetUsername }.
-  async mergeStudents(fromStudentId, toStudentId) {
+  // Объединяет два аккаунта: переносит на toStudentId ВСЁ, что ссылается на
+  // fromStudentId (попытки, учебные программы, курсы, посещаемость, дела), плюс
+  // пустые поля профиля (группа, класс, telegram, владелец), затем удаляет
+  // fromStudentId. Выполняется серверным hook'ом в одной транзакции.
+  //
+  // opts.keepCredentials — оставшийся аккаунт получает логин и пароль удаляемого
+  // (ученик помнит именно их, когда сливаем новый аккаунт в старый).
+  // opts.renameAttempts — переписать student_name в перенесённых попытках
+  // именем целевого ученика (по умолчанию да).
+  //
+  // Возвращает { moved, movedByCollection, droppedByCollection, profileFields,
+  //              deletedUsername, targetUsername, resultUsername }.
+  async mergeStudents(fromStudentId, toStudentId, opts = {}) {
+    const { keepCredentials = false, renameAttempts = true, dryRun = false } = opts;
     const response = await fetch(`${PB_BASE_URL}/api/students/merge`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fromStudentId, toStudentId }),
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ fromStudentId, toStudentId, keepCredentials, renameAttempts, dryRun }),
     });
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
     return data;
+  },
+
+  // Что именно переедет при слиянии — ничего не меняет, только считает.
+  async previewMergeStudents(fromStudentId, toStudentId, opts = {}) {
+    return this.mergeStudents(fromStudentId, toStudentId, { ...opts, dryRun: true });
   },
 
   async getAttemptsForRegisteredStudents() {

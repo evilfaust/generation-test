@@ -49,13 +49,16 @@ export function andRelOwnerOrFree(relField, filter = '') {
   return filter ? `(${filter}) && ${own}` : own;
 }
 
-// Заголовок авторизации для ИИ-ручек pdf-service (/latex-fix, /scan-blank):
-// сервер валидирует токен учителя через PB и проверяет teachers.ai_enabled
-// (включается env REQUIRE_TEACHER_AI_AUTH=1 на VPS).
-export function aiHeaders() {
+// Заголовок авторизации учителя для ручек вне PB SDK (pdf-service, кастомные
+// роуты pb_hooks): сервер сам валидирует токен через PocketBase.
+export function authHeaders() {
   const t = currentTeacher();
   return t && pb.authStore.token ? { Authorization: `Bearer ${pb.authStore.token}` } : {};
 }
+
+// ИИ-ручки pdf-service (/latex-fix, /scan-blank) дополнительно проверяют
+// teachers.ai_enabled (включается env REQUIRE_TEACHER_AI_AUTH=1 на VPS).
+export const aiHeaders = authHeaders;
 
 export function _logAudit(action, collectionName, recordId, summary) {
   try {

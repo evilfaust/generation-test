@@ -53,6 +53,9 @@ const WorkTaskStatement = ({ task }) => {
   return <TaskStatementRenderer text={task.statement_md} images={conditionImages} />;
 };
 
+// Псевдо-значение селектора выдач: показать попытки сразу по всем выдачам работы.
+const ALL_SESSIONS = '__all_sessions__';
+
 const WorkEditor = ({
   work,
   variants,
@@ -85,6 +88,7 @@ const WorkEditor = ({
   const [worksheetPrintOpen, setWorksheetPrintOpen] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
   const [resultsSessionId, setResultsSessionId] = useState(null);
+  const [sessionStudents, setSessionStudents] = useState({}); // session id → { id, name }
 
   const dragDropHandlers = useTaskDragDrop(variants, setVariants);
   const taskEditing = useTaskEditing(variants, setVariants);
@@ -107,13 +111,40 @@ const WorkEditor = ({
     setActiveVariantKey(prev => prev || key);
   }, [variants]);
 
-  // По умолчанию в «Результатах» показываем свежайшую сессию (sessions отсортированы -created).
+  // Выдач у работы бывает много (летняя программа делает персональную ссылку
+  // каждому ученику), поэтому по умолчанию показываем сразу все — в разрезе
+  // одной выдачи учитель видел пусто и считал результаты потерянными.
   useEffect(() => {
     setResultsSessionId(prev => {
+      if (prev === ALL_SESSIONS && sessions.length > 1) return prev;
       if (prev && sessions.some(s => s.id === prev)) return prev;
+      if (sessions.length > 1) return ALL_SESSIONS;
       return sessions[0]?.id || null;
     });
   }, [sessions]);
+
+  // Кому адресована каждая выдача — подписи в селекторе и колонка «Из выдачи».
+  useEffect(() => {
+    if (sessions.length < 2) { setSessionStudents({}); return; }
+    let cancelled = false;
+    api.getSessionStudentMap(sessions.map(s => s.id))
+      .then((map) => { if (!cancelled) setSessionStudents(map); })
+      .catch(() => { /* подписи не критичны */ });
+    return () => { cancelled = true; };
+  }, [sessions]);
+
+  const sessionLabels = useMemo(() => {
+    const labels = {};
+    sessions.forEach((session, i) => {
+      const number = sessions.length - i;
+      const student = sessionStudents[session.id]?.name;
+      const date = new Date(session.created).toLocaleDateString('ru-RU');
+      labels[session.id] = student
+        ? `Выдача ${number} · ${student}`
+        : `Выдача ${number} — ${date}`;
+    });
+    return labels;
+  }, [sessions, sessionStudents]);
 
   const activeVariantIndex = useMemo(() => {
     if (!activeVariantKey) return 0;
@@ -632,18 +663,27 @@ const WorkEditor = ({
                     sessions.length > 1 ? (
                       <Select
                         size="small"
-                        style={{ minWidth: 240 }}
+                        style={{ minWidth: 260 }}
                         value={resultsSessionId}
                         onChange={setResultsSessionId}
-                        options={sessions.map((s, i) => ({
-                          value: s.id,
-                          label: `Выдача ${sessions.length - i} — ${new Date(s.created).toLocaleDateString('ru-RU')}${s.is_open ? ' · приём открыт' : ''}`,
-                        }))}
+                        options={[
+                          { value: ALL_SESSIONS, label: `Все выдачи (${sessions.length})` },
+                          ...sessions.map((s, i) => ({
+                            value: s.id,
+                            label: `${sessionLabels[s.id] || `Выдача ${sessions.length - i}`}${s.is_open ? ' · приём открыт' : ''}`,
+                          })),
+                        ]}
                       />
                     ) : null
                   }
                 >
-                  {resultsSessionId ? (
+                  {resultsSessionId === ALL_SESSIONS ? (
+                    <TeacherResultsDashboard
+                      key={ALL_SESSIONS}
+                      sessionId={sessions.map(s => s.id)}
+                      sessionLabels={sessionLabels}
+                    />
+                  ) : resultsSessionId ? (
                     <TeacherResultsDashboard key={resultsSessionId} sessionId={resultsSessionId} />
                   ) : (
                     <Empty description="Нет активной сессии" />

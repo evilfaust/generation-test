@@ -13,8 +13,14 @@ const PB_URL = PB_BASE_URL;
 /**
  * Панель результатов учителя.
  * Таблица попыток учеников с возможностью просмотра ответов, ручного зачёта и выдачи нового варианта.
+ *
+ * sessionId — id одной выдачи ИЛИ массив id (режим «все выдачи»). Массив нужен
+ * потому, что у одной работы легко десяток выдач: летняя/каникулярная программа
+ * создаёт персональную ссылку каждому ученику, и результаты по работе оказываются
+ * размазаны по сессиям — в разрезе одной выдачи учитель видит пусто.
+ * sessionLabels — подписи выдач (id → строка) для колонки «Из выдачи».
  */
-const TeacherResultsDashboard = ({ sessionId }) => {
+const TeacherResultsDashboard = ({ sessionId, sessionLabels = null }) => {
   const { message } = App.useApp();
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,6 +34,13 @@ const TeacherResultsDashboard = ({ sessionId }) => {
   const [manualUnlockedAchievementIds, setManualUnlockedAchievementIds] = useState([]);
   const [mcTestData, setMcTestData] = useState(null); // данные MC-теста для отображения текста опций
   const [classRemOpen, setClassRemOpen] = useState(false);
+
+  const sessionIds = useMemo(
+    () => (Array.isArray(sessionId) ? sessionId.filter(Boolean) : sessionId ? [sessionId] : []),
+    [sessionId]
+  );
+  const primarySessionId = sessionIds[0] || null;
+  const multiSession = sessionIds.length > 1;
 
   const normalizeAchievementId = useCallback((value) => {
     if (!value) return undefined;
@@ -66,16 +79,18 @@ const TeacherResultsDashboard = ({ sessionId }) => {
   }, []);
 
   const loadAttempts = useCallback(async () => {
-    if (!sessionId) return;
+    if (sessionIds.length === 0) return;
     setLoading(true);
     try {
-      const data = await api.getAttemptsBySession(sessionId);
+      const data = multiSession
+        ? await api.getAttemptsBySessionsFull(sessionIds)
+        : await api.getAttemptsBySession(primarySessionId);
       setAttempts(data);
     } catch (err) {
       console.error('Error loading attempts:', err);
     }
     setLoading(false);
-  }, [sessionId]);
+  }, [sessionIds, multiSession, primarySessionId]);
 
   useEffect(() => {
     loadAttempts();
@@ -85,11 +100,11 @@ const TeacherResultsDashboard = ({ sessionId }) => {
 
   // Загружаем MC-тест для сессии (если есть), чтобы отображать текст опций вместо индексов
   useEffect(() => {
-    if (!sessionId) return;
+    if (!primarySessionId) return;
     let cancelled = false;
     const loadMCTest = async () => {
       try {
-        const session = await api.getSession(sessionId);
+        const session = await api.getSession(primarySessionId);
         if (cancelled) return;
         const mcTestId = session?.mc_test;
         if (!mcTestId) { setMcTestData(null); return; }
@@ -99,7 +114,7 @@ const TeacherResultsDashboard = ({ sessionId }) => {
     };
     loadMCTest();
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [primarySessionId]);
 
   const loadAchievements = useCallback(async () => {
     setAchievementsLoading(true);
@@ -192,7 +207,10 @@ const TeacherResultsDashboard = ({ sessionId }) => {
       cancelText: 'Отмена',
       onOk: async () => {
         try {
-          const session = await api.getSession(sessionId);
+          // Новый вариант выдаём в той же сессии, где ученик писал: в режиме
+          // «все выдачи» попытки приходят из разных выдач одной работы.
+          const attemptSessionId = attempt.session || primarySessionId;
+          const session = await api.getSession(attemptSessionId);
           if (!session) return;
 
           const allVariants = await api.getVariantsByWork(session.work);
@@ -201,7 +219,7 @@ const TeacherResultsDashboard = ({ sessionId }) => {
             return;
           }
 
-          const allAttempts = await api.getAttemptsBySession(sessionId);
+          const allAttempts = await api.getAttemptsBySession(attemptSessionId);
           const assignmentCount = {};
           allVariants.forEach(v => { assignmentCount[v.id] = 0; });
           allAttempts.forEach(a => {
@@ -251,7 +269,7 @@ const TeacherResultsDashboard = ({ sessionId }) => {
 
           const taskList = chosenVariant.expand?.tasks || [];
           await api.createAttempt({
-            session: sessionId,
+            session: attemptSessionId,
             student_name: attempt.student_name,
             device_id: attempt.device_id,
             student: attempt.student || null, // Копируем student из предыдущей попытки
@@ -416,6 +434,16 @@ const TeacherResultsDashboard = ({ sessionId }) => {
       key: 'student_name',
       width: 160,
     },
+    ...(multiSession ? [{
+      title: 'Из выдачи',
+      key: 'sessionLabel',
+      width: 170,
+      render: (_, record) => (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {sessionLabels?.[record.session] || record.session}
+        </Text>
+      ),
+    }] : []),
     {
       title: 'Вариант',
       key: 'variant',
@@ -687,7 +715,7 @@ const TeacherResultsDashboard = ({ sessionId }) => {
       <ClassRemediationModal
         open={classRemOpen}
         onClose={() => setClassRemOpen(false)}
-        sessionId={sessionId}
+        sessionId={primarySessionId}
         attempts={attempts}
       />
 

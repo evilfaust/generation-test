@@ -145,6 +145,49 @@ export const sessionsApi = {
     }
   },
 
+  // Полные попытки сразу по нескольким выдачам — для режима «все выдачи» в
+  // результатах работы. Одна работа легко имеет десяток выдач: летняя программа
+  // создаёт персональную сессию каждому ученику, поэтому результаты по работе
+  // размазаны по сессиям и в разрезе одной выдачи почти всегда пусто.
+  async getAttemptsBySessionsFull(sessionIds = []) {
+    try {
+      const records = await getFullListByOr('attempts', 'session', sessionIds, {
+        sort: 'student_name,-created',
+        expand: 'variant',
+      });
+      // Куски OR-запроса сортируются каждый сам по себе — досортировываем целое.
+      return records.sort((a, b) => {
+        const byName = (a.student_name || '').localeCompare(b.student_name || '', 'ru');
+        if (byName !== 0) return byName;
+        return new Date(b.created) - new Date(a.created);
+      });
+    } catch (error) {
+      console.error('Error fetching full attempts by sessions:', error);
+      return [];
+    }
+  },
+
+  // Кому персонально адресована выдача: session → { studentId, studentName }.
+  // Связь живёт в study_program_items (летняя/каникулярная программа), поэтому
+  // подписи выдач («Выдача 4 — Дрибинская Ксения») собираются оттуда.
+  async getSessionStudentMap(sessionIds = []) {
+    try {
+      const items = await getFullListByOr('study_program_items', 'session', sessionIds, {
+        expand: 'program.student',
+      });
+      const map = {};
+      for (const item of items) {
+        const student = item.expand?.program?.expand?.student;
+        if (!item.session || !student) continue;
+        map[item.session] = { id: student.id, name: student.name || '' };
+      }
+      return map;
+    } catch (error) {
+      console.error('Error fetching session→student map:', error);
+      return {};
+    }
+  },
+
   // fields по умолчанию — минимум для агрегатов; вызывающий может запросить больше
   // (например статус и время сдачи для прогресса кампании).
   async getAttemptsBySessions(sessionIds = [], { fields = 'id,session,score,total' } = {}) {
