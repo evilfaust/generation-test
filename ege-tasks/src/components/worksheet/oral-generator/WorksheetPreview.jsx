@@ -15,6 +15,7 @@ export default function WorksheetPreview({
   sheetMeta,
   hideTaskPrefixes,
   variantLabel,
+  showVariantLabel,
   fontScale,
   fontFamily,
   answerStyle,
@@ -61,7 +62,8 @@ export default function WorksheetPreview({
             // его руками, но переопределить можно.
             title: sheetMeta.title || workTitle || 'Лист задач',
             showStudentFields: showStudentInfo,
-            alwaysShowVariant: false,
+            // null = авто (надпись появляется при нескольких вариантах)
+            showVariant: showVariantLabel,
           }}
           options={{
             answerStyle,

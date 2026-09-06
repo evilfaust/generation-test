@@ -279,7 +279,12 @@ export default function PrintSheet({
     opts.answerStyle = options.answerLine ? 'line' : 'none';
   }
 
-  const showVariant = variants.length > 1 || meta.alwaysShowVariant;
+  // Надпись «Вариант N» в шапке, колонтитуле и ключе. По умолчанию появляется
+  // сама, когда вариантов больше одного; meta.showVariant (true/false) —
+  // явное решение учителя и перебивает авто-режим в обе стороны.
+  const showVariant = meta.showVariant != null
+    ? !!meta.showVariant
+    : (variants.length > 1 || !!meta.alwaysShowVariant);
   const cols = Math.max(1, Math.min(3, Math.floor(columns) || 1));
 
   const handlePageCount = (num, count) =>
@@ -344,6 +349,9 @@ export default function PrintSheet({
         <AnswerKeyPage
           variants={variants}
           variantLabel={variantLabel}
+          // В ключе заголовок варианта скрываем только когда вариант один:
+          // при нескольких без него не понять, чьи это ответы.
+          showVariantTitle={showVariant || variants.length > 1}
           meta={meta}
           brand={brand}
           pageNumber={offset + 1}

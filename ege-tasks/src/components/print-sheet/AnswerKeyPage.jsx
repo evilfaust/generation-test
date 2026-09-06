@@ -1,7 +1,9 @@
 import MathRenderer from '../MathRenderer';
 
 /** Лист ответов для учителя — общий для всех вариантов, всегда последним. */
-export default function AnswerKeyPage({ variants, variantLabel, meta, brand, pageNumber, showFooter }) {
+export default function AnswerKeyPage({
+  variants, variantLabel, meta, brand, pageNumber, showFooter, showVariantTitle = true,
+}) {
   return (
     <section className="ps-page ps-page--key">
       <div className="ps-runhead">
@@ -13,7 +15,7 @@ export default function AnswerKeyPage({ variants, variantLabel, meta, brand, pag
         <h2 className="ps-key-title">Ответы</h2>
         {variants.map(v => (
           <div className="ps-key-block" key={v.number}>
-            <div className="ps-key-variant">{variantLabel} {v.number}</div>
+            {showVariantTitle && <div className="ps-key-variant">{variantLabel} {v.number}</div>}
             <div className="ps-key-grid">
               {(v.tasks || []).map((t, i) => (
                 <div className="ps-key-cell" key={t.id || i}>

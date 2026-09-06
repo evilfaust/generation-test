@@ -103,6 +103,9 @@ export default function AppearanceSection({
   setShowAnswersPage,
   variantLabel,
   setVariantLabel,
+  showVariantLabel,
+  setShowVariantLabel,
+  variantsCount = 1,
   cryptogramEnabled,
   setCryptogramEnabled,
   cryptogramPhrase,
@@ -119,6 +122,9 @@ export default function AppearanceSection({
   setShowCardStudentInfo,
 }) {
   const lettersCount = getCryptogramLetterCount(cryptogramPhrase);
+  // Тумблер показывает фактическое состояние листа: пока учитель его не трогал
+  // (null), надпись живёт по авто-правилу движка — «вариантов больше одного».
+  const variantVisible = showVariantLabel != null ? showVariantLabel : variantsCount > 1;
 
   const sheetBody = (
     <>
@@ -147,15 +153,23 @@ export default function AppearanceSection({
         <Field label="Шрифт">
           <Segmented size="small" value={fontFamily} onChange={setFontFamily} options={FONT_FAMILY_OPTIONS} />
         </Field>
-        <Field label="Название варианта">
-          <Input
-            size="small"
-            value={variantLabel}
-            onChange={(e) => setVariantLabel(e.target.value)}
-            placeholder="Вариант"
-            style={{ width: 130 }}
-          />
-        </Field>
+        <SwitchField
+          label="Номер варианта"
+          hint="Надпись «Вариант N» в шапке, колонтитуле и ключе. Сама включается, когда вариантов несколько."
+          checked={variantVisible}
+          onChange={setShowVariantLabel}
+        />
+        {variantVisible && (
+          <Field label="Название варианта">
+            <Input
+              size="small"
+              value={variantLabel}
+              onChange={(e) => setVariantLabel(e.target.value)}
+              placeholder="Вариант"
+              style={{ width: 130 }}
+            />
+          </Field>
+        )}
       </Space>
 
       <Divider style={{ margin: '12px 0' }} />

@@ -437,3 +437,51 @@ describe('Лист задач — редактируемая шапка', () => 
       .toEqual(['Фамилия, имя', 'Дата']);
   });
 });
+
+describe('надпись «Вариант N» (meta.showVariant)', () => {
+  const oneVariant = [{ number: 1, tasks: [{ id: 't1', statement_md: 'Задача', answer: '5' }] }];
+  const twoVariants = [
+    { number: 1, tasks: [{ id: 't1', statement_md: 'Задача', answer: '5' }] },
+    { number: 2, tasks: [{ id: 't2', statement_md: 'Задача', answer: '6' }] },
+  ];
+
+  it('без флага работает авто-правило: один вариант — без надписи, два — с надписью', () => {
+    const one = render(<PrintSheet variants={oneVariant} meta={{ title: 'Лист' }} />, { wrapper });
+    expect(one.container.querySelector('.ps-variant')).toBeNull();
+    one.unmount();
+
+    const two = render(<PrintSheet variants={twoVariants} meta={{ title: 'Лист' }} />, { wrapper });
+    expect(two.container.querySelector('.ps-variant')).toBeTruthy();
+  });
+
+  it('showVariant=true добавляет надпись единственному варианту', () => {
+    const { container } = render(
+      <PrintSheet variants={oneVariant} meta={{ title: 'Лист', showVariant: true }} />,
+      { wrapper },
+    );
+    expect(container.querySelector('.ps-variant')).toBeTruthy();
+  });
+
+  it('showVariant=false убирает надпись даже при нескольких вариантах', () => {
+    const { container } = render(
+      <PrintSheet variants={twoVariants} meta={{ title: 'Лист', showVariant: false }} />,
+      { wrapper },
+    );
+    expect(container.querySelector('.ps-variant')).toBeNull();
+  });
+
+  it('в ключе учителя заголовок варианта скрывается только когда вариант один', () => {
+    const one = render(
+      <PrintSheet variants={oneVariant} meta={{ title: 'Лист', showVariant: false }} showAnswersPage />,
+      { wrapper },
+    );
+    expect(one.container.querySelector('.ps-key-variant')).toBeNull();
+    one.unmount();
+
+    const two = render(
+      <PrintSheet variants={twoVariants} meta={{ title: 'Лист', showVariant: false }} showAnswersPage />,
+      { wrapper },
+    );
+    expect(two.container.querySelector('.ps-key-variant')).toBeTruthy();
+  });
+});

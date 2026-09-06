@@ -107,6 +107,9 @@ const TaskSheetGenerator = () => {
   const [showAnswersInline, setShowAnswersInline] = useState(false);
   const [showAnswersPage, setShowAnswersPage] = useState(true);
   const [variantLabel, setVariantLabel] = useState('Вариант');
+  // Надпись «Вариант N» на листе: null = как раньше (сама появляется при
+  // нескольких вариантах), true/false — решение учителя.
+  const [showVariantLabel, setShowVariantLabel] = useState(null);
   const [cryptogramEnabled, setCryptogramEnabled] = useState(false);
   const [cryptogramPhrase, setCryptogramPhrase] = useState('');
   const [cardFormat, setCardFormat] = useState('А6');
@@ -137,6 +140,7 @@ const TaskSheetGenerator = () => {
 
   const watchedValues = Form.useWatch([], form);
   const tasksPerVariantValue = Form.useWatch('tasksPerVariant', form) || 0;
+  const variantsCountValue = Form.useWatch('variantsCount', form) || 1;
   const { availableTasksCount, loadingTasksCount } = useTaskCounter(watchedValues);
 
   useEffect(() => {
@@ -478,6 +482,9 @@ const TaskSheetGenerator = () => {
             setShowAnswersPage={setShowAnswersPage}
             variantLabel={variantLabel}
             setVariantLabel={setVariantLabel}
+            showVariantLabel={showVariantLabel}
+            setShowVariantLabel={setShowVariantLabel}
+            variantsCount={variants.length || variantsCountValue}
             cryptogramEnabled={cryptogramEnabled}
             setCryptogramEnabled={setCryptogramEnabled}
             cryptogramPhrase={cryptogramPhrase}
@@ -543,6 +550,7 @@ const TaskSheetGenerator = () => {
         showAnswersPage={showAnswersPage}
         solutionSpace={solutionSpace}
         variantLabel={variantLabel}
+        showVariantLabel={showVariantLabel}
         cryptogramEnabled={cryptogramEnabled}
         cryptogramPhrase={cryptogramPhrase}
         dragDropHandlers={dragDropHandlers}
