@@ -36,3 +36,35 @@
   border-bottom: 1px solid #888;
   font-size: 0.95em;
 }
+
+/* Четверть листа и мельче: заголовки разделов ужимаются, иначе три подписи
+   съедают строку заданий. Префикс .oral-print-root — чтобы правило перебивало
+   размеры по data-fs выше в этом же файле. */
+@media print {
+  .oral-print-root .oral-page--quad .oral-mixed-section {
+    margin-top: 0.5mm;
+  }
+  .oral-print-root .oral-page--quad .oral-mixed-section + .oral-mixed-section {
+    margin-top: 1.5mm;
+  }
+  .oral-print-root .oral-page--quad .oral-mixed-section-title {
+    font-size: 8pt;
+    letter-spacing: 0.3pt;
+    margin-bottom: 0.8mm;
+    padding-bottom: 0.3mm;
+  }
+  .oral-print-root .oral-quad-page--r3 .oral-mixed-section-title,
+  .oral-print-root .oral-quad-page--r4 .oral-mixed-section-title {
+    font-size: 7.5pt;
+    margin-bottom: 0.6mm;
+  }
+}
+
+.oral-screen-root .oral-page--quad .oral-mixed-section + .oral-mixed-section {
+  margin-top: 1.5mm;
+}
+.oral-screen-root .oral-page--quad .oral-mixed-section-title {
+  font-size: 0.8em;
+  margin-top: 0.5mm;
+  margin-bottom: 0.8mm;
+}

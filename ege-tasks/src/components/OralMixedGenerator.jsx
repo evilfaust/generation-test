@@ -121,15 +121,15 @@ export default function OralMixedGenerator() {
   const [sections, setSections] = useState(() => [
     makeSection('oral_counting'),
   ]);
-  const [twoPerPage, setTwoPerPage] = useState(false);
-  const [sideBySide, setSideBySide] = useState(true);
   const [showTeacherKey, setShowTeacherKey] = useState(true);
   const [showSectionHeaders, setShowSectionHeaders] = useState(true);
   const [columnsCount, setColumnsCount] = useState(2);
   const [fontSize, setFontSize] = useState('s');
   // Общие настройки листа (шапка, класс, название, интервал) — как в остальных
   // генераторах; здесь они лежат отдельным объектом, а не в settings хука.
-  const [sheet, setSheet] = useState({ ...SHEET_DEFAULTS });
+  // Раскладка листа («вариантов на листе») живёт здесь же, рядом с шапкой и
+  // интервалом: переключатель общий с устным счётом (SheetLayoutOptions).
+  const [sheet, setSheet] = useState({ ...SHEET_DEFAULTS, variantsPerPage: '2side' });
   const updateSheet = (k, v) => setSheet(p => ({ ...p, [k]: v }));
 
   const [generated, setGenerated] = useState(null); // массив variants для печати
@@ -143,13 +143,19 @@ export default function OralMixedGenerator() {
     if (st.workTitle) setWorkTitle(st.workTitle);
     if (typeof st.variantsCount === 'number') setVariantsCount(st.variantsCount);
     if (Array.isArray(st.sections)) setSections(st.sections);
-    if (typeof st.twoPerPage === 'boolean') setTwoPerPage(st.twoPerPage);
-    if (typeof st.sideBySide === 'boolean') setSideBySide(st.sideBySide);
     if (typeof st.showTeacherKey === 'boolean') setShowTeacherKey(st.showTeacherKey);
     if (typeof st.showSectionHeaders === 'boolean') setShowSectionHeaders(st.showSectionHeaders);
     if (typeof st.columnsCount === 'number') setColumnsCount(st.columnsCount);
     if (st.fontSize) setFontSize(st.fontSize);
-    setSheet({ ...SHEET_DEFAULTS, ...(st.sheet || {}) });
+    // Листы, сохранённые до переключателя, несут только sideBySide/twoPerPage.
+    const legacyPerPage = st.sideBySide === false
+      ? (st.twoPerPage ? '2half' : 1)
+      : '2side';
+    setSheet({
+      ...SHEET_DEFAULTS,
+      variantsPerPage: legacyPerPage,
+      ...(st.sheet || {}),
+    });
     setGenerated(s.tasksData ?? null);
   }, []);
 
@@ -158,7 +164,7 @@ export default function OralMixedGenerator() {
     hook: {
       title: workTitle,
       settings: {
-        workTitle, variantsCount, sections, twoPerPage, sideBySide,
+        workTitle, variantsCount, sections,
         showTeacherKey, showSectionHeaders, columnsCount, fontSize, sheet,
       },
       tasksData: generated,
@@ -267,8 +273,6 @@ export default function OralMixedGenerator() {
   }, [sections]);
 
   const printSettings = {
-    twoPerPage,
-    sideBySide,
     showTeacherKey,
     columnsCount,
     showSectionHeaders,
@@ -360,12 +364,6 @@ export default function OralMixedGenerator() {
                   />
                   <span style={{ fontSize: 13 }}>2 колонки на листе</span>
                 </div>
-                <Checkbox checked={sideBySide} onChange={e => setSideBySide(e.target.checked)}>
-                  2 варианта рядом (лево/право)
-                </Checkbox>
-                <Checkbox checked={twoPerPage} onChange={e => setTwoPerPage(e.target.checked)}>
-                  2 варианта на листе A4 (верх/низ)
-                </Checkbox>
                 <Checkbox checked={showSectionHeaders} onChange={e => setShowSectionHeaders(e.target.checked)}>
                   Заголовки разделов
                 </Checkbox>
@@ -383,7 +381,17 @@ export default function OralMixedGenerator() {
                 </div>
               </Space>
               <Divider style={{ margin: '10px 0' }} />
-              <SheetLayoutOptions settings={sheet} onChange={updateSheet} />
+              <SheetLayoutOptions
+                // Заголовки разделов съедают примерно строку задания каждый —
+                // иначе прикидка вместимости у смешанной работы врёт в плюс.
+                settings={{
+                  ...sheet,
+                  questionsCount: totalTasks + (showSectionHeaders ? sections.length : 0),
+                  columnsCount,
+                }}
+                onChange={updateSheet}
+                showPerPage
+              />
             </div>
 
             {/* Кнопки */}

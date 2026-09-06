@@ -1,6 +1,7 @@
 import React from 'react';
 import { MathInline } from '../shared/MathInline';
 import { sheetOptions, sheetSpacingStyle } from './sheetOptions';
+import { GRID_MODES, variantsPerPage } from './OralCountingPrintLayout';
 import './OralCountingPrintLayout.css';
 import './OralMixedPrintLayout.css';
 
@@ -34,6 +35,7 @@ function VariantPage({ variant, title, mode, showSectionHeaders, columnsCount, o
   const pageClass =
     mode === 'side' ? 'oral-page oral-page--side' :
     mode === 'half' ? 'oral-page oral-page--half' :
+    mode === 'quad' ? 'oral-page oral-page--quad' :
                       'oral-page oral-page--full';
 
   let globalIdx = 0;
@@ -121,68 +123,59 @@ export default function OralMixedPrintLayout({
 }) {
   if (!variants || !variants.length) return null;
   const {
-    twoPerPage = false,
-    sideBySide = true,
     showTeacherKey = true,
     columnsCount = 2,
     showSectionHeaders = true,
   } = settings || {};
   const opts = sheetOptions(settings || {});
+  // Сколько вариантов на листе: общая функция устного счёта — она же понимает
+  // старые ключи sideBySide / twoPerPage из сохранённых листов.
+  const perPage = variantsPerPage(settings || {});
 
   let pages;
 
-  if (sideBySide) {
-    pages = [];
-    for (let i = 0; i < variants.length; i += 2) {
-      const pair = variants.slice(i, i + 2);
-      pages.push(
-        <div key={i} className="oral-pair-page">
-          {pair.map((v) => (
-            <VariantPage
-              key={v.number}
-              variant={v}
-              title={title}
-              mode="side"
-              showSectionHeaders={showSectionHeaders}
-              columnsCount={1}
-              opts={opts}
-            />
-          ))}
-        </div>
-      );
-    }
-  } else if (twoPerPage) {
-    pages = [];
-    for (let i = 0; i < variants.length; i += 2) {
-      const pair = variants.slice(i, i + 2);
-      pages.push(
-        <div key={i} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>
-          {pair.map((v) => (
-            <VariantPage
-              key={v.number}
-              variant={v}
-              title={title}
-              mode="half"
-              showSectionHeaders={showSectionHeaders}
-              columnsCount={columnsCount}
-              opts={opts}
-            />
-          ))}
-        </div>
-      );
-    }
-  } else {
-    pages = variants.map((v) => (
-      <VariantPage
-        key={v.number}
-        variant={v}
-        title={title}
-        mode="full"
-        showSectionHeaders={showSectionHeaders}
-        columnsCount={columnsCount}
-        opts={opts}
-      />
+  // Один VariantPage; раскладка ячейки задаётся режимом, колонки — снаружи.
+  const page = (v, mode, cols) => (
+    <VariantPage
+      key={v.number}
+      variant={v}
+      title={title}
+      mode={mode}
+      showSectionHeaders={showSectionHeaders}
+      columnsCount={cols}
+      opts={opts}
+    />
+  );
+
+  const chunk = (size) => {
+    const out = [];
+    for (let i = 0; i < variants.length; i += size) out.push([i, variants.slice(i, i + size)]);
+    return out;
+  };
+
+  if (perPage === '2side') {
+    pages = chunk(2).map(([i, pair]) => (
+      <div key={i} className="oral-pair-page">
+        {pair.map(v => page(v, 'side', 1))}
+      </div>
     ));
+  } else if (perPage === '2half') {
+    pages = chunk(2).map(([i, pair]) => (
+      <div key={i} style={{ pageBreakAfter: 'always', breakAfter: 'page' }}>
+        {pair.map(v => page(v, 'half', columnsCount))}
+      </div>
+    ));
+  } else if (perPage in GRID_MODES) {
+    // Сетка в две колонки: 4 (2×2), 6 (2×3), 8 (2×4) — те же классы и CSS, что
+    // у устного счёта, поэтому четверть листа выглядит одинаково в обоих листах.
+    const { mod } = GRID_MODES[perPage];
+    pages = chunk(perPage).map(([i, group]) => (
+      <div key={i} className={`oral-quad-page${mod ? ` oral-quad-page--${mod}` : ''}`}>
+        {group.map(v => page(v, 'quad', 1))}
+      </div>
+    ));
+  } else {
+    pages = variants.map(v => page(v, 'full', columnsCount));
   }
 
   const inner = (
